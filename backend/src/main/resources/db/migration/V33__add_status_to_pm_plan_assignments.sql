@@ -1,0 +1,1 @@
+ALTER TABLE pm_plan_assignments ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE';

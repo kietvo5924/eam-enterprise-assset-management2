@@ -1,0 +1,90 @@
+# generated: 2026-05-21T10:58:15+07:00
+# last_updated: 2026-05-21T10:58:15+07:00
+# project: eam-enterprise-assset-management
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: "2026-05-21T10:58:15+07:00"
+last_updated: "2026-07-01T14:44:12+07:00"
+project: "eam-enterprise-assset-management"
+project_key: "NOKEY"
+tracking_system: "file-system"
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  epic-1: in-progress
+  1-1-khoi-tao-du-an-ha-tang: done
+  1-2-xac-thuc-cot-loi-cach-ly-tenant: done
+  1-3-cau-hinh-to-chuc-cho-tenant-admin: done
+  1-4-quan-ly-vai-tro-quyen-rbac: done
+  1-5-quan-ly-nguoi-dung-moi-tham-gia-import: done
+  1-6-nhat-ky-audit-he-thong: done
+  1-7-backup-restore-an-toan-migration: done
+  1-8-system-administration-tenant-onboarding: done
+  epic-1-retrospective: optional
+  epic-2: done
+  2-1-danh-muc-tai-san-template-phan-cap: done
+  2-2-crud-tai-san-kem-qr-code: done
+  2-3-tim-kiem-loc-tree-view-tai-san: done
+  2-4-di-chuyen-tai-san-lich-su-bao-tri: done
+  epic-2-retrospective: optional
+  epic-3: done
+  3-1-tao-work-order: done
+  3-2-phan-cong-phan-cong-lai: done
+  3-3-luong-trang-thai-cua-work-order: done
+  3-4-checklist-anh-ghi-chu: done
+  3-5-supervisor-review-follow-up: done
+  epic-3-retrospective: optional
+  epic-4: done
+  4-1-quet-qr-tra-cuu-thong-tin-tai-san: done
+  4-2-cache-du-lieu-cuc-bo: done
+  4-3-thuc-hien-offline-trang-thai-dong-bo: done
+  4-4-dong-bo-nen-retry-an-toan-conflict: done
+  epic-4-retrospective: optional
+  epic-5: in-progress
+  5-1-tao-pm-plan: done
+  5-2-gan-pm-plan-cho-tai-san: done
+  5-3-tu-dong-sinh-work-order: done
+  5-4-calendar-view-lich-bao-tri: done
+  epic-5-retrospective: optional
+  epic-6: backlog
+  6-1-notification-engine-thoi-gian-thuc: backlog
+  6-2-push-notification-cho-technician: backlog
+  6-3-web-notification-cho-supervisor: backlog
+  epic-6-retrospective: optional
+  epic-7: backlog
+  7-1-dashboard-tong-quan-mttr-mtbf: backlog
+  7-2-bao-cao-chi-phi-bao-tri: backlog
+  7-3-bao-cao-hieu-suat-theo-vi-tri: backlog
+  7-4-tu-dong-gui-bao-cao-dinh-ky: backlog
+  epic-7-retrospective: optional

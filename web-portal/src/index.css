@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary-50: #e6f6fc;
+  --color-primary-100: #b3e3f5;
+  --color-primary-200: #80d0ee;
+  --color-primary-300: #4dbde7;
+  --color-primary-400: #1aaae0;
+  --color-primary-500: #00a0e2;
+  --color-primary-600: #0080b5;
+  --color-primary-700: #006088;
+  --color-primary-800: #00405b;
+  --color-primary-900: #00202d;
+
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-danger: #ff4d4f;
+  --color-info: #1677ff;
+
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+
+  --font-sans: 'Be Vietnam Pro', 'Inter', system-ui, sans-serif;
+
+  /* Legacy mappings */
+  --primary: var(--color-primary-500);
+  --primary-hover: var(--color-primary-600);
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --danger: var(--color-danger);
+  --dark: var(--color-neutral-900);
+  --text-primary: var(--color-neutral-800);
+  --text-secondary: var(--color-neutral-500);
+  --bg-app: var(--color-neutral-50);
+  --bg-panel: #ffffff;
+  --border: var(--color-neutral-200);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --font-family: var(--font-sans);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family);
+  color: var(--dark);
+}
+
+/* Ant Design Overrides to match UX Prototype */
+.ant-layout {
+  background: var(--bg-app) !important;
+}
+
+.ant-layout-header {
+  background: var(--bg-panel) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.premium-card {
+  background: var(--bg-panel);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 32px;
+  max-width: 600px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+}
+
+.premium-card h2 {
+  color: var(--dark);
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ant-btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 4px 14px 0 rgba(0, 160, 226, 0.39) !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-family: var(--font-family) !important;
+}
+
+.ant-btn-primary:hover {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.ant-input, .ant-select-selector {
+  border-radius: 8px !important;
+  border-color: var(--border) !important;
+  font-family: var(--font-family) !important;
+}
+
+.ant-input:focus, .ant-input-focused, .ant-select-focused .ant-select-selector {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(0, 160, 226, 0.2) !important;
+}
+
+.ant-form-item-label > label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-example-box {
+  background-color: var(--bg-app);
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.settings-example-box .example-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.settings-example-box .example-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.settings-example-box .example-highlight {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only, .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+}

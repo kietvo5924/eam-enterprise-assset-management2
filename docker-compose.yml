@@ -1,0 +1,122 @@
+version: '3.8'
+name: e-eam
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: eam_postgres
+    environment:
+      POSTGRES_USER: eam_user
+      POSTGRES_PASSWORD: eam_password
+      POSTGRES_DB: eam_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eam_user -d eam_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: eam_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.4
+    container_name: eam_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.4
+    container_name: eam_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  minio:
+    image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+    container_name: eam_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.90.1
+    container_name: eam_otel
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    volumes:
+      - ./otel-config.yaml:/etc/otelcol/config.yaml
+    command: ["--config=/etc/otelcol/config.yaml"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eam_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/eam_db
+      - SPRING_DATASOURCE_USERNAME=eam_user
+      - SPRING_DATASOURCE_PASSWORD=eam_password
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - MINIO_URL=http://minio:9000
+      - MINIO_PUBLIC_URL=http://localhost:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      minio:
+        condition: service_healthy
+
+  web-portal:
+    build:
+      context: ./web-portal
+      dockerfile: Dockerfile
+    container_name: eam_web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:8080
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  minio_data:
