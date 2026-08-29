@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}Roles - EAM System{% endblock %}
+{% block breadcrumb %}System Admin / Roles{% endblock %}
+
+{% block content %}
+<div class="max-w-[1400px] mx-auto py-6 px-4 h-full flex flex-col">
+  <!-- KPI Header -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 shrink-0">
+    <!-- Total Roles -->
+    <div class="bg-gradient-to-br from-white to-primary-50/30 rounded-2xl p-6 border border-primary/10 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-center relative z-10">
+        <div>
+          <p class="text-sm font-extrabold text-primary/70 uppercase tracking-widest mb-2">Total Roles</p>
+          <h3 class="text-4xl font-black text-primary m-0" id="kpi-total">{{ roles|length }}</h3>
+        </div>
+        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(0,160,226,0.15)] border border-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-shield-check text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Roles -->
+    <div class="bg-gradient-to-br from-white to-info/5 rounded-2xl p-6 border border-info/10 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-info/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-center relative z-10">
+        <div>
+          <p class="text-sm font-extrabold text-info/70 uppercase tracking-widest mb-2">System Roles</p>
+          <h3 class="text-4xl font-black text-info m-0" id="kpi-system">0</h3>
+        </div>
+        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(14,165,233,0.15)] border border-info/10 flex items-center justify-center text-info group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-lock-key text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Roles -->
+    <div class="bg-gradient-to-br from-white to-success/5 rounded-2xl p-6 border border-success/20 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-success/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-center relative z-10">
+        <div>
+          <p class="text-sm font-extrabold text-success/70 uppercase tracking-widest mb-2">Custom Roles</p>
+          <h3 class="text-4xl font-black text-success m-0" id="kpi-custom">0</h3>
+        </div>
+        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(82,196,26,0.1)] border border-success/20 flex items-center justify-center text-success group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-users-three text-2xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Table Container -->
+  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+    
+    <!-- Search Bar -->
+    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+      <div class="relative w-full sm:max-w-md">
+        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search roles by name or description..." class="w-full pl-11 pr-4 h-12 bg-neutral-50/50 hover:bg-white focus:bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition-all font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 h-12 rounded-xl border border-neutral-100">
+           <i class="ph-fill ph-shield-check text-primary"></i>
+           <span id="roles-count">{{ roles|length }} Roles Found</span>
+        </div>
+        <button onclick="openRoleModal()" class="bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl h-12 px-6 font-bold flex items-center justify-center gap-2 shadow-sm shadow-primary/20 transition-all active:scale-[0.98]">
+          <i class="ph-bold ph-plus"></i> New Role
+        </button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto p-4 custom-scrollbar">
+      <table class="w-full text-sm text-left custom-beautiful-table" id="rolesTable">
+        <thead class="text-xs text-neutral-500 bg-neutral-50/50 border-b border-neutral-200/80">
+          <tr>
+            <th class="px-5 py-4 font-bold cursor-pointer" onclick="sortTable(0)">Name <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-4 font-bold cursor-pointer" onclick="sortTable(1)">Description <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-4 font-bold">Permissions</th>
+            <th class="px-5 py-4 font-bold w-24">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-neutral-100" id="rolesTbody">
+          {% for role in roles %}
+          <tr class="hover:bg-neutral-50/50 transition-colors group" data-is-system="{{ role.is_system|lower }}" data-role-id="{{ role.id }}" data-perms='[{% for p in role.permissions.all %}"{{ p.id }}"{% if not forloop.last %},{% endif %}{% endfor %}]'>
+            <td class="px-5 py-4">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-neutral-800 name-cell">{{ role.name }}</span>
+                {% if role.is_system %}
+                  <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-bold border border-blue-200">System</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="px-5 py-4 text-neutral-600 desc-cell">{{ role.description|default:"" }}</td>
+            <td class="px-5 py-4">
+              <div class="flex flex-wrap gap-1 max-w-[400px]">
+                {% for p in role.permissions.all %}
+                <span class="px-2 py-0.5 bg-cyan-50 text-cyan-600 rounded border border-cyan-200 text-xs font-semibold">{{ p.name }}</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td class="px-5 py-4">
+              <div class="flex gap-3 items-center">
+                <button onclick="openRoleModal('{{ role.id }}', '{{ role.name|escapejs }}', '{{ role.description|escapejs }}')" class="text-neutral-400 hover:text-primary transition-colors {% if role.is_system %}opacity-50 cursor-not-allowed{% endif %}" title="Edit" {% if role.is_system %}disabled{% endif %}>
+                  <i class="ph-bold ph-pencil-simple text-lg"></i>
+                </button>
+                <button onclick="deleteRole('{{ role.id }}', '{{ role.name|escapejs }}')" class="text-neutral-400 hover:text-danger transition-colors {% if role.is_system %}opacity-50 cursor-not-allowed{% endif %}" title="Delete" {% if role.is_system %}disabled{% endif %}>
+                  <i class="ph-bold ph-trash text-lg"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Create/Edit -->
+<div id="role-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+  <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" onclick="closeRoleModal()"></div>
+  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="role-modal-content">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-start bg-white shrink-0 relative">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
+          <i class="ph-fill ph-shield-plus text-2xl" id="role-modal-icon"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-black text-neutral-900 m-0" id="role-modal-title">Create New Role</h3>
+          <p class="text-sm font-medium text-neutral-500 m-0 mt-0.5" id="role-modal-subtitle">Define a new security role.</p>
+        </div>
+      </div>
+      <button onclick="closeRoleModal()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    
+    <div class="p-6 overflow-y-auto flex-1 bg-white">
+      <form id="role-form" class="space-y-6">
+        <input type="hidden" id="role-id" />
+        <div id="role-msg" class="hidden p-4 rounded-xl text-sm font-semibold"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Role Name <span class="text-danger">*</span></label>
+            <input type="text" id="role-name" required placeholder="e.g. Regional Manager" class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900">
+          </div>
+          <div>
+            <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Description</label>
+            <input type="text" id="role-desc" placeholder="Describe the purpose..." class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-medium text-neutral-900">
+          </div>
+        </div>
+
+        <div class="pt-6">
+          <h4 class="font-extrabold text-neutral-900 text-lg m-0 flex items-center gap-2">
+            <i class="ph-fill ph-key text-warning text-xl"></i> Permissions Assignment
+          </h4>
+          <p class="text-neutral-500 text-sm font-medium mt-1 mb-4">Select the capabilities granted to this role.</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="permissions-grid">
+            {% for p in permissions %}
+            <label class="relative group cursor-pointer h-full">
+              <input type="checkbox" name="permissions" value="{{ p.id }}" class="peer hidden">
+              <div class="border border-neutral-200/80 rounded-2xl p-4 bg-white peer-checked:bg-primary-50/50 peer-checked:border-primary/40 peer-checked:shadow-primary/10 transition shadow-sm hover:shadow-md h-full flex flex-col group-hover:-translate-y-1 transform-gpu duration-300 relative overflow-hidden">
+                <div class="absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-neutral-300 peer-checked:border-primary flex items-center justify-center transition-colors bg-white">
+                  <div class="w-2.5 h-2.5 rounded-full bg-primary opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+                </div>
+                <div class="flex items-center gap-2 mb-2 pr-6">
+                  <div class="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-600 group-hover:bg-primary/10 group-hover:text-primary peer-checked:bg-primary/10 peer-checked:text-primary transition-colors shrink-0">
+                    <i class="ph-fill ph-shield text-lg"></i>
+                  </div>
+                  <span class="font-bold text-neutral-800 text-sm leading-tight">{{ p.name }}</span>
+                </div>
+                <p class="text-xs text-neutral-500 m-0 mt-auto font-medium leading-relaxed">{{ p.description }}</p>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </form>
+    </div>
+    
+    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white shrink-0">
+      <button onclick="closeRoleModal()" class="px-6 h-12 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-base font-bold transition-colors">Cancel</button>
+      <button onclick="saveRole()" id="btn-save-role" class="px-8 h-12 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl text-base font-bold shadow-lg shadow-primary/40 transition-transform active:scale-[0.98]">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reassign Modal (Delete Fallback) -->
+<div id="reassign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+  <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" onclick="closeReassignModal()"></div>
+  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="reassign-modal-content">
+    <div class="p-6 border-b border-neutral-100 flex items-center gap-3 bg-white">
+      <div class="w-12 h-12 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger">
+        <i class="ph-fill ph-warning-circle text-2xl"></i>
+      </div>
+      <div>
+        <h3 class="text-xl font-black text-neutral-900 m-0">Role is Currently Assigned</h3>
+        <p class="text-sm font-medium text-neutral-500 m-0 mt-0.5">Please reassign users to continue.</p>
+      </div>
+      <button onclick="closeReassignModal()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors ml-auto">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <div class="mb-6 p-4 bg-warning/10 rounded-xl border border-warning/20 text-neutral-700 font-medium text-[15px] leading-relaxed">
+        The role <strong class="text-neutral-900" id="delete-role-name"></strong> is currently assigned to one or more users. 
+        Please select a replacement role to assign to these users before this role can be deleted safely.
+      </div>
+      <input type="hidden" id="delete-role-id" />
+      <label class="block font-extrabold text-neutral-700 text-sm uppercase tracking-wide mb-2">Replacement Role</label>
+      <select id="fallback-role-id" class="w-full px-5 h-14 bg-white border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900 appearance-none">
+        <option value="">Select replacement role...</option>
+        {% for role in roles %}
+        <option value="{{ role.id }}">{{ role.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+      <button onclick="closeReassignModal()" class="px-6 h-11 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-base font-bold transition-colors">Cancel</button>
+      <button onclick="confirmDeleteRole()" id="btn-confirm-delete" class="px-6 h-11 bg-danger hover:bg-red-600 text-white rounded-xl text-base font-bold shadow-lg shadow-danger/30 transition-transform active:scale-[0.98]">Reassign and Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+      calculateKPIs();
+  });
+
+  function calculateKPIs() {
+      const rows = document.querySelectorAll('#rolesTbody tr');
+      let system = 0, custom = 0;
+      rows.forEach(r => {
+          if (r.getAttribute('data-is-system') === 'true') system++;
+          else custom++;
+      });
+      document.getElementById('kpi-system').innerText = system;
+      document.getElementById('kpi-custom').innerText = custom;
+  }
+
+  function filterTable() {
+    const searchVal = document.getElementById("searchInput").value.toLowerCase();
+    const tbody = document.getElementById("rolesTbody");
+    const rows = tbody.querySelectorAll("tr");
+    let count = 0;
+    
+    rows.forEach(row => {
+      const name = row.querySelector(".name-cell").textContent.toLowerCase();
+      const desc = row.querySelector(".desc-cell").textContent.toLowerCase();
+      
+      if (name.includes(searchVal) || desc.includes(searchVal)) {
+        row.style.display = "";
+        count++;
+      } else {
+        row.style.display = "none";
+      }
+    });
+    document.getElementById("roles-count").innerText = `${count} Roles Found`;
+  }
+
+  function sortTable(colIdx) {
+    const table = document.getElementById("rolesTable");
+    const tbody = document.getElementById("rolesTbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    
+    let sortDir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+    table.setAttribute('data-sort-dir', sortDir);
+
+    rows.sort((a, b) => {
+        const aVal = a.cells[colIdx].innerText.trim();
+        const bVal = b.cells[colIdx].innerText.trim();
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  function openRoleModal(id='', name='', desc='') {
+      document.getElementById('role-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('role-modal-content').classList.remove('scale-95'), 10);
+      
+      document.getElementById('role-msg').classList.add('hidden');
+      document.querySelectorAll('input[name="permissions"]').forEach(cb => cb.checked = false);
+
+      if (id) {
+          document.getElementById('role-modal-title').innerText = 'Edit Role';
+          document.getElementById('role-modal-subtitle').innerText = 'Update permissions for this role.';
+          document.getElementById('role-modal-icon').className = 'ph-fill ph-pencil-simple text-2xl';
+          
+          document.getElementById('role-id').value = id;
+          document.getElementById('role-name').value = name;
+          document.getElementById('role-desc').value = desc !== 'None' ? desc : '';
+          
+          const row = document.querySelector(`tr[data-role-id="${id}"]`);
+          if (row) {
+              const perms = JSON.parse(row.getAttribute('data-perms') || '[]');
+              perms.forEach(pId => {
+                  const cb = document.querySelector(`input[name="permissions"][value="${pId}"]`);
+                  if (cb) cb.checked = true;
+              });
+          }
+      } else {
+          document.getElementById('role-modal-title').innerText = 'Create New Role';
+          document.getElementById('role-modal-subtitle').innerText = 'Define a new security role.';
+          document.getElementById('role-modal-icon').className = 'ph-fill ph-shield-plus text-2xl';
+          
+          document.getElementById('role-form').reset();
+          document.getElementById('role-id').value = '';
+      }
+  }
+
+  function closeRoleModal() {
+      document.getElementById('role-modal-content').classList.add('scale-95');
+      setTimeout(() => {
+          document.getElementById('role-modal').classList.add('hidden');
+          document.getElementById('role-form').reset();
+      }, 200);
+  }
+
+  function saveRole() {
+      const id = document.getElementById('role-id').value;
+      const name = document.getElementById('role-name').value;
+      if (!name) return;
+      
+      const checkedBoxes = document.querySelectorAll('input[name="permissions"]:checked');
+      if (checkedBoxes.length === 0) {
+          const msg = document.getElementById('role-msg');
+          msg.className = 'mb-4 p-4 rounded-xl text-sm font-semibold bg-danger/10 text-danger border border-danger/20';
+          msg.innerText = 'Please select at least one permission.';
+          msg.classList.remove('hidden');
+          return;
+      }
+      
+      const permIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+      const data = {
+          id: id,
+          name: name,
+          description: document.getElementById('role-desc').value,
+          permissions: permIds // Note: portal view uses `permissions` for array of IDs
+      };
+      
+      const method = id ? 'PUT' : 'POST';
+      const btn = document.getElementById('btn-save-role');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Saving...';
+      
+      fetch('{% url "portal_roles" %}', {
+          method: method,
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if(resData.success) {
+              window.location.reload();
+          } else {
+              const msg = document.getElementById('role-msg');
+              msg.className = 'mb-4 p-4 rounded-xl text-sm font-semibold bg-danger/10 text-danger border border-danger/20';
+              msg.innerText = resData.error || resData.message || 'An error occurred';
+              msg.classList.remove('hidden');
+          }
+      })
+      .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = 'Save';
+      });
+  }
+
+  function deleteRole(id, name) {
+      if(confirm(`Are you sure you want to delete the role "${name}"?`)) {
+          fetch('{% url "portal_roles" %}', {
+              method: 'DELETE',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({ id: id })
+          })
+          .then(res => res.json())
+          .then(data => {
+              if(data.success) {
+                  window.location.reload();
+              } else {
+                  if (data.message === 'ROLE_HAS_USERS' || (data.error && data.error.includes('ROLE_HAS_USERS'))) {
+                      openReassignModal(id, name);
+                  } else {
+                      alert(data.error || data.message || 'Failed to delete role.');
+                  }
+              }
+          });
+      }
+  }
+
+  function openReassignModal(id, name) {
+      document.getElementById('delete-role-id').value = id;
+      document.getElementById('delete-role-name').innerText = name;
+      
+      // Disable current role in select
+      const select = document.getElementById('fallback-role-id');
+      select.value = '';
+      Array.from(select.options).forEach(opt => {
+          if (opt.value === id) opt.disabled = true;
+          else opt.disabled = false;
+      });
+
+      document.getElementById('reassign-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('reassign-modal-content').classList.remove('scale-95'), 10);
+  }
+
+  function closeReassignModal() {
+      document.getElementById('reassign-modal-content').classList.add('scale-95');
+      setTimeout(() => document.getElementById('reassign-modal').classList.add('hidden'), 200);
+  }
+
+  function confirmDeleteRole() {
+      const id = document.getElementById('delete-role-id').value;
+      const fallbackId = document.getElementById('fallback-role-id').value;
+      
+      if (!fallbackId) {
+          alert('Please select a replacement role.');
+          return;
+      }
+      
+      const btn = document.getElementById('btn-confirm-delete');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Processing...';
+      
+      fetch('{% url "portal_roles" %}', {
+          method: 'DELETE',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({ id: id, fallbackRoleId: fallbackId })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) {
+              window.location.reload();
+          } else {
+              alert(data.error || data.message || 'Failed to delete role.');
+          }
+      })
+      .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = 'Reassign and Delete';
+      });
+  }
+</script>
+{% endblock %}

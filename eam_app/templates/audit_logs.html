@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs - EAM System{% endblock %}
+{% block breadcrumb %}System Admin / Audit Logs{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden flex flex-col h-full">
+  <div class="p-6 border-b border-neutral-100 flex flex-wrap justify-between items-center gap-4 bg-white">
+    <div>
+      <h2 class="text-lg font-bold text-neutral-800 m-0">System Audit Logs</h2>
+      <p class="text-sm text-neutral-500 mt-1">Track all system activities, data changes, and user actions.</p>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <button class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
+        <i class="ph ph-export"></i> Export Logs
+      </button>
+    </div>
+  </div>
+  
+  <div class="p-4 border-b border-neutral-100 bg-neutral-50/50 flex gap-4">
+    <div class="relative flex-1 max-w-md">
+      <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
+      <input type="text" placeholder="Search logs by User, Entity, or Action..." class="w-full pl-10 pr-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+    </div>
+    <select class="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
+      <option value="">All Actions</option>
+      <option value="CREATE">CREATE</option>
+      <option value="UPDATE">UPDATE</option>
+      <option value="DELETE">DELETE</option>
+    </select>
+  </div>
+
+  <div class="overflow-x-auto flex-1">
+    <table class="w-full text-sm text-left">
+      <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
+        <tr>
+          <th class="px-6 py-4 font-bold tracking-wider">Timestamp</th>
+          <th class="px-6 py-4 font-bold tracking-wider">User</th>
+          <th class="px-6 py-4 font-bold tracking-wider">Action</th>
+          <th class="px-6 py-4 font-bold tracking-wider">Entity Type</th>
+          <th class="px-6 py-4 font-bold tracking-wider">Entity ID</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-neutral-100">
+        {% for log in logs %}
+        <tr class="hover:bg-neutral-50/50 transition-colors">
+          <td class="px-6 py-4 text-neutral-500 text-xs font-mono">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-2">
+              <i class="ph-fill ph-user-circle text-neutral-400 text-lg"></i>
+              <span class="font-medium text-neutral-700">{{ log.user_id }}</span>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            {% if log.action_type == 'CREATE' %}
+              <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border border-green-200">CREATE</span>
+            {% elif log.action_type == 'UPDATE' %}
+              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-bold border border-blue-200">UPDATE</span>
+            {% elif log.action_type == 'DELETE' %}
+              <span class="px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold border border-red-200">DELETE</span>
+            {% else %}
+              <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border border-neutral-200">{{ log.action_type }}</span>
+            {% endif %}
+          </td>
+          <td class="px-6 py-4 font-semibold text-neutral-800">{{ log.entity_type }}</td>
+          <td class="px-6 py-4 text-neutral-500 text-xs font-mono">{{ log.entity_id }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+            <div class="flex flex-col items-center justify-center">
+              <i class="ph ph-file-search text-4xl text-neutral-300 mb-3"></i>
+              <p class="text-base font-semibold text-neutral-700 m-0">No audit logs found</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

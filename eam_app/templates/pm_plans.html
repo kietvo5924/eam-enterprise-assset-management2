@@ -1,0 +1,629 @@
+{% extends "base.html" %}
+
+{% block title %}PM Plans - EAM System{% endblock %}
+{% block breadcrumb %}Workspace / Preventive Maintenance{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col h-full overflow-hidden">
+  
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1">PLANNING</p>
+      <h2 class="text-[26px] leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-3">
+        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-2xl shrink-0">
+          <i class="ph-fill ph-calendar-check"></i>
+        </div>
+        Preventive Maintenance
+      </h2>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 opacity-90">
+      <div class="flex bg-white border border-neutral-200 rounded-lg p-1 shadow-sm">
+        <button onclick="switchView('calendar')" id="btn-view-calendar" class="px-3 py-1.5 rounded-md text-sm font-bold shadow-sm bg-primary-50 text-primary transition-colors">
+          Calendar
+        </button>
+        <button onclick="switchView('list')" id="btn-view-list" class="px-3 py-1.5 rounded-md text-sm font-bold text-neutral-500 hover:bg-neutral-50 transition-colors">
+          List
+        </button>
+        <button onclick="switchView('plans')" id="btn-view-plans" class="px-3 py-1.5 rounded-md text-sm font-bold text-neutral-500 hover:bg-neutral-50 transition-colors">
+          Plans
+        </button>
+      </div>
+      <button onclick="openAssignModal()" class="bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl h-10 px-4 font-semibold flex items-center gap-2 shadow-sm transition-colors">
+        <i class="ph-bold ph-link"></i> Assign Plan
+      </button>
+      <button onclick="openPmModal()" class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
+        <i class="ph-bold ph-plus"></i> New Plan
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary">
+          <i class="ph-fill ph-calendar-check"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total Plans</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.totalPlans }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+    
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-orange-50 text-warning">
+          <i class="ph-fill ph-clock-countdown"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Upcoming (7d)</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.upcomingIn7Days }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-red-50 text-danger">
+          <i class="ph-fill ph-warning-circle"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Missed PMs</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.missedPms }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-red-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-green-50 text-success">
+          <i class="ph-fill ph-check-circle"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Compliance Rate</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.complianceRate }}%</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+  </div>
+
+  <!-- Views Container -->
+  <div class="flex-1 flex flex-col bg-white border border-neutral-200 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative">
+    
+    <!-- View: Calendar -->
+    <div id="view-calendar" class="absolute inset-0 flex flex-col">
+      <div class="p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0 rounded-t-3xl">
+        <h3 class="font-bold text-lg text-neutral-800 m-0">Maintenance Schedule</h3>
+        <div class="flex flex-wrap gap-2">
+            <select id="cal-status" onchange="refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors">
+                <option value="">All Statuses</option>
+                <option value="CREATED">Created</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="SCHEDULED">Scheduled (PM)</option>
+            </select>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-4 custom-scrollbar">
+        <div id="calendar" class="h-full min-h-[500px]"></div>
+      </div>
+    </div>
+
+    <!-- View: List -->
+    <div id="view-list" class="absolute inset-0 flex flex-col hidden bg-white rounded-3xl overflow-hidden">
+      <div class="p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0">
+        <div class="flex items-center gap-4">
+          <h3 class="font-bold text-lg text-neutral-800 m-0" id="list-month-title">Events</h3>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button onclick="refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:bg-neutral-50 font-semibold"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-4 custom-scrollbar">
+        <table class="w-full text-sm text-left custom-beautiful-table" id="eventsTable">
+          <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
+            <tr>
+              <th class="px-4 py-3 font-semibold">Title</th>
+              <th class="px-4 py-3 font-semibold">Asset</th>
+              <th class="px-4 py-3 font-semibold">Target Date</th>
+              <th class="px-4 py-3 font-semibold">Type</th>
+              <th class="px-4 py-3 font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100" id="eventsListBody">
+            <tr><td colspan="5" class="text-center py-12 text-neutral-500"><i class="ph-bold ph-spinner animate-spin text-2xl"></i> Loading events...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- View: Plans -->
+    <div id="view-plans" class="absolute inset-0 flex flex-col hidden bg-white rounded-3xl overflow-hidden">
+      <div class="p-4 border-b border-neutral-100 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0">
+        <div>
+          <h2 class="text-lg font-bold text-neutral-800 m-0">Preventive Maintenance Plans</h2>
+          <p class="text-sm text-neutral-500 mt-1 mb-0">Configure time-based and meter-based automated maintenance schedules.</p>
+        </div>
+        <div class="flex items-center gap-2">
+           <select class="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
+            <option value="">All Triggers</option>
+            <option value="TIME">Time Based</option>
+            <option value="METER">Meter Based</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex-1 overflow-x-auto custom-scrollbar">
+        <table class="w-full text-sm text-left custom-beautiful-table">
+          <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
+            <tr>
+              <th class="px-6 py-4 font-bold tracking-wider">Plan Name</th>
+              <th class="px-6 py-4 font-bold tracking-wider">Trigger</th>
+              <th class="px-6 py-4 font-bold tracking-wider">Interval</th>
+              <th class="px-6 py-4 font-bold tracking-wider">Status</th>
+              <th class="px-6 py-4 font-bold tracking-wider text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            {% for plan in pm_plans %}
+            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer" onclick="openPmModal('{{ plan.id }}', '{{ plan.name|escapejs }}', '{{ plan.description|escapejs }}', '{{ plan.trigger_type }}', '{{ plan.interval_value|default_if_none:'' }}', '{{ plan.interval_unit|default_if_none:'' }}', {{ plan.is_active|lower }})">
+              <td class="px-6 py-4">
+                <p class="font-bold text-neutral-800 m-0 group-hover:text-primary transition-colors">{{ plan.name }}</p>
+                <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.description }}">{{ plan.description|default:"No description" }}</p>
+              </td>
+              <td class="px-6 py-4">
+                {% if plan.trigger_type == 'TIME' %}
+                  <div class="flex items-center gap-1 text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded w-max text-xs border border-blue-200">
+                    <i class="ph-fill ph-clock text-sm"></i> Time
+                  </div>
+                {% elif plan.trigger_type == 'METER' %}
+                  <div class="flex items-center gap-1 text-purple-600 font-semibold bg-purple-50 px-2 py-1 rounded w-max text-xs border border-purple-200">
+                    <i class="ph-fill ph-gauge text-sm"></i> Meter
+                  </div>
+                {% else %}
+                  <span class="text-neutral-600">{{ plan.trigger_type }}</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 font-medium text-neutral-700">
+                {% if plan.trigger_type == 'TIME' %}
+                  Every {{ plan.interval_value|floatformat:0 }} {{ plan.interval_unit|lower }}
+                {% elif plan.trigger_type == 'METER' %}
+                  Every {{ plan.interval_value|floatformat:0 }} units
+                {% endif %}
+              </td>
+              <td class="px-6 py-4">
+                {% if plan.is_active %}
+                  <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border border-green-200 flex items-center gap-1 w-max">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Active
+                  </span>
+                {% else %}
+                  <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border border-neutral-200">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="px-6 py-4 text-right">
+                <button onclick="event.stopPropagation(); deletePm('{{ plan.id }}')" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-danger rounded-lg hover:bg-red-50 bg-transparent transition-colors ml-auto"><i class="ph-bold ph-trash text-lg"></i></button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+                <div class="flex flex-col items-center justify-center">
+                  <i class="ph ph-calendar-check text-4xl text-neutral-300 mb-3"></i>
+                  <p class="text-base font-semibold text-neutral-700 m-0">No PM Plans found</p>
+                  <p class="text-sm mt-1">Create automated schedules to prevent asset breakdowns.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Create PM -->
+<div id="pm-modal" class="fixed inset-0 z-[100] hidden">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closePmModal()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-[550px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
+      <div>
+          <h3 class="font-black text-2xl text-neutral-800" id="pm-modal-title">New PM Plan</h3>
+          <p class="text-neutral-500 text-sm mt-1">Configure automated maintenance</p>
+      </div>
+      <button onclick="closePmModal()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 bg-neutral-50/50">
+      <form id="pm-form" class="space-y-5">
+        <input type="hidden" id="pm-id" />
+        <div id="pm-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Plan Name <span class="text-danger">*</span></label>
+          <input type="text" id="pm-name" required class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trigger Type <span class="text-danger">*</span></label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="border border-primary bg-primary-50 rounded-xl p-3 flex items-start gap-3 cursor-pointer">
+              <input type="radio" name="trigger" value="TIME" id="trigger-time" class="mt-0.5 text-primary focus:ring-primary" checked>
+              <div>
+                <p class="font-bold text-sm text-primary-700 m-0">Time Based</p>
+                <p class="text-xs text-primary-600/70 m-0">E.g., Every 3 months</p>
+              </div>
+            </label>
+            <label class="border border-neutral-200 bg-white rounded-xl p-3 flex items-start gap-3 cursor-pointer hover:bg-neutral-50 transition-colors">
+              <input type="radio" name="trigger" value="METER" id="trigger-meter" class="mt-0.5 text-primary focus:ring-primary">
+              <div>
+                <p class="font-bold text-sm text-neutral-700 m-0">Meter Based</p>
+                <p class="text-xs text-neutral-500 m-0">E.g., Every 10,000 km</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Interval Value <span class="text-danger">*</span></label>
+            <input type="number" id="pm-interval-value" min="1" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Interval Unit <span class="text-danger">*</span></label>
+            <select id="pm-interval-unit" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="DAYS">Days</option>
+              <option value="WEEKS">Weeks</option>
+              <option value="MONTHS">Months</option>
+              <option value="YEARS">Years</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <input type="checkbox" id="pm-is-active" class="w-5 h-5 text-primary rounded border-neutral-300 focus:ring-primary" checked>
+          <label for="pm-is-active" class="text-sm font-bold text-neutral-700">Is Active</label>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Description & Instructions</label>
+          <textarea id="pm-desc" rows="3" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="p-6 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+      <button onclick="closePmModal()" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy bỏ</button>
+      <button onclick="savePm()" id="btn-save-pm" class="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+        <i class="ph-bold ph-floppy-disk"></i> Save PM Plan
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Modal Placeholder -->
+<div id="assign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignModal()"></div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative z-10 p-8 text-center">
+      <i class="ph-fill ph-link text-5xl text-neutral-300 mb-4"></i>
+      <h3 class="font-black text-xl text-neutral-800 mb-2">Assign Plan Feature</h3>
+      <p class="text-neutral-500 mb-6">This feature requires a separate Assignment endpoint not fully implemented in this view template yet.</p>
+      <button onclick="closeAssignModal()" class="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold mx-auto transition-all">Close</button>
+  </div>
+</div>
+
+<!-- Event Detail Drawer -->
+<div id="event-detail-drawer" class="fixed inset-0 z-[100] hidden">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeEventDetail()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-[450px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+      <div class="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
+      <div class="flex items-center gap-3">
+          <h3 class="font-black text-2xl text-neutral-800 m-0">Event Details</h3>
+      </div>
+      <button onclick="closeEventDetail()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 bg-neutral-50/50" id="event-detail-content">
+        <!-- content injected here -->
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+<script>
+  let calendar;
+  let viewMode = 'calendar';
+  
+  document.addEventListener('DOMContentLoaded', function() {
+      // Initialize FullCalendar
+      const calendarEl = document.getElementById('calendar');
+      calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth',
+          headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          },
+          height: '100%',
+          themeSystem: 'standard',
+          events: function(info, successCallback, failureCallback) {
+              const start = info.start.toISOString();
+              const end = info.end.toISOString();
+              const status = document.getElementById('cal-status').value;
+              let url = `{% url 'work_order_calendar' %}?startDate=${start}&endDate=${end}`;
+              if (status) {
+                  url += `&status=${status}`;
+              }
+              
+              fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        const events = data.data.map(e => {
+                            let color = '#d9d9d9'; // default
+                            if(e.status === 'COMPLETED') color = '#52c41a'; // success green
+                            else if(e.status === 'SCHEDULED') color = '#faad14'; // warning orange
+                            else if(e.status === 'IN_PROGRESS') color = '#1677ff'; // processing blue
+                            
+                            let textColor = e.status === 'CREATED' ? '#333' : '#fff';
+
+                            return {
+                                id: e.id,
+                                title: e.title,
+                                start: e.eventDate,
+                                backgroundColor: color,
+                                borderColor: color,
+                                textColor: textColor,
+                                extendedProps: { ...e }
+                            };
+                        });
+                        successCallback(events);
+                        renderListView(events);
+                    } else {
+                        console.error(data.error);
+                        failureCallback(data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    failureCallback(err);
+                });
+          },
+          eventClick: function(info) {
+              openEventDetail(info.event);
+          },
+          eventContent: function(arg) {
+              return {
+                  html: `<div class="p-1 truncate text-xs font-semibold" title="${arg.event.title}">${arg.event.title}</div>`
+              };
+          }
+      });
+      calendar.render();
+      
+      // Load saved viewMode
+      const savedMode = localStorage.getItem('maintenanceViewMode');
+      if(savedMode) {
+          switchView(savedMode);
+      } else {
+          switchView('calendar');
+      }
+  });
+
+  function switchView(mode) {
+      viewMode = mode;
+      localStorage.setItem('maintenanceViewMode', mode);
+      
+      // Update buttons
+      document.querySelectorAll('#btn-view-calendar, #btn-view-list, #btn-view-plans').forEach(btn => {
+          btn.className = 'px-3 py-1.5 rounded-md text-sm font-bold text-neutral-500 hover:bg-neutral-50 transition-colors';
+      });
+      document.getElementById('btn-view-' + mode).className = 'px-3 py-1.5 rounded-md text-sm font-bold shadow-sm bg-primary-50 text-primary transition-colors';
+      
+      // Update containers
+      document.getElementById('view-calendar').classList.add('hidden');
+      document.getElementById('view-list').classList.add('hidden');
+      document.getElementById('view-plans').classList.add('hidden');
+      
+      document.getElementById('view-' + mode).classList.remove('hidden');
+      
+      if(mode === 'calendar' && calendar) {
+          calendar.render();
+      }
+  }
+
+  function refreshEvents() {
+      if(calendar) calendar.refetchEvents();
+  }
+
+  function renderListView(events) {
+      const tbody = document.getElementById('eventsListBody');
+      tbody.innerHTML = '';
+      
+      if(events.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center py-12 text-neutral-500 font-medium">No events found for this period.</td></tr>';
+          return;
+      }
+      
+      // sort by start date
+      events.sort((a,b) => new Date(a.start) - new Date(b.start));
+      
+      events.forEach(e => {
+          const ep = e.extendedProps;
+          
+          let statusBadge = `<span class="px-3 py-0.5 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold border border-neutral-200">${ep.status}</span>`;
+          if (ep.status === 'COMPLETED') statusBadge = `<span class="px-3 py-0.5 bg-green-50 text-green-600 rounded-full text-xs font-bold border border-green-200">COMPLETED</span>`;
+          else if (ep.status === 'SCHEDULED') statusBadge = `<span class="px-3 py-0.5 bg-orange-50 text-orange-600 rounded-full text-xs font-bold border border-orange-200">SCHEDULED</span>`;
+          else if (ep.status === 'IN_PROGRESS') statusBadge = `<span class="px-3 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-200">IN_PROGRESS</span>`;
+          
+          let typeBadge = ep.eventType === 'PM_PLAN' 
+            ? `<span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-bold border border-blue-200">PM Plan</span>`
+            : `<span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-xs font-bold border border-purple-200">Work Order</span>`;
+            
+          const d = new Date(e.start);
+          const dateStr = d.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit', hour12: false });
+          
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-neutral-50/50 transition-colors group cursor-pointer";
+          tr.onclick = () => openEventDetail(e);
+          tr.innerHTML = `
+              <td class="px-4 py-3"><span class="font-bold text-neutral-800 group-hover:text-primary transition-colors">${e.title}</span></td>
+              <td class="px-4 py-3 text-neutral-600 font-medium">${ep.assetName || '-'}</td>
+              <td class="px-4 py-3 text-neutral-600">${dateStr}</td>
+              <td class="px-4 py-3">${typeBadge}</td>
+              <td class="px-4 py-3">${statusBadge}</td>
+          `;
+          tbody.appendChild(tr);
+      });
+  }
+
+  function openEventDetail(event) {
+      const ep = event.extendedProps;
+      const d = new Date(event.start);
+      const dateStr = d.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit', hour12: false });
+      
+      const content = `
+          <div class="space-y-4">
+              <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Title</p>
+                  <p class="font-bold text-neutral-800 text-lg">${event.title}</p>
+              </div>
+              <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Asset</p>
+                  <p class="font-bold text-neutral-800">${ep.assetName || 'N/A'}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Target Date</p>
+                      <p class="font-bold text-neutral-800">${dateStr}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Status</p>
+                      <p class="font-bold text-neutral-800">${ep.status}</p>
+                  </div>
+              </div>
+              <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Event Type</p>
+                  <p class="font-bold text-neutral-800">${ep.eventType}</p>
+              </div>
+          </div>
+          <div class="mt-8 flex justify-end">
+             ${ep.eventType === 'WORK_ORDER' ? `<a href="/portal/work-orders/" class="px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-sm shadow-primary/20 hover:bg-primary-600 transition-colors">Go to Work Orders</a>` : ''}
+          </div>
+      `;
+      document.getElementById('event-detail-content').innerHTML = content;
+      document.getElementById('event-detail-drawer').classList.remove('hidden');
+  }
+
+  function closeEventDetail() {
+      document.getElementById('event-detail-drawer').classList.add('hidden');
+  }
+  
+  function openAssignModal() {
+      document.getElementById('assign-modal').classList.remove('hidden');
+  }
+  function closeAssignModal() {
+      document.getElementById('assign-modal').classList.add('hidden');
+  }
+
+  // PM Modal JS
+  function openPmModal(id='', name='', desc='', trigger='TIME', interval_value='', interval_unit='MONTHS', is_active=true) {
+      document.getElementById('pm-modal').classList.remove('hidden');
+      document.getElementById('pm-id').value = id;
+      document.getElementById('pm-name').value = name;
+      document.getElementById('pm-desc').value = desc !== 'None' ? desc : '';
+      
+      if(trigger === 'METER') {
+          document.getElementById('trigger-meter').checked = true;
+      } else {
+          document.getElementById('trigger-time').checked = true;
+      }
+      
+      document.getElementById('pm-interval-value').value = interval_value !== 'None' ? interval_value : '';
+      document.getElementById('pm-interval-unit').value = interval_unit !== 'None' && interval_unit ? interval_unit : 'MONTHS';
+      document.getElementById('pm-is-active').checked = is_active;
+      
+      document.getElementById('pm-modal-title').innerText = id ? 'Edit PM Plan' : 'New PM Plan';
+      document.getElementById('pm-msg').classList.add('hidden');
+  }
+
+  function closePmModal() {
+      document.getElementById('pm-modal').classList.add('hidden');
+      document.getElementById('pm-form').reset();
+  }
+
+  function savePm() {
+      const id = document.getElementById('pm-id').value;
+      let trigger = 'TIME';
+      if(document.getElementById('trigger-meter').checked) trigger = 'METER';
+      
+      const data = {
+          id: id,
+          name: document.getElementById('pm-name').value,
+          description: document.getElementById('pm-desc').value,
+          trigger_type: trigger,
+          interval_value: document.getElementById('pm-interval-value').value,
+          interval_unit: document.getElementById('pm-interval-unit').value,
+          is_active: document.getElementById('pm-is-active').checked
+      };
+      
+      const method = id ? 'PUT' : 'POST';
+      const btn = document.getElementById('btn-save-pm');
+      const msg = document.getElementById('pm-msg');
+      btn.disabled = true;
+      
+      fetch('{% url "portal_pm_plans" %}', {
+          method: method,
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if(resData.success) {
+              window.location.reload();
+          } else {
+              msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+              msg.innerText = resData.error || 'An error occurred';
+              msg.classList.remove('hidden');
+          }
+      })
+      .finally(() => {
+          btn.disabled = false;
+      });
+  }
+
+  function deletePm(id) {
+      if(confirm('Are you sure you want to delete this PM Plan?')) {
+          fetch('{% url "portal_pm_plans" %}', {
+              method: 'DELETE',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({id: id})
+          })
+          .then(res => res.json())
+          .then(data => {
+              if(data.success) {
+                  window.location.reload();
+              } else {
+                  alert(data.error);
+              }
+          });
+      }
+  }
+</script>
+{% endblock %}

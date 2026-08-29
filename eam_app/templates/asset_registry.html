@@ -1,0 +1,806 @@
+{% extends "base.html" %}
+
+{% block title %}Asset Registry - EAM System{% endblock %}
+{% block breadcrumb %}Workspace / Asset Registry{% endblock %}
+
+{% block content %}
+<!-- Main Content -->
+<div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-full p-6">
+  <!-- Left Pane: Asset List -->
+  <div id="left-pane" class="w-full md:w-1/3 md:min-w-[320px] md:max-w-sm flex bg-white border border-neutral-200 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex-col overflow-hidden transition-all duration-300 relative">
+
+    <!-- Full Header -->
+    <div id="left-pane-header" class="p-3 border-b border-neutral-200 bg-white flex items-center justify-between z-10 shadow-sm shrink-0">
+      <h2 class="font-bold text-neutral-800 text-sm flex items-center gap-2 whitespace-nowrap">
+        <i class="ph-fill ph-list-tree text-primary"></i> Cây Tài Sản
+      </h2>
+      <div class="flex gap-1 shrink-0">
+        <button onclick="openAssetModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Thêm tài sản mới"><i class="ph-bold ph-plus"></i></button>
+        <button class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Nhập (Import)"><i class="ph ph-upload-simple"></i></button>
+        <button onclick="executeExportData()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Xuất (Export)"><i class="ph ph-printer"></i></button>
+        <button class="w-7 h-7 rounded hover:bg-neutral-100 flex items-center justify-center text-neutral-500 transition-colors" title="Lọc tài sản"><i class="ph ph-funnel"></i></button>
+        <button class="w-7 h-7 rounded hover:bg-neutral-100 flex items-center justify-center text-neutral-500 transition-colors" onclick="toggleLeftPane()" title="Thu gọn"><i class="ph ph-caret-left"></i></button>
+      </div>
+    </div>
+
+    <!-- Mini Header (Collapsed) -->
+    <div id="left-pane-mini-header" class="hidden py-4 border-b border-neutral-200 bg-white flex flex-col items-center z-10 h-full cursor-pointer hover:bg-neutral-50 transition-colors shrink-0" onclick="toggleLeftPane()" title="Mở rộng">
+      <i class="ph-fill ph-list-tree text-primary text-xl"></i>
+      <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-6" style="writing-mode: vertical-rl; text-orientation: mixed;">CÂY TÀI SẢN</span>
+    </div>
+
+    <!-- Content -->
+    <div id="left-pane-content" class="flex-1 flex flex-col overflow-hidden">
+      <div class="p-2 border-b border-neutral-100 bg-neutral-50/50 shrink-0">
+        <div class="relative">
+          <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm"></i>
+          <input type="text" placeholder="Tìm tên, mã Serial..." class="w-full pl-9 pr-3 py-1.5 h-9 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-2 text-sm select-none custom-scrollbar">
+        {% for node in tree_locations %}
+          {% with depth=0 %}
+            {% include "partials/tree_node.html" %}
+          {% endwith %}
+        {% empty %}
+          {% if not unassigned_assets %}
+            <div class="text-center p-6 text-neutral-400 mt-4">
+              <i class="ph ph-magnifying-glass text-3xl mb-2"></i>
+              <p>Không tìm thấy tài sản nào</p>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {% if unassigned_assets %}
+        <div class="tree-node mt-3">
+          <div class="group flex items-center gap-1.5 p-1.5 text-neutral-700 font-medium opacity-80" onclick="toggleNode('unassigned')">
+            <i class="ph-fill ph-caret-down text-xs transition-transform transform -rotate-90" id="caret-unassigned"></i>
+            <i class="ph-fill ph-warning-circle text-neutral-400 text-sm"></i>
+            <span class="truncate italic text-sm">Chưa gán vị trí ({{ unassigned_assets|length }})</span>
+          </div>
+          <div id="children-unassigned" class="hidden ml-5 border-l border-neutral-200 pl-1.5 mt-0.5 space-y-0.5">
+            {% for asset in unassigned_assets %}
+              <div onclick="selectAsset('{{ asset.id }}')" class="asset-item group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all text-neutral-700 hover:bg-neutral-100" id="asset-item-{{ asset.id }}">
+                <span class="asset-indicator hidden absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-primary rounded-r"></span>
+                <i class="asset-icon ph-fill ph-engine text-base text-neutral-400"></i>
+                <span class="flex-1 truncate text-[13px]">{{ asset.name }}</span>
+                <span class="shrink-0 w-1.5 h-1.5 rounded-full {% if asset.status == 'OPERATIONAL' %}bg-green-500{% elif asset.status == 'MAINTENANCE' %}bg-orange-500{% else %}bg-red-500{% endif %}" title="{{ asset.status }}"></span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Pane: Asset Details -->
+  <div id="right-pane" class="flex-1 bg-white border border-neutral-200 rounded-xl flex-col overflow-hidden min-w-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hidden md:flex relative">
+    
+    <!-- Empty State -->
+    <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-neutral-400 p-6">
+      <i class="ph-fill ph-cube text-6xl mb-4 text-neutral-200"></i>
+      <h3 class="text-xl font-bold text-neutral-800 mb-2">Select an asset to view details</h3>
+      <p class="text-sm">Click on an asset from the tree on the left to view its information.</p>
+    </div>
+
+    <!-- Details View -->
+    <div id="details-view" class="hidden flex-col h-full">
+      <div class="p-4 sm:p-6 border-b border-neutral-200 bg-white shrink-0 relative overflow-hidden">
+        <div class="absolute top-0 right-0 -mr-16 -mt-16 w-[300px] h-[300px] rounded-full bg-gradient-to-bl from-info/10 via-primary-100/20 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
+        <div class="flex flex-wrap justify-between items-start gap-4 sm:gap-6 relative z-10">
+          <div class="flex items-start gap-3 sm:gap-4 flex-auto min-w-0 md:min-w-[320px]">
+            <button class="md:hidden mt-2 w-10 h-10 bg-neutral-100 hover:bg-neutral-200 rounded-xl flex items-center justify-center text-neutral-600 shrink-0 transition-colors" onclick="closeDetails()">
+              <i class="ph-bold ph-arrow-left"></i>
+            </button>
+            <div class="w-14 h-14 sm:w-16 sm:h-16 bg-primary-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-primary text-2xl sm:text-3xl shrink-0 shadow-inner mt-1">
+              <i class="ph-fill ph-engine"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1.5 hidden sm:block">CHI TIẾT TÀI SẢN</p>
+              <div class="flex items-center gap-3 flex-wrap mb-2.5">
+                <h2 class="text-2xl sm:text-3xl leading-tight font-black text-neutral-900 tracking-tight" id="detail-name">Asset Name</h2>
+                <div class="shrink-0 mt-1">
+                  <span id="detail-status" class="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md"></span>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-xs flex-wrap">
+                <span class="flex items-center gap-1.5 font-mono text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-lg"><i class="ph ph-barcode text-sm"></i> <span id="detail-serial"></span></span>
+                <span class="flex items-center gap-1.5 text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-semibold"><i class="ph-fill ph-map-pin text-sm"></i> <span id="detail-location"></span></span>
+                <span class="flex items-center gap-1.5 text-info bg-info/10 px-2.5 py-1 rounded-lg font-semibold"><i class="ph-fill ph-tree-structure text-sm"></i> <span id="detail-template"></span></span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+            <button onclick="handleDelete()" class="w-10 h-10 text-neutral-400 hover:text-danger hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors">
+              <i class="ph-bold ph-trash"></i>
+            </button>
+            <button onclick="handleMove()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 font-semibold text-sm hover:bg-neutral-50 rounded-xl flex items-center gap-2 transition-colors h-10">
+              <i class="ph-bold ph-arrows-left-right text-lg"></i> Di chuyển
+            </button>
+            <button onclick="handleEdit()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 font-semibold text-sm hover:bg-neutral-50 rounded-xl flex items-center gap-2 transition-colors h-10">
+              <i class="ph-bold ph-pencil-simple text-lg"></i> Sửa
+            </button>
+            <a href="{% url 'portal_work_orders' %}" class="px-5 py-2 bg-primary text-white font-bold text-sm hover:bg-primary-600 rounded-xl flex items-center gap-2 transition-colors shadow-sm shadow-primary/30 h-10">
+              <i class="ph-bold ph-plus text-lg"></i> Tạo Work Order
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div class="flex-1 overflow-y-auto bg-neutral-50/60 p-4 sm:p-6 custom-scrollbar">
+        <div class="space-y-4 sm:space-y-6">
+
+          <!-- TOP CARDS -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+            <!-- Vị trí thực tế -->
+            <div class="bg-white border border-primary/10 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow min-w-0 flex flex-col justify-center">
+              <p class="text-[10px] font-bold text-primary/60 uppercase tracking-widest mb-3">Vị Trí Thực Tế (Location)</p>
+              <div class="flex items-start gap-3 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                  <i class="ph-fill ph-map-pin text-lg"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="font-bold text-neutral-900 text-base leading-tight truncate" id="card-location-name">Name</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cấu trúc mẫu -->
+            <div class="bg-white border border-info/10 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow min-w-0 flex flex-col justify-center">
+              <p class="text-[10px] font-bold text-info/60 uppercase tracking-widest mb-3">Cấu Trúc Mẫu (Hierarchy)</p>
+              <div class="flex items-start gap-3 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center text-info shrink-0 mt-0.5">
+                  <i class="ph-fill ph-tree-structure text-lg"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="font-bold text-neutral-900 text-base leading-tight truncate" id="card-template-name">Template</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mã Định Danh -->
+            <div class="bg-white border border-success/10 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow min-w-0 flex flex-col justify-center">
+              <p class="text-[10px] font-bold text-success/60 uppercase tracking-widest mb-3">QR Code</p>
+              <div class="flex items-start gap-3 min-w-0">
+                <div class="p-1 bg-white border border-neutral-100 rounded-lg shadow-sm shrink-0 mt-0.5 w-14 h-14 flex items-center justify-center bg-gray-100 qr-canvas-container" id="qr-container">
+                  <!-- QR Canvas injected here -->
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="font-bold text-neutral-900 text-base leading-tight truncate font-mono" id="card-qr-code">QR</p>
+                  <div class="mt-2 w-full max-w-[120px]">
+                    <button onclick="handlePrintQR()" class="w-full px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-100 transition-colors flex items-center justify-center gap-2">
+                      <i class="ph ph-printer text-sm"></i> In QR
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM TABS -->
+          <div class="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden p-6">
+            <div class="flex gap-6 border-b border-neutral-200 mb-6">
+              <button onclick="switchTab('info')" id="tab-btn-info" class="pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors"><i class="ph-fill ph-info"></i> Thông Tin Chung</button>
+              <button onclick="switchTab('history')" id="tab-btn-history" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors"><i class="ph-fill ph-clock-counter-clockwise"></i> Lịch Sử Bảo Trì</button>
+            </div>
+            
+            <div id="tab-content-info" class="bg-neutral-50 border border-neutral-100 rounded-2xl p-6 shadow-inner mt-2 block">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-8 gap-x-8">
+                <div class="min-w-0">
+                  <p class="text-neutral-400 text-[10px] font-bold uppercase tracking-widest mb-2 truncate">Danh mục phân loại</p>
+                  <p class="font-semibold text-neutral-900 truncate text-base" id="detail-category">-</p>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-neutral-400 text-[10px] font-bold uppercase tracking-widest mb-2 truncate">Nhà sản xuất</p>
+                  <p class="font-semibold text-neutral-900 truncate text-base" id="detail-manufacturer">-</p>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-neutral-400 text-[10px] font-bold uppercase tracking-widest mb-2 truncate">Model</p>
+                  <p class="font-semibold text-neutral-900 truncate text-base" id="detail-model">-</p>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-neutral-400 text-[10px] font-bold uppercase tracking-widest mb-2 truncate">Ngày mua</p>
+                  <p class="font-semibold text-neutral-900 truncate text-base" id="detail-purchase">-</p>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-neutral-400 text-[10px] font-bold uppercase tracking-widest mb-2 truncate">Giá trị</p>
+                  <p class="font-semibold text-neutral-900 truncate text-base" id="detail-value">-</p>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-neutral-400 text-[10px] font-bold uppercase tracking-widest mb-2 truncate">Trạng thái Active</p>
+                  <div class="truncate"><span id="detail-active" class="px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700">ACTIVE</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-content-history" class="mt-2 min-h-[300px] hidden">
+              <div class="flex flex-col h-full">
+                <div class="relative mb-6 w-full sm:max-w-md">
+                  <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+                  <input type="text" placeholder="Tìm kiếm theo tiêu đề phiếu hoặc mã phiếu..." class="w-full pl-9 pr-3 py-2 h-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                </div>
+                <div class="flex flex-col items-center justify-center text-neutral-400 py-12 bg-neutral-50 rounded-2xl border border-neutral-100 flex-1">
+                  <i class="ph ph-calendar-x text-5xl mb-3 text-neutral-300"></i>
+                  <p class="font-medium text-neutral-500">Chưa có lịch sử bảo trì</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Move Asset Modal -->
+<div id="move-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
+      <h3 class="text-lg font-bold text-neutral-800 m-0">Di chuyển tài sản</h3>
+      <button onclick="closeMoveModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
+        <i class="ph ph-x text-xl"></i>
+      </button>
+    </div>
+    <div class="p-6">
+        <div class="mb-4">
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Vị trí mới</label>
+          <select id="move-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="">-- Chọn vị trí --</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+          </select>
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t border-neutral-100">
+          <button onclick="closeMoveModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
+          <button onclick="submitMoveAsset()" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Lưu thay đổi</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<!-- Asset Modal -->
+<div id="asset-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
+      <h3 class="text-lg font-bold text-neutral-800 m-0" id="asset-modal-title">Thêm Tài Sản Mới</h3>
+      <button onclick="closeAssetModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
+        <i class="ph ph-x text-xl"></i>
+      </button>
+    </div>
+    <div class="p-6 overflow-y-auto custom-scrollbar">
+      <form id="asset-form" onsubmit="event.preventDefault(); submitAsset();">
+        <input type="hidden" id="asset-id" value="">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Tên tài sản <span class="text-danger">*</span></label>
+            <input type="text" id="asset-name" required class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Model</label>
+            <input type="text" id="asset-model" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Serial Number</label>
+            <input type="text" id="asset-serial" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mô tả</label>
+            <textarea id="asset-desc" rows="3" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Danh mục</label>
+              <select id="asset-category" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
+                <option value="">-- Chọn danh mục --</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trạng thái</label>
+              <select id="asset-status" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
+                <option value="OPERATIONAL">OPERATIONAL</option>
+                <option value="DOWN">DOWN</option>
+                <option value="MAINTENANCE">MAINTENANCE</option>
+                <option value="RETIRED">RETIRED</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="asset-error" class="hidden mt-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200"></div>
+        <div class="flex justify-end gap-3 pt-6 mt-6 border-t border-neutral-100">
+          <button type="button" onclick="closeAssetModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
+          <button type="submit" id="btn-save-asset" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center gap-2">
+            <i class="ph-bold ph-floppy-disk"></i> Lưu
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+  let treeCollapsed = false;
+  let currentSelectedAssetId = null;
+  
+  function toggleLeftPane() {
+    treeCollapsed = !treeCollapsed;
+    const pane = document.getElementById('left-pane');
+    const header = document.getElementById('left-pane-header');
+    const miniHeader = document.getElementById('left-pane-mini-header');
+    const content = document.getElementById('left-pane-content');
+    
+    if (treeCollapsed) {
+      pane.classList.remove('w-full', 'md:w-1/3', 'md:min-w-[320px]', 'md:max-w-sm');
+      pane.classList.add('hidden', 'md:flex', 'w-14', 'min-w-[3.5rem]');
+      header.classList.add('hidden');
+      content.classList.add('hidden');
+      miniHeader.classList.remove('hidden');
+    } else {
+      pane.classList.add('w-full', 'md:w-1/3', 'md:min-w-[320px]', 'md:max-w-sm');
+      pane.classList.remove('hidden', 'md:flex', 'w-14', 'min-w-[3.5rem]');
+      header.classList.remove('hidden');
+      content.classList.remove('hidden');
+      miniHeader.classList.add('hidden');
+    }
+  }
+
+  function toggleNode(id) {
+    const children = document.getElementById(`children-${id}`);
+    const caret = document.getElementById(`caret-${id}`);
+    if (children) {
+      if (children.classList.contains('hidden')) {
+        children.classList.remove('hidden');
+        if (caret) caret.classList.remove('-rotate-90');
+      } else {
+        children.classList.add('hidden');
+        if (caret) caret.classList.add('-rotate-90');
+      }
+    }
+  }
+  
+  // Store all asset data in JS for quick view
+  const assetsData = {
+    {% for asset in assets %}
+    "{{ asset.id }}": {
+      name: "{{ asset.name|escapejs }}",
+      status: "{{ asset.status }}",
+      serial: "{{ asset.serial_number|default:'N/A'|escapejs }}",
+      location: "{{ asset.location.name|default:'Chưa gán vị trí'|escapejs }}",
+      template: "{{ asset.hierarchy_template.name|default:'Chưa gán cấu trúc'|escapejs }}",
+      category: "{{ asset.category.name|default:'-'|escapejs }}",
+      category_id: "{{ asset.category_id|default:'' }}",
+      location_id: "{{ asset.location_id|default:'' }}",
+      description: "{{ asset.description|default:''|escapejs }}",
+      manufacturer: "{{ asset.manufacturer|default:'-'|escapejs }}",
+      model: "{{ asset.model|default:'-'|escapejs }}",
+      purchase: "{{ asset.purchase_date|date:'d/m/Y'|default:'-' }}",
+      value: "{{ asset.value|default:'-' }}",
+      isActive: {{ asset.is_active|lower }},
+      qrCode: "{{ asset.qr_code|escapejs }}"
+    },
+    {% endfor %}
+  };
+
+  function selectAsset(id) {
+    // UI update for tree
+    document.querySelectorAll('.asset-item').forEach(el => {
+      el.classList.remove('bg-primary-50', 'text-primary', 'font-semibold', 'relative');
+      el.classList.add('text-neutral-700', 'hover:bg-neutral-100');
+    });
+    document.querySelectorAll('.asset-indicator').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.asset-icon').forEach(el => el.classList.add('text-neutral-400'));
+    
+    const item = document.getElementById(`asset-item-${id}`);
+    if (item) {
+      item.classList.add('bg-primary-50', 'text-primary', 'font-semibold', 'relative');
+      item.classList.remove('text-neutral-700', 'hover:bg-neutral-100');
+      item.querySelector('.asset-indicator').classList.remove('hidden');
+      item.querySelector('.asset-icon').classList.remove('text-neutral-400');
+    }
+
+    const data = assetsData[id];
+    if (data) {
+      document.getElementById('empty-state').classList.add('hidden');
+      document.getElementById('details-view').classList.remove('hidden');
+      
+      document.getElementById('detail-name').innerText = data.name;
+      const statusBadge = document.getElementById('detail-status');
+      if(data.status === 'OPERATIONAL') {
+        statusBadge.className = 'inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md bg-green-50 text-green-700';
+        statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-green-600"></span> ${data.status}`;
+      } else if (data.status === 'MAINTENANCE') {
+        statusBadge.className = 'inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md bg-orange-50 text-orange-700';
+        statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-orange-600"></span> ${data.status}`;
+      } else {
+        statusBadge.className = 'inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md bg-red-50 text-red-700';
+        statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-red-600"></span> ${data.status}`;
+      }
+      
+      document.getElementById('detail-serial').innerText = data.serial;
+      document.getElementById('detail-location').innerText = data.location;
+      document.getElementById('detail-template').innerText = data.template;
+      
+      document.getElementById('card-location-name').innerText = data.location;
+      document.getElementById('card-template-name').innerText = data.template;
+      document.getElementById('card-qr-code').innerText = data.qrCode.split('-')[0].toUpperCase();
+      
+      document.getElementById('detail-category').innerText = data.category;
+      document.getElementById('detail-manufacturer').innerText = data.manufacturer;
+      document.getElementById('detail-model').innerText = data.model;
+      document.getElementById('detail-purchase').innerText = data.purchase;
+      document.getElementById('detail-value').innerText = data.value !== '-' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(data.value) : '-';
+      
+      const activeBadge = document.getElementById('detail-active');
+      if (data.isActive) {
+        activeBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700';
+        activeBadge.innerText = 'ACTIVE';
+      } else {
+        activeBadge.className = 'px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700';
+        activeBadge.innerText = 'INACTIVE';
+      }
+      
+      // On mobile view, show right pane and hide left pane
+      if (window.innerWidth < 768) {
+        document.getElementById('left-pane').classList.add('hidden');
+        document.getElementById('right-pane').classList.remove('hidden');
+        document.getElementById('right-pane').classList.add('flex');
+      }
+
+      currentSelectedAssetId = id;
+
+      // Generate QR
+      const qrContainer = document.getElementById('qr-container');
+      qrContainer.innerHTML = '<canvas id="qr-canvas"></canvas>';
+      QRCode.toCanvas(document.getElementById('qr-canvas'), data.qrCode, {
+        width: 48,
+        margin: 0,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }, function (error) {
+        if (error) console.error(error)
+      });
+    }
+  }
+
+  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='') {
+    document.getElementById('asset-id').value = id;
+    document.getElementById('asset-name').value = name;
+    document.getElementById('asset-desc').value = desc;
+    document.getElementById('asset-model').value = model;
+    document.getElementById('asset-serial').value = serial;
+    document.getElementById('asset-category').value = category_id;
+    if (status) document.getElementById('asset-status').value = status;
+    document.getElementById('asset-modal-title').innerText = id ? 'Chỉnh Sửa Tài Sản' : 'Thêm Tài Sản Mới';
+    document.getElementById('asset-error').classList.add('hidden');
+    document.getElementById('asset-modal').classList.remove('hidden');
+  }
+
+  function closeAssetModal() {
+    document.getElementById('asset-modal').classList.add('hidden');
+  }
+
+  function submitAsset() {
+    const id = document.getElementById('asset-id').value;
+    const name = document.getElementById('asset-name').value;
+    const desc = document.getElementById('asset-desc').value;
+    const model = document.getElementById('asset-model').value;
+    const serial = document.getElementById('asset-serial').value;
+    const category_id = document.getElementById('asset-category').value;
+    const status = document.getElementById('asset-status').value;
+    const btn = document.getElementById('btn-save-asset');
+    const msg = document.getElementById('asset-error');
+    
+    btn.disabled = true;
+    msg.classList.add('hidden');
+
+    const method = id ? 'PUT' : 'POST';
+    const payload = {
+        name: name,
+        description: desc,
+        model: model,
+        serial_number: serial,
+        status: status,
+        category_id: category_id || null
+    };
+    if (id) payload.id = id;
+
+    fetch('{% url "portal_asset_registry" %}', {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(resData => {
+        if (resData.success) {
+            window.location.reload();
+        } else {
+            msg.innerText = resData.error || 'An error occurred';
+            msg.classList.remove('hidden');
+        }
+    })
+    .finally(() => {
+        btn.disabled = false;
+    });
+  }
+
+  function handleEdit() {
+    if (!currentSelectedAssetId) return;
+    const data = assetsData[currentSelectedAssetId];
+    openAssetModal(
+      currentSelectedAssetId,
+      data.name,
+      data.description,
+      data.model !== '-' ? data.model : '',
+      data.serial !== 'N/A' ? data.serial : '',
+      data.qrCode,
+      data.status,
+      data.category_id
+    );
+  }
+
+  function handleMove() {
+    if (!currentSelectedAssetId) return;
+    const data = assetsData[currentSelectedAssetId];
+    document.getElementById('move-location').value = data.location_id || '';
+    document.getElementById('move-modal').classList.remove('hidden');
+  }
+
+  function closeMoveModal() {
+    document.getElementById('move-modal').classList.add('hidden');
+  }
+
+  function submitMoveAsset() {
+    if (!currentSelectedAssetId) return;
+    const data = assetsData[currentSelectedAssetId];
+    const newLocationId = document.getElementById('move-location').value;
+    
+    if (newLocationId === data.location_id) {
+      closeMoveModal();
+      return;
+    }
+
+    const payload = {
+      id: currentSelectedAssetId,
+      name: data.name,
+      description: data.description,
+      model: data.model !== '-' ? data.model : '',
+      serial_number: data.serial !== 'N/A' ? data.serial : '',
+      qr_code: data.qrCode,
+      status: data.status,
+      category_id: data.category_id,
+      location_id: newLocationId || null
+    };
+
+    fetch('{% url "portal_asset_registry" %}', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(resData => {
+        if(resData.success) {
+            window.location.reload();
+        } else {
+            alert(resData.error || 'Lỗi khi di chuyển tài sản');
+        }
+    });
+  }
+
+  function handleDelete() {
+    if (!currentSelectedAssetId) return;
+    const data = assetsData[currentSelectedAssetId];
+    if (confirm(`Bạn có chắc chắn muốn xóa tài sản: ${data.name}?`)) {
+        fetch('{% url "portal_asset_registry" %}', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({id: currentSelectedAssetId})
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if(resData.success) {
+                window.location.reload();
+            } else {
+                alert(resData.error || 'Lỗi khi xóa tài sản');
+            }
+        });
+    }
+  }
+
+  function handlePrintQR() {
+    if (!currentSelectedAssetId) return;
+    const data = assetsData[currentSelectedAssetId];
+    const canvas = document.querySelector('#qr-container canvas');
+    if (!canvas) {
+      alert('Không tìm thấy mã QR để in');
+      return;
+    }
+    const qrImage = canvas.toDataURL('image/png');
+    const printWindow = window.open('', '_blank', 'width=400,height=400');
+    if (!printWindow) {
+      alert('Vui lòng cho phép mở popup để in');
+      return;
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>In Mã Định Danh - ${data.name}</title>
+          <style>
+            @page { margin: 0; size: 50mm 50mm; }
+            body { 
+              margin: 0; 
+              display: flex; 
+              flex-direction: column;
+              align-items: center; 
+              justify-content: center; 
+              height: 100vh;
+              font-family: Arial, sans-serif;
+              background-color: white;
+            }
+            .label {
+               text-align: center;
+               width: 46mm;
+               height: 46mm;
+               box-sizing: border-box;
+               display: flex;
+               flex-direction: column;
+               align-items: center;
+               justify-content: center;
+               border: 1px solid #1f2937;
+               padding: 2mm;
+            }
+            img { width: 26mm; height: 26mm; margin: 0 auto; }
+            .name { font-size: 9px; margin: 2mm 0 0 0; font-weight: bold; color: #000; line-height: 1.2; text-align: center; max-height: 22px; overflow: hidden; }
+            .code { font-size: 8px; margin: 1mm 0 0 0; font-weight: bold; font-family: monospace; color: #000; }
+            .category { font-size: 6px; margin: 1mm 0 0 0; color: #4b5563; text-transform: uppercase; letter-spacing: 0.05em; }
+          </style>
+        </head>
+        <body>
+          <div class="label">
+             <img src="${qrImage}" />
+             <div class="name">${data.name}</div>
+             <div class="code">${data.qrCode}</div>
+             <div class="category">${data.category || 'N/A'}</div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 250);
+            };
+          <\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
+  function executeExportData() {
+    const all = Object.values(assetsData);
+    if (all.length === 0) {
+      alert('Không tìm thấy tài sản nào.');
+      return;
+    }
+
+    const header = [
+      "Name", "Category", "Template", "Serial Number", "Model",
+      "Manufacturer", "Purchase Date", "Value", "Status", "Location",
+      "QR Code", "IsActive"
+    ];
+
+    const rows = all.map(a => [
+      a.name, a.category, a.template, a.serial, a.model, a.manufacturer,
+      a.purchase, a.value, a.status, a.location, a.qrCode, a.isActive ? 'true' : 'false'
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+    XLSX.writeFile(workbook, `Assets_Export.xlsx`);
+  }
+
+  function switchTab(tab) {
+    const btnInfo = document.getElementById('tab-btn-info');
+    const btnHistory = document.getElementById('tab-btn-history');
+    const contentInfo = document.getElementById('tab-content-info');
+    const contentHistory = document.getElementById('tab-content-history');
+
+    if (tab === 'info') {
+      btnInfo.className = 'pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors';
+      btnHistory.className = 'pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors';
+      contentInfo.classList.remove('hidden');
+      contentHistory.classList.add('hidden');
+    } else {
+      btnHistory.className = 'pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors';
+      btnInfo.className = 'pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors';
+      contentHistory.classList.remove('hidden');
+      contentInfo.classList.add('hidden');
+    }
+  }
+  
+  function closeDetails() {
+    document.getElementById('left-pane').classList.remove('hidden');
+    document.getElementById('right-pane').classList.add('hidden');
+    document.getElementById('right-pane').classList.remove('flex');
+    
+    document.querySelectorAll('.asset-item').forEach(el => {
+      el.classList.remove('bg-primary-50', 'text-primary', 'font-semibold', 'relative');
+      el.classList.add('text-neutral-700', 'hover:bg-neutral-100');
+    });
+    document.querySelectorAll('.asset-indicator').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.asset-icon').forEach(el => el.classList.add('text-neutral-400'));
+    
+    document.getElementById('empty-state').classList.remove('hidden');
+    document.getElementById('details-view').classList.add('hidden');
+  }
+
+  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='') {
+    document.getElementById('asset-id').value = id;
+    document.getElementById('asset-name').value = name;
+    document.getElementById('asset-desc').value = desc;
+    document.getElementById('asset-model').value = model;
+    document.getElementById('asset-serial').value = serial;
+    document.getElementById('asset-category').value = category_id;
+    if (status) document.getElementById('asset-status').value = status;
+    document.getElementById('asset-modal-title').innerText = id ? 'Chỉnh Sửa Tài Sản' : 'Thêm Tài Sản Mới';
+    document.getElementById('asset-error').classList.add('hidden');
+    document.getElementById('asset-modal').classList.remove('hidden');
+  }
+
+  function closeAssetModal() {
+    document.getElementById('asset-modal').classList.add('hidden');
+  }
+
+  function submitAsset() {
+    const payload = {
+      id: document.getElementById('asset-id').value,
+      name: document.getElementById('asset-name').value,
+      model: document.getElementById('asset-model').value,
+      serial_number: document.getElementById('asset-serial').value,
+      category_id: document.getElementById('asset-category').value,
+      status: document.getElementById('asset-status').value
+    };
+
+    fetch('{% url "portal_asset_registry" %}', {
+        method: payload.id ? 'PUT' : 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(resData => {
+        if(resData.success) {
+            window.location.reload();
+        } else {
+            const err = document.getElementById('asset-error');
+            err.classList.remove('hidden');
+            err.innerText = resData.error || 'Lỗi khi lưu tài sản';
+        }
+    });
+  }
+</script>
+{% endblock %}

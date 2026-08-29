@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory - EAM System{% endblock %}
+{% block breadcrumb %}Workspace / Inventory{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col h-full overflow-hidden">
+  
+  <!-- Page Header -->
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1">INVENTORY</p>
+      <h2 class="text-[26px] leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-3">
+        <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500 text-2xl shrink-0">
+          <i class="ph-fill ph-package"></i>
+        </div>
+        Spare Parts Management
+      </h2>
+    </div>
+    <button onclick="openInventoryModal()" class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
+      <i class="ph-bold ph-plus"></i> New Part
+    </button>
+  </div>
+  
+  <!-- Filter Row -->
+  <div class="flex gap-4 mb-4 items-center">
+    <div class="relative w-80">
+      <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
+      <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Tìm kiếm theo Tên hoặc Mã vật tư..." class="w-full pl-10 pr-4 h-10 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+    </div>
+    <select id="filterStock" onchange="filterTable()" class="w-48 px-4 h-10 bg-white border border-neutral-200 rounded-xl text-sm text-neutral-700 focus:outline-none focus:border-primary transition-all">
+      <option value="all">Tất cả trạng thái kho</option>
+      <option value="instock">Còn hàng</option>
+      <option value="low">Sắp hết (≤ 10)</option>
+      <option value="out">Hết hàng (0)</option>
+    </select>
+  </div>
+
+  <!-- Table Area -->
+  <div class="flex-1 overflow-auto bg-white border border-neutral-200 rounded-3xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] custom-scrollbar">
+    <table class="w-full text-sm text-left custom-beautiful-table" id="inventoryTable">
+      <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
+        <tr>
+          <th class="px-4 py-3 font-semibold cursor-pointer" onclick="sortTable(0)">Name <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-4 py-3 font-semibold cursor-pointer" onclick="sortTable(1)">Part Number <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-4 py-3 font-semibold">Description</th>
+          <th class="px-4 py-3 font-semibold cursor-pointer" onclick="sortTable(3, true)">In Stock <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-4 py-3 font-semibold cursor-pointer" onclick="sortTable(4, true)">Unit Cost <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-4 py-3 font-semibold">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-neutral-100" id="inventoryTbody">
+        {% for part in spare_parts %}
+        <tr class="hover:bg-neutral-50/50 transition-colors group" data-qty="{{ part.quantity_in_stock|floatformat:0 }}">
+          <td class="px-4 py-3 font-semibold text-neutral-800 name-cell">{{ part.name }}</td>
+          <td class="px-4 py-3 text-neutral-600 part-cell">{{ part.part_number|default:"" }}</td>
+          <td class="px-4 py-3 text-neutral-600">{{ part.description|default:"" }}</td>
+          <td class="px-4 py-3 text-neutral-600">{{ part.quantity_in_stock|floatformat:0 }}</td>
+          <td class="px-4 py-3 text-neutral-600">{% if part.unit_cost %}${{ part.unit_cost|floatformat:2 }}{% else %}-{% endif %}</td>
+          <td class="px-4 py-3">
+            <div class="flex gap-3 items-center">
+              <button onclick="openInventoryModal('{{ part.id }}', '{{ part.name|escapejs }}', '{{ part.part_number|escapejs }}', '{{ part.description|escapejs }}', '{{ part.quantity_in_stock }}', '{{ part.unit_cost }}')" class="text-neutral-400 hover:text-primary transition-colors" title="Edit">
+                <i class="ph-bold ph-pencil-simple text-lg"></i>
+              </button>
+              <button onclick="deleteInventory('{{ part.id }}')" class="text-neutral-400 hover:text-danger transition-colors" title="Delete">
+                <i class="ph-bold ph-trash text-lg"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr id="empty-row">
+          <td colspan="6" class="px-4 py-12 text-center text-neutral-500">
+            <div class="flex flex-col items-center justify-center">
+              <i class="ph ph-package text-4xl text-neutral-300 mb-3"></i>
+              <p class="text-base font-semibold text-neutral-700 m-0">No spare parts found</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="inventory-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeInventoryModal()"></div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10">
+    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-white">
+      <h3 class="font-bold text-lg text-neutral-800" id="inv-modal-title">Create Spare Part</h3>
+      <button onclick="closeInventoryModal()" class="text-neutral-400 hover:text-neutral-700 transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="p-6 overflow-y-auto max-h-[80vh]">
+      <form id="inv-form" class="space-y-4">
+        <input type="hidden" id="inv-id" />
+        <div id="inv-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+        <div>
+          <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Part Name <span class="text-danger">*</span></label>
+          <input type="text" id="inv-name" required placeholder="e.g. Engine Oil Filter" class="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary hover:border-primary transition-colors">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Part Number <span class="text-danger">*</span></label>
+          <input type="text" id="inv-part-number" required placeholder="e.g. FLT-001" class="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary hover:border-primary transition-colors">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Description</label>
+          <textarea id="inv-desc" rows="3" class="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary hover:border-primary transition-colors"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Quantity In Stock <span class="text-danger">*</span></label>
+            <input type="number" id="inv-quantity" step="1" min="0" required class="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary hover:border-primary transition-colors">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-neutral-700 mb-1.5">Unit Cost ($) <span class="text-danger">*</span></label>
+            <input type="number" id="inv-unit-cost" step="0.01" min="0" required class="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary hover:border-primary transition-colors">
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+      <button onclick="closeInventoryModal()" class="px-4 py-2 bg-white text-neutral-600 hover:text-neutral-900 rounded-lg text-sm font-semibold transition-colors">Cancel</button>
+      <button onclick="saveInventory()" id="btn-save-inv" class="px-5 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg text-sm font-semibold shadow-sm shadow-primary/20 transition-all">Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function filterTable() {
+    const searchVal = document.getElementById("searchInput").value.toLowerCase();
+    const stockFilter = document.getElementById("filterStock").value;
+    const tbody = document.getElementById("inventoryTbody");
+    const rows = tbody.querySelectorAll("tr:not(#empty-row)");
+    
+    rows.forEach(row => {
+      const name = row.querySelector(".name-cell").textContent.toLowerCase();
+      const partNumber = row.querySelector(".part-cell").textContent.toLowerCase();
+      const qty = parseInt(row.getAttribute("data-qty") || "0", 10);
+      
+      const matchSearch = name.includes(searchVal) || partNumber.includes(searchVal);
+      let matchStock = true;
+      
+      if (stockFilter === 'out') matchStock = (qty === 0);
+      else if (stockFilter === 'low') matchStock = (qty > 0 && qty <= 10);
+      else if (stockFilter === 'instock') matchStock = (qty > 0);
+      
+      if (matchSearch && matchStock) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  }
+
+  function sortTable(colIdx, isNumeric = false) {
+    const table = document.getElementById("inventoryTable");
+    const tbody = document.getElementById("inventoryTbody");
+    const rows = Array.from(tbody.querySelectorAll("tr:not(#empty-row)"));
+    
+    let sortDir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+    table.setAttribute('data-sort-dir', sortDir);
+    table.setAttribute('data-sort-col', colIdx);
+
+    rows.sort((a, b) => {
+        const aVal = a.cells[colIdx].innerText.trim();
+        const bVal = b.cells[colIdx].innerText.trim();
+        
+        if (isNumeric) {
+            const numA = parseFloat(aVal.replace(/[^0-9.-]+/g, "")) || 0;
+            const numB = parseFloat(bVal.replace(/[^0-9.-]+/g, "")) || 0;
+            return sortDir === 'asc' ? numA - numB : numB - numA;
+        } else {
+            return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  function openInventoryModal(id='', name='', part_number='', desc='', quantity='', cost='') {
+      document.getElementById('inventory-modal').classList.remove('hidden');
+      document.getElementById('inv-id').value = id;
+      document.getElementById('inv-name').value = name;
+      document.getElementById('inv-part-number').value = part_number !== 'None' ? part_number : '';
+      document.getElementById('inv-desc').value = desc !== 'None' ? desc : '';
+      document.getElementById('inv-quantity').value = quantity !== 'None' ? quantity : '0';
+      document.getElementById('inv-unit-cost').value = cost !== 'None' && cost ? cost : '0.00';
+      
+      document.getElementById('inv-modal-title').innerText = id ? 'Edit Spare Part' : 'Create Spare Part';
+      document.getElementById('inv-msg').classList.add('hidden');
+  }
+
+  function closeInventoryModal() {
+      document.getElementById('inventory-modal').classList.add('hidden');
+      document.getElementById('inv-form').reset();
+  }
+
+  function saveInventory() {
+      // Basic validation
+      const name = document.getElementById('inv-name').value;
+      const partNum = document.getElementById('inv-part-number').value;
+      const qty = document.getElementById('inv-quantity').value;
+      const cost = document.getElementById('inv-unit-cost').value;
+      
+      const msg = document.getElementById('inv-msg');
+      if (!name || !partNum || qty === '' || cost === '') {
+          msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 font-medium';
+          msg.innerText = 'Please fill all required fields.';
+          msg.classList.remove('hidden');
+          return;
+      }
+
+      const id = document.getElementById('inv-id').value;
+      const data = {
+          id: id,
+          name: name,
+          part_number: partNum,
+          description: document.getElementById('inv-desc').value,
+          quantity_in_stock: parseFloat(qty),
+          unit_cost: parseFloat(cost)
+      };
+      
+      const method = id ? 'PUT' : 'POST';
+      const btn = document.getElementById('btn-save-inv');
+      btn.disabled = true;
+      
+      fetch('{% url "portal_inventory" %}', {
+          method: method,
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if(resData.success) {
+              window.location.reload();
+          } else {
+              msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+              msg.innerText = resData.error || 'An error occurred';
+              msg.classList.remove('hidden');
+          }
+      })
+      .finally(() => {
+          btn.disabled = false;
+      });
+  }
+
+  function deleteInventory(id) {
+      if(confirm('Delete this part?')) {
+          fetch('{% url "portal_inventory" %}', {
+              method: 'DELETE',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({id: id})
+          })
+          .then(res => res.json())
+          .then(data => {
+              if(data.success) {
+                  window.location.reload();
+              } else {
+                  alert(data.error);
+              }
+          });
+      }
+  }
+</script>
+{% endblock %}

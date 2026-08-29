@@ -6,3 +6,10 @@ dist/
 build/
 target/
 *.log
+
+# Python
+venv/
+eam_app/venv/
+__pycache__/
+*.pyc
+db.sqlite3

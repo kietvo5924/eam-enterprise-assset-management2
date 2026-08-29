@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Settings - EAM System{% endblock %}
+
+{% block content %}
+<div class="max-w-[1200px] mx-auto py-8 px-4 h-full">
+  <div class="bg-white backdrop-blur-2xl rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-neutral-200/60 overflow-hidden relative transition flex flex-col min-h-[600px]">
+    <!-- Magic Background Elements -->
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+    <div class="absolute top-0 right-0 w-[800px] h-[800px] rounded-full bg-gradient-to-bl from-primary-100/40 via-info/10 to-transparent blur-3xl opacity-80 pointer-events-none"></div>
+    <div class="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-success/5 via-primary-50/20 to-transparent blur-3xl opacity-80 pointer-events-none"></div>
+
+    <!-- Top Header Bar -->
+    <div class="w-full p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-gear text-xl"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 to-neutral-600 tracking-tight m-0">Settings & Preferences</h2>
+          <p class="text-xs font-medium text-neutral-500 m-0 mt-0.5">Customize how your organization appears and operates across the system.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+        <i class="ph-fill ph-buildings text-primary"></i>
+        <span>Organization Profile</span>
+      </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row flex-1 relative z-10">
+      <!-- Left Sidebar Profile View -->
+      <div class="w-full md:w-[380px] bg-neutral-50/80 border-r border-neutral-200/80 p-8 flex flex-col items-center justify-center text-center shrink-0">
+        <div class="relative group cursor-pointer mb-6">
+          <div class="w-32 h-32 rounded-full border-4 border-white shadow-[0_8px_30px_rgba(0,0,0,0.1)] overflow-hidden bg-white flex items-center justify-center relative z-10 transition-transform duration-500 group-hover:scale-105">
+            {% if tenant.logo_url %}
+              <img src="{{ tenant.logo_url }}" alt="Organization Logo" class="w-full h-full object-cover" onerror="this.style.display='none'" id="logo-preview-img" />
+            {% else %}
+              <div class="w-full h-full bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center" id="logo-preview-placeholder">
+                <i class="ph-fill ph-buildings text-5xl text-primary/50"></i>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <h2 class="text-2xl font-black text-neutral-900 m-0 mb-2 truncate w-full px-4" id="display-name">{{ tenant.name|default:"Your Organization" }}</h2>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-success/10 text-success font-bold text-xs rounded-full border border-success/20">
+          <i class="ph-fill ph-check-circle"></i> Active Tenant
+        </div>
+
+        <div class="mt-10 w-full text-left space-y-4">
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-neutral-100 flex items-start gap-3">
+            <div class="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center shrink-0">
+              <i class="ph-fill ph-clock text-xl"></i>
+            </div>
+            <div>
+              <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider m-0">Timezone</p>
+              <p class="text-sm font-bold text-neutral-800 m-0 mt-0.5" id="display-timezone">{{ tenant.timezone|default:"UTC" }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form section -->
+      <div class="flex-1 flex flex-col bg-white/50">
+        <div class="flex-1 overflow-y-auto">
+          <form id="settings-form" class="p-10 space-y-8">
+            {% csrf_token %}
+            <!-- Organization Name -->
+            <div class="group">
+              <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                <i class="ph-fill ph-text-t text-primary"></i>
+                Organization Name <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="name" id="input-name" required value="{{ tenant.name }}" placeholder="e.g. Acme Corporation" class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300" oninput="document.getElementById('display-name').innerText = this.value || 'Your Organization'" />
+              <p class="text-xs font-medium text-neutral-500 mt-2 ml-1">This name will be displayed on reports, dashboards, and emails sent to users.</p>
+            </div>
+
+            <!-- Logo URL -->
+            <div class="group">
+              <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                <i class="ph-fill ph-image text-primary"></i>
+                Brand Logo URL
+              </label>
+              <div class="flex items-center gap-4">
+                <div class="flex-1">
+                  <input type="url" name="logoUrl" id="input-logoUrl" value="{{ tenant.logo_url|default:'' }}" placeholder="https://example.com/logo.png" class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300" onchange="updateLogoPreview(this.value)" />
+                </div>
+                <div class="shrink-0">
+                  <label class="px-6 h-14 bg-gradient-to-br from-neutral-50 to-neutral-100 hover:from-white hover:to-neutral-50 text-neutral-800 rounded-xl font-black text-sm shadow-[0_4px_10px_rgba(0,0,0,0.05)] transition-all active:scale-[0.98] flex items-center gap-2.5 border border-neutral-200/80 hover:border-neutral-300 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transform-gpu cursor-pointer" id="upload-label">
+                    <input type="file" accept="image/*" class="hidden" id="logo-upload-input" onchange="handleLogoUpload(this)" />
+                    <i class="ph-bold ph-upload-simple text-lg text-primary" id="upload-icon"></i> <span class="tracking-wide" id="upload-text">UPLOAD</span>
+                  </label>
+                </div>
+              </div>
+              <p class="text-xs font-medium text-neutral-500 mt-2 ml-1">Upload an image or provide a URL (recommended size: 256x256px, max 2MB).</p>
+            </div>
+
+            <!-- Timezone -->
+            <div class="group">
+              <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                <i class="ph-fill ph-globe text-primary"></i>
+                Default Timezone <span class="text-danger">*</span>
+              </label>
+              <div class="relative">
+                <select name="timezone" id="input-timezone" required class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 appearance-none pr-12 shadow-sm group-hover:border-neutral-300 cursor-pointer" onchange="document.getElementById('display-timezone').innerText = this.value">
+                  <option value="UTC" {% if tenant.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                  <option value="Asia/Ho_Chi_Minh" {% if tenant.timezone == 'Asia/Ho_Chi_Minh' %}selected{% endif %}>Asia/Ho_Chi_Minh</option>
+                  <option value="America/New_York" {% if tenant.timezone == 'America/New_York' %}selected{% endif %}>America/New_York</option>
+                  <option value="Europe/London" {% if tenant.timezone == 'Europe/London' %}selected{% endif %}>Europe/London</option>
+                  <option value="Asia/Tokyo" {% if tenant.timezone == 'Asia/Tokyo' %}selected{% endif %}>Asia/Tokyo</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-neutral-400">
+                  <i class="ph-bold ph-caret-down text-lg"></i>
+                </div>
+              </div>
+              <p class="text-xs font-medium text-neutral-500 mt-2 ml-1">All dates and times in the system will be displayed according to this timezone by default.</p>
+            </div>
+
+            <div class="pt-8 border-t border-neutral-100/80 flex items-center justify-between">
+              <div id="settings-message" class="text-sm font-semibold text-neutral-500 flex items-center gap-2">
+                <i class="ph-fill ph-shield-check text-success text-xl"></i>
+                Changes apply immediately across all sessions.
+              </div>
+              <button type="submit" id="save-btn" class="px-8 h-14 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl font-black text-base shadow-[0_8px_20px_rgba(0,160,226,0.3)] transition active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 flex items-center gap-3 hover:-translate-y-1 transform-gpu hover:shadow-[0_12px_25px_rgba(0,160,226,0.4)]">
+                <i class="ph-bold ph-floppy-disk text-xl" id="save-icon"></i> <span id="save-text">SAVE CHANGES</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateLogoPreview(url) {
+    let img = document.getElementById('logo-preview-img');
+    let placeholder = document.getElementById('logo-preview-placeholder');
+    if (url) {
+        if (!img) {
+            img = document.createElement('img');
+            img.id = 'logo-preview-img';
+            img.className = 'w-full h-full object-cover';
+            img.onerror = () => { img.style.display = 'none'; if(placeholder) placeholder.style.display = 'flex'; };
+            document.querySelector('.w-32.h-32.rounded-full').appendChild(img);
+        }
+        img.src = url;
+        img.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+    } else {
+        if (img) img.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+    }
+}
+
+async function handleLogoUpload(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 2 * 1024 * 1024) {
+            alert('File must be smaller than 2MB');
+            input.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const label = document.getElementById('upload-label');
+        const icon = document.getElementById('upload-icon');
+        const text = document.getElementById('upload-text');
+        const originalIcon = icon.className;
+        
+        label.classList.add('opacity-70', 'pointer-events-none');
+        icon.className = 'ph-bold ph-spinner animate-spin text-lg text-primary';
+        text.innerText = 'UPLOADING...';
+
+        try {
+            const response = await fetch('/api/v1/files/upload/logo', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('input-logoUrl').value = data.data.url;
+                updateLogoPreview(data.data.url);
+                const msg = document.getElementById('settings-message');
+                msg.innerHTML = '<i class="ph-fill ph-check-circle text-success text-xl"></i> <span class="text-success">Logo uploaded! Don\'t forget to save changes.</span>';
+            } else {
+                alert(data.error || 'Failed to upload logo');
+            }
+        } catch (error) {
+            alert('Failed to upload logo');
+        } finally {
+            label.classList.remove('opacity-70', 'pointer-events-none');
+            icon.className = originalIcon;
+            text.innerText = 'UPLOAD';
+            input.value = '';
+        }
+    }
+}
+
+document.getElementById('settings-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('save-btn');
+    const icon = document.getElementById('save-icon');
+    const text = document.getElementById('save-text');
+    const msg = document.getElementById('settings-message');
+
+    btn.disabled = true;
+    icon.className = 'ph-bold ph-spinner animate-spin text-xl';
+    text.innerText = 'SAVING...';
+
+    const data = {
+        name: document.getElementById('input-name').value,
+        logoUrl: document.getElementById('input-logoUrl').value,
+        timezone: document.getElementById('input-timezone').value,
+    };
+
+    fetch('{% url "portal_settings" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            msg.innerHTML = '<i class="ph-fill ph-check-circle text-success text-xl"></i> <span class="text-success">Settings updated successfully!</span>';
+            setTimeout(() => {
+                msg.innerHTML = '<i class="ph-fill ph-shield-check text-success text-xl"></i> Changes apply immediately across all sessions.';
+            }, 3000);
+        } else {
+            msg.innerHTML = '<i class="ph-fill ph-x-circle text-danger text-xl"></i> <span class="text-danger">Failed to save settings: ' + data.error + '</span>';
+        }
+    })
+    .catch(err => {
+        msg.innerHTML = '<i class="ph-fill ph-warning text-danger text-xl"></i> <span class="text-danger">An error occurred.</span>';
+    })
+    .finally(() => {
+        btn.disabled = false;
+        icon.className = 'ph-bold ph-floppy-disk text-xl';
+        text.innerText = 'SAVE CHANGES';
+    });
+});
+</script>
+{% endblock %}

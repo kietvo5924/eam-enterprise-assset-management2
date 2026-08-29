@@ -1,0 +1,698 @@
+{% extends "base.html" %}
+
+{% block title %}Work Orders - EAM System{% endblock %}
+{% block breadcrumb %}Workspace / Work Orders{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col h-full overflow-hidden">
+  
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1">OPERATIONS</p>
+      <h2 class="text-[26px] leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-3">
+        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-2xl shrink-0">
+          <i class="ph-fill ph-clipboard-text"></i>
+        </div>
+        Work Orders
+      </h2>
+    </div>
+  </div>
+
+  <!-- KPI Grid -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary">
+          <i class="ph-fill ph-clipboard-text"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total WOs</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.total|default:"0" }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+    
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-orange-50 text-warning">
+          <i class="ph-fill ph-wrench"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">In Progress</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.in_progress|default:"0" }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-red-50 text-danger">
+          <i class="ph-fill ph-warning-circle"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Overdue</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.overdue|default:"0" }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-red-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+
+    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-4 relative z-10">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-green-50 text-success">
+          <i class="ph-fill ph-check-circle"></i>
+        </div>
+      </div>
+      <div class="relative z-10">
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Completed (YTD)</p>
+        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.completed|default:"0" }}</h3>
+      </div>
+      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+    </div>
+  </div>
+
+  <div class="bg-transparent h-full flex flex-col space-y-6">
+    <!-- Massive Beautiful Header -->
+    <div class="bg-white p-6 md:p-8 rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden shrink-0 group">
+      <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
+      <div class="absolute bottom-0 left-0 -ml-32 -mb-32 w-80 h-80 rounded-full bg-gradient-to-tr from-info/10 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
+      
+      <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
+        <div class="flex items-center gap-5">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.2)] border border-primary/20 transform -rotate-12 group-hover:rotate-12 group-hover:scale-110 transition duration-500">
+            <i class="ph-fill ph-clipboard-text text-3xl drop-shadow-sm"></i>
+          </div>
+          <div>
+            <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
+              Work Orders
+            </h2>
+            <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+              Quản lý, phân công và theo dõi các yêu cầu bảo trì tài sản.
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+            <button 
+              onclick="openWoModal()"
+              class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
+            >
+              <i class="ph-bold ph-plus"></i> Tạo Work Order
+            </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Table Container -->
+    <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+      
+      <!-- Search Bar -->
+      <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+        <div class="relative w-full sm:max-w-md">
+            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Tìm kiếm Work Order theo tiêu đề..." class="w-full pl-10 pr-4 h-12 rounded-xl border border-neutral-200/80 hover:border-primary focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus-within:bg-white transition-all text-base font-medium">
+        </div>
+        <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100">
+           <i class="ph-fill ph-clipboard-text text-primary"></i>
+           <span id="wo-count">{{ work_orders_data|length }} Work Orders</span>
+        </div>
+      </div>
+
+      <div class="p-2 flex-1 flex flex-col overflow-x-auto">
+        <table class="w-full text-sm text-left min-w-max custom-beautiful-table" id="woTable">
+          <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
+            <tr>
+              <th class="px-4 py-3 font-semibold">Title</th>
+              <th class="px-4 py-3 font-semibold">Asset</th>
+              <th class="px-4 py-3 font-semibold">Priority</th>
+              <th class="px-4 py-3 font-semibold">Status</th>
+              <th class="px-4 py-3 font-semibold">Assignee</th>
+              <th class="px-4 py-3 font-semibold">Requested By</th>
+              <th class="px-4 py-3 font-semibold">Deadline</th>
+              <th class="px-4 py-3 font-semibold">Created At</th>
+              <th class="px-4 py-3 font-semibold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100">
+            {% for item in work_orders_data %}
+            {% with wo=item.wo checklists_json=item.checklists_json follow_ups_count=item.follow_ups_count %}
+            <tr class="hover:bg-neutral-50/50 transition-colors group">
+              <td class="px-4 py-3 w-[250px] max-w-[250px]">
+                <div class="flex flex-col items-start">
+                  <strong class="text-neutral-800 truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
+                  <div class="flex gap-1 mt-1 flex-wrap w-full">
+                    {% if wo.parent_id %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-bold truncate max-w-full" title="Kế thừa từ: {{ wo.parent_id.title }}">
+                        ↳ Kế thừa: {{ wo.parent_id.title }}
+                        </span>
+                    {% endif %}
+                    {% if follow_ups_count > 0 %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold whitespace-nowrap">
+                        Có {{ follow_ups_count }} Follow-ups
+                        </span>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3 max-w-[150px]">
+                <div class="truncate text-neutral-600 font-medium" title="{{ wo.asset.name|default:'-' }}">{{ wo.asset.name|default:'-' }}</div>
+              </td>
+              <td class="px-4 py-3">
+                {% if wo.priority == 'CRITICAL' %}
+                    <span class="px-3 py-0.5 bg-fuchsia-50 text-fuchsia-600 border border-fuchsia-200 rounded-full text-xs font-bold">CRITICAL</span>
+                {% elif wo.priority == 'HIGH' %}
+                    <span class="px-3 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-xs font-bold">HIGH</span>
+                {% elif wo.priority == 'MEDIUM' %}
+                    <span class="px-3 py-0.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-full text-xs font-bold">MEDIUM</span>
+                {% else %}
+                    <span class="px-3 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-xs font-bold">LOW</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3">
+                {% if wo.status == 'CREATED' %}
+                    <span class="px-3 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-full text-xs font-bold">CREATED</span>
+                {% elif wo.status == 'ASSIGNED' %}
+                    <span class="px-3 py-0.5 bg-cyan-50 text-cyan-600 border border-cyan-200 rounded-full text-xs font-bold">ASSIGNED</span>
+                {% elif wo.status == 'IN_PROGRESS' %}
+                    <span class="px-3 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-200 rounded-full text-xs font-bold">IN_PROGRESS</span>
+                {% elif wo.status == 'COMPLETED' %}
+                    <span class="px-3 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-xs font-bold">COMPLETED</span>
+                {% else %}
+                    <span class="px-3 py-0.5 bg-neutral-100 text-neutral-600 border border-neutral-200 rounded-full text-xs font-bold">{{ wo.status }}</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-neutral-600">
+                {{ wo.assigned_to.username|default:'-' }}
+              </td>
+              <td class="px-4 py-3 text-neutral-600">
+                {{ wo.tenant.users.first.username|default:'-' }}
+              </td>
+              <td class="px-4 py-3 text-neutral-600">
+                {{ wo.deadline|date:'Y-m-d H:i'|default:'-' }}
+              </td>
+              <td class="px-4 py-3 text-neutral-600">
+                {{ wo.created_at|date:'Y-m-d H:i'|default:'-' }}
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex gap-2 items-center justify-end">
+                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{{ wo.assigned_to.username|default:''|escapejs }}', '{{ wo.deadline|date:'Y-m-d' }}', {{ checklists_json|safe }})" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                        <i class="ph-bold ph-eye text-lg"></i>
+                    </button>
+                    
+                    {% if wo.status == 'CREATED' or wo.status == 'ASSIGNED' %}
+                    <button onclick="openWoModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.assigned_to_id|default:'' }}', '{{ wo.deadline|date:'Y-m-d' }}')" title="Chỉnh sửa" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                        <i class="ph-bold ph-pencil-simple text-lg"></i>
+                    </button>
+                    {% endif %}
+
+                    {% if wo.status != 'COMPLETED' and wo.status != 'CANCELLED' %}
+                    <button onclick="openAssignModal('{{ wo.id }}', '{{ wo.assigned_to_id|default:'' }}')" title="Phân công" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                        <i class="ph-bold ph-user-switch text-lg"></i>
+                    </button>
+                    {% endif %}
+
+                    {% if wo.status == 'CREATED' or wo.status == 'ASSIGNED' %}
+                    <button onclick="deleteWo('{{ wo.id }}', {{ follow_ups_count }})" title="Xóa" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
+                        <i class="ph-bold ph-trash text-lg"></i>
+                    </button>
+                    {% endif %}
+
+                    {% if wo.status == 'ASSIGNED' and wo.assigned_to == request.user %}
+                    <button onclick="updateStatus('{{ wo.id }}', 'IN_PROGRESS')" title="Bắt đầu" class="w-8 h-8 flex items-center justify-center text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm">
+                        <i class="ph-fill ph-play-circle text-lg"></i>
+                    </button>
+                    {% endif %}
+
+                    {% if wo.status == 'IN_PROGRESS' and wo.assigned_to == request.user %}
+                    <button onclick="updateStatus('{{ wo.id }}', 'COMPLETED')" title="Hoàn thành" class="w-8 h-8 flex items-center justify-center text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors shadow-sm">
+                        <i class="ph-fill ph-check-circle text-lg"></i>
+                    </button>
+                    {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr>
+              <td colspan="9" class="px-4 py-12 text-center text-neutral-500">
+                <div class="flex flex-col items-center justify-center">
+                  <i class="ph ph-clipboard-text text-4xl text-neutral-300 mb-3"></i>
+                  <p class="text-base font-semibold text-neutral-700 m-0">No work orders found</p>
+                  <p class="text-sm mt-1">Create a new work order to start tracking maintenance tasks.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create/Edit Modal/Drawer (Sliding Drawer from Right) -->
+<div id="wo-modal" class="fixed inset-0 z-[100] hidden">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeWoModal()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-[500px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+      <div class="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
+      <div>
+          <h3 class="font-black text-2xl text-neutral-800" id="wo-modal-title">Tạo Work Order</h3>
+          <p class="text-neutral-500 text-sm mt-1">Điền thông tin chi tiết cho Work Order</p>
+      </div>
+      <button onclick="closeWoModal()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 bg-neutral-50/50">
+      <form id="wo-form" class="space-y-6">
+        <input type="hidden" id="wo-id" />
+        <div id="wo-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Title <span class="text-danger">*</span></label>
+          <input type="text" id="wo-title" placeholder="Ví dụ: Bảo trì định kỳ máy bơm A" required class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Asset</label>
+          <select id="wo-asset" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            <option value="">-- Không liên kết tài sản --</option>
+            {% for a in assets %}
+            <option value="{{ a.id }}">{{ a.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Priority</label>
+            <select id="wo-priority" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+              <option value="CRITICAL">CRITICAL</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Status</label>
+            <select id="wo-status" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="CREATED">CREATED</option>
+              <option value="ASSIGNED">ASSIGNED</option>
+              <option value="IN_PROGRESS">IN_PROGRESS</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="CANCELLED">CANCELLED</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Assignee</label>
+            <select id="wo-assignee" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="">Unassigned</option>
+              {% for u in users %}
+              <option value="{{ u.id }}">{{ u.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Deadline</label>
+            <input type="date" id="wo-deadline" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Description</label>
+          <textarea id="wo-desc" rows="4" placeholder="Mô tả công việc cần làm..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="p-6 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+      <button onclick="closeWoModal()" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy bỏ</button>
+      <button onclick="saveWo()" id="btn-save-wo" class="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+        <i class="ph-bold ph-floppy-disk"></i> Lưu Work Order
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Modal -->
+<div id="assign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignModal()"></div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col relative z-10">
+    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-neutral-50">
+      <h3 class="font-bold text-lg text-neutral-800">Phân công người dùng</h3>
+      <button onclick="closeAssignModal()" class="text-neutral-400 hover:text-neutral-700 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+    </div>
+    <div class="p-6">
+      <input type="hidden" id="assign-wo-id" />
+      <label class="block text-sm font-bold text-neutral-700 mb-1.5">Người được phân công</label>
+      <select id="assign-user" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+        <option value="">-- Bỏ phân công --</option>
+        {% for u in users %}
+        <option value="{{ u.id }}">{{ u.username }}</option>
+        {% endfor %}
+      </select>
+      <div class="mt-6 flex justify-end gap-3">
+        <button onclick="closeAssignModal()" class="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-lg text-sm font-bold transition-colors">Hủy</button>
+        <button onclick="submitAssign()" class="px-5 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg text-sm font-bold transition-all shadow-sm shadow-primary/20">Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal/Drawer -->
+<div id="wo-detail-modal" class="fixed inset-0 z-[100] hidden">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeWoDetailModal()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-[800px] max-w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
+      <div class="flex items-center gap-3">
+        <h3 class="font-black text-xl text-neutral-800 flex items-center gap-2" id="detail-title">
+          <i class="ph-fill ph-clipboard-text text-primary"></i> Work Order Details
+        </h3>
+        <span id="detail-status" class="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold border border-neutral-200">Status</span>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="editCurrentWo()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
+          <i class="ph-bold ph-pencil-simple"></i> Sửa
+        </button>
+        <button onclick="closeWoDetailModal()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto">
+      <div class="p-8">
+        <div class="flex items-start justify-between mb-6">
+          <div>
+            <h2 class="text-3xl font-black text-neutral-900 mb-2" id="detail-title-large">Title</h2>
+            <p class="text-neutral-500 text-base" id="detail-desc">Description</p>
+          </div>
+          <div class="text-right">
+            <span id="detail-priority" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Priority</span>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8 bg-neutral-50 p-5 rounded-2xl border border-neutral-100">
+          <div>
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Asset</p>
+            <p class="font-medium text-neutral-800" id="detail-asset-name">-</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Assignee</p>
+            <p class="font-medium text-neutral-800" id="detail-assignee-name">-</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Deadline</p>
+            <p class="font-medium text-neutral-800" id="detail-deadline">-</p>
+          </div>
+        </div>
+        
+        <h4 class="font-black text-lg text-neutral-800 mb-4 flex items-center gap-2">
+          <i class="ph-fill ph-check-square-offset text-primary"></i> Checklists
+        </h4>
+        <div class="bg-white border border-neutral-200 rounded-2xl p-2 mb-4 space-y-1" id="detail-checklists">
+          <!-- Populated by JS -->
+        </div>
+        <div class="flex gap-2">
+            <input type="text" id="new-checklist-item" placeholder="Tên công việc cần làm..." class="flex-1 px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            <button onclick="addChecklistItem()" class="bg-primary hover:bg-primary-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm shadow-primary/20 transition-colors flex items-center gap-2">
+              <i class="ph-bold ph-plus"></i> Thêm
+            </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let currentWo = null;
+
+  function filterTable() {
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById("woTable");
+    const tr = table.getElementsByTagName("tr");
+    let count = 0;
+
+    for (let i = 1; i < tr.length; i++) {
+      const tdTitle = tr[i].getElementsByTagName("td")[0];
+      if (tdTitle) {
+        const txtValue = tdTitle.textContent || tdTitle.innerText;
+        if (txtValue.toLowerCase().indexOf(filter) > -1) {
+          tr[i].style.display = "";
+          count++;
+        } else {
+          tr[i].style.display = "none";
+        }
+      }
+    }
+    document.getElementById("wo-count").innerText = `${count} Work Orders`;
+  }
+
+  function openWoModal(id='', title='', desc='', priority='MEDIUM', status='CREATED', asset_id='', assignee_id='', deadline='') {
+      document.getElementById('wo-modal').classList.remove('hidden');
+      document.getElementById('wo-id').value = id;
+      document.getElementById('wo-title').value = title;
+      document.getElementById('wo-desc').value = desc !== 'None' ? desc : '';
+      document.getElementById('wo-priority').value = priority;
+      document.getElementById('wo-status').value = status;
+      document.getElementById('wo-asset').value = asset_id;
+      document.getElementById('wo-assignee').value = assignee_id;
+      document.getElementById('wo-deadline').value = deadline !== 'None' ? deadline : '';
+      
+      document.getElementById('wo-modal-title').innerText = id ? 'Sửa Work Order' : 'Tạo Work Order';
+      document.getElementById('wo-msg').classList.add('hidden');
+  }
+
+  function closeWoModal() {
+      document.getElementById('wo-modal').classList.add('hidden');
+      document.getElementById('wo-form').reset();
+  }
+
+  function saveWo() {
+      const id = document.getElementById('wo-id').value;
+      const data = {
+          id: id,
+          title: document.getElementById('wo-title').value,
+          description: document.getElementById('wo-desc').value,
+          priority: document.getElementById('wo-priority').value,
+          status: document.getElementById('wo-status').value,
+          asset_id: document.getElementById('wo-asset').value,
+          assigned_to_id: document.getElementById('wo-assignee').value,
+          deadline: document.getElementById('wo-deadline').value
+      };
+      
+      const method = id ? 'PUT' : 'POST';
+      const btn = document.getElementById('btn-save-wo');
+      const msg = document.getElementById('wo-msg');
+      btn.disabled = true;
+      
+      fetch('{% url "portal_work_orders" %}', {
+          method: method,
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if(resData.success) {
+              window.location.reload();
+          } else {
+              msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+              msg.innerText = resData.error || 'An error occurred';
+              msg.classList.remove('hidden');
+          }
+      })
+      .finally(() => {
+          btn.disabled = false;
+      });
+  }
+
+  function deleteWo(id, followUpCount) {
+      if (followUpCount > 0) {
+        alert("Work Order này có Follow-up. Bạn phải xóa các Follow-up trước khi xóa Work Order gốc.");
+        return;
+      }
+      if(confirm('Bạn có chắc chắn muốn xóa Work Order này không?')) {
+          fetch('{% url "portal_work_orders" %}', {
+              method: 'DELETE',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({id: id})
+          })
+          .then(res => res.json())
+          .then(data => {
+              if(data.success) {
+                  window.location.reload();
+              } else {
+                  alert(data.error);
+              }
+          });
+      }
+  }
+
+  function updateStatus(id, status) {
+    fetch('{% url "portal_work_orders" %}', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({id: id, status: status})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.success) {
+            window.location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+  }
+
+  function openAssignModal(id, currentAssignee) {
+      document.getElementById('assign-wo-id').value = id;
+      document.getElementById('assign-user').value = currentAssignee;
+      document.getElementById('assign-modal').classList.remove('hidden');
+  }
+
+  function closeAssignModal() {
+      document.getElementById('assign-modal').classList.add('hidden');
+  }
+
+  function submitAssign() {
+      const id = document.getElementById('assign-wo-id').value;
+      const assigned_to_id = document.getElementById('assign-user').value;
+      
+      // Update assigned_to_id by fetching the existing data (for parity, partial put)
+      fetch('{% url "portal_work_orders" %}', {
+          method: 'PUT',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({id: id, assigned_to_id: assigned_to_id})
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) {
+              window.location.reload();
+          } else {
+              alert(data.error);
+          }
+      });
+  }
+
+  // Checklists logic
+  function openWoDetailModal(id, title, desc, priority, status, asset_id, asset_name, assignee_id, assignee_name, deadline, checklists) {
+      currentWo = { id, title, desc, priority, status, asset_id, assignee_id, deadline };
+      document.getElementById('wo-detail-modal').classList.remove('hidden');
+      
+      const woTag = `#${id.substring(0,8)}`;
+      document.getElementById('detail-title').innerHTML = `<i class="ph-fill ph-clipboard-text text-primary"></i> Work Order ${woTag}`;
+      document.getElementById('detail-title-large').innerText = title;
+      document.getElementById('detail-desc').innerText = desc !== 'None' && desc !== '' ? desc : 'Không có mô tả.';
+      document.getElementById('detail-status').innerText = status;
+      
+      const pColor = priority === 'CRITICAL' ? 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200' :
+                     priority === 'HIGH' ? 'bg-red-50 text-red-600 border-red-200' :
+                     priority === 'MEDIUM' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                     'bg-green-50 text-green-600 border-green-200';
+      document.getElementById('detail-priority').className = `px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider ${pColor}`;
+      document.getElementById('detail-priority').innerText = priority;
+      
+      document.getElementById('detail-asset-name').innerText = asset_id ? asset_name : 'Không có';
+      document.getElementById('detail-assignee-name').innerText = assignee_id ? assignee_name : 'Chưa phân công';
+      document.getElementById('detail-deadline').innerText = deadline && deadline !== 'None' ? deadline : 'Chưa thiết lập';
+      
+      renderChecklists(id, checklists);
+  }
+
+  function closeWoDetailModal() {
+      document.getElementById('wo-detail-modal').classList.add('hidden');
+      currentWo = null;
+  }
+  
+  function editCurrentWo() {
+      closeWoDetailModal();
+      openWoModal(currentWo.id, currentWo.title, currentWo.desc, currentWo.priority, currentWo.status, currentWo.asset_id, currentWo.assignee_id, currentWo.deadline);
+  }
+
+  function renderChecklists(wo_id, checklists) {
+      const container = document.getElementById('detail-checklists');
+      container.innerHTML = '';
+      if(!checklists || checklists.length === 0) {
+          container.innerHTML = '<p class="text-sm text-neutral-500 p-4 text-center font-medium">Chưa có checklist nào.</p>';
+          return;
+      }
+      checklists.forEach(item => {
+          const isChecked = item.is_completed ? 'checked' : '';
+          const textClass = item.is_completed ? 'line-through text-neutral-400' : 'text-neutral-700 font-medium';
+          container.innerHTML += `
+            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-neutral-50 transition-colors group">
+              <input type="checkbox" class="w-5 h-5 text-primary rounded border-neutral-300 focus:ring-primary transition-all" ${isChecked} onchange="toggleChecklist('${item.id}', this.checked)">
+              <span class="text-sm ${textClass} group-hover:text-primary transition-colors flex-1">${item.item_name}</span>
+              <button onclick="deleteChecklist('${item.id}', event)" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-danger rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                <i class="ph-bold ph-trash"></i>
+              </button>
+            </label>
+          `;
+      });
+  }
+
+  function toggleChecklist(itemId, isCompleted) {
+      fetch('{% url "portal_work_orders" %}', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({action: 'toggle_checklist', item_id: itemId, is_completed: isCompleted})
+      })
+      .then(() => window.location.reload());
+  }
+
+  function deleteChecklist(itemId, event) {
+      event.stopPropagation();
+      event.preventDefault();
+      fetch('{% url "portal_work_orders" %}', {
+          method: 'DELETE',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({action: 'delete_checklist', item_id: itemId})
+      })
+      .then(() => window.location.reload());
+  }
+
+  function addChecklistItem() {
+      const name = document.getElementById('new-checklist-item').value;
+      if(!name || !currentWo) return;
+      
+      fetch('{% url "portal_work_orders" %}', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({action: 'add_checklist', work_order_id: currentWo.id, item_name: name})
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) {
+              window.location.reload(); 
+          }
+      });
+  }
+</script>
+{% endblock %}
