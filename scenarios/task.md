@@ -1,0 +1,215 @@
+- `[x]` Phase 0 — Discovery & Architecture
+  - `[x]` Task 0.1 — System Discovery & Architecture Setup (Django Init, Postgres, DRF)
+- `[x]` Phase 1 — Django Core & Security
+  - `[x]` Task 1.1 — Multitenancy Architecture (Core)
+  - `[x]` Task 1.2 — Custom User Model & JWT Authentication
+  - `[x]` Task 1.3 — Global Exceptions & Audit Logging Base
+- `[ ]` Phase 2 — System & Tenant Management
+  - `[x]` Task 2.1 — System Tenant Management
+  - `[x]` Task 2.2 — RBAC (Roles & Permissions)
+  - `[x]` Task 2.3 — User Management & Invitations
+- `[ ]` Phase 3 — Business Modules
+  - `[x]` Task 3.1 — Location & Asset Category
+  - `[x]` Task 3.2 — Hierarchy Templates
+  - `[x]` Task 3.3 — Inventory (Spare Parts) & Storage (MinIO)
+  - `[x]` Task 3.4 — Asset Core, Meter Readings & Import
+  - `[x]` Sub-task 3.5.1 — Work Orders (Core Flow & State Machine)
+  - `[x]` Sub-task 3.5.2 — Work Orders (Extended Details)
+  - `[x]` Sub-task 3.5.3 — Work Orders (Inventory & Async)
+  - `[x]` Task 3.6 — Preventive Maintenance (PM Plan)
+  - `[x]` Task 3.7 — PM Scheduler Background Job
+- `[ ]` Phase 3.5 — 100% Backend API Parity (Spring Boot to Django)
+  - `[x]` Task 3.5.1 — Auth & System Controllers Parity
+    - `[x]` `AuthController`: Login, Token Refresh, Password Reset flow (with email simulation), Change Password.
+    - `[x]` `SystemTenantController` & `TenantController`: Multitenant scoping, Logo upload handling, Settings update.
+  - `[x]` Task 3.5.2 — User & Role Controllers Parity
+    - `[x]` `UserController`: CRUD, pagination, filtering by status, auto-assign default tenant.
+    - `[x]` `RoleController`: Role-Permissions Many-to-Many mapping endpoint equivalent.
+  - `[x]` Task 3.5.3 — Asset & Location Controllers Parity
+    - `[x]` `AssetController`: Tree endpoint (nested locations), Asset History (fetching related WOs), Move Location logic.
+    - `[x]` `LocationController`, `AssetCategoryController`, `HierarchyTemplateController`: Basic CRUD and nested fetching.
+    - `[x]` `MeterReadingController`: Recording and fetching historical readings for assets.
+  - `[x]` Task 3.5.4 — Work Order Controller Parity
+    - `[x]` `WorkOrderController`: Status transition logic (CREATED -> ASSIGNED -> IN_PROGRESS -> COMPLETED).
+    - `[x]` Checklist constraints: Cannot complete WO if mandatory checklists are unfinished.
+    - `[x]` KPIs endpoint & Maintenance Calendar endpoint (`getCalendarEvents` for WO and PM).
+  - `[x]` Task 3.5.5 — PM Plan & Inventory Controllers Parity
+    - `[x]` `PmPlanController`: CRUD and assigning PM Plans to Assets.
+    - `[x]` `SparePartController`: Inventory transactions (In/Out adjustments, Stock threshold validations).
+    - `[x]` `AuditLogController`: Fetching and filtering audit trails with JSON diffs.
+  - `[x]` Task 3.5.6 — System Bootstrap & Data Initialization Parity
+    - `[x]` Create `manage.py seed_core` to replicate Flyway `V8` and `V10` migrations.
+    - `[x]` Seed `SYSTEM` tenant with hardcoded UUID `00000000-0000-0000-0000-000000000000`.
+    - `[x]` Seed 50+ Permissions (matching `V8__Seed_Permissions.sql` / Flyway) globally.
+    - `[x]` Seed SYSTEM Super Admin User with all Permissions.
+    - `[x]` Ensure script runs idempotently (creates if not exists).
+- `[ ]` Phase 4 — Web Portal (Django Templates Migration)
+  - `[x]` Task 4.1 — Base Template & Authentication UI
+  - `[x]` Task 4.2 — System Admin & Organization UI
+  - `[x]` Task 4.3 — Asset Management & Hierarchy UI
+  - `[x]` Task 4.4 — Work Order Management UI
+  - `[x]` Task 4.5 — Inventory (Spare Parts) UI
+  - `[x]` Task 4.6 — Preventive Maintenance (PM Plan) UI
+  - `[x]` Task 4.7 — Dashboard, Reports & Audit Logs UI
+- `[ ]` Phase 5 — Full Frontend Functional Logic (Forms & CRUD)
+  - `[x]` Task 5.1 — Auth & Organization Settings Logic
+  - `[x]` Task 5.2 — System Admin (Tenants, Users, Roles) CRUD
+  - `[x]` Task 5.3 — Asset Config & Registry CRUD
+  - `[x]` Task 5.4 — Work Order Management & Checklists Logic
+  - `[x]` Task 5.5 — Inventory & PM Plans CRUD
+- `[ ]` Phase 5.5 — 100% UI/UX & Functional Parity (Granular Details)
+  - `[x]` Task 5.5.1 — Global App Shell & Layout (App.tsx)
+    - `[x]` Implement Sidebar collapse logic: 64px width when collapsed, hover effects, transition duration 300ms.
+    - `[x]` Sidebar Menu Items: active state `bg-primary-50 text-primary font-semibold`, inactive `text-neutral-600 hover:bg-neutral-100`, icons switch to `ph-fill` when active.
+    - `[x]` Admin/Workspace section dividers with uppercase tracking text `text-[10px] font-bold text-neutral-400`.
+    - `[x]` Bottom User Profile Card: CRM-style, background `bg-neutral-50`, logout button `hover:text-danger hover:bg-red-50`.
+    - `[x]` Header: Breadcrumbs layout, Top Search bar `bg-neutral-50 focus:bg-white`, Notification bell with `bg-danger text-white` badge.
+    - `[x]` Modal: Change Password in dropdown (Ant Design style modal `destroyOnHidden`).
+    - `[x]` Auto-logout script: 15 mins inactivity timeout resetting on mouse/keyboard events.
+
+  - `[x]` Task 5.5.2 — Dashboard & Analytics Details (Dashboard.tsx)
+    - `[x]` Hero Header: `bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]` with decorative blobs (absolute `blur-3xl` div elements).
+    - `[x]` Status Badge: `bg-green-50 text-green-700` with pulse dot.
+    - `[x]` KPI Grid: 4 cards with background `bg-white`, absolute decorative ring `border-[12px] opacity-20` on bottom right, trend tags `bg-green-50` or `bg-red-50`.
+    - `[x]` Chart Area: Create `Work Order Trends` area chart (SVG gradients or Chart.js) with blue/green series.
+    - `[x]` Asset Health Column: Progress bars `bg-success`, `bg-warning`, `bg-danger` for Operating/Maintenance/Down percentages.
+    - `[x]` Activity Feed: List with distinct icons `bg-green-50`, `bg-red-50`, `bg-primary-50`, text-hover transitions.
+
+  - `[x]` Task 5.5.3 — Asset Registry Layout & Tree (AssetRegistry.tsx)
+    - `[x]` Layout split: Left Pane (Tree) `w-1/3 max-w-sm`, Right Pane (Details) `flex-1`.
+    - `[x]` Left Pane Header: Title "Asset Hierarchy" and Action buttons `ph-plus`, `ph-funnel`, `ph-arrows-down-up`.
+    - `[x]` Tree Nodes: `hover:bg-neutral-50`, indent padding based on depth `pl-[X]`, active state `bg-primary-50 border-l-2 border-primary`.
+    - `[x]` Status dot on node: `bg-success` or `bg-warning` absolute positioning.
+    - `[x]` Empty Right Pane State: Centered icon `ph-cube` and text "Select an asset to view details".
+    - `[x]` Right Pane Toolbar: Status Tag `bg-green-50 text-green-700`, Action buttons (Edit, Actions dropdown).
+    - `[x]` Details Tabs: "Overview", "Work Orders", "History" with active state `border-b-2 border-primary text-primary`.
+    - `[x]` Info Grid: Grouped by "System Information", "Operational Data", etc., using `text-[10px] uppercase`., Status tag `bg-green-50`.
+    - `[x]` Detail tags: `bg-neutral-100` (Serial), `bg-primary/10` (Location), `bg-info/10` (Template).
+    - `[x]` Action buttons: Delete `text-danger`, Move, Edit, Create Work Order `bg-primary shadow-primary/30`.
+    - `[x]` QR Code Card: Render canvas using `qrcode.js`, "In QR" print button opening new window with 50x50mm CSS layout.
+    - `[x]` Info Tabs: "Thông Tin Chung" (Grid layout of specs), "Lịch Sử Bảo Trì" (Search bar + timeline list of completed WOs).
+    - `[x]` Excel logic: Map filtered array to AoA, trigger `XLSX.writeFile`.
+
+  - `[x]` Task 5.5.4 — Asset Registry Details & Actions (AssetRegistry.tsx)
+    - `[x]` Right Pane Header: Giant icon `bg-primary-50 w-16 h-16`, Asset name `text-3xl font-black`, Status tag `bg-green-50`.
+    - `[x]` Detail tags: `bg-neutral-100` (Serial), `bg-primary/10` (Location), `bg-info/10` (Template).
+    - `[x]` Action buttons: Delete `text-danger`, Move, Edit, Create Work Order `bg-primary shadow-primary/30`.
+    - `[x]` QR Code Card: Render canvas using `qrcode.js`, "In QR" print button opening new window with 50x50mm CSS layout.
+    - `[x]` Info Tabs: "Thông Tin Chung" (Grid layout of specs), "Lịch Sử Bảo Trì" (Search bar + timeline list of completed WOs).
+    - `[x]` Excel logic: Map filtered array to AoA, trigger `XLSX.writeFile`.
+
+  - `[x]` Task 5.5.5 — Work Orders List & Modals (WorkOrders.tsx, WorkOrderList.tsx)
+    - `[x]` KPI Header: 4 stats cards similar to Dashboard.
+    - `[x]` Massive Table Header: `rounded-3xl` with gradient blobs `from-primary-200/40 via-primary-50/20`, huge title font `text-3xl font-black`.
+    - `[x]` Table Styling: Replace standard Django tables with Ant Design-like responsive table.
+    - `[x]` Column Tags: Priority tags (magenta, red, orange, green), Status tags (blue, cyan, gold, green, default).
+    - `[x]` Action Column: Tooltips, Icon buttons (Eye, Edit, UserSwitch, Delete, Play, CheckCircle).
+    - `[x]` Create/Edit Drawer: Slide-out drawer instead of new page, checklist toggling logic.
+
+  - `[x]` Task 5.5.6 — Maintenance Calendar (MaintenanceCalendar.tsx)
+    - `[x]` Import FullCalendar / React Big Calendar equivalent logic.
+    - `[x]` Calendar View: Month, Week, Day toggle.
+    - `[x]` Data Merging: Combine `WorkOrder` and `PmPlan` data into calendar events.
+    - `[x]` Event Colors: `SCHEDULED` (orange), `IN_PROGRESS` (blue), `COMPLETED` (green).
+    - `[x]` Event Click: Open right Drawer showing Event Details.
+    - `[x]` Filters: By Asset, Category, Status.
+
+  - `[x]` Task 5.5.7 — Inventory Stock & Adjustments (SparePartsManagement.tsx)
+    - `[x]` Stock Threshold Logic: Red text / badge if `quantity_in_stock < min_stock_level`.
+    - `[x]` Transaction Modal: "In/Out" toggle button group `bg-green-500` vs `bg-red-500`.
+
+  - `[x]` Task 5.5.8 — System Admin: Roles & Settings (OrganizationSettings.tsx)
+    - `[x]` Roles Modal: Grouped checkboxes for Permissions by module (System, Asset, WorkOrder, etc.).
+    - `[x]` Tenant Settings: Two-column form layout, logo preview circle.
+- `[ ]` Phase 6 — Research Algorithms / AI
+  - `[ ]` Task 6.1 — Assignment Algorithm (Hungarian)
+  - `[ ]` Task 6.2 — Routing Algorithm (TSP)
+  - `[ ]` Task 6.3 — LLM Work Order Summarization
+- `[ ]` Phase 7 — Integration & Final Verification
+  - `[x]` Task 7.1 — End-to-End Regression Testing (E2E Browser Automation)
+    - `[x]` Setup architecture (`pytest.ini`, `conftest.py`, POM).
+    - `[x]` Write `test_01_auth.py` and `test_02_system_admin.py`.
+    - `[x]` Write `test_03_assets.py` and `test_04_inventory.py`.
+    - `[x]` Write `test_05_work_orders.py` and `test_06_pm_plans.py`.
+    - `[x]` Run and verify all tests in headed Chrome.
+  - `[ ]` Task 7.2 — Deprecation & Handover Strategy
+
+- `[ ]` Phase 8 — Comprehensive Legacy Parity Restoration (Detailed Audit)
+  - `[ ]` **8.1 — General System & Configuration Parity**
+    - `[x]` Task 8.1.1 — Audit `.env` and configuration variables against Legacy
+    - `[x]` Task 8.1.2 — Audit Docker Compose services parity (DB, Cache, Storage)
+    - `[x]` Task 8.1.3 — Audit Project Structure and Static Files integration
+  - `[ ]` **8.2 — Authentication & Bootstrap Flow Parity**
+    - `[x]` Task 8.2.1 — Audit Legacy `V8` flyway script for SuperAdmin initialization
+    - `[x]` Task 8.2.2 — Audit Django `seed_core.py` for exact data match
+    - `[x]` Task 8.2.3 — Audit Legacy Permissions Seed (all 50+ perms)
+    - `[x]` Task 8.2.4 — Cross-check Django `seed_core.py` permissions against Legacy
+    - `[x]` Task 8.2.5 — Audit JWT Token Payload and Expiry logic in Backend
+    - `[x]` Task 8.2.6 — Fix/Implement Django Auth & JWT behavior to match Legacy
+  - `[ ]` **8.3 — Global Navigation (App Shell) Parity**
+    - `[x]` Task 8.3.1 — Audit Legacy `App.tsx` WORKSPACE menu list and ordering
+    - `[x]` Task 8.3.2 — Compare Django `base.html` WORKSPACE menu list
+    - `[x]` Task 8.3.3 — Fix missing/incorrect WORKSPACE items in Django
+    - `[x]` Task 8.3.4 — Audit Legacy `App.tsx` ADMIN menu list and ordering
+    - `[x]` Task 8.3.5 — Compare Django `base.html` ADMIN menu list
+    - `[x]` Task 8.3.6 — Fix missing/incorrect ADMIN items in Django (Add Settings, Move Asset Config)
+  - `[ ]` **8.4 — Tenant & Organization Settings Parity**
+    - `[x]` Task 8.4.1 — Audit Legacy `OrganizationSettings.tsx` UI components
+    - `[x]` Task 8.4.2 — Audit Legacy `SystemTenantController.java` settings endpoints
+    - `[x]` Task 8.4.3 — Implement Django `portal_settings` URL and View logic
+    - `[x]` Task 8.4.4 — Implement Django `settings.html` template matching Legacy UI
+    - `[x]` Task 8.4.5 — Test Timezone and Logo upload integration in Django Settings
+  - `[ ]` **8.5 — Asset Registry & Hierarchy Parity**
+    - `[x]` Task 8.5.1 — Audit Legacy `AssetRegistry.tsx` Layout and Data Grid
+    - `[x]` Task 8.5.2 — Audit Legacy AssetController.java endpoints
+    - `[x]` Task 8.5.3 — Cross-check Django `portal_asset_registry` View
+    - `[x]` Task 8.5.4 — Cross-check Django `asset_registry.html` template
+    - `[x]` Task 8.5.5 — Fix any discrepancies in Asset Tree Rendering
+    - `[x]` Task 8.5.6 — Fix discrepancies in Asset Detail Tabs (Overview, Work Orders, History)
+  - `[ ]` **8.6 — Asset Configuration (Categories & Templates) Parity**
+    - `[ ]` Task 8.6.1 — Audit Legacy `AssetCategoryManagement.tsx`
+    - `[ ]` Task 8.6.2 — Verify Django `portal_asset_categories` logic
+    - `[ ]` Task 8.6.3 — Verify Django `asset_categories.html` template
+    - `[ ]` Task 8.6.4 — Audit Legacy `HierarchyTemplateManagement.tsx`
+    - `[ ]` Task 8.6.5 — Verify Django `hierarchy_templates.html` and View
+  - `[ ]` **8.7 — Work Order Management Parity**
+    - `[ ]` Task 8.7.1 — Audit Legacy `WorkOrders.tsx` List View and Filters
+    - `[ ]` Task 8.7.2 — Audit Legacy `WorkOrderController.java` State Machine
+    - `[ ]` Task 8.7.3 — Verify Django `portal_work_orders` status transition logic
+    - `[ ]` Task 8.7.4 — Verify Django `work_orders.html` Checklist interaction
+    - `[ ]` Task 8.7.5 — Fix Work Order Kanban/List view discrepancies
+  - `[ ]` **8.8 — Inventory (Spare Parts) Parity**
+    - `[ ]` Task 8.8.1 — Audit Legacy `SparePartsManagement.tsx` UI
+    - `[ ]` Task 8.8.2 — Verify Django `portal_inventory` logic
+    - `[ ]` Task 8.8.3 — Verify Django Stock Threshold UI implementation
+    - `[ ]` Task 8.8.4 — Fix Inventory functional or UI discrepancies
+  - `[ ]` **8.9 — PM Plans (Maintenance) Parity**
+    - `[ ]` Task 8.9.1 — Audit Legacy `Maintenance.tsx` and `MaintenanceCalendar.tsx`
+    - `[ ]` Task 8.9.2 — Verify Django `portal_pm_plans` view
+    - `[ ]` Task 8.9.3 — Audit Background Scheduler logic (Celery vs Legacy Quartz/Cron)
+    - `[ ]` Task 8.9.4 — Verify Django PM generation matches Legacy rules
+    - `[ ]` Task 8.9.5 — Fix PM logic or Calendar View discrepancies
+  - `[ ]` **8.10 — System Admin (Users, Roles, Tenants) Parity**
+    - `[ ]` Task 8.10.1 — Audit Legacy `UserManagement.tsx` and RBAC logic
+    - `[ ]` Task 8.10.2 — Verify Django `portal_users` and role assignment
+    - `[ ]` Task 8.10.3 — Audit Legacy `RoleManagement.tsx` mapping UI
+    - `[ ]` Task 8.10.4 — Verify Django `portal_roles` permissions matrix UI
+    - `[ ]` Task 8.10.5 — Verify System Tenant Management (SuperAdmin only) flow
+  - `[ ]` **8.11 — Reports Module Parity**
+    - `[ ]` Task 8.11.1 — Audit Legacy `Reports.tsx` UI and Data Sources
+    - `[ ]` Task 8.11.2 — Implement Django `portal_reports` View
+    - `[ ]` Task 8.11.3 — Implement Django `reports.html` matching Legacy placeholder
+    - `[ ]` Task 8.11.4 — Ensure Reports routing is hooked into App Shell
+  - `[ ]` **8.12 — Deep Database Schema Parity (Django ORM vs Flyway)**
+    - `[ ]` Task 8.12.1 — Cross-check `users` and `roles` tables
+    - `[ ]` Task 8.12.2 — Cross-check `assets`, `locations`, and `categories` tables
+    - `[ ]` Task 8.12.3 — Cross-check `work_orders`, `checklists`, and `pm_plans` tables
+    - `[ ]` Task 8.12.4 — Generate and apply any missing Django migrations
+  - `[ ]` **8.13 — API Route Protection & Security Parity**
+    - `[ ]` Task 8.13.1 — Audit Legacy Spring Security Method-level `@PreAuthorize`
+    - `[ ]` Task 8.13.2 — Map Legacy Permissions to Django views
+    - `[ ]` Task 8.13.3 — Apply `@permission_required` to all Django portal views
+  - `[ ]` **8.14 — End-to-End Functional Parity Sign-off**
+    - `[ ]` Task 8.14.1 — Update Pytest E2E scripts to cover Settings
+    - `[ ]` Task 8.14.2 — Update Pytest E2E scripts to cover Reports
+    - `[ ]` Task 8.14.3 — Run full E2E suite against Django implementation

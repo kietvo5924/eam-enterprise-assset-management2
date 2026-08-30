@@ -133,6 +133,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # Email configuration
@@ -180,9 +181,12 @@ SIMPLE_JWT = {
 }
 
 # MinIO Config
-MINIO_ENDPOINT = env('MINIO_ENDPOINT', default='localhost:9000')
+MINIO_URL = env('MINIO_URL', default='http://localhost:9000')
+MINIO_ENDPOINT = MINIO_URL.replace('http://', '').replace('https://', '') # Derive endpoint from URL for python-minio compatibility
 MINIO_ACCESS_KEY = env('MINIO_ACCESS_KEY', default='minioadmin')
 MINIO_SECRET_KEY = env('MINIO_SECRET_KEY', default='minioadmin')
-MINIO_BUCKET_NAME = env('MINIO_BUCKET_NAME', default='eam-bucket')
+MINIO_BUCKET_NAME = env('MINIO_BUCKET_NAME', default='tenant-assets')
 MINIO_SECURE = env('MINIO_SECURE', default=False, cast=bool)
 MINIO_PUBLIC_URL = env('MINIO_PUBLIC_URL', default='http://localhost:9000')
+
+RESEND_API_KEY = env('RESEND_API_KEY', default='')

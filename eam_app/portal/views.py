@@ -95,11 +95,16 @@ def portal_tenants(request):
 def portal_settings(request):
     from core.models import Tenant
     import json
-    from django.http import JsonResponse
+    from django.http import JsonResponse, HttpResponseForbidden
+    from users.permissions import HasPermission
     
     tenant = request.user.tenant
     
     if request.method == 'POST':
+        checker = HasPermission('tenant:update')()
+        if not checker.has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied: tenant:update required'}, status=403)
+            
         try:
             data = json.loads(request.body)
             tenant.name = data.get('name', tenant.name)
@@ -110,6 +115,11 @@ def portal_settings(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
+    # GET method
+    checker = HasPermission('tenant:read')()
+    if not checker.has_permission(request, None):
+        return HttpResponseForbidden("You do not have permission to view tenant settings (tenant:read required).")
+        
     return render(request, 'settings.html', {'tenant': tenant})
 
 
@@ -433,14 +443,17 @@ def portal_hierarchy_templates(request):
 
 @login_required(login_url='portal_login')
 def portal_asset_registry(request):
-    from assets.models import Asset, AssetCategory, Location
+    from assets.models import Asset, AssetCategory, Location, HierarchyTemplate
     import json
     import uuid
-    from django.http import JsonResponse
+    from django.http import JsonResponse, HttpResponseForbidden
+    from users.permissions import HasPermission
     
     tenant_id = request.user.tenant_id
     
     if request.method == 'POST':
+        if not HasPermission('asset:create')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             category_id = data.get('category_id')
@@ -449,7 +462,7 @@ def portal_asset_registry(request):
                 name=data.get('name'),
                 model=data.get('model'),
                 serial_number=data.get('serial_number'),
-                qr_code=data.get('qr_code') or str(uuid.uuid4())[:8].upper(),
+                qr_code=data.get('qr_code') or ("AST-" + str(uuid.uuid4())[:8].upper()),
                 status=data.get('status', 'OPERATIONAL'),
                 category_id=category_id if category_id else None
             )
@@ -458,18 +471,21 @@ def portal_asset_registry(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not HasPermission('asset:update')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
-            a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            a.name = data.get('name')
-            a.model = data.get('model')
-            a.serial_number = data.get('serial_number')
-            if data.get('qr_code'):
-                a.qr_code = data.get('qr_code')
-            a.status = data.get('status', 'OPERATIONAL')
+            a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id, is_active=True)
             
-            category_id = data.get('category_id')
-            a.category_id = category_id if category_id else None
+            if 'name' in data: a.name = data.get('name')
+            if 'model' in data: a.model = data.get('model')
+            if 'serial_number' in data: a.serial_number = data.get('serial_number')
+            if data.get('qr_code'): a.qr_code = data.get('qr_code')
+            if 'status' in data: a.status = data.get('status')
+            
+            if 'category_id' in data:
+                category_id = data.get('category_id')
+                a.category_id = category_id if category_id else None
             
             if 'location_id' in data:
                 location_id = data.get('location_id')
@@ -481,31 +497,49 @@ def portal_asset_registry(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not HasPermission('asset:delete')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
-            a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            a.delete()
+            a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id, is_active=True)
+            a.is_active = False # Soft delete to match DRF API
+            a.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    assets = Asset.objects.filter(tenant_id=tenant_id).select_related('category', 'location', 'hierarchy_template')
+    if not HasPermission('asset:read')().has_permission(request, None):
+        return HttpResponseForbidden("You do not have permission to access the asset registry.")
+
+    assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True).select_related('category', 'location', 'hierarchy_template')
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
     locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True))
     
+    import unicodedata
+    import re
+    def format_to_ltree(input_str):
+        if not input_str: return ""
+        normalized = unicodedata.normalize('NFD', input_str)
+        no_diacritics = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+        ltree = re.sub(r'[^a-zA-Z0-9\.]', '_', no_diacritics)
+        ltree = re.sub(r'_+', '_', ltree)
+        ltree = re.sub(r'\.+', '.', ltree)
+        ltree = re.sub(r'^[\._]+|[\._]+$', '', ltree)
+        return ltree
+
     # Build Tree Data
-    def build_location_tree(parent_id=None):
+    def build_location_tree(parent_path=None):
         nodes = []
         for loc in locations_list:
-            if loc.parent_id == parent_id or (parent_id is None and not loc.parent_id):
+            if loc.parent_id == parent_path or (parent_path is None and not loc.parent_id):
                 loc_assets = [a for a in assets if str(a.location_id) == str(loc.id)]
-                loc_path = f"{loc.parent_id}.{loc.name}" if loc.parent_id else loc.name # simplified
+                loc_path = f"{loc.parent_id}.{format_to_ltree(loc.name)}" if loc.parent_id else format_to_ltree(loc.name)
                 nodes.append({
                     'id': str(loc.id),
                     'name': loc.name,
                     'is_active': loc.is_active,
                     'assets': loc_assets,
-                    'children': build_location_tree(str(loc.id))
+                    'children': build_location_tree(loc_path)
                 })
         return nodes
         
@@ -517,7 +551,8 @@ def portal_asset_registry(request):
         'categories': categories,
         'tree_locations': tree_locations,
         'unassigned_assets': unassigned_assets,
-        'locations': locations_list
+        'locations': locations_list,
+        'templates': HierarchyTemplate.objects.filter(tenant_id=tenant_id, is_active=True)
     }
     return render(request, 'asset_registry.html', context)
 

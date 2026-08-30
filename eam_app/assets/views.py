@@ -468,7 +468,7 @@ class AssetListView(APIView):
         if not HasPermission('asset:read')().has_permission(request, self):
             self.permission_denied(request)
             
-        assets = Asset.objects.all()
+        assets = Asset.objects.filter(is_active=True)
 
         try:
             page = int(request.query_params.get('page', 0))
@@ -500,7 +500,14 @@ class AssetListView(APIView):
             
         data = serializer.validated_data
         
-        if Asset.objects.filter(qr_code=data['qrCode']).exists():
+        qr_code = data.get('qrCode')
+        if not qr_code:
+            import uuid
+            qr_code = "AST-" + str(uuid.uuid4())[:8].upper()
+            while Asset.objects.filter(qr_code=qr_code).exists():
+                qr_code = "AST-" + str(uuid.uuid4())[:8].upper()
+
+        if Asset.objects.filter(qr_code=qr_code).exists():
             raise ValidationError("QR Code must be unique")
             
         parent_id = data.get('parentId')
@@ -519,7 +526,8 @@ class AssetListView(APIView):
             status=data.get('status', 'OPERATIONAL'),
             location_id=data.get('locationId'),
             hierarchy_template_id=data.get('hierarchyTemplateId'),
-            qr_code=data['qrCode']
+            qr_code=qr_code,
+            is_active=data.get('isActive', True)
         )
         
         return success_response(AssetSerializer(asset).data, message="Created")
@@ -531,7 +539,7 @@ class AssetDetailView(APIView):
             self.permission_denied(request)
             
         try:
-            asset = Asset.objects.get(id=asset_id)
+            asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
             raise ValidationError("Asset not found")
             
@@ -543,7 +551,7 @@ class AssetDetailView(APIView):
             self.permission_denied(request)
 
         try:
-            asset = Asset.objects.get(id=asset_id)
+            asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
             raise ValidationError("Asset not found")
             
@@ -593,6 +601,9 @@ class AssetDetailView(APIView):
         if 'hierarchyTemplateId' in data:
             asset.hierarchy_template_id = data['hierarchyTemplateId']
             
+        if 'isActive' in data:
+            asset.is_active = data['isActive']
+            
         asset.save()
         return success_response(AssetSerializer(asset).data)
 
@@ -602,7 +613,7 @@ class AssetDetailView(APIView):
             self.permission_denied(request)
 
         try:
-            asset = Asset.objects.get(id=asset_id)
+            asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
             raise ValidationError("Asset not found")
             
@@ -616,7 +627,7 @@ class MeterReadingListView(APIView):
             self.permission_denied(request)
             
         try:
-            asset = Asset.objects.get(id=asset_id)
+            asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
             raise ValidationError("Asset not found")
             
@@ -630,7 +641,7 @@ class MeterReadingListView(APIView):
             self.permission_denied(request)
             
         try:
-            asset = Asset.objects.get(id=asset_id)
+            asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
             raise ValidationError("Asset not found")
 
@@ -656,24 +667,130 @@ class AssetTreeView(APIView):
     def get(self, request):
         if not HasPermission('asset:read')().has_permission(request, self):
             self.permission_denied(request)
+
+        all_locations = list(Location.objects.filter(is_active=True))
+        loc_map = {loc.id: loc for loc in all_locations}
         
-        # Simplified tree response, real implementation would build nested tree using parent_id (ltree)
-        assets = Asset.objects.all()
-        
-        search = request.query_params.get('search')
-        status = request.query_params.get('status')
-        category_id = request.query_params.get('categoryId')
-        
-        if search:
-            assets = assets.filter(name__icontains=search)
-        if status:
-            assets = assets.filter(status=status)
-        if category_id:
-            assets = assets.filter(category_id=category_id)
+        assets_qs = Asset.objects.filter(is_active=True)
+        status_param = request.query_params.get('status')
+        if status_param:
+            assets_qs = assets_qs.filter(status=status_param.upper())
             
-        serializer = AssetSerializer(assets, many=True)
+        category_id = request.query_params.get('categoryId')
+        if category_id:
+            assets_qs = assets_qs.filter(category_id=category_id)
+            
+        filtered_assets = list(assets_qs)
+        search = request.query_params.get('search')
+        search_lower = search.lower() if search else None
+        
+        matching_assets = []
+        
+        def get_full_path(l):
+            if not l: return ""
+            if l.parent_id:
+                return f"{l.parent_id}.{format_to_ltree(l.name)}"
+            return format_to_ltree(l.name)
+
+        for a in filtered_assets:
+            matches = True
+            if search_lower:
+                asset_matches = False
+                if a.name and search_lower in a.name.lower(): asset_matches = True
+                elif a.serial_number and search_lower in a.serial_number.lower(): asset_matches = True
+                elif a.qr_code and search_lower in a.qr_code.lower(): asset_matches = True
+                
+                if not asset_matches:
+                    ancestor_matches = False
+                    loc = a.location
+                    while loc:
+                        if loc.name and search_lower in loc.name.lower():
+                            ancestor_matches = True
+                            break
+                        if loc.parent_id:
+                            parent_path = loc.parent_id
+                            loc = next((l for l in all_locations if get_full_path(l) == parent_path), None)
+                        else:
+                            loc = None
+                    if not ancestor_matches:
+                        matches = False
+                        
+            if matches:
+                matching_assets.append(a)
+                
+        visible_loc_ids = set()
+        
+        for a in matching_assets:
+            if a.location_id:
+                loc = loc_map.get(a.location_id)
+                while loc:
+                    visible_loc_ids.add(loc.id)
+                    if loc.parent_id:
+                        parent_path = loc.parent_id
+                        loc = next((l for l in all_locations if get_full_path(l) == parent_path), None)
+                    else:
+                        loc = None
+                        
+        if search_lower:
+            for loc in all_locations:
+                if loc.name and search_lower in loc.name.lower():
+                    curr = loc
+                    while curr:
+                        visible_loc_ids.add(curr.id)
+                        if curr.parent_id:
+                            parent_path = curr.parent_id
+                            curr = next((l for l in all_locations if get_full_path(l) == parent_path), None)
+                        else:
+                            curr = None
+        else:
+            if not status_param and not category_id:
+                for l in all_locations:
+                    visible_loc_ids.add(l.id)
+                    
+        root_nodes = []
+        node_map = {}
+        
+        serialized_assets_cache = {a.id: AssetSerializer(a).data for a in matching_assets}
+        
+        for loc in all_locations:
+            if loc.id not in visible_loc_ids: continue
+            
+            loc_assets = [serialized_assets_cache[a.id] for a in matching_assets if a.location_id == loc.id]
+            
+            node = {
+                "id": loc.id,
+                "name": loc.name,
+                "parentId": loc.parent_id,
+                "isActive": loc.is_active,
+                "assets": loc_assets,
+                "children": []
+            }
+            node_map[loc.id] = node
+            
+        for loc in all_locations:
+            if loc.id not in visible_loc_ids: continue
+            
+            node = node_map[loc.id]
+            if not loc.parent_id:
+                root_nodes.append(node)
+            else:
+                parent_node = None
+                parent_path = loc.parent_id
+                for p_loc in all_locations:
+                    if p_loc.id in visible_loc_ids:
+                        if get_full_path(p_loc) == parent_path:
+                            parent_node = node_map.get(p_loc.id)
+                            break
+                if parent_node:
+                    parent_node['children'].append(node)
+                else:
+                    root_nodes.append(node)
+                    
+        unassigned_assets = [serialized_assets_cache[a.id] for a in matching_assets if not a.location_id]
+        
         return success_response({
-            "nodes": serializer.data
+            "locations": root_nodes,
+            "unassignedAssets": unassigned_assets
         })
 
 class AssetQRCodeView(APIView):
@@ -682,7 +799,7 @@ class AssetQRCodeView(APIView):
             self.permission_denied(request)
             
         try:
-            asset = Asset.objects.get(qr_code=qr_code)
+            asset = Asset.objects.get(qr_code=qr_code, is_active=True)
         except Asset.DoesNotExist:
             raise ValidationError("Asset not found")
             

@@ -97,7 +97,8 @@ class AssetCreateUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Asset.STATUS_CHOICES, required=False, default='OPERATIONAL')
     locationId = serializers.UUIDField(required=False, allow_null=True)
     hierarchyTemplateId = serializers.UUIDField(required=False, allow_null=True)
-    qrCode = serializers.CharField(max_length=255)
+    qrCode = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    isActive = serializers.BooleanField(required=False, default=True)
 
 class MeterReadingSerializer(serializers.ModelSerializer):
     assetId = serializers.UUIDField(source='asset.id', read_only=True)

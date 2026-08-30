@@ -1,4 +1,4 @@
-<div class="tree-node mt-1" data-node-id="{{ node.id }}">
+<div class="tree-node mt-1" data-node-id="{{ node.id }}" data-node-name="{{ node.name|escapejs }}">
   <div class="group flex items-center gap-1.5 p-1.5 hover:bg-neutral-100 rounded cursor-pointer font-medium transition-colors {% if not node.is_active %}text-neutral-400 italic bg-neutral-50/50{% else %}text-neutral-700{% endif %}" onclick="toggleNode('{{ node.id }}')">
     <i class="ph-fill ph-caret-down text-xs transition-transform transform -rotate-90 {% if not node.children and not node.assets %}invisible{% endif %} {% if not node.is_active %}text-neutral-300{% else %}text-neutral-400{% endif %}" id="caret-{{ node.id }}"></i>
     {% if depth == 0 %}

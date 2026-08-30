@@ -3,6 +3,7 @@
 {% block title %}Asset Registry - EAM System{% endblock %}
 {% block breadcrumb %}Workspace / Asset Registry{% endblock %}
 
+
 {% block content %}
 <!-- Main Content -->
 <div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-full p-6">
@@ -16,9 +17,37 @@
       </h2>
       <div class="flex gap-1 shrink-0">
         <button onclick="openAssetModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Thêm tài sản mới"><i class="ph-bold ph-plus"></i></button>
-        <button class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Nhập (Import)"><i class="ph ph-upload-simple"></i></button>
-        <button onclick="executeExportData()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Xuất (Export)"><i class="ph ph-printer"></i></button>
-        <button class="w-7 h-7 rounded hover:bg-neutral-100 flex items-center justify-center text-neutral-500 transition-colors" title="Lọc tài sản"><i class="ph ph-funnel"></i></button>
+        <button onclick="openImportModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Nhập (Import)"><i class="ph ph-upload-simple"></i></button>
+        <button onclick="openBulkFilterModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Xuất/In (Export/Print)"><i class="ph ph-printer"></i></button>
+        <div class="relative">
+          <button onclick="toggleAssetFilter()" class="w-7 h-7 rounded hover:bg-neutral-100 flex items-center justify-center text-neutral-500 transition-colors" title="Lọc tài sản"><i class="ph ph-funnel"></i></button>
+          <div id="asset-filter-dropdown" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-neutral-200 z-50 p-4">
+            <h4 class="font-bold text-neutral-800 mb-3 text-sm">Lọc Tài Sản</h4>
+            <div class="mb-3">
+              <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Trạng thái</label>
+              <select id="filter-status" class="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm" onchange="applyFilters()">
+                <option value="">Tất cả trạng thái</option>
+                <option value="OPERATIONAL">Đang hoạt động</option>
+                <option value="MAINTENANCE">Bảo trì</option>
+                <option value="BROKEN">Hỏng hóc</option>
+                <option value="DECOMMISSIONED">Thanh lý</option>
+                <option value="RESERVED">Dự trữ</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Danh mục</label>
+              <select id="filter-category" class="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm" onchange="applyFilters()">
+                <option value="">Tất cả danh mục</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-neutral-100">
+              <button onclick="clearFilters()" class="text-primary text-xs font-bold hover:underline">Xóa lọc</button>
+            </div>
+          </div>
+        </div>
         <button class="w-7 h-7 rounded hover:bg-neutral-100 flex items-center justify-center text-neutral-500 transition-colors" onclick="toggleLeftPane()" title="Thu gọn"><i class="ph ph-caret-left"></i></button>
       </div>
     </div>
@@ -34,7 +63,7 @@
       <div class="p-2 border-b border-neutral-100 bg-neutral-50/50 shrink-0">
         <div class="relative">
           <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm"></i>
-          <input type="text" placeholder="Tìm tên, mã Serial..." class="w-full pl-9 pr-3 py-1.5 h-9 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+          <input type="text" id="search-input" onkeyup="applyFilters()" placeholder="Tìm tên, mã Serial..." class="w-full pl-9 pr-3 py-1.5 h-9 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
         </div>
       </div>
       <div class="flex-1 overflow-y-auto p-2 text-sm select-none custom-scrollbar">
@@ -52,7 +81,7 @@
         {% endfor %}
 
         {% if unassigned_assets %}
-        <div class="tree-node mt-3">
+        <div class="tree-node mt-3" data-node-id="unassigned" data-node-name="Chưa gán vị trí">
           <div class="group flex items-center gap-1.5 p-1.5 text-neutral-700 font-medium opacity-80" onclick="toggleNode('unassigned')">
             <i class="ph-fill ph-caret-down text-xs transition-transform transform -rotate-90" id="caret-unassigned"></i>
             <i class="ph-fill ph-warning-circle text-neutral-400 text-sm"></i>
@@ -121,7 +150,7 @@
             <button onclick="handleEdit()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 font-semibold text-sm hover:bg-neutral-50 rounded-xl flex items-center gap-2 transition-colors h-10">
               <i class="ph-bold ph-pencil-simple text-lg"></i> Sửa
             </button>
-            <a href="{% url 'portal_work_orders' %}" class="px-5 py-2 bg-primary text-white font-bold text-sm hover:bg-primary-600 rounded-xl flex items-center gap-2 transition-colors shadow-sm shadow-primary/30 h-10">
+            <a id="btn-create-wo" href="{% url 'portal_work_orders' %}" class="px-5 py-2 bg-primary text-white font-bold text-sm hover:bg-primary-600 rounded-xl flex items-center gap-2 transition-colors shadow-sm shadow-primary/30 h-10">
               <i class="ph-bold ph-plus text-lg"></i> Tạo Work Order
             </a>
           </div>
@@ -184,6 +213,7 @@
             <div class="flex gap-6 border-b border-neutral-200 mb-6">
               <button onclick="switchTab('info')" id="tab-btn-info" class="pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors"><i class="ph-fill ph-info"></i> Thông Tin Chung</button>
               <button onclick="switchTab('history')" id="tab-btn-history" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors"><i class="ph-fill ph-clock-counter-clockwise"></i> Lịch Sử Bảo Trì</button>
+              <button onclick="switchTab('meterReadings')" id="tab-btn-meterReadings" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors pr-2"><i class="ph-fill ph-gauge"></i> Chỉ số hoạt động</button>
             </div>
             
             <div id="tab-content-info" class="bg-neutral-50 border border-neutral-100 rounded-2xl p-6 shadow-inner mt-2 block">
@@ -219,11 +249,34 @@
               <div class="flex flex-col h-full">
                 <div class="relative mb-6 w-full sm:max-w-md">
                   <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
-                  <input type="text" placeholder="Tìm kiếm theo tiêu đề phiếu hoặc mã phiếu..." class="w-full pl-9 pr-3 py-2 h-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                  <input type="text" id="history-search" onkeyup="filterHistory()" placeholder="Tìm kiếm theo tiêu đề phiếu hoặc mã phiếu..." class="w-full pl-9 pr-3 py-2 h-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
                 </div>
-                <div class="flex flex-col items-center justify-center text-neutral-400 py-12 bg-neutral-50 rounded-2xl border border-neutral-100 flex-1">
-                  <i class="ph ph-calendar-x text-5xl mb-3 text-neutral-300"></i>
-                  <p class="font-medium text-neutral-500">Chưa có lịch sử bảo trì</p>
+                <div id="history-list" class="max-h-[400px] overflow-y-auto px-2 pb-4 custom-scrollbar">
+                  <div id="history-empty-state" class="flex flex-col items-center justify-center text-neutral-400 py-12 bg-neutral-50 rounded-2xl border border-neutral-100 flex-1">
+                    <i class="ph ph-calendar-x text-5xl mb-3 text-neutral-300"></i>
+                    <p class="font-medium text-neutral-500">Chưa có lịch sử bảo trì</p>
+                  </div>
+                  <div id="history-timeline" class="hidden space-y-4">
+                    <!-- History injected here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-content-meterReadings" class="mt-2 min-h-[300px] hidden">
+              <div class="flex flex-col h-full">
+                <div class="relative mb-6 w-full sm:max-w-md">
+                  <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+                  <input type="text" id="meter-search" onkeyup="filterMeterReadings()" placeholder="Tìm kiếm theo chỉ số, đơn vị, hoặc ghi chú..." class="w-full pl-9 pr-3 py-2 h-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                </div>
+                <div id="meter-list" class="max-h-[400px] overflow-y-auto px-2 pb-4 custom-scrollbar">
+                  <div id="meter-empty-state" class="flex flex-col items-center justify-center text-neutral-400 py-12 bg-neutral-50 rounded-2xl border border-neutral-100">
+                    <i class="ph ph-gauge text-5xl mb-3 text-neutral-300"></i>
+                    <p class="font-medium text-neutral-500">Chưa có chỉ số hoạt động nào</p>
+                  </div>
+                  <div id="meter-timeline" class="hidden relative border-l-2 border-neutral-200 ml-3 pl-6 space-y-6">
+                    <!-- Timeline items injected here -->
+                  </div>
                 </div>
               </div>
             </div>
@@ -311,6 +364,40 @@
               </select>
             </div>
           </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Nhà sản xuất</label>
+              <input type="text" id="asset-manufacturer" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Ngày mua</label>
+              <input type="date" id="asset-purchase" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Giá trị</label>
+              <input type="number" step="0.01" id="asset-value" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mẫu cấu trúc</label>
+              <select id="asset-template" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
+                <option value="">-- Chọn mẫu --</option>
+                {% for t in templates %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div>
+              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Vị trí (Location)</label>
+              <select id="asset-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
+                <option value="">-- Chọn vị trí --</option>
+                {% for loc in locations %}
+                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                {% endfor %}
+              </select>
+          </div>
         </div>
         <div id="asset-error" class="hidden mt-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200"></div>
         <div class="flex justify-end gap-3 pt-6 mt-6 border-t border-neutral-100">
@@ -324,6 +411,119 @@
   </div>
 </div>
 
+
+<!-- Print Filter Modal -->
+<div id="bulk-filter-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
+      <h3 class="text-lg font-bold text-neutral-800 m-0">Bộ lọc In / Xuất Tài Sản</h3>
+      <button onclick="closeBulkFilterModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
+        <i class="ph ph-x text-xl"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Trạng thái</label>
+        <select id="bulk-status" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
+          <option value="">Tất cả trạng thái</option>
+          <option value="OPERATIONAL">Đang hoạt động</option>
+          <option value="MAINTENANCE">Bảo trì</option>
+          <option value="BROKEN">Hỏng hóc</option>
+          <option value="DECOMMISSIONED">Thanh lý</option>
+          <option value="RESERVED">Dự trữ</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Danh mục</label>
+        <select id="bulk-category" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
+          <option value="">Tất cả danh mục</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Vị trí</label>
+        <select id="bulk-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
+          <option value="">Tất cả vị trí</option>
+          {% for loc in locations %}
+          <option value="{{ loc.id }}">{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Mẫu cấu trúc</label>
+        <select id="bulk-template" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
+          <option value="">Tất cả mẫu</option>
+          {% for t in templates %}
+          <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 px-6 py-4 border-t border-neutral-100 bg-neutral-50">
+      <button onclick="closeBulkFilterModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
+      <button onclick="executeExportData()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2"><i class="ph ph-file-xls"></i> Xuất Excel</button>
+      <button onclick="executePrintAllQR()" class="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-2"><i class="ph ph-printer"></i> In Mã QR</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Assets Modal -->
+<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl shadow-xl w-full max-w-[560px] overflow-hidden flex flex-col p-0 fancy-modal relative">
+    <button onclick="closeImportModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white hover:bg-danger hover:border-danger transition-all z-50 cursor-pointer">
+      <i class="ph ph-x text-base"></i>
+    </button>
+    <div class="relative overflow-hidden bg-white flex flex-col">
+      <div class="relative p-6 pb-10 bg-gradient-to-br from-primary-600 to-info overflow-hidden shrink-0">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        <div class="relative z-10 flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg transform -rotate-3 transition-all duration-300">
+            <i class="ph-fill ph-file-xls text-3xl drop-shadow-sm"></i>
+          </div>
+          <div>
+            <h3 class="text-2xl font-black text-white m-0 tracking-tight drop-shadow-sm">Bulk Import Assets</h3>
+            <p class="text-primary-100 font-medium m-0 mt-1 text-[13px] opacity-90">Onboard multiple assets via spreadsheet</p>
+          </div>
+        </div>
+      </div>
+      <div class="p-6 -mt-6 bg-white rounded-t-3xl relative z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] flex-1">
+        <div class="mb-5 p-3.5 bg-info/5 rounded-xl border border-info/20 flex items-start gap-3">
+          <i class="ph-fill ph-info text-info text-xl mt-0.5 shrink-0"></i>
+          <div>
+            <p class="text-[13px] font-bold text-neutral-800 m-0 mb-1 flex items-center gap-2">
+              Format: <span class="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-info font-bold tracking-wide">Name, Category, Template, Serial...</span>
+            </p>
+            <p class="text-[12px] text-neutral-500 m-0 leading-relaxed font-medium">
+              First row is header. <a href="/api/assets/importtemplate/" target="_blank" class="text-primary hover:underline cursor-pointer">Download template</a> to see the required structure.
+            </p>
+          </div>
+        </div>
+        <div class="rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary bg-neutral-50/50 hover:bg-primary/5 transition-all duration-300 overflow-hidden group">
+          <label class="w-full h-full flex flex-col items-center justify-center py-10 px-6 cursor-pointer relative">
+            <input type="file" id="import-file" accept=".csv" class="hidden" onchange="handleImportFile(event)">
+            <div class="w-20 h-20 mb-4 relative flex items-center justify-center transform group-hover:-translate-y-1 transition-transform duration-300">
+              <div class="absolute inset-0 bg-primary/20 rounded-full blur-xl group-hover:bg-primary/30 transition-colors"></div>
+              <div class="w-16 h-16 bg-white rounded-2xl shadow-[0_8px_20px_rgba(0,160,226,0.12)] border border-primary/10 flex items-center justify-center text-primary relative z-10 rotate-3 group-hover:rotate-6 transition-transform duration-300">
+                <i class="ph ph-upload-simple text-3xl drop-shadow-sm"></i>
+              </div>
+            </div>
+            <h4 class="text-lg font-black text-neutral-800 m-0 mb-1 relative z-10">Select or drop file</h4>
+            <p class="text-neutral-500 font-medium text-[13px] text-center max-w-[250px] relative z-10" id="import-file-name">
+              Upload <span class="font-bold text-info">.CSV</span> files.
+            </p>
+          </label>
+        </div>
+        <div class="mt-4 flex justify-end">
+          <button id="btn-submit-import" onclick="executeImport()" class="hidden px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center gap-2">
+             Xác nhận Nhập
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -332,6 +532,18 @@
 <script>
   let treeCollapsed = false;
   let currentSelectedAssetId = null;
+  let expandedNodes = JSON.parse(localStorage.getItem('assetTreeExpandedNodes') || '[]');
+
+  window.addEventListener('DOMContentLoaded', () => {
+    expandedNodes.forEach(id => {
+      const children = document.getElementById(`children-${id}`);
+      const caret = document.getElementById(`caret-${id}`);
+      if (children) {
+        children.classList.remove('hidden');
+        if (caret) caret.classList.remove('-rotate-90');
+      }
+    });
+  });
   
   function toggleLeftPane() {
     treeCollapsed = !treeCollapsed;
@@ -362,9 +574,15 @@
       if (children.classList.contains('hidden')) {
         children.classList.remove('hidden');
         if (caret) caret.classList.remove('-rotate-90');
+        if (!expandedNodes.includes(id)) {
+          expandedNodes.push(id);
+          localStorage.setItem('assetTreeExpandedNodes', JSON.stringify(expandedNodes));
+        }
       } else {
         children.classList.add('hidden');
         if (caret) caret.classList.add('-rotate-90');
+        expandedNodes = expandedNodes.filter(nId => nId !== id);
+        localStorage.setItem('assetTreeExpandedNodes', JSON.stringify(expandedNodes));
       }
     }
   }
@@ -381,11 +599,14 @@
       category: "{{ asset.category.name|default:'-'|escapejs }}",
       category_id: "{{ asset.category_id|default:'' }}",
       location_id: "{{ asset.location_id|default:'' }}",
+      template_id: "{{ asset.hierarchy_template_id|default:'' }}",
       description: "{{ asset.description|default:''|escapejs }}",
       manufacturer: "{{ asset.manufacturer|default:'-'|escapejs }}",
       model: "{{ asset.model|default:'-'|escapejs }}",
       purchase: "{{ asset.purchase_date|date:'d/m/Y'|default:'-' }}",
+      purchase_raw: "{{ asset.purchase_date|date:'Y-m-d'|default:'' }}",
       value: "{{ asset.value|default:'-' }}",
+      value_raw: "{{ asset.value|default:'' }}",
       isActive: {{ asset.is_active|lower }},
       qrCode: "{{ asset.qr_code|escapejs }}"
     },
@@ -458,6 +679,7 @@
       }
 
       currentSelectedAssetId = id;
+      document.getElementById('btn-create-wo').href = "{% url 'portal_work_orders' %}?asset_id=" + id;
 
       // Generate QR
       const qrContainer = document.getElementById('qr-container');
@@ -475,7 +697,7 @@
     }
   }
 
-  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='') {
+  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='', manufacturer='', purchase_date='', value='', template_id='', location_id='') {
     document.getElementById('asset-id').value = id;
     document.getElementById('asset-name').value = name;
     document.getElementById('asset-desc').value = desc;
@@ -483,6 +705,13 @@
     document.getElementById('asset-serial').value = serial;
     document.getElementById('asset-category').value = category_id;
     if (status) document.getElementById('asset-status').value = status;
+    
+    document.getElementById('asset-manufacturer').value = manufacturer;
+    document.getElementById('asset-purchase').value = purchase_date;
+    document.getElementById('asset-value').value = value;
+    document.getElementById('asset-template').value = template_id;
+    document.getElementById('asset-location').value = location_id;
+
     document.getElementById('asset-modal-title').innerText = id ? 'Chỉnh Sửa Tài Sản' : 'Thêm Tài Sản Mới';
     document.getElementById('asset-error').classList.add('hidden');
     document.getElementById('asset-modal').classList.remove('hidden');
@@ -500,6 +729,13 @@
     const serial = document.getElementById('asset-serial').value;
     const category_id = document.getElementById('asset-category').value;
     const status = document.getElementById('asset-status').value;
+    
+    const manufacturer = document.getElementById('asset-manufacturer').value;
+    const purchase_date = document.getElementById('asset-purchase').value;
+    const value = document.getElementById('asset-value').value;
+    const template_id = document.getElementById('asset-template').value;
+    const location_id = document.getElementById('asset-location').value;
+
     const btn = document.getElementById('btn-save-asset');
     const msg = document.getElementById('asset-error');
     
@@ -513,7 +749,12 @@
         model: model,
         serial_number: serial,
         status: status,
-        category_id: category_id || null
+        category_id: category_id || null,
+        manufacturer: manufacturer || null,
+        purchase_date: purchase_date || null,
+        value: value || null,
+        hierarchy_template_id: template_id || null,
+        location_id: location_id || null
     };
     if (id) payload.id = id;
 
@@ -550,7 +791,12 @@
       data.serial !== 'N/A' ? data.serial : '',
       data.qrCode,
       data.status,
-      data.category_id
+      data.category_id,
+      data.manufacturer !== '-' ? data.manufacturer : '',
+      data.purchase_raw || '',
+      data.value_raw || '',
+      data.template_id || '',
+      data.location_id || ''
     );
   }
 
@@ -697,8 +943,361 @@
     printWindow.document.close();
   }
 
+  let meterReadingsData = [];
+
+  function filterMeterReadings() {
+    const query = document.getElementById('meter-search').value.toLowerCase();
+    const timeline = document.getElementById('meter-timeline');
+    const items = timeline.querySelectorAll('.timeline-item');
+    let hasVisible = false;
+    items.forEach(item => {
+      const text = item.innerText.toLowerCase();
+      if (text.includes(query)) {
+        item.style.display = 'block';
+        hasVisible = true;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    if (!hasVisible && meterReadingsData.length > 0) {
+      // Could show a "no results" state here
+    }
+  }
+
+  function fetchMeterReadings(assetId) {
+    const timeline = document.getElementById('meter-timeline');
+    const emptyState = document.getElementById('meter-empty-state');
+    
+    fetch(`/api/assets/${assetId}/meter-readings/`)
+      .then(res => res.json())
+      .then(resData => {
+        if (resData.success) {
+          meterReadingsData = resData.data || [];
+          if (meterReadingsData.length === 0) {
+            emptyState.classList.remove('hidden');
+            timeline.classList.add('hidden');
+            timeline.innerHTML = '';
+          } else {
+            emptyState.classList.add('hidden');
+            timeline.classList.remove('hidden');
+            
+            timeline.innerHTML = meterReadingsData.map(reading => {
+              const remarks = reading.remarks || '';
+              const isWarning = /(nguy hiểm|cảnh báo|vượt ngưỡng|bất thường|quá cao|nóng|lỗi|danger|warning|high)/i.test(remarks);
+              const dateStr = new Date(reading.reading_date).toLocaleString('vi-VN');
+              const val = new Intl.NumberFormat('vi-VN').format(reading.reading_value);
+              const color = isWarning ? 'bg-red-500' : 'bg-blue-500';
+              const cardBg = isWarning ? 'bg-red-50/50 border-red-100' : 'bg-neutral-50 border-neutral-200';
+              const textColor = isWarning ? 'text-red-700 font-bold' : 'text-neutral-800 font-medium';
+              
+              return `
+                <div class="timeline-item relative">
+                  <!-- Timeline Node -->
+                  <div class="absolute -left-[31px] top-4 w-3 h-3 rounded-full ${color} border-2 border-white shadow-sm"></div>
+                  <!-- Card -->
+                  <div class="mb-5 rounded-xl p-5 border shadow-sm w-full lg:w-3/4 xl:w-2/3 ${cardBg}">
+                    <div class="flex items-center flex-wrap gap-3 mb-3">
+                      <span class="font-black text-neutral-900 text-lg">
+                        ${val} <span class="text-sm text-neutral-500 font-bold">${reading.unit}</span>
+                      </span>
+                      ${isWarning ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 flex items-center gap-1 tracking-widest"><i class="ph-fill ph-warning"></i> CẢNH BÁO</span>` : ''}
+                      <span class="text-xs text-neutral-500 ml-auto flex items-center gap-1.5 font-semibold bg-white px-3 py-1.5 rounded-lg border border-neutral-100 shadow-sm">
+                        <i class="ph ph-clock text-primary"></i> ${dateStr}
+                      </span>
+                    </div>
+                    ${remarks ? `<p class="text-base mb-3 ${textColor}">${remarks}</p>` : ''}
+                    <div class="flex items-center gap-2">
+                      <span class="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-500">
+                        <i class="ph-fill ph-user text-xs"></i>
+                      </span> 
+                      <span class="text-sm font-medium text-neutral-600">${reading.recorded_by_name || 'Người ghi nhận'}</span>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+      });
+  }
+
+  function toggleAssetFilter() {
+    const dropdown = document.getElementById('asset-filter-dropdown');
+    dropdown.classList.toggle('hidden');
+  }
+
+  function applyFilters() {
+    const status = document.getElementById('filter-status').value;
+    const category = document.getElementById('filter-category').value;
+    const searchInput = document.getElementById('search-input');
+    const search = searchInput ? searchInput.value.toLowerCase() : '';
+
+    // First pass: Reset all node displays and determine matching assets
+    const matchingAssets = new Set();
+    const matchingLocations = new Set();
+    
+    // Find locations that directly match the search
+    if (search) {
+      document.querySelectorAll('.tree-node').forEach(node => {
+        const name = node.getAttribute('data-node-name');
+        if (name && name.toLowerCase().includes(search)) {
+          matchingLocations.add(node);
+        }
+      });
+    }
+
+    document.querySelectorAll('.asset-item').forEach(el => {
+      const assetId = el.id.replace('asset-item-', '');
+      const asset = assetsData[assetId];
+      if (asset) {
+        const matchStatus = status ? asset.status === status : true;
+        const matchCategory = category ? asset.category_id === category : true;
+        
+        let matchSearch = true;
+        if (search) {
+          const directMatch = asset.name.toLowerCase().includes(search) || 
+                              asset.serial.toLowerCase().includes(search) || 
+                              asset.qrCode.toLowerCase().includes(search);
+          
+          let ancestorMatch = false;
+          let parentNode = el.closest('.tree-node');
+          while (parentNode) {
+            if (matchingLocations.has(parentNode)) {
+              ancestorMatch = true;
+              break;
+            }
+            parentNode = parentNode.parentElement.closest('.tree-node');
+          }
+          matchSearch = directMatch || ancestorMatch;
+        }
+
+        if (matchStatus && matchCategory && matchSearch) {
+          matchingAssets.add(el);
+          el.style.display = 'flex';
+          
+          // If searching, auto-expand ancestors
+          if (search) {
+            let parentNode = el.closest('.tree-node');
+            while (parentNode) {
+              const nodeId = parentNode.getAttribute('data-node-id') || 'unassigned';
+              const children = document.getElementById(`children-${nodeId}`);
+              const caret = document.getElementById(`caret-${nodeId}`);
+              if (children && children.classList.contains('hidden')) {
+                children.classList.remove('hidden');
+                if (caret) caret.classList.remove('-rotate-90');
+                if (!expandedNodes.includes(nodeId)) {
+                  expandedNodes.push(nodeId);
+                }
+              }
+              parentNode = parentNode.parentElement.closest('.tree-node');
+            }
+          }
+        } else {
+          el.style.display = 'none';
+        }
+      }
+    });
+    
+    if (search) {
+       localStorage.setItem('assetTreeExpandedNodes', JSON.stringify(expandedNodes));
+    }
+
+    // Second pass: Show/hide locations based on whether they contain visible items
+    // Process bottom-up to correctly evaluate parent visibility
+    const nodes = Array.from(document.querySelectorAll('.tree-node'));
+    // Sort by depth (deepest first). We can approximate this by DOM nesting level, or just run a simple recursive check.
+    
+    // Instead of sorting, let's use a function that checks if a node is visible
+    const checkNodeVisibility = (node) => {
+      let isVisible = false;
+      // Does it match search directly?
+      if (matchingLocations.has(node) && !status && !category) {
+        isVisible = true; // Wait, if there are status/category filters, legacy applies them to assets. If no assets match, is the location still visible? Legacy says YES if the location matched search directly! But let's just make it visible.
+      }
+      
+      // Does it have visible assets?
+      const directAssets = Array.from(node.querySelectorAll(':scope > div[id^="children-"] > .asset-item'));
+      if (directAssets.some(a => a.style.display !== 'none')) {
+        isVisible = true;
+      }
+      
+      // Does it have visible children?
+      const directChildren = Array.from(node.querySelectorAll(':scope > div[id^="children-"] > .tree-node'));
+      for (const child of directChildren) {
+        if (checkNodeVisibility(child)) {
+          isVisible = true;
+        }
+      }
+      
+      // If we have filters but no search, we should show the node if it has visible children/assets.
+      if (!search && !status && !category) {
+        isVisible = true; // Default state: all locations visible
+      }
+
+      node.style.display = isVisible ? 'block' : 'none';
+      return isVisible;
+    };
+
+    // Only top level nodes need to be called, they will recurse
+    const topLevelNodes = Array.from(document.querySelectorAll('#left-pane-content > div.overflow-y-auto > .tree-node'));
+    topLevelNodes.forEach(node => checkNodeVisibility(node));
+  }
+
+  function clearFilters() {
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-category').value = '';
+    applyFilters();
+    toggleAssetFilter();
+  }
+  
+  function openBulkFilterModal() {
+    document.getElementById('bulk-filter-modal').classList.remove('hidden');
+  }
+  
+  function closeBulkFilterModal() {
+    document.getElementById('bulk-filter-modal').classList.add('hidden');
+  }
+  
+  function executePrintAllQR() {
+    const status = document.getElementById('bulk-status').value;
+    const category = document.getElementById('bulk-category').value;
+    const location = document.getElementById('bulk-location').value;
+    const template = document.getElementById('bulk-template').value;
+    
+    const toPrint = Object.values(assetsData).filter(asset => {
+      const matchStatus = status ? asset.status === status : true;
+      const matchCategory = category ? asset.category_id === category : true;
+      const matchLocation = location ? asset.location_id === location : true;
+      const matchTemplate = template ? asset.template_id === template : true;
+      return matchStatus && matchCategory && matchLocation && matchTemplate;
+    });
+    
+    if (toPrint.length === 0) {
+      alert('Không có tài sản nào phù hợp để in.');
+      return;
+    }
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Vui lòng cho phép mở popup để in');
+      return;
+    }
+    
+    const qrPromises = toPrint.map(asset => {
+      return new Promise((resolve) => {
+        QRCode.toDataURL(asset.qrCode, { margin: 0, width: 150 }, (err, url) => {
+          resolve(`
+            <div style="border: 1px solid #111; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; break-inside: avoid; min-width: 200px;">
+              <img src="${url}" style="width: 150px; height: 150px;" />
+              <p style="margin-top: 15px; font-weight: bold; font-size: 16px; color: black; line-height: 1.2; margin-bottom: 0;">${asset.name}</p>
+              <p style="font-size: 14px; color: black; font-family: monospace; font-weight: bold; margin-top: 5px; margin-bottom: 0;">${asset.qrCode}</p>
+              <p style="font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; margin-bottom: 0;">${asset.category || 'N/A'}</p>
+            </div>
+          `);
+        });
+      });
+    });
+    
+    Promise.all(qrPromises).then(htmlBlocks => {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>In Mã QR Hàng Loạt</title>
+            <style>
+              @page { size: auto; margin: 10mm; }
+              body { font-family: Arial, sans-serif; background-color: white; margin: 0; padding: 20px; }
+              .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+            </style>
+          </head>
+          <body>
+            <div class="grid">
+              ${htmlBlocks.join('')}
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  window.close();
+                }, 500);
+              };
+            <\/script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      closeBulkFilterModal();
+    });
+  }
+  
+  function openImportModal() {
+    document.getElementById('import-modal').classList.remove('hidden');
+    document.getElementById('import-file').value = '';
+    document.getElementById('import-file-name').innerHTML = 'Upload <span class="font-bold text-info">.CSV</span> files.';
+    document.getElementById('btn-submit-import').classList.add('hidden');
+  }
+  
+  function closeImportModal() {
+    document.getElementById('import-modal').classList.add('hidden');
+  }
+  
+  function handleImportFile(event) {
+    const file = event.target.files[0];
+    if (file) {
+      document.getElementById('import-file-name').innerHTML = `<span class="font-bold text-success">${file.name}</span>`;
+      document.getElementById('btn-submit-import').classList.remove('hidden');
+    }
+  }
+  
+  function executeImport() {
+    const fileInput = document.getElementById('import-file');
+    if (!fileInput.files || fileInput.files.length === 0) return;
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const btn = document.getElementById('btn-submit-import');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Đang tải...';
+    
+    fetch('/api/assets/import', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      },
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+         if (data.data && data.data.failure_count > 0) {
+            alert(`Nhập thành công ${data.data.success_count}, thất bại ${data.data.failure_count}. Các lỗi:\n${data.data.errors.join('\n')}`);
+         } else {
+            alert('Nhập dữ liệu thành công!');
+         }
+         window.location.reload();
+      } else {
+         alert(data.error || 'Lỗi khi nhập dữ liệu.');
+      }
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = 'Xác nhận Nhập';
+    });
+  }
+
   function executeExportData() {
-    const all = Object.values(assetsData);
+    const status = document.getElementById('bulk-status') ? document.getElementById('bulk-status').value : '';
+    const category = document.getElementById('bulk-category') ? document.getElementById('bulk-category').value : '';
+    const location = document.getElementById('bulk-location') ? document.getElementById('bulk-location').value : '';
+    const template = document.getElementById('bulk-template') ? document.getElementById('bulk-template').value : '';
+    
+    const all = Object.values(assetsData).filter(asset => {
+      const matchStatus = status ? asset.status === status : true;
+      const matchCategory = category ? asset.category_id === category : true;
+      const matchLocation = location ? asset.location_id === location : true;
+      const matchTemplate = template ? asset.template_id === template : true;
+      return matchStatus && matchCategory && matchLocation && matchTemplate;
+    });
     if (all.length === 0) {
       alert('Không tìm thấy tài sản nào.');
       return;
@@ -721,22 +1320,183 @@
     XLSX.writeFile(workbook, `Assets_Export.xlsx`);
   }
 
-  function switchTab(tab) {
-    const btnInfo = document.getElementById('tab-btn-info');
-    const btnHistory = document.getElementById('tab-btn-history');
-    const contentInfo = document.getElementById('tab-content-info');
-    const contentHistory = document.getElementById('tab-content-history');
+  let currentHistoryData = [];
+  function fetchHistory(assetId) {
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 5);
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + 1);
 
-    if (tab === 'info') {
-      btnInfo.className = 'pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors';
-      btnHistory.className = 'pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors';
-      contentInfo.classList.remove('hidden');
-      contentHistory.classList.add('hidden');
+    fetch(`/api/v1/work-orders/calendar?assetId=${assetId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
+      }
+    })
+    .then(res => res.json())
+    .then(resData => {
+      if (resData.success) {
+        currentHistoryData = resData.data
+          .filter(e => e.eventType === 'WORK_ORDER' && (e.status === 'COMPLETED' || e.status === 'CANCELLED'))
+          .map(e => e.originalData)
+          .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
+        renderHistory();
+      }
+    })
+    .catch(err => console.error("Error fetching history:", err));
+  }
+
+  function renderHistory() {
+    const term = document.getElementById('history-search').value.toLowerCase();
+    const filtered = currentHistoryData.filter(wo => {
+      const matchTitle = wo.title && wo.title.toLowerCase().includes(term);
+      const matchId = wo.id && String(wo.id).toLowerCase().includes(term);
+      return matchTitle || matchId;
+    });
+
+    const empty = document.getElementById('history-empty-state');
+    const timeline = document.getElementById('history-timeline');
+
+    if (filtered.length === 0) {
+      empty.classList.remove('hidden');
+      timeline.classList.add('hidden');
     } else {
-      btnHistory.className = 'pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors';
-      btnInfo.className = 'pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors';
-      contentHistory.classList.remove('hidden');
-      contentInfo.classList.add('hidden');
+      empty.classList.add('hidden');
+      timeline.classList.remove('hidden');
+      
+      let html = '';
+      filtered.forEach(wo => {
+        const date = new Date(wo.updated_at || wo.created_at);
+        const dateStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' ' + date.toLocaleDateString('en-GB');
+        const shortId = wo.id.split('-')[0].toUpperCase();
+        const isCompleted = wo.status === 'COMPLETED';
+        const color = isCompleted ? 'green' : 'red';
+        const icon = isCompleted ? 'ph-check-circle' : 'ph-x-circle';
+        
+        html += `
+          <div class="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/40 hover:shadow-md transition-all group">
+            <div class="flex items-center gap-4 flex-1 min-w-0">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-${color}-50 text-${color}-600">
+                <i class="ph-fill ${icon} text-2xl"></i>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-black text-neutral-900 text-sm">#${shortId}</span>
+                  <span class="rounded font-bold border-0 text-[10px] tracking-widest px-1.5 py-0.5 bg-${color}-100 text-${color}-700 uppercase">${wo.status}</span>
+                </div>
+                <p class="font-bold text-neutral-800 text-base truncate" title="${wo.title}">${wo.title}</p>
+              </div>
+            </div>
+            <div class="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-neutral-100 pt-3 sm:pt-0 sm:pl-4">
+              <div class="flex items-center gap-1.5 text-xs text-neutral-500 font-medium">
+                <i class="ph ph-calendar-blank text-neutral-400"></i> ${dateStr}
+              </div>
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 bg-neutral-50 px-2.5 py-1.5 rounded-lg border border-neutral-100 shadow-sm">
+                <span class="w-5 h-5 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-500 overflow-hidden">
+                  <i class="ph-fill ph-user text-[10px]"></i>
+                </span>
+                ${wo.assignedTo ? 'Đã giao (ID: ' + wo.assignedTo.split('-')[0].toUpperCase() + ')' : 'Chưa gán'}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      timeline.innerHTML = html;
+    }
+  }
+
+  function filterHistory() {
+    renderHistory();
+  }
+
+  let currentMeterReadings = [];
+  function fetchMeterReadings(assetId) {
+    fetch(`/api/v1/assets/${assetId}/meter-readings`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(res => res.json())
+    .then(resData => {
+      if (resData.success) {
+        currentMeterReadings = resData.data;
+        renderMeterReadings();
+      }
+    })
+    .catch(err => console.error("Error fetching meter readings:", err));
+  }
+
+  function renderMeterReadings() {
+    const term = document.getElementById('meter-search').value.toLowerCase();
+    const filtered = currentMeterReadings.filter(mr => {
+      const matchVal = String(mr.readingValue).toLowerCase().includes(term);
+      const matchUnit = (mr.unit || '').toLowerCase().includes(term);
+      const matchRemarks = (mr.remarks || '').toLowerCase().includes(term);
+      return matchVal || matchUnit || matchRemarks;
+    });
+
+    const empty = document.getElementById('meter-empty-state');
+    const timeline = document.getElementById('meter-timeline');
+
+    if (filtered.length === 0) {
+      empty.classList.remove('hidden');
+      timeline.classList.add('hidden');
+    } else {
+      empty.classList.add('hidden');
+      timeline.classList.remove('hidden');
+      
+      let html = '';
+      filtered.forEach(mr => {
+        const date = new Date(mr.readingDate);
+        const dateStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' ' + date.toLocaleDateString('en-GB');
+        
+        html += `
+          <div class="relative group">
+            <div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-white bg-primary shadow-sm group-hover:scale-125 transition-transform"></div>
+            <div class="bg-white border border-neutral-200 rounded-xl p-4 hover:border-primary/30 transition-colors shadow-sm">
+              <div class="flex justify-between items-start mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-black text-primary text-lg">${mr.readingValue}</span>
+                  <span class="text-xs font-bold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">${mr.unit || 'N/A'}</span>
+                </div>
+                <span class="text-xs font-medium text-neutral-400 flex items-center gap-1"><i class="ph-fill ph-clock"></i> ${dateStr}</span>
+              </div>
+              ${mr.remarks ? `<p class="text-sm text-neutral-600 m-0">${mr.remarks}</p>` : ''}
+            </div>
+          </div>
+        `;
+      });
+      timeline.innerHTML = html;
+    }
+  }
+
+  function filterMeterReadings() {
+    renderMeterReadings();
+  }
+
+  function switchTab(tab) {
+    const tabs = ['info', 'history', 'meterReadings'];
+    
+    tabs.forEach(t => {
+      const btn = document.getElementById(`tab-btn-${t}`);
+      const content = document.getElementById(`tab-content-${t}`);
+      if (btn && content) {
+        if (t === tab) {
+          btn.className = 'pb-3 text-sm font-semibold border-b-2 border-primary text-primary flex items-center gap-2 transition-colors' + (t === 'meterReadings' ? ' pr-2' : '');
+          content.classList.remove('hidden');
+        } else {
+          btn.className = 'pb-3 text-sm font-semibold border-b-2 border-transparent text-neutral-500 hover:text-neutral-700 flex items-center gap-2 transition-colors' + (t === 'meterReadings' ? ' pr-2' : '');
+          content.classList.add('hidden');
+        }
+      }
+    });
+    
+    if (tab === 'meterReadings' && currentSelectedAssetId) {
+      fetchMeterReadings(currentSelectedAssetId);
+    } else if (tab === 'history' && currentSelectedAssetId) {
+      fetchHistory(currentSelectedAssetId);
     }
   }
   
@@ -756,51 +1516,8 @@
     document.getElementById('details-view').classList.add('hidden');
   }
 
-  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='') {
-    document.getElementById('asset-id').value = id;
-    document.getElementById('asset-name').value = name;
-    document.getElementById('asset-desc').value = desc;
-    document.getElementById('asset-model').value = model;
-    document.getElementById('asset-serial').value = serial;
-    document.getElementById('asset-category').value = category_id;
-    if (status) document.getElementById('asset-status').value = status;
-    document.getElementById('asset-modal-title').innerText = id ? 'Chỉnh Sửa Tài Sản' : 'Thêm Tài Sản Mới';
-    document.getElementById('asset-error').classList.add('hidden');
-    document.getElementById('asset-modal').classList.remove('hidden');
-  }
 
-  function closeAssetModal() {
-    document.getElementById('asset-modal').classList.add('hidden');
-  }
-
-  function submitAsset() {
-    const payload = {
-      id: document.getElementById('asset-id').value,
-      name: document.getElementById('asset-name').value,
-      model: document.getElementById('asset-model').value,
-      serial_number: document.getElementById('asset-serial').value,
-      category_id: document.getElementById('asset-category').value,
-      status: document.getElementById('asset-status').value
-    };
-
-    fetch('{% url "portal_asset_registry" %}', {
-        method: payload.id ? 'PUT' : 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(resData => {
-        if(resData.success) {
-            window.location.reload();
-        } else {
-            const err = document.getElementById('asset-error');
-            err.classList.remove('hidden');
-            err.innerText = resData.error || 'Lỗi khi lưu tài sản';
-        }
-    });
-  }
 </script>
+
+
 {% endblock %}

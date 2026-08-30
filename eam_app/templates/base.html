@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EAM System{% endblock %}</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}" />
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -102,8 +102,8 @@
                 <i class="{% if request.resolver_match.url_name == 'portal_dashboard' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-squares-four text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Dashboard</span>
               </a>
-              <a href="{% url 'portal_asset_registry' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_registry' or request.resolver_match.url_name == 'portal_asset_categories' or request.resolver_match.url_name == 'portal_hierarchy_templates' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
-                <i class="{% if request.resolver_match.url_name == 'portal_asset_registry' or request.resolver_match.url_name == 'portal_asset_categories' or request.resolver_match.url_name == 'portal_hierarchy_templates' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-cube text-lg shrink-0"></i>
+              <a href="{% url 'portal_asset_registry' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_registry' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+                <i class="{% if request.resolver_match.url_name == 'portal_asset_registry' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-cube text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Registry</span>
               </a>
               <a href="{% url 'portal_work_orders' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_work_orders' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
@@ -111,17 +111,17 @@
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Work Orders</span>
                 <span class="sidebar-text ml-auto bg-danger text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap transition-opacity duration-300 opacity-100">12</span>
               </a>
-              <a href="{% url 'portal_inventory' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_inventory' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
-                <i class="{% if request.resolver_match.url_name == 'portal_inventory' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-package text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Inventory</span>
-              </a>
               <a href="{% url 'portal_pm_plans' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_pm_plans' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_pm_plans' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-calendar-check text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Maintenance</span>
               </a>
-              <a href="#" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-600 hover:bg-neutral-100">
-                <i class="ph ph-chart-line-up text-lg shrink-0 group-hover:text-primary transition-colors"></i>
+              <a href="#" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_reports' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+                <i class="{% if request.resolver_match.url_name == 'portal_reports' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-chart-line-up text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Reports</span>
+              </a>
+              <a href="{% url 'portal_inventory' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_inventory' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+                <i class="{% if request.resolver_match.url_name == 'portal_inventory' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-package text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Inventory</span>
               </a>
             </div>
             
@@ -136,6 +136,14 @@
               <a href="{% url 'portal_roles' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_roles' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_roles' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-shield-check text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Roles</span>
+              </a>
+              <a href="{% url 'portal_asset_categories' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_categories' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+                <i class="{% if request.resolver_match.url_name == 'portal_asset_categories' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-tag text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Config</span>
+              </a>
+              <a href="{% url 'portal_settings' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_settings' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+                <i class="{% if request.resolver_match.url_name == 'portal_settings' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-gear text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Settings</span>
               </a>
               <a href="{% url 'portal_audit_logs' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_audit_logs' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_audit_logs' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-file-text text-lg shrink-0"></i>
