@@ -6,7 +6,7 @@
 
 {% block content %}
 <!-- Main Content -->
-<div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-full p-6">
+<div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-full">
   <!-- Left Pane: Asset List -->
   <div id="left-pane" class="w-full md:w-1/3 md:min-w-[320px] md:max-w-sm flex bg-white border border-neutral-200 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex-col overflow-hidden transition-all duration-300 relative">
 
@@ -138,6 +138,9 @@
                 <span class="flex items-center gap-1.5 text-primary bg-primary/10 px-2.5 py-1 rounded-lg font-semibold"><i class="ph-fill ph-map-pin text-sm"></i> <span id="detail-location"></span></span>
                 <span class="flex items-center gap-1.5 text-info bg-info/10 px-2.5 py-1 rounded-lg font-semibold"><i class="ph-fill ph-tree-structure text-sm"></i> <span id="detail-template"></span></span>
               </div>
+              <div id="detail-timestamps" class="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-xs mt-2 text-neutral-500">
+                <!-- Timestamp content injected by JS -->
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
@@ -170,7 +173,7 @@
                 <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
                   <i class="ph-fill ph-map-pin text-lg"></i>
                 </div>
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0 flex-1" id="card-location-container">
                   <p class="font-bold text-neutral-900 text-base leading-tight truncate" id="card-location-name">Name</p>
                 </div>
               </div>
@@ -183,7 +186,7 @@
                 <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center text-info shrink-0 mt-0.5">
                   <i class="ph-fill ph-tree-structure text-lg"></i>
                 </div>
-                <div class="min-w-0 flex-1">
+                <div class="min-w-0 flex-1" id="card-template-container">
                   <p class="font-bold text-neutral-900 text-base leading-tight truncate" id="card-template-name">Template</p>
                 </div>
               </div>
@@ -315,95 +318,95 @@
   </div>
 </div>
 
-<!-- Asset Modal -->
-<div id="asset-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
-    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
-      <h3 class="text-lg font-bold text-neutral-800 m-0" id="asset-modal-title">Thêm Tài Sản Mới</h3>
-      <button onclick="closeAssetModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
-        <i class="ph ph-x text-xl"></i>
+<div id="asset-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-[24px] shadow-xl w-full max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col fancy-modal relative">
+    <div class="px-6 pt-6 pb-3 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
+      <h3 class="text-xl font-black text-neutral-900 m-0" id="asset-modal-title">Thêm Tài Sản Mới</h3>
+      <button type="button" onclick="closeAssetModal()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 transition-colors z-50">
+        <i class="ph ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-6 overflow-y-auto custom-scrollbar">
+    <div class="p-6 overflow-y-auto custom-scrollbar bg-white">
       <form id="asset-form" onsubmit="event.preventDefault(); submitAsset();">
         <input type="hidden" id="asset-id" value="">
-        <div class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+          <!-- Column 1 -->
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Tên tài sản <span class="text-danger">*</span></label>
-            <input type="text" id="asset-name" required class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            <input type="text" id="asset-name" required class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-10">
           </div>
           <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Model</label>
-            <input type="text" id="asset-model" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Danh mục</label>
+            <select id="asset-category" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="">-- Chọn danh mục --</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mẫu cấu trúc</label>
+            <select id="asset-template" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="">-- Chọn mẫu --</option>
+              {% for t in templates %}
+              <option value="{{ t.id }}">{{ t.name }}</option>
+              {% endfor %}
+            </select>
           </div>
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Serial Number</label>
-            <input type="text" id="asset-serial" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            <input type="text" id="asset-serial" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-10">
           </div>
           <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mô tả</label>
-            <textarea id="asset-desc" rows="3" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Danh mục</label>
-              <select id="asset-category" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
-                <option value="">-- Chọn danh mục --</option>
-                {% for cat in categories %}
-                <option value="{{ cat.id }}">{{ cat.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trạng thái</label>
-              <select id="asset-status" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
-                <option value="OPERATIONAL">OPERATIONAL</option>
-                <option value="DOWN">DOWN</option>
-                <option value="MAINTENANCE">MAINTENANCE</option>
-                <option value="RETIRED">RETIRED</option>
-              </select>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Nhà sản xuất</label>
-              <input type="text" id="asset-manufacturer" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Ngày mua</label>
-              <input type="date" id="asset-purchase" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-            </div>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Giá trị</label>
-              <input type="number" step="0.01" id="asset-value" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mẫu cấu trúc</label>
-              <select id="asset-template" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
-                <option value="">-- Chọn mẫu --</option>
-                {% for t in templates %}
-                <option value="{{ t.id }}">{{ t.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Model</label>
+            <input type="text" id="asset-model" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-10">
           </div>
           <div>
-              <label class="block text-sm font-bold text-neutral-700 mb-1.5">Vị trí (Location)</label>
-              <select id="asset-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium">
-                <option value="">-- Chọn vị trí --</option>
-                {% for loc in locations %}
-                <option value="{{ loc.id }}">{{ loc.name }}</option>
-                {% endfor %}
-              </select>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Nhà sản xuất</label>
+            <input type="text" id="asset-manufacturer" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-10">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Ngày mua</label>
+            <input type="date" id="asset-purchase" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-10">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Giá trị</label>
+            <input type="number" step="0.01" id="asset-value" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-10">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trạng thái</label>
+            <select id="asset-status" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="OPERATIONAL">OPERATIONAL</option>
+              <option value="DOWN">DOWN</option>
+              <option value="MAINTENANCE">MAINTENANCE</option>
+              <option value="RETIRED">RETIRED</option>
+            </select>
+          </div>
+          <div class="flex flex-col justify-center">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trạng thái Active</label>
+            <label class="relative inline-flex items-center cursor-pointer mt-1">
+              <input type="checkbox" id="asset-is-active" class="sr-only peer" checked>
+              <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Vị trí (Location)</label>
+            <select id="asset-location" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="">-- Chọn vị trí --</option>
+              {% for loc in locations %}
+              <option value="{{ loc.id }}">{{ loc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mô tả (Tùy chọn)</label>
+            <textarea id="asset-desc" rows="3" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
           </div>
         </div>
         <div id="asset-error" class="hidden mt-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200"></div>
-        <div class="flex justify-end gap-3 pt-6 mt-6 border-t border-neutral-100">
-          <button type="button" onclick="closeAssetModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
-          <button type="submit" id="btn-save-asset" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20 flex items-center gap-2">
-            <i class="ph-bold ph-floppy-disk"></i> Lưu
+        <div class="flex justify-end pt-6 mt-6 border-t border-neutral-100">
+          <button type="submit" id="btn-save-asset" class="px-8 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-xl h-10 transition-colors">
+            Tạo Mới
           </button>
         </div>
       </form>
@@ -608,7 +611,11 @@
       value: "{{ asset.value|default:'-' }}",
       value_raw: "{{ asset.value|default:'' }}",
       isActive: {{ asset.is_active|lower }},
-      qrCode: "{{ asset.qr_code|escapejs }}"
+      qrCode: "{{ asset.qr_code|escapejs }}",
+      createdAt: "{{ asset.created_at|date:'H:i d/m/Y' }}",
+      updatedAt: "{{ asset.updated_at|date:'H:i d/m/Y' }}",
+      createdByName: "{{ asset.created_by.get_full_name|default:asset.created_by.username|escapejs }}",
+      updatedByName: "{{ asset.updated_by.get_full_name|default:asset.updated_by.username|escapejs }}"
     },
     {% endfor %}
   };
@@ -652,9 +659,49 @@
       document.getElementById('detail-location').innerText = data.location;
       document.getElementById('detail-template').innerText = data.template;
       
-      document.getElementById('card-location-name').innerText = data.location;
-      document.getElementById('card-template-name').innerText = data.template;
+      const formatBreadcrumbs = (str) => {
+        if (!str || str === 'Chưa gán vị trí' || str === 'Chưa gán cấu trúc') return '';
+        const parts = str.split('.');
+        return parts.map((part, idx) => `
+          <span class="text-[10px] bg-white border border-neutral-100 text-neutral-600 px-1.5 py-0.5 rounded flex items-center gap-1.5 break-all sm:break-normal">
+            ${idx > 0 ? '<span class="text-neutral-300 font-bold">&gt;</span>' : ''} ${part}
+          </span>
+        `).join('');
+      };
+      
+      const locParts = data.location.split('.');
+      const tplParts = data.template.split('.');
+      
+      const locContainer = document.getElementById('card-location-container');
+      locContainer.innerHTML = `
+        <p class="font-bold text-neutral-900 text-base leading-tight truncate" title="${locParts[locParts.length - 1]}">${locParts[locParts.length - 1]}</p>
+        <div class="flex flex-wrap gap-1.5 mt-2">${formatBreadcrumbs(data.location)}</div>
+      `;
+      
+      const tplContainer = document.getElementById('card-template-container');
+      tplContainer.innerHTML = `
+        <p class="font-bold text-neutral-900 text-base leading-tight truncate" title="${tplParts[tplParts.length - 1]}">${tplParts[tplParts.length - 1]}</p>
+        <div class="flex flex-wrap gap-1.5 mt-2">${formatBreadcrumbs(data.template)}</div>
+      `;
+      
       document.getElementById('card-qr-code').innerText = data.qrCode.split('-')[0].toUpperCase();
+      
+      const tsContainer = document.getElementById('detail-timestamps');
+      let tsHtml = `
+        <span class="flex items-center gap-1.5">
+          <i class="ph ph-clock-counter-clockwise"></i>
+          Được thêm vào lúc ${data.createdAt} ${data.createdByName ? 'bởi ' + data.createdByName : ''}
+        </span>
+      `;
+      if (data.updatedAt && data.updatedAt !== data.createdAt) {
+        tsHtml += `
+          <span class="flex items-center gap-1.5 sm:border-l sm:border-neutral-200 sm:pl-4">
+            <i class="ph ph-pencil-simple"></i>
+            Cập nhật lần cuối lúc ${data.updatedAt} ${data.updatedByName ? 'bởi ' + data.updatedByName : ''}
+          </span>
+        `;
+      }
+      tsContainer.innerHTML = tsHtml;
       
       document.getElementById('detail-category').innerText = data.category;
       document.getElementById('detail-manufacturer').innerText = data.manufacturer;
@@ -697,7 +744,7 @@
     }
   }
 
-  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='', manufacturer='', purchase_date='', value='', template_id='', location_id='') {
+  function openAssetModal(id='', name='', desc='', model='', serial='', qr='', status='', category_id='', manufacturer='', purchase_date='', value='', template_id='', location_id='', is_active=true) {
     document.getElementById('asset-id').value = id;
     document.getElementById('asset-name').value = name;
     document.getElementById('asset-desc').value = desc;
@@ -711,8 +758,10 @@
     document.getElementById('asset-value').value = value;
     document.getElementById('asset-template').value = template_id;
     document.getElementById('asset-location').value = location_id;
+    document.getElementById('asset-is-active').checked = is_active;
 
     document.getElementById('asset-modal-title').innerText = id ? 'Chỉnh Sửa Tài Sản' : 'Thêm Tài Sản Mới';
+    document.getElementById('btn-save-asset').innerText = id ? 'Lưu Thay Đổi' : 'Tạo Mới';
     document.getElementById('asset-error').classList.add('hidden');
     document.getElementById('asset-modal').classList.remove('hidden');
   }
@@ -729,6 +778,7 @@
     const serial = document.getElementById('asset-serial').value;
     const category_id = document.getElementById('asset-category').value;
     const status = document.getElementById('asset-status').value;
+    const is_active = document.getElementById('asset-is-active').checked;
     
     const manufacturer = document.getElementById('asset-manufacturer').value;
     const purchase_date = document.getElementById('asset-purchase').value;
@@ -754,7 +804,8 @@
         purchase_date: purchase_date || null,
         value: value || null,
         hierarchy_template_id: template_id || null,
-        location_id: location_id || null
+        location_id: location_id || null,
+        is_active: is_active
     };
     if (id) payload.id = id;
 
@@ -796,7 +847,8 @@
       data.purchase_raw || '',
       data.value_raw || '',
       data.template_id || '',
-      data.location_id || ''
+      data.location_id || '',
+      data.isActive
     );
   }
 
@@ -1328,6 +1380,7 @@
     endDate.setFullYear(endDate.getFullYear() + 1);
 
     fetch(`/api/v1/work-orders/calendar?assetId=${assetId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
+      credentials: 'same-origin',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
         'Content-Type': 'application/json',
@@ -1413,6 +1466,7 @@
   let currentMeterReadings = [];
   function fetchMeterReadings(assetId) {
     fetch(`/api/v1/assets/${assetId}/meter-readings`, {
+      credentials: 'same-origin',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
         'Content-Type': 'application/json'

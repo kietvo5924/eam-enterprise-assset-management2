@@ -355,16 +355,24 @@ def portal_roles(request):
 def portal_asset_categories(request):
     from assets.models import AssetCategory
     import json
-    from django.http import JsonResponse
+    from django.http import JsonResponse, HttpResponseForbidden
+    from users.permissions import HasPermission
     
     tenant_id = request.user.tenant_id
     
     if request.method == 'POST':
+        if not HasPermission('asset_category:create')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
+            name = data.get('name')
+            
+            if AssetCategory.objects.filter(tenant_id=tenant_id, name=name).exists():
+                return JsonResponse({'success': False, 'error': 'Category name already exists in this tenant'}, status=400)
+                
             c = AssetCategory.objects.create(
                 tenant_id=tenant_id,
-                name=data.get('name'),
+                name=name,
                 description=data.get('description'),
                 is_active=data.get('is_active', True)
             )
@@ -373,10 +381,17 @@ def portal_asset_categories(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not HasPermission('asset_category:update')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             c = AssetCategory.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            c.name = data.get('name')
+            new_name = data.get('name')
+            
+            if new_name != c.name and AssetCategory.objects.filter(tenant_id=tenant_id, name=new_name).exists():
+                return JsonResponse({'success': False, 'error': 'Category name already exists in this tenant'}, status=400)
+                
+            c.name = new_name
             c.description = data.get('description')
             c.is_active = data.get('is_active', True)
             c.save()
@@ -385,61 +400,100 @@ def portal_asset_categories(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not HasPermission('asset_category:delete')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             c = AssetCategory.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            c.delete()
+            c.is_active = False
+            c.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
+    if not (HasPermission('asset_category:read')().has_permission(request, None) or HasPermission('asset:read')().has_permission(request, None)):
+        return HttpResponseForbidden("Permission denied")
+
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
-    return render(request, 'asset_categories.html', {'categories': categories})
+    from assets.models import HierarchyTemplate
+    template_count = HierarchyTemplate.objects.filter(tenant_id=tenant_id).count()
+    return render(request, 'asset_categories.html', {
+        'categories': categories,
+        'template_count': template_count
+    })
 
 @login_required(login_url='portal_login')
 def portal_hierarchy_templates(request):
-    from assets.models import HierarchyTemplate
+    from assets.models import HierarchyTemplate, AssetCategory
     import json
     from django.http import JsonResponse
+    from users.permissions import HasPermission
     
     tenant_id = request.user.tenant_id
     
+    if not (HasPermission('asset_category:read')().has_permission(request, None) or HasPermission('asset:read')().has_permission(request, None)):
+        return HttpResponseForbidden("Permission denied")
+
     if request.method == 'POST':
+        if not HasPermission('asset_category:create')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
+            name = data.get('name')
+            if HierarchyTemplate.objects.filter(tenant_id=tenant_id, name=name).exists():
+                return JsonResponse({'success': False, 'error': 'Hierarchy template name already exists in this tenant'}, status=400)
+            
             t = HierarchyTemplate.objects.create(
                 tenant_id=tenant_id,
-                name=data.get('name'),
+                name=name,
                 description=data.get('description'),
-                path=data.get('path', '/')
+                path=data.get('path', '/'),
+                is_active=data.get('is_active', True)
             )
             return JsonResponse({'success': True, 'id': str(t.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not HasPermission('asset_category:update')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             t = HierarchyTemplate.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            t.name = data.get('name')
-            t.description = data.get('description')
-            t.path = data.get('path', '/')
+            name = data.get('name')
+            if name != t.name and HierarchyTemplate.objects.filter(tenant_id=tenant_id, name=name).exists():
+                return JsonResponse({'success': False, 'error': 'Hierarchy template name already exists in this tenant'}, status=400)
+                
+            t.name = name
+            if 'description' in data:
+                t.description = data.get('description')
+            if 'path' in data:
+                t.path = data.get('path', '/')
+            if 'is_active' in data:
+                t.is_active = data.get('is_active')
             t.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not HasPermission('asset_category:delete')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             t = HierarchyTemplate.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            t.delete()
+            t.is_active = False
+            t.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
     templates = HierarchyTemplate.objects.filter(tenant_id=tenant_id)
-    return render(request, 'hierarchy_templates.html', {'templates': templates})
+    category_count = AssetCategory.objects.filter(tenant_id=tenant_id).count()
+    return render(request, 'hierarchy_templates.html', {
+        'templates': templates,
+        'category_count': category_count
+    })
 
 @login_required(login_url='portal_login')
 def portal_asset_registry(request):
@@ -575,6 +629,8 @@ def portal_work_orders(request):
             if action == 'toggle_checklist':
                 item = WorkOrderChecklistItem.objects.get(id=data.get('item_id'), tenant_id=tenant_id)
                 item.is_completed = data.get('is_completed')
+                if 'actual_value' in data:
+                    item.actual_value = data.get('actual_value')
                 item.save()
                 return JsonResponse({'success': True})
                 
@@ -599,7 +655,8 @@ def portal_work_orders(request):
                     status=data.get('status', 'CREATED'),
                     asset_id=asset_id if asset_id else None,
                     assigned_to_id=assigned_to_id if assigned_to_id else None,
-                    deadline=parse_datetime(data.get('deadline')) if data.get('deadline') else None
+                    deadline=parse_datetime(data.get('deadline')) if data.get('deadline') else None,
+                    created_by=request.user
                 )
                 return JsonResponse({'success': True, 'id': str(wo.id)})
         except Exception as e:
@@ -609,24 +666,83 @@ def portal_work_orders(request):
         try:
             data = json.loads(request.body)
             wo = WorkOrder.objects.get(id=data.get('id'), tenant_id=tenant_id)
+            from django.utils import timezone
             
-            asset_id = data.get('asset_id')
-            assigned_to_id = data.get('assigned_to_id')
-            
-            wo.title = data.get('title')
-            wo.description = data.get('description')
-            wo.priority = data.get('priority')
-            wo.status = data.get('status')
-            wo.asset_id = asset_id if asset_id else None
-            wo.assigned_to_id = assigned_to_id if assigned_to_id else None
-            
-            if data.get('deadline'):
-                wo.deadline = parse_datetime(data.get('deadline'))
-            else:
-                wo.deadline = None
+            # 1. Update Status Action
+            if len(data) == 2 and 'status' in data:
+                new_status = data.get('status')
+                current_status = wo.status
                 
-            wo.save()
-            return JsonResponse({'success': True})
+                if current_status != new_status:
+                    if new_status == 'ASSIGNED':
+                        raise Exception("Cannot manually change status to ASSIGNED")
+                    elif new_status == 'IN_PROGRESS':
+                        if current_status != 'ASSIGNED':
+                            raise Exception("Work Order can only be started from ASSIGNED state")
+                        if str(wo.assigned_to_id) != str(request.user.id):
+                            raise Exception("Only the assignee can start the Work Order")
+                        wo.actual_start_time = timezone.now()
+                    elif new_status == 'COMPLETED':
+                        if current_status != 'IN_PROGRESS':
+                            raise Exception("Work Order can only be completed from IN_PROGRESS state")
+                        if str(wo.assigned_to_id) != str(request.user.id):
+                            raise Exception("Only the assignee can complete the Work Order")
+                            
+                        has_notes = wo.resolution_notes and wo.resolution_notes.strip()
+                        has_attachments = wo.attachments.exists()
+                        if not has_notes and not has_attachments:
+                            raise Exception("Vui lòng nhập ghi chú sửa chữa hoặc tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.")
+                            
+                        for item in wo.checklists.all():
+                            if item.is_mandatory and not item.is_completed:
+                                raise Exception(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
+                                
+                        wo.completed_at = timezone.now()
+                    elif new_status in ['CANCELED', 'CANCELLED']:
+                        if current_status == 'COMPLETED':
+                            raise Exception("Cannot cancel a COMPLETED Work Order")
+                            
+                    wo.status = new_status
+                    wo.save()
+                return JsonResponse({'success': True})
+                
+            # 2. Assign Action
+            elif len(data) == 2 and 'assigned_to_id' in data:
+                if wo.status in ['COMPLETED', 'CANCELED', 'CANCELLED']:
+                    raise Exception("Cannot reassign a completed or canceled work order")
+                    
+                new_assignee_id = data.get('assigned_to_id')
+                if str(wo.assigned_to_id) != str(new_assignee_id):
+                    wo.assigned_to_id = new_assignee_id if new_assignee_id else None
+                    if new_assignee_id:
+                        wo.assigned_at = timezone.now()
+                        if wo.status == 'IN_PROGRESS':
+                            wo.status = 'ASSIGNED'
+                            wo.actual_start_time = None
+                        elif wo.status == 'CREATED':
+                            wo.status = 'ASSIGNED'
+                    wo.save()
+                return JsonResponse({'success': True})
+                
+            # 3. Full Update Action
+            else:
+                asset_id = data.get('asset_id')
+                assigned_to_id = data.get('assigned_to_id')
+                
+                wo.title = data.get('title')
+                wo.description = data.get('description')
+                wo.priority = data.get('priority')
+                wo.status = data.get('status')
+                wo.asset_id = asset_id if asset_id else None
+                wo.assigned_to_id = assigned_to_id if assigned_to_id else None
+                
+                if data.get('deadline'):
+                    wo.deadline = parse_datetime(data.get('deadline'))
+                else:
+                    wo.deadline = None
+                    
+                wo.save()
+                return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
@@ -647,7 +763,7 @@ def portal_work_orders(request):
     from django.utils import timezone
     now = timezone.now()
 
-    work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id').prefetch_related('checklists', 'follow_up_work_orders')
+    work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by').prefetch_related('checklists', 'follow_up_work_orders')
     
     total_wos = work_orders.count()
     in_progress = sum(1 for wo in work_orders if wo.status == 'IN_PROGRESS')
@@ -656,7 +772,7 @@ def portal_work_orders(request):
 
     wo_data = []
     for wo in work_orders:
-        checklists = list(wo.checklists.all().values('id', 'item_name', 'is_completed'))
+        checklists = list(wo.checklists.all().values('id', 'item_name', 'is_completed', 'input_type', 'expected_value', 'actual_value', 'is_mandatory'))
         # Need to cast UUIDs to strings
         for c in checklists:
             c['id'] = str(c['id'])
@@ -685,19 +801,28 @@ def portal_work_orders(request):
 def portal_inventory(request):
     from assets.models import SparePart
     import json
-    from django.http import JsonResponse
+    from django.http import JsonResponse, HttpResponseForbidden
     
     tenant_id = request.user.tenant_id
+    is_admin = request.user.is_superuser or request.user.roles.filter(permissions__id='system:admin').exists()
     
+    if request.method == 'GET':
+        if not (is_admin or request.user.roles.filter(permissions__id='inventory:read').exists()):
+            return HttpResponseForbidden("Permission denied")
+            
     if request.method == 'POST':
+        if not (is_admin or request.user.roles.filter(permissions__id='inventory:create').exists()):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
+            qty = data.get('quantity_in_stock')
+            
             sp = SparePart.objects.create(
                 tenant_id=tenant_id,
                 name=data.get('name'),
                 part_number=data.get('part_number'),
                 description=data.get('description'),
-                quantity_in_stock=data.get('quantity_in_stock', 0),
+                quantity_in_stock=qty if qty is not None else 0,
                 unit_cost=data.get('unit_cost') or None
             )
             return JsonResponse({'success': True, 'id': str(sp.id)})
@@ -705,13 +830,18 @@ def portal_inventory(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not (is_admin or request.user.roles.filter(permissions__id='inventory:update').exists()):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             sp = SparePart.objects.get(id=data.get('id'), tenant_id=tenant_id)
             sp.name = data.get('name')
             sp.part_number = data.get('part_number')
             sp.description = data.get('description')
-            sp.quantity_in_stock = data.get('quantity_in_stock', 0)
+            
+            if data.get('quantity_in_stock') is not None:
+                sp.quantity_in_stock = data['quantity_in_stock']
+                
             sp.unit_cost = data.get('unit_cost') or None
             sp.save()
             return JsonResponse({'success': True})
@@ -719,6 +849,8 @@ def portal_inventory(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not (is_admin or request.user.roles.filter(permissions__id='inventory:delete').exists()):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             sp = SparePart.objects.get(id=data.get('id'), tenant_id=tenant_id)
@@ -741,15 +873,44 @@ def portal_pm_plans(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            pm = PmPlan.objects.create(
-                tenant_id=tenant_id,
-                name=data.get('name'),
-                description=data.get('description'),
-                trigger_type=data.get('trigger_type', 'TIME'),
-                interval_value=data.get('interval_value') or None,
-                interval_unit=data.get('interval_unit') or None,
-                is_active=data.get('is_active', True)
-            )
+            with transaction.atomic():
+                pm = PmPlan.objects.create(
+                    tenant_id=tenant_id,
+                    name=data.get('name'),
+                    description=data.get('description'),
+                    trigger_type=data.get('trigger_type', 'TIME'),
+                    interval_value=data.get('interval_value') or None,
+                    interval_unit=data.get('interval_unit') or None,
+                    is_active=data.get('is_active', True),
+                    is_floating_schedule=data.get('is_floating_schedule', False),
+                    suppress_if_pending=data.get('suppress_if_pending', True),
+                    lead_time_days=data.get('lead_time_days', 0),
+                    estimated_duration_minutes=data.get('estimated_duration_minutes') or None,
+                    assignee_id=data.get('assignee_id') or None
+                )
+                
+                from maintenance.models import PmPlanChecklistItem, PmPlanMaterial
+                from assets.models import SparePart
+                
+                if 'checklists' in data:
+                    for pc in data['checklists']:
+                        PmPlanChecklistItem.objects.create(
+                            pm_plan=pm,
+                            item_name=pc.get('item_name'),
+                            input_type=pc.get('input_type', 'PASS_FAIL'),
+                            expected_value=pc.get('expected_value') or None,
+                            is_mandatory=pc.get('is_mandatory', False)
+                        )
+                
+                if 'materials' in data:
+                    for pm_mat in data['materials']:
+                        sp = SparePart.objects.get(id=pm_mat.get('spare_part_id'), tenant_id=tenant_id)
+                        PmPlanMaterial.objects.create(
+                            pm_plan=pm,
+                            spare_part=sp,
+                            quantity=pm_mat.get('quantity')
+                        )
+                
             return JsonResponse({'success': True, 'id': str(pm.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -757,14 +918,45 @@ def portal_pm_plans(request):
     elif request.method == 'PUT':
         try:
             data = json.loads(request.body)
-            pm = PmPlan.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            pm.name = data.get('name')
-            pm.description = data.get('description')
-            pm.trigger_type = data.get('trigger_type')
-            pm.interval_value = data.get('interval_value') or None
-            pm.interval_unit = data.get('interval_unit') or None
-            pm.is_active = data.get('is_active', True)
-            pm.save()
+            with transaction.atomic():
+                pm = PmPlan.objects.get(id=data.get('id'), tenant_id=tenant_id)
+                pm.name = data.get('name')
+                pm.description = data.get('description')
+                pm.trigger_type = data.get('trigger_type')
+                pm.interval_value = data.get('interval_value') or None
+                pm.interval_unit = data.get('interval_unit') or None
+                pm.is_active = data.get('is_active', True)
+                pm.is_floating_schedule = data.get('is_floating_schedule', False)
+                pm.suppress_if_pending = data.get('suppress_if_pending', True)
+                pm.lead_time_days = data.get('lead_time_days', 0)
+                pm.estimated_duration_minutes = data.get('estimated_duration_minutes') or None
+                pm.assignee_id = data.get('assignee_id') or None
+                pm.save()
+                
+                from maintenance.models import PmPlanChecklistItem, PmPlanMaterial
+                from assets.models import SparePart
+                
+                if 'checklists' in data:
+                    pm.checklists.all().delete()
+                    for pc in data['checklists']:
+                        PmPlanChecklistItem.objects.create(
+                            pm_plan=pm,
+                            item_name=pc.get('item_name'),
+                            input_type=pc.get('input_type', 'PASS_FAIL'),
+                            expected_value=pc.get('expected_value') or None,
+                            is_mandatory=pc.get('is_mandatory', False)
+                        )
+                
+                if 'materials' in data:
+                    pm.materials.all().delete()
+                    for pm_mat in data['materials']:
+                        sp = SparePart.objects.get(id=pm_mat.get('spare_part_id'), tenant_id=tenant_id)
+                        PmPlanMaterial.objects.create(
+                            pm_plan=pm,
+                            spare_part=sp,
+                            quantity=pm_mat.get('quantity')
+                        )
+
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -797,14 +989,139 @@ def portal_pm_plans(request):
     if total_pm_wos > 0:
         compliance_rate = (completed_pm_wos / total_pm_wos) * 100.0
 
+    upcoming_pms_count = 0
+    from maintenance.models import PmPlanAssignment
+    from dateutil.relativedelta import relativedelta
+    now_time = timezone.now()
+    next_7_days = now_time + timezone.timedelta(days=7)
+
+    active_assignments = PmPlanAssignment.objects.filter(tenant_id=tenant_id, status='ACTIVE', pm_plan__trigger_type='TIME')
+    for assignment in active_assignments:
+        plan = assignment.pm_plan
+        interval = plan.interval_value
+        unit = plan.interval_unit
+        if not interval or interval <= 0 or not unit:
+            continue
+            
+        ref_date = assignment.last_triggered_at or assignment.created_at
+        due_date = ref_date
+        
+        while due_date <= next_7_days:
+            if unit == 'DAYS':
+                due_date += relativedelta(days=int(interval))
+            elif unit == 'WEEKS':
+                due_date += relativedelta(weeks=int(interval))
+            elif unit == 'MONTHS':
+                due_date += relativedelta(months=int(interval))
+            elif unit == 'YEARS':
+                due_date += relativedelta(years=int(interval))
+            else:
+                break
+                
+            if now_time <= due_date <= next_7_days:
+                upcoming_pms_count += 1
+
     kpis = {
         'totalPlans': total_plans,
-        'upcomingIn7Days': 0, # Since we'd need to project plans, hardcode or leave 0 for now as in the API
+        'upcomingIn7Days': upcoming_pms_count,
         'missedPms': missed_pms,
         'complianceRate': round(compliance_rate, 1)
     }
 
-    return render(request, 'pm_plans.html', {'pm_plans': pm_plans, 'kpis': kpis})
+    pm_plans_data = []
+    for pm in pm_plans:
+        pm_plans_data.append({
+            'pm': pm,
+            'checklists_json': json.dumps([
+                {
+                    'id': str(c.id),
+                    'item_name': c.item_name,
+                    'input_type': c.input_type,
+                    'expected_value': c.expected_value,
+                    'is_mandatory': c.is_mandatory
+                } for c in pm.checklists.all()
+            ]),
+            'materials_json': json.dumps([
+                {
+                    'id': str(m.id),
+                    'spare_part_id': str(m.spare_part_id),
+                    'quantity': float(m.quantity)
+                } for m in pm.materials.all()
+            ])
+        })
+        
+    from users.models import User
+    from assets.models import Asset, SparePart
+    users = User.objects.all()
+    spare_parts = SparePart.objects.filter(tenant_id=tenant_id)
+    assets = Asset.objects.filter(tenant_id=tenant_id)
+
+    return render(request, 'pm_plans.html', {
+        'pm_plans_data': pm_plans_data,
+        'kpis': kpis,
+        'users': users,
+        'spare_parts': spare_parts,
+        'assets': assets
+    })
+
+@login_required(login_url='portal_login')
+def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
+    from maintenance.models import PmPlanAssignment, PmPlan
+    from assets.models import Asset
+    import json
+    from django.http import JsonResponse
+    
+    tenant_id = request.user.tenant_id
+    
+    if request.method == 'GET' and plan_id:
+        assignments = PmPlanAssignment.objects.filter(pm_plan_id=plan_id, tenant_id=tenant_id).select_related('asset')
+        data = []
+        for a in assignments:
+            data.append({
+                'id': str(a.id),
+                'assetId': str(a.asset_id),
+                'assetName': a.asset.name,
+                'status': a.status
+            })
+        return JsonResponse({'success': True, 'data': data})
+        
+    elif request.method == 'POST' and plan_id:
+        try:
+            data = json.loads(request.body)
+            asset_ids = data.get('asset_ids', [])
+            pm = PmPlan.objects.get(id=plan_id, tenant_id=tenant_id)
+            for aid in asset_ids:
+                asset = Asset.objects.get(id=aid, tenant_id=tenant_id)
+                PmPlanAssignment.objects.get_or_create(
+                    pm_plan=pm,
+                    asset=asset,
+                    tenant_id=tenant_id,
+                    defaults={'status': 'ACTIVE'}
+                )
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            
+    elif request.method == 'PATCH' and assignment_id:
+        try:
+            data = json.loads(request.body)
+            assignment = PmPlanAssignment.objects.get(id=assignment_id, tenant_id=tenant_id)
+            if 'status' in data:
+                assignment.status = data['status']
+                assignment.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            
+    elif request.method == 'DELETE' and assignment_id:
+        try:
+            assignment = PmPlanAssignment.objects.get(id=assignment_id, tenant_id=tenant_id)
+            assignment.delete()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
 
 @login_required(login_url='portal_login')
 def portal_audit_logs(request):

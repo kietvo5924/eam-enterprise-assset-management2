@@ -57,7 +57,7 @@ class PortalAuthenticatedViewsTest(TestCase):
         from users.models import User, Role
         from core.models import Tenant
         self.tenant = Tenant.objects.create(name='Test Tenant', tenant_code='TEST')
-        self.user = User.objects.create_user(username='admin', email='admin@test.com', password='password', tenant_id=self.tenant.id)
+        self.user = User.objects.create_user(username='admin', email='admin@test.com', password='password', tenant_id=self.tenant.id, is_superuser=True)
         self.client.login(username='admin', password='password')
 
     def test_dashboard_renders(self):

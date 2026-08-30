@@ -94,15 +94,17 @@
   </div>
 
   <!-- Views Container -->
-  <div class="flex-1 flex flex-col bg-white border border-neutral-200 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative">
+  <div class="flex-1 flex flex-col bg-white border border-neutral-200 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-h-[650px] relative">
     
     <!-- View: Calendar -->
-    <div id="view-calendar" class="absolute inset-0 flex flex-col">
+    <div id="view-calendar" class="w-full h-full flex flex-col absolute inset-0">
       <div class="p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0 rounded-t-3xl">
         <h3 class="font-bold text-lg text-neutral-800 m-0">Maintenance Schedule</h3>
         <div class="flex flex-wrap gap-2">
-            <select id="cal-status" onchange="refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors">
-                <option value="">All Statuses</option>
+            <input type="text" id="cal-asset-id" placeholder="Asset ID" onkeyup="if(event.key === 'Enter') refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors w-32">
+            <input type="text" id="cal-category-id" placeholder="Category ID" onkeyup="if(event.key === 'Enter') refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors w-32">
+            <select id="cal-status" onchange="refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors w-40">
+                <option value="">Filter by Status</option>
                 <option value="CREATED">Created</option>
                 <option value="IN_PROGRESS">In Progress</option>
                 <option value="COMPLETED">Completed</option>
@@ -116,7 +118,7 @@
     </div>
 
     <!-- View: List -->
-    <div id="view-list" class="absolute inset-0 flex flex-col hidden bg-white rounded-3xl overflow-hidden">
+    <div id="view-list" class="w-full h-full flex flex-col hidden bg-white rounded-3xl overflow-hidden absolute inset-0">
       <div class="p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0">
         <div class="flex items-center gap-4">
           <h3 class="font-bold text-lg text-neutral-800 m-0" id="list-month-title">Events</h3>
@@ -144,7 +146,7 @@
     </div>
 
     <!-- View: Plans -->
-    <div id="view-plans" class="absolute inset-0 flex flex-col hidden bg-white rounded-3xl overflow-hidden">
+    <div id="view-plans" class="w-full h-full flex flex-col hidden bg-white rounded-3xl overflow-hidden absolute inset-0">
       <div class="p-4 border-b border-neutral-100 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0">
         <div>
           <h2 class="text-lg font-bold text-neutral-800 m-0">Preventive Maintenance Plans</h2>
@@ -170,34 +172,34 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100">
-            {% for plan in pm_plans %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer" onclick="openPmModal('{{ plan.id }}', '{{ plan.name|escapejs }}', '{{ plan.description|escapejs }}', '{{ plan.trigger_type }}', '{{ plan.interval_value|default_if_none:'' }}', '{{ plan.interval_unit|default_if_none:'' }}', {{ plan.is_active|lower }})">
-              <td class="px-6 py-4">
-                <p class="font-bold text-neutral-800 m-0 group-hover:text-primary transition-colors">{{ plan.name }}</p>
-                <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.description }}">{{ plan.description|default:"No description" }}</p>
+            {% for plan in pm_plans_data %}
+            <tr class="hover:bg-neutral-50/50 transition-colors group">
+              <td class="px-6 py-4 cursor-pointer" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
+                <p class="font-bold text-neutral-800 m-0 group-hover:text-primary transition-colors">{{ plan.pm.name }}</p>
+                <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.pm.description }}">{{ plan.pm.description|default:"No description" }}</p>
               </td>
               <td class="px-6 py-4">
-                {% if plan.trigger_type == 'TIME' %}
+                {% if plan.pm.trigger_type == 'TIME' %}
                   <div class="flex items-center gap-1 text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded w-max text-xs border border-blue-200">
                     <i class="ph-fill ph-clock text-sm"></i> Time
                   </div>
-                {% elif plan.trigger_type == 'METER' %}
+                {% elif plan.pm.trigger_type == 'METER' %}
                   <div class="flex items-center gap-1 text-purple-600 font-semibold bg-purple-50 px-2 py-1 rounded w-max text-xs border border-purple-200">
                     <i class="ph-fill ph-gauge text-sm"></i> Meter
                   </div>
                 {% else %}
-                  <span class="text-neutral-600">{{ plan.trigger_type }}</span>
+                  <span class="text-neutral-600">{{ plan.pm.trigger_type }}</span>
                 {% endif %}
               </td>
               <td class="px-6 py-4 font-medium text-neutral-700">
-                {% if plan.trigger_type == 'TIME' %}
-                  Every {{ plan.interval_value|floatformat:0 }} {{ plan.interval_unit|lower }}
-                {% elif plan.trigger_type == 'METER' %}
-                  Every {{ plan.interval_value|floatformat:0 }} units
+                {% if plan.pm.trigger_type == 'TIME' %}
+                  Every {{ plan.pm.interval_value|floatformat:0 }} {{ plan.pm.interval_unit|lower }}
+                {% elif plan.pm.trigger_type == 'METER' %}
+                  Every {{ plan.pm.interval_value|floatformat:0 }} units
                 {% endif %}
               </td>
               <td class="px-6 py-4">
-                {% if plan.is_active %}
+                {% if plan.pm.is_active %}
                   <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border border-green-200 flex items-center gap-1 w-max">
                     <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Active
                   </span>
@@ -206,7 +208,17 @@
                 {% endif %}
               </td>
               <td class="px-6 py-4 text-right">
-                <button onclick="event.stopPropagation(); deletePm('{{ plan.id }}')" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-danger rounded-lg hover:bg-red-50 bg-transparent transition-colors ml-auto"><i class="ph-bold ph-trash text-lg"></i></button>
+                <div class="flex gap-2 items-center justify-end">
+                    <button onclick="event.stopPropagation(); openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})" title="Edit Plan" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                        <i class="ph-bold ph-pencil-simple text-lg"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); openAssignments('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}')" title="View Assignments" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                        <i class="ph-bold ph-link text-lg"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); deletePm('{{ plan.pm.id }}')" title="Delete" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
+                        <i class="ph-bold ph-trash text-lg"></i>
+                    </button>
+                </div>
               </td>
             </tr>
             {% empty %}
@@ -247,38 +259,32 @@
         <div id="pm-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
 
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Plan Name <span class="text-danger">*</span></label>
-          <input type="text" id="pm-name" required class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Name <span class="text-danger">*</span></label>
+          <input type="text" id="pm-name" placeholder="Enter PM Plan name" required class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Description</label>
+          <textarea id="pm-desc" rows="3" placeholder="Enter description" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"></textarea>
         </div>
         
         <div>
           <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trigger Type <span class="text-danger">*</span></label>
-          <div class="grid grid-cols-2 gap-3">
-            <label class="border border-primary bg-primary-50 rounded-xl p-3 flex items-start gap-3 cursor-pointer">
-              <input type="radio" name="trigger" value="TIME" id="trigger-time" class="mt-0.5 text-primary focus:ring-primary" checked>
-              <div>
-                <p class="font-bold text-sm text-primary-700 m-0">Time Based</p>
-                <p class="text-xs text-primary-600/70 m-0">E.g., Every 3 months</p>
-              </div>
-            </label>
-            <label class="border border-neutral-200 bg-white rounded-xl p-3 flex items-start gap-3 cursor-pointer hover:bg-neutral-50 transition-colors">
-              <input type="radio" name="trigger" value="METER" id="trigger-meter" class="mt-0.5 text-primary focus:ring-primary">
-              <div>
-                <p class="font-bold text-sm text-neutral-700 m-0">Meter Based</p>
-                <p class="text-xs text-neutral-500 m-0">E.g., Every 10,000 km</p>
-              </div>
-            </label>
-          </div>
+          <select id="pm-trigger" onchange="toggleIntervalUnit()" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+            <option value="TIME">Time-based</option>
+            <option value="USAGE">Usage-based</option>
+            <option value="METER">Meter-based</option>
+          </select>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Interval Value <span class="text-danger">*</span></label>
-            <input type="number" id="pm-interval-value" min="1" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          <div class="col-span-2 sm:col-span-1" id="interval-value-container">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5" id="interval-value-label">Interval Value <span class="text-danger">*</span></label>
+            <input type="number" id="pm-interval-value" min="1" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
           </div>
-          <div>
+          <div class="col-span-2 sm:col-span-1" id="interval-unit-container">
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Interval Unit <span class="text-danger">*</span></label>
-            <select id="pm-interval-unit" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+            <select id="pm-interval-unit" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
               <option value="DAYS">Days</option>
               <option value="WEEKS">Weeks</option>
               <option value="MONTHS">Months</option>
@@ -286,15 +292,73 @@
             </select>
           </div>
         </div>
-
-        <div class="flex items-center gap-3">
-          <input type="checkbox" id="pm-is-active" class="w-5 h-5 text-primary rounded border-neutral-300 focus:ring-primary" checked>
-          <label for="pm-is-active" class="text-sm font-bold text-neutral-700">Is Active</label>
+        
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5" title="Number of days before the actual due date to generate the Work Order">Lead Time (Days) <span class="text-danger">*</span></label>
+          <input type="number" id="pm-lead-time" min="0" value="0" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
         </div>
         
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Description & Instructions</label>
-          <textarea id="pm-desc" rows="3" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Estimated Duration (Minutes) <span class="text-danger">*</span></label>
+          <input type="number" id="pm-est-duration" min="1" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5" title="Optional. The selected technician will be automatically assigned to any work orders generated from this plan.">Default Assignee</label>
+          <select id="pm-assignee" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+            <option value="">Select a default technician</option>
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.username|default:u.email }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="flex flex-wrap gap-6 items-center">
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="pm-is-floating" class="sr-only peer">
+              <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              <span class="ml-3 text-sm font-bold text-neutral-700" title="Calculate next due date from actual completion">Floating Schedule</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="pm-suppress-pending" class="sr-only peer" checked>
+              <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              <span class="ml-3 text-sm font-bold text-neutral-700" title="Skip generation if previous WO is pending">Suppress If Pending</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="pm-is-active" class="sr-only peer" checked>
+              <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              <span class="ml-3 text-sm font-bold text-neutral-700">Status</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mt-4 mb-2">
+              <label class="block text-sm font-bold text-neutral-700 m-0">SOP Checklist</label>
+          </div>
+          <div id="pm-checklists-container" class="space-y-3">
+            <!-- Dynamic checklist rows -->
+          </div>
+          <button type="button" onclick="addChecklistRow()" class="mt-2 w-full py-2 border border-dashed border-primary text-primary hover:bg-primary-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+              <i class="ph-bold ph-plus"></i> Add Checklist Item
+          </button>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mt-4 mb-2">
+              <label class="block text-sm font-bold text-neutral-700 m-0">Estimated Materials (Spare Parts)</label>
+          </div>
+          <div id="pm-materials-container" class="space-y-3">
+            <!-- Dynamic material rows -->
+          </div>
+          <button type="button" onclick="addMaterialRow()" class="mt-2 w-full py-2 border border-dashed border-primary text-primary hover:bg-primary-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+              <i class="ph-bold ph-plus"></i> Add Material
+          </button>
         </div>
       </form>
     </div>
@@ -307,14 +371,37 @@
   </div>
 </div>
 
-<!-- Assign Modal Placeholder -->
-<div id="assign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
-  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignModal()"></div>
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative z-10 p-8 text-center">
-      <i class="ph-fill ph-link text-5xl text-neutral-300 mb-4"></i>
-      <h3 class="font-black text-xl text-neutral-800 mb-2">Assign Plan Feature</h3>
-      <p class="text-neutral-500 mb-6">This feature requires a separate Assignment endpoint not fully implemented in this view template yet.</p>
-      <button onclick="closeAssignModal()" class="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold mx-auto transition-all">Close</button>
+<!-- Assignment Drawer -->
+<div id="assign-drawer" class="fixed inset-0 z-[100] hidden">
+  <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignments()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-[550px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+      <div class="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
+      <div class="flex flex-col">
+          <h3 class="font-black text-2xl text-neutral-800 m-0">Asset Assignments</h3>
+          <p class="text-neutral-500 text-sm mt-1" id="assign-plan-name">Plan Name</p>
+      </div>
+      <button onclick="closeAssignments()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="p-6 bg-neutral-50 border-b border-neutral-100">
+        <label class="block text-sm font-bold text-neutral-700 mb-2">Assign New Asset</label>
+        <div class="flex gap-2">
+            <select id="new-assign-asset" class="flex-1 px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+                <option value="">-- Select Asset --</option>
+                {% for a in assets %}
+                <option value="{{ a.id }}">{{ a.name }}</option>
+                {% endfor %}
+            </select>
+            <button onclick="addAssignment()" class="px-5 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+                <i class="ph-bold ph-plus"></i> Assign
+            </button>
+        </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6 bg-white" id="assignments-list-container">
+        <!-- List of assignments injected via JS -->
+    </div>
   </div>
 </div>
 
@@ -361,10 +448,12 @@
               const start = info.start.toISOString();
               const end = info.end.toISOString();
               const status = document.getElementById('cal-status').value;
+              const assetId = document.getElementById('cal-asset-id').value;
+              const categoryId = document.getElementById('cal-category-id').value;
               let url = `{% url 'work_order_calendar' %}?startDate=${start}&endDate=${end}`;
-              if (status) {
-                  url += `&status=${status}`;
-              }
+              if (status) url += `&status=${status}`;
+              if (assetId) url += `&assetId=${assetId}`;
+              if (categoryId) url += `&categoryId=${categoryId}`;
               
               fetch(url)
                 .then(res => res.json())
@@ -440,10 +529,66 @@
       if(mode === 'calendar' && calendar) {
           calendar.render();
       }
+      
+      if(mode === 'list') {
+          // Manually trigger a refresh if the list is empty or stuck on loading
+          const tbody = document.getElementById('eventsListBody');
+          if(tbody.innerHTML.includes('Loading events...')) {
+              refreshEvents();
+          }
+      }
   }
 
   function refreshEvents() {
       if(calendar) calendar.refetchEvents();
+      
+      // If calendar is hidden, it might not fetch, so let's do a direct fetch for the list view just in case
+      if(viewMode === 'list') {
+          const status = document.getElementById('cal-status').value;
+          const assetId = document.getElementById('cal-asset-id').value;
+          const categoryId = document.getElementById('cal-category-id').value;
+          
+          let d = new Date();
+          let start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+          let end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString();
+          
+          if(calendar) {
+              const view = calendar.view;
+              if (view && view.activeStart) {
+                  start = view.activeStart.toISOString();
+                  end = view.activeEnd.toISOString();
+              }
+          }
+          
+          let url = `{% url 'work_order_calendar' %}?startDate=${start}&endDate=${end}`;
+          if (status) url += `&status=${status}`;
+          if (assetId) url += `&assetId=${assetId}`;
+          if (categoryId) url += `&categoryId=${categoryId}`;
+          
+          document.getElementById('eventsListBody').innerHTML = '<tr><td colspan="5" class="text-center py-12 text-neutral-500"><i class="ph-bold ph-spinner animate-spin text-2xl"></i> Loading events...</td></tr>';
+          
+          fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    const events = data.data.map(e => {
+                        return {
+                            id: e.id,
+                            title: e.title,
+                            start: e.eventDate,
+                            extendedProps: { ...e }
+                        };
+                    });
+                    renderListView(events);
+                } else {
+                    document.getElementById('eventsListBody').innerHTML = '<tr><td colspan="5" class="text-center py-12 text-danger font-medium">Failed to load events.</td></tr>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('eventsListBody').innerHTML = '<tr><td colspan="5" class="text-center py-12 text-danger font-medium">Failed to load events.</td></tr>';
+            });
+      }
   }
 
   function renderListView(events) {
@@ -451,7 +596,17 @@
       tbody.innerHTML = '';
       
       if(events.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="text-center py-12 text-neutral-500 font-medium">No events found for this period.</td></tr>';
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+                <div class="flex flex-col items-center justify-center">
+                  <i class="ph ph-calendar-blank text-4xl text-neutral-300 mb-3"></i>
+                  <p class="text-base font-semibold text-neutral-700 m-0">No events found for this period</p>
+                  <p class="text-sm mt-1">Try adjusting your filters or checking a different month.</p>
+                </div>
+              </td>
+            </tr>
+          `;
           return;
       }
       
@@ -491,11 +646,79 @@
       const ep = event.extendedProps;
       const d = new Date(event.start);
       const dateStr = d.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit', hour12: false });
+      const orig = ep.originalData || {};
       
-      const content = `
-          <div class="space-y-4">
+      let priorityBadge = '';
+      if (ep.priority === 'HIGH') priorityBadge = `<span class="px-2 py-0.5 bg-red-50 text-red-600 rounded text-xs font-bold border border-red-200">${ep.priority}</span>`;
+      else if (ep.priority === 'MEDIUM') priorityBadge = `<span class="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-xs font-bold border border-orange-200">${ep.priority}</span>`;
+      else if (ep.priority) priorityBadge = `<span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-bold border border-blue-200">${ep.priority}</span>`;
+
+      let content = `<div class="space-y-4">`;
+      
+      if (ep.eventType === 'WORK_ORDER') {
+          let materialsHtml = '';
+          if (orig.materials && orig.materials.length > 0) {
+              materialsHtml = orig.materials.map(m => `
+                  <div class="text-xs mt-1">
+                      • ${m.sparePart?.name || 'Unknown'} <span class="text-neutral-400">(${m.sparePart?.partNumber || ''})</span>: <span class="font-bold">x${m.quantity}</span>
+                  </div>
+              `).join('');
+          }
+          
+          content += `
               <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
-                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Title</p>
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Work Order Title</p>
+                  <p class="font-bold text-neutral-800 text-lg">${event.title}</p>
+              </div>
+              <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Description</p>
+                  <p class="font-bold text-neutral-800">${orig.description || '-'}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Asset</p>
+                      <p class="font-bold text-neutral-800">${ep.assetName || 'N/A'}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Priority</p>
+                      <p class="font-bold text-neutral-800">${priorityBadge}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Status</p>
+                      <p class="font-bold text-neutral-800">${ep.status}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Deadline</p>
+                      <p class="font-bold text-neutral-800">${dateStr}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Assignee</p>
+                      <p class="font-bold text-neutral-800">${orig.assigneeName || 'Chưa phân công'}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Estimated</p>
+                      <p class="font-bold text-neutral-800">${orig.estimatedDurationMinutes ? orig.estimatedDurationMinutes + ' phút' : '-'}</p>
+                  </div>
+              </div>
+              ${materialsHtml ? `
+              <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Materials</p>
+                  ${materialsHtml}
+              </div>` : ''}
+          `;
+      } else {
+          let materialsHtml = '';
+          if (orig.materials && orig.materials.length > 0) {
+              materialsHtml = orig.materials.map(m => `
+                  <div class="text-xs mt-1">
+                      • ${m.sparePartName || 'Unknown'} <span class="text-neutral-400">(${m.sparePartId ? m.sparePartId.substring(0,8) : ''})</span>: <span class="font-bold">x${m.quantity}</span>
+                  </div>
+              `).join('');
+          }
+          
+          content += `
+              <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Plan Name</p>
                   <p class="font-bold text-neutral-800 text-lg">${event.title}</p>
               </div>
               <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
@@ -504,19 +727,32 @@
               </div>
               <div class="grid grid-cols-2 gap-4">
                   <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
-                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Target Date</p>
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Expected Date</p>
                       <p class="font-bold text-neutral-800">${dateStr}</p>
                   </div>
                   <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
                       <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Status</p>
-                      <p class="font-bold text-neutral-800">${ep.status}</p>
+                      <p class="font-bold text-neutral-800"><span class="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-xs font-bold border border-orange-200">SCHEDULED</span></p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Assignee</p>
+                      <p class="font-bold text-neutral-800">${orig.assignee ? (orig.assignee.fullName || orig.assignee.username) : 'Chưa phân công'}</p>
+                  </div>
+                  <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
+                      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Estimated</p>
+                      <p class="font-bold text-neutral-800">${orig.estimatedDurationMinutes ? orig.estimatedDurationMinutes + ' phút' : '-'}</p>
                   </div>
               </div>
+              ${materialsHtml ? `
               <div class="bg-white p-4 rounded-2xl border border-neutral-100 shadow-sm">
-                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Event Type</p>
-                  <p class="font-bold text-neutral-800">${ep.eventType}</p>
-              </div>
-          </div>
+                  <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Materials</p>
+                  ${materialsHtml}
+              </div>` : ''}
+          `;
+      }
+      content += `</div>`;
+      
+      content += `
           <div class="mt-8 flex justify-end">
              ${ep.eventType === 'WORK_ORDER' ? `<a href="/portal/work-orders/" class="px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-sm shadow-primary/20 hover:bg-primary-600 transition-colors">Go to Work Orders</a>` : ''}
           </div>
@@ -529,29 +765,236 @@
       document.getElementById('event-detail-drawer').classList.add('hidden');
   }
   
-  function openAssignModal() {
-      document.getElementById('assign-modal').classList.remove('hidden');
+  let currentPlanIdForAssign = null;
+  
+  function openAssignments(planId, planName) {
+      currentPlanIdForAssign = planId;
+      document.getElementById('assign-plan-name').innerText = planName;
+      document.getElementById('assign-drawer').classList.remove('hidden');
+      document.getElementById('new-assign-asset').value = '';
+      fetchAssignments();
   }
-  function closeAssignModal() {
-      document.getElementById('assign-modal').classList.add('hidden');
+  
+  function closeAssignments() {
+      document.getElementById('assign-drawer').classList.add('hidden');
+      currentPlanIdForAssign = null;
+  }
+  
+  function fetchAssignments() {
+      if(!currentPlanIdForAssign) return;
+      const container = document.getElementById('assignments-list-container');
+      container.innerHTML = '<p class="text-center text-neutral-500 py-4"><i class="ph-bold ph-spinner animate-spin text-xl"></i></p>';
+      
+      fetch(`/portal/pm-plans/${currentPlanIdForAssign}/assignments/`, {
+          method: 'GET',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          }
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) {
+              if(data.data.length === 0) {
+                  container.innerHTML = '<p class="text-center text-neutral-500 py-4">No assets assigned to this plan.</p>';
+                  return;
+              }
+              let html = '<div class="space-y-3">';
+              data.data.forEach(a => {
+                  const isActive = a.status === 'ACTIVE';
+                  html += `
+                    <div class="p-4 border border-neutral-200 rounded-xl flex items-center justify-between bg-white shadow-sm hover:border-primary/50 transition-colors">
+                        <div>
+                            <p class="font-bold text-neutral-800 m-0">${a.assetName}</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isActive ? 'bg-green-50 text-green-600' : 'bg-neutral-100 text-neutral-500'}">${a.status}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="updateAssignmentStatus('${a.id}', '${isActive ? 'PAUSED' : 'ACTIVE'}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-50 text-neutral-500 hover:text-primary transition-colors" title="${isActive ? 'Pause' : 'Activate'}">
+                                <i class="ph-bold ${isActive ? 'ph-pause' : 'ph-play'}"></i>
+                            </button>
+                            <button onclick="removeAssignment('${a.id}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-danger hover:bg-red-100 transition-colors" title="Remove">
+                                <i class="ph-bold ph-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                  `;
+              });
+              html += '</div>';
+              container.innerHTML = html;
+          } else {
+              container.innerHTML = '<p class="text-center text-danger py-4">Failed to load assignments.</p>';
+          }
+      });
+  }
+  
+  function addAssignment() {
+      const assetId = document.getElementById('new-assign-asset').value;
+      if(!assetId || !currentPlanIdForAssign) return;
+      
+      fetch(`/portal/pm-plans/${currentPlanIdForAssign}/assignments/`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({ asset_ids: [assetId] })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) {
+              fetchAssignments();
+              document.getElementById('new-assign-asset').value = '';
+          } else {
+              alert(data.error);
+          }
+      });
+  }
+  
+  function removeAssignment(assignmentId) {
+      if(!confirm("Are you sure you want to remove this assignment?")) return;
+      fetch(`/portal/pm-plans/assignments/${assignmentId}/`, {
+          method: 'DELETE',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          }
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) fetchAssignments();
+          else alert(data.error);
+      });
+  }
+  
+  function updateAssignmentStatus(assignmentId, newStatus) {
+      fetch(`/portal/pm-plans/assignments/${assignmentId}/`, {
+          method: 'PATCH',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({ status: newStatus })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) fetchAssignments();
+          else alert(data.error);
+      });
+  }
+
+  // Checklists and Materials dynamic rows
+  let checklistIdCounter = 0;
+  let materialIdCounter = 0;
+
+  function renderChecklistRow(item = {}) {
+      checklistIdCounter++;
+      const id = checklistIdCounter;
+      const name = item.item_name || '';
+      const type = item.input_type || 'PASS_FAIL';
+      const expected = item.expected_value || '';
+      const mandatory = item.is_mandatory ? 'checked' : '';
+      
+      const rowHtml = `
+        <div id="chk-row-${id}" class="bg-white p-4 rounded-xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] relative chk-item">
+            <button type="button" onclick="document.getElementById('chk-row-${id}').remove()" class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-danger hover:bg-red-50 rounded-lg transition-colors" title="Remove"><i class="ph-bold ph-trash"></i></button>
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pr-8">
+                <div class="sm:col-span-12">
+                    <input type="text" class="chk-name w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:border-primary focus:outline-none transition-all" placeholder="Checklist Item Name (e.g. Inspect Motor)" value="${name}">
+                </div>
+                <div class="sm:col-span-5">
+                    <select class="chk-type w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:border-primary focus:outline-none transition-all">
+                        <option value="PASS_FAIL" ${type==='PASS_FAIL'?'selected':''}>Pass / Fail</option>
+                        <option value="NUMBER" ${type==='NUMBER'?'selected':''}>Number</option>
+                        <option value="TEXT" ${type==='TEXT'?'selected':''}>Text</option>
+                    </select>
+                </div>
+                <div class="sm:col-span-7">
+                    <input type="text" class="chk-expected w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:border-primary focus:outline-none transition-all" placeholder="Expected Value (Optional)" value="${expected}">
+                </div>
+                <div class="sm:col-span-12 mt-1">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="chk-mandatory sr-only peer" ${mandatory}>
+                        <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                        <span class="ml-2 text-xs font-bold text-neutral-600">Mandatory</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+      `;
+      document.getElementById('pm-checklists-container').insertAdjacentHTML('beforeend', rowHtml);
+  }
+
+  function addChecklistRow() { renderChecklistRow(); }
+
+  function renderMaterialRow(item = {}) {
+      materialIdCounter++;
+      const id = materialIdCounter;
+      const partId = item.spare_part_id || '';
+      const qty = item.quantity || 1;
+      
+      let optionsHtml = '<option value="">Select Spare Part</option>';
+      {% for sp in spare_parts %}
+          optionsHtml += `<option value="{{ sp.id }}" ${partId === '{{ sp.id }}' ? 'selected' : ''}>{{ sp.name }} ({{ sp.part_number }})</option>`;
+      {% endfor %}
+      
+      const rowHtml = `
+        <div id="mat-row-${id}" class="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-xl border border-neutral-200 shadow-sm mat-item relative">
+            <select class="mat-part w-full sm:flex-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:border-primary focus:outline-none transition-all">
+                ${optionsHtml}
+            </select>
+            <div class="flex gap-2 items-center w-full sm:w-auto">
+                <input type="number" min="0.1" step="0.1" class="mat-qty flex-1 sm:w-32 px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:border-primary focus:outline-none transition-all" placeholder="Quantity" value="${qty}">
+                <button type="button" onclick="document.getElementById('mat-row-${id}').remove()" class="w-10 h-10 shrink-0 flex items-center justify-center text-neutral-400 hover:text-danger hover:bg-red-50 rounded-lg transition-colors"><i class="ph-bold ph-trash"></i></button>
+            </div>
+        </div>
+      `;
+      document.getElementById('pm-materials-container').insertAdjacentHTML('beforeend', rowHtml);
+  }
+
+  function addMaterialRow() { renderMaterialRow(); }
+
+  function toggleIntervalUnit() {
+      const trigger = document.getElementById('pm-trigger').value;
+      if(trigger === 'USAGE' || trigger === 'METER') {
+          document.getElementById('interval-unit-container').classList.add('hidden');
+          document.getElementById('interval-value-container').classList.remove('sm:col-span-1');
+          document.getElementById('interval-value-label').innerHTML = 'Threshold Value <span class="text-danger">*</span>';
+      } else {
+          document.getElementById('interval-unit-container').classList.remove('hidden');
+          document.getElementById('interval-value-container').classList.add('sm:col-span-1');
+          document.getElementById('interval-value-label').innerHTML = 'Interval Value <span class="text-danger">*</span>';
+      }
   }
 
   // PM Modal JS
-  function openPmModal(id='', name='', desc='', trigger='TIME', interval_value='', interval_unit='MONTHS', is_active=true) {
+  function openPmModal(id='', name='', desc='', trigger='TIME', interval_value='', interval_unit='MONTHS', is_active=true, is_floating=false, suppress_pending=true, lead_time=0, duration='', assignee='', checklists=[], materials=[]) {
       document.getElementById('pm-modal').classList.remove('hidden');
       document.getElementById('pm-id').value = id;
       document.getElementById('pm-name').value = name;
       document.getElementById('pm-desc').value = desc !== 'None' ? desc : '';
       
-      if(trigger === 'METER') {
-          document.getElementById('trigger-meter').checked = true;
-      } else {
-          document.getElementById('trigger-time').checked = true;
-      }
+      document.getElementById('pm-trigger').value = trigger || 'TIME';
+      toggleIntervalUnit();
       
       document.getElementById('pm-interval-value').value = interval_value !== 'None' ? interval_value : '';
       document.getElementById('pm-interval-unit').value = interval_unit !== 'None' && interval_unit ? interval_unit : 'MONTHS';
       document.getElementById('pm-is-active').checked = is_active;
+      
+      document.getElementById('pm-lead-time').value = lead_time !== 'None' ? lead_time : 0;
+      document.getElementById('pm-est-duration').value = duration !== 'None' ? duration : '';
+      document.getElementById('pm-assignee').value = assignee !== 'None' ? assignee : '';
+      document.getElementById('pm-is-floating').checked = is_floating;
+      document.getElementById('pm-suppress-pending').checked = suppress_pending;
+      
+      document.getElementById('pm-checklists-container').innerHTML = '';
+      if(checklists && checklists.length) {
+          checklists.forEach(c => renderChecklistRow(c));
+      }
+      
+      document.getElementById('pm-materials-container').innerHTML = '';
+      if(materials && materials.length) {
+          materials.forEach(m => renderMaterialRow(m));
+      }
       
       document.getElementById('pm-modal-title').innerText = id ? 'Edit PM Plan' : 'New PM Plan';
       document.getElementById('pm-msg').classList.add('hidden');
@@ -560,12 +1003,40 @@
   function closePmModal() {
       document.getElementById('pm-modal').classList.add('hidden');
       document.getElementById('pm-form').reset();
+      document.getElementById('pm-checklists-container').innerHTML = '';
+      document.getElementById('pm-materials-container').innerHTML = '';
   }
 
   function savePm() {
       const id = document.getElementById('pm-id').value;
-      let trigger = 'TIME';
-      if(document.getElementById('trigger-meter').checked) trigger = 'METER';
+      let trigger = document.getElementById('pm-trigger').value;
+      
+      // Gather checklists
+      const checklists = [];
+      document.querySelectorAll('.chk-item').forEach(el => {
+          const name = el.querySelector('.chk-name').value;
+          if(name) {
+              checklists.push({
+                  item_name: name,
+                  input_type: el.querySelector('.chk-type').value,
+                  expected_value: el.querySelector('.chk-expected').value,
+                  is_mandatory: el.querySelector('.chk-mandatory').checked
+              });
+          }
+      });
+      
+      // Gather materials
+      const materials = [];
+      document.querySelectorAll('.mat-item').forEach(el => {
+          const partId = el.querySelector('.mat-part').value;
+          const qty = el.querySelector('.mat-qty').value;
+          if(partId && qty) {
+              materials.push({
+                  spare_part_id: partId,
+                  quantity: qty
+              });
+          }
+      });
       
       const data = {
           id: id,
@@ -574,7 +1045,14 @@
           trigger_type: trigger,
           interval_value: document.getElementById('pm-interval-value').value,
           interval_unit: document.getElementById('pm-interval-unit').value,
-          is_active: document.getElementById('pm-is-active').checked
+          is_active: document.getElementById('pm-is-active').checked,
+          lead_time_days: document.getElementById('pm-lead-time').value || 0,
+          estimated_duration_minutes: document.getElementById('pm-est-duration').value || null,
+          assignee_id: document.getElementById('pm-assignee').value || null,
+          is_floating_schedule: document.getElementById('pm-is-floating').checked,
+          suppress_if_pending: document.getElementById('pm-suppress-pending').checked,
+          checklists: checklists,
+          materials: materials
       };
       
       const method = id ? 'PUT' : 'POST';

@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import transaction, models
 from workorders.models import WorkOrder
 from workorders.serializers import (
     WorkOrderSerializer, WorkOrderCreateSerializer,
@@ -523,6 +523,9 @@ class WorkOrderKpiView(APIView):
         })
 
 class MaintenanceCalendarView(APIView):
+    from rest_framework.authentication import SessionAuthentication
+    from rest_framework_simplejwt.authentication import JWTAuthentication
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -609,6 +612,30 @@ class MaintenanceCalendarView(APIView):
 
                 if due_date >= start_date and due_date <= end_date:
                     ts = int(time.mktime(due_date.timetuple()) * 1000)
+                    
+                    # Construct originalData for PM_PLAN
+                    materials_list = []
+                    for mat in plan.materials.all():
+                        materials_list.append({
+                            "id": str(mat.id),
+                            "sparePartId": str(mat.spare_part.id) if mat.spare_part else None,
+                            "sparePartName": mat.spare_part.name if mat.spare_part else None,
+                            "quantity": float(mat.quantity)
+                        })
+                        
+                    assignee_data = None
+                    if plan.assignee:
+                        assignee_data = {
+                            "username": plan.assignee.username,
+                            "fullName": plan.assignee.get_full_name() if hasattr(plan.assignee, 'get_full_name') else None
+                        }
+                    
+                    original_data = {
+                        "estimatedDurationMinutes": plan.estimated_duration_minutes,
+                        "assignee": assignee_data,
+                        "materials": materials_list
+                    }
+                    
                     events.append({
                         "id": f"{assignment.id}_proj_{ts}",
                         "title": f"PM: {plan.name}",
@@ -618,7 +645,7 @@ class MaintenanceCalendarView(APIView):
                         "priority": "MEDIUM",
                         "assetId": str(assignment.asset_id) if assignment.asset_id else None,
                         "assetName": assignment.asset.name if assignment.asset else None,
-                        "originalData": None # We can skip full originalData for projected PMs
+                        "originalData": original_data
                     })
 
         return success_response(events)

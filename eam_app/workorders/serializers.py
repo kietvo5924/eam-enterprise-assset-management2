@@ -45,6 +45,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     assignedAt = serializers.DateTimeField(source='assigned_at', read_only=True)
     completedAt = serializers.DateTimeField(source='completed_at', read_only=True)
     resolutionNotes = serializers.CharField(source='resolution_notes', read_only=True)
+    assigneeName = serializers.CharField(source='assigned_to.username', read_only=True, default=None)
     
     asset = AssetSerializer(read_only=True)
     checklists = WorkOrderChecklistItemSerializer(many=True, read_only=True)
@@ -55,7 +56,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         model = WorkOrder
         fields = [
             'id', 'assetId', 'parentId', 'title', 'description', 
-            'priority', 'status', 'deadline', 'assignedTo',
+            'priority', 'status', 'deadline', 'assignedTo', 'assigneeName',
             'estimatedDurationMinutes', 'actualDurationMinutes',
             'sourceReference', 'actualStartTime', 'assignedAt',
             'completedAt', 'resolutionNotes', 'created_at', 'updated_at',

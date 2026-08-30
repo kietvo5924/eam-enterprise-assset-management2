@@ -18,5 +18,7 @@ urlpatterns = [
     path('work-orders/', views.portal_work_orders, name='portal_work_orders'),
     path('inventory/', views.portal_inventory, name='portal_inventory'),
     path('pm-plans/', views.portal_pm_plans, name='portal_pm_plans'),
+    path('pm-plans/<uuid:plan_id>/assignments/', views.portal_pm_plan_assignments, name='portal_pm_plan_assignments'),
+    path('pm-plans/assignments/<uuid:assignment_id>/', views.portal_pm_plan_assignments, name='portal_pm_plan_assignments_detail'),
     path('audit-logs/', views.portal_audit_logs, name='portal_audit_logs'),
 ]

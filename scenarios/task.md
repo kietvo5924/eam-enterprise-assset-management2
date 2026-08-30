@@ -167,28 +167,28 @@
     - `[x]` Task 8.5.5 — Fix any discrepancies in Asset Tree Rendering
     - `[x]` Task 8.5.6 — Fix discrepancies in Asset Detail Tabs (Overview, Work Orders, History)
   - `[ ]` **8.6 — Asset Configuration (Categories & Templates) Parity**
-    - `[ ]` Task 8.6.1 — Audit Legacy `AssetCategoryManagement.tsx`
-    - `[ ]` Task 8.6.2 — Verify Django `portal_asset_categories` logic
-    - `[ ]` Task 8.6.3 — Verify Django `asset_categories.html` template
-    - `[ ]` Task 8.6.4 — Audit Legacy `HierarchyTemplateManagement.tsx`
-    - `[ ]` Task 8.6.5 — Verify Django `hierarchy_templates.html` and View
+    - `[x]` Task 8.6.1 — Audit Legacy `AssetCategoryManagement.tsx`
+    - `[x]` Task 8.6.2 — Verify Django `portal_asset_categories` logic
+    - `[x]` Task 8.6.3 — Verify Django `asset_categories.html` template
+    - `[x]` Task 8.6.4 — Audit Legacy `HierarchyTemplateManagement.tsx`
+    - `[x]` Task 8.6.5 — Verify Django `hierarchy_templates.html` and View
   - `[ ]` **8.7 — Work Order Management Parity**
-    - `[ ]` Task 8.7.1 — Audit Legacy `WorkOrders.tsx` List View and Filters
-    - `[ ]` Task 8.7.2 — Audit Legacy `WorkOrderController.java` State Machine
-    - `[ ]` Task 8.7.3 — Verify Django `portal_work_orders` status transition logic
-    - `[ ]` Task 8.7.4 — Verify Django `work_orders.html` Checklist interaction
-    - `[ ]` Task 8.7.5 — Fix Work Order Kanban/List view discrepancies
+    - `[x]` Task 8.7.1 — Audit Legacy `WorkOrders.tsx` List View and Filters
+    - `[x]` Task 8.7.2 — Audit Legacy `WorkOrderController.java` State Machine
+    - `[x]` Task 8.7.3 — Verify Django `portal_work_orders` status transition logic
+    - `[x]` Task 8.7.4 — Verify Django `work_orders.html` Checklist interaction
+    - `[x]` Task 8.7.5 — Fix Work Order Kanban/List view discrepancies
   - `[ ]` **8.8 — Inventory (Spare Parts) Parity**
-    - `[ ]` Task 8.8.1 — Audit Legacy `SparePartsManagement.tsx` UI
-    - `[ ]` Task 8.8.2 — Verify Django `portal_inventory` logic
-    - `[ ]` Task 8.8.3 — Verify Django Stock Threshold UI implementation
-    - `[ ]` Task 8.8.4 — Fix Inventory functional or UI discrepancies
+    - `[x]` Task 8.8.1 — Audit Legacy `SparePartsManagement.tsx` UI
+    - `[x]` Task 8.8.2 — Verify Django `portal_inventory` logic
+    - `[x]` Task 8.8.3 — Verify Django Stock Threshold UI implementation
+    - `[x]` Task 8.8.4 — Fix Inventory functional or UI discrepancies
   - `[ ]` **8.9 — PM Plans (Maintenance) Parity**
-    - `[ ]` Task 8.9.1 — Audit Legacy `Maintenance.tsx` and `MaintenanceCalendar.tsx`
-    - `[ ]` Task 8.9.2 — Verify Django `portal_pm_plans` view
-    - `[ ]` Task 8.9.3 — Audit Background Scheduler logic (Celery vs Legacy Quartz/Cron)
-    - `[ ]` Task 8.9.4 — Verify Django PM generation matches Legacy rules
-    - `[ ]` Task 8.9.5 — Fix PM logic or Calendar View discrepancies
+    - `[x]` Task 8.9.1 — Audit Legacy `Maintenance.tsx` and `MaintenanceCalendar.tsx`
+    - `[x]` Task 8.9.2 — Verify Django `portal_pm_plans` view
+    - `[x]` Task 8.9.3 — Audit Background Scheduler logic (Celery vs Legacy Quartz/Cron)
+    - `[x]` Task 8.9.4 — Verify Django PM generation matches Legacy rules
+    - `[x]` Task 8.9.5 — Fix PM logic or Calendar View discrepancies
   - `[ ]` **8.10 — System Admin (Users, Roles, Tenants) Parity**
     - `[ ]` Task 8.10.1 — Audit Legacy `UserManagement.tsx` and RBAC logic
     - `[ ]` Task 8.10.2 — Verify Django `portal_users` and role assignment

@@ -189,7 +189,7 @@
                 {{ wo.assigned_to.username|default:'-' }}
               </td>
               <td class="px-4 py-3 text-neutral-600">
-                {{ wo.tenant.users.first.username|default:'-' }}
+                {{ wo.created_by.username|default:'-' }}
               </td>
               <td class="px-4 py-3 text-neutral-600">
                 {{ wo.deadline|date:'Y-m-d H:i'|default:'-' }}
@@ -627,6 +627,8 @@
       openWoModal(currentWo.id, currentWo.title, currentWo.desc, currentWo.priority, currentWo.status, currentWo.asset_id, currentWo.assignee_id, currentWo.deadline);
   }
 
+  const currentUserId = "{{ request.user.id }}";
+
   function renderChecklists(wo_id, checklists) {
       const container = document.getElementById('detail-checklists');
       container.innerHTML = '';
@@ -634,29 +636,72 @@
           container.innerHTML = '<p class="text-sm text-neutral-500 p-4 text-center font-medium">Chưa có checklist nào.</p>';
           return;
       }
+      
+      const canEditChecklist = currentWo && currentWo.assignee_id === currentUserId && currentWo.status !== 'COMPLETED' && currentWo.status !== 'CANCELED' && currentWo.status !== 'CANCELLED';
+      const canUpdateWO = true; // simple fallback
+      
       checklists.forEach(item => {
           const isChecked = item.is_completed ? 'checked' : '';
           const textClass = item.is_completed ? 'line-through text-neutral-400' : 'text-neutral-700 font-medium';
-          container.innerHTML += `
-            <label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-neutral-50 transition-colors group">
-              <input type="checkbox" class="w-5 h-5 text-primary rounded border-neutral-300 focus:ring-primary transition-all" ${isChecked} onchange="toggleChecklist('${item.id}', this.checked)">
-              <span class="text-sm ${textClass} group-hover:text-primary transition-colors flex-1">${item.item_name}</span>
-              <button onclick="deleteChecklist('${item.id}', event)" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-danger rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+          
+          let inputHtml = '';
+          if (item.input_type === 'NUMBER') {
+              inputHtml = `<input type="number" onblur="toggleChecklist('${item.id}', ${item.is_completed}, this.value, true)" value="${item.actual_value || ''}" placeholder="Nhập số liệu..." class="mt-2 ml-8 w-48 px-3 py-1.5 border border-neutral-200 rounded-lg text-sm" ${!canEditChecklist ? 'disabled' : ''}>`;
+          } else if (item.input_type === 'TEXT') {
+              inputHtml = `<input type="text" onblur="toggleChecklist('${item.id}', ${item.is_completed}, this.value, true)" value="${item.actual_value || ''}" placeholder="Nhập ghi chú..." class="mt-2 ml-8 w-full max-w-sm px-3 py-1.5 border border-neutral-200 rounded-lg text-sm" ${!canEditChecklist ? 'disabled' : ''}>`;
+          }
+          
+          let tagsHtml = '';
+          if (item.expected_value) {
+              tagsHtml += `<span class="text-neutral-500 font-normal text-xs ml-1">(Yêu cầu: ${item.expected_value})</span>`;
+          }
+          if (item.is_mandatory) {
+              tagsHtml += `<span class="ml-2 text-[10px] px-1.5 py-0.5 bg-red-50 text-red-600 rounded font-bold uppercase tracking-wider">Bắt buộc</span>`;
+          }
+          
+          const disabledAttr = !canEditChecklist ? 'disabled' : '';
+          const checkboxHtml = `<input type="checkbox" class="w-5 h-5 text-primary rounded border-neutral-300 focus:ring-primary transition-all cursor-pointer disabled:opacity-50" ${isChecked} ${disabledAttr} onchange="toggleChecklist('${item.id}', this.checked, '${item.actual_value || ''}', false)">`;
+          
+          let deleteBtnHtml = '';
+          if (canUpdateWO || (canEditChecklist && !item.is_mandatory)) {
+              deleteBtnHtml = `<button onclick="deleteChecklist('${item.id}', event)" class="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-danger rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
                 <i class="ph-bold ph-trash"></i>
-              </button>
-            </label>
+              </button>`;
+          }
+
+          container.innerHTML += `
+            <div class="flex flex-col p-3 rounded-xl hover:bg-neutral-50 transition-colors group border border-transparent hover:border-neutral-200 mb-1">
+                <div class="flex items-center gap-3 w-full">
+                  <label class="flex items-center gap-3 cursor-pointer flex-1">
+                    ${checkboxHtml}
+                    <span class="text-sm ${textClass} transition-colors flex-1">${item.item_name} ${tagsHtml}</span>
+                  </label>
+                  ${deleteBtnHtml}
+                </div>
+                ${inputHtml}
+            </div>
           `;
       });
   }
 
-  function toggleChecklist(itemId, isCompleted) {
+  function toggleChecklist(itemId, isCompleted, actualValue = '', isFromBlur = false) {
+      const payload = {action: 'toggle_checklist', item_id: itemId, is_completed: isCompleted};
+      if (actualValue !== undefined) {
+          payload.actual_value = actualValue;
+      }
+      
+      // Auto-check if input has value
+      if (isFromBlur && actualValue.trim() !== '') {
+          payload.is_completed = true;
+      }
+      
       fetch('{% url "portal_work_orders" %}', {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json',
               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
           },
-          body: JSON.stringify({action: 'toggle_checklist', item_id: itemId, is_completed: isCompleted})
+          body: JSON.stringify(payload)
       })
       .then(() => window.location.reload());
   }
