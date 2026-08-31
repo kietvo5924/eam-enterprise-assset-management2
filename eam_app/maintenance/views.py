@@ -36,6 +36,7 @@ class PmPlanListView(APIView):
             
         serializer = PmPlanCreateUpdateSerializer(data=request.data)
         if not serializer.is_valid():
+            print("PM PLAN VALIDATION ERROR:", serializer.errors)
             raise ValidationError(serializer.errors)
         data = serializer.validated_data
         

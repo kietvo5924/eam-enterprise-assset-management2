@@ -614,8 +614,8 @@
       qrCode: "{{ asset.qr_code|escapejs }}",
       createdAt: "{{ asset.created_at|date:'H:i d/m/Y' }}",
       updatedAt: "{{ asset.updated_at|date:'H:i d/m/Y' }}",
-      createdByName: "{{ asset.created_by.get_full_name|default:asset.created_by.username|escapejs }}",
-      updatedByName: "{{ asset.updated_by.get_full_name|default:asset.updated_by.username|escapejs }}"
+      createdByName: "{% if asset.created_by %}{{ asset.created_by.get_full_name|default:asset.created_by.username|escapejs }}{% endif %}",
+      updatedByName: "{% if asset.updated_by %}{{ asset.updated_by.get_full_name|default:asset.updated_by.username|escapejs }}{% endif %}"
     },
     {% endfor %}
   };

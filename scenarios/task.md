@@ -190,21 +190,21 @@
     - `[x]` Task 8.9.4 — Verify Django PM generation matches Legacy rules
     - `[x]` Task 8.9.5 — Fix PM logic or Calendar View discrepancies
   - `[ ]` **8.10 — System Admin (Users, Roles, Tenants) Parity**
-    - `[ ]` Task 8.10.1 — Audit Legacy `UserManagement.tsx` and RBAC logic
-    - `[ ]` Task 8.10.2 — Verify Django `portal_users` and role assignment
-    - `[ ]` Task 8.10.3 — Audit Legacy `RoleManagement.tsx` mapping UI
-    - `[ ]` Task 8.10.4 — Verify Django `portal_roles` permissions matrix UI
-    - `[ ]` Task 8.10.5 — Verify System Tenant Management (SuperAdmin only) flow
+    - `[x]` Task 8.10.1 — Audit Legacy `UserManagement.tsx` and RBAC logic
+    - `[x]` Task 8.10.2 — Verify Django `portal_users` and role assignment
+    - `[x]` Task 8.10.3 — Audit Legacy `RoleManagement.tsx` mapping UI
+    - `[x]` Task 8.10.4 — Verify Django `portal_roles` permissions matrix UI
+    - `[x]` Task 8.10.5 — Verify System Tenant Management (SuperAdmin only) flow
   - `[ ]` **8.11 — Reports Module Parity**
-    - `[ ]` Task 8.11.1 — Audit Legacy `Reports.tsx` UI and Data Sources
-    - `[ ]` Task 8.11.2 — Implement Django `portal_reports` View
-    - `[ ]` Task 8.11.3 — Implement Django `reports.html` matching Legacy placeholder
-    - `[ ]` Task 8.11.4 — Ensure Reports routing is hooked into App Shell
+    - `[x]` Task 8.11.1 — Audit Legacy `Reports.tsx` UI and Data Sources
+    - `[x]` Task 8.11.2 — Implement Django `portal_reports` View
+    - `[x]` Task 8.11.3 — Implement Django `reports.html` matching Legacy placeholder
+    - `[x]` Task 8.11.4 — Ensure Reports routing is hooked into App Shell
   - `[ ]` **8.12 — Deep Database Schema Parity (Django ORM vs Flyway)**
-    - `[ ]` Task 8.12.1 — Cross-check `users` and `roles` tables
-    - `[ ]` Task 8.12.2 — Cross-check `assets`, `locations`, and `categories` tables
-    - `[ ]` Task 8.12.3 — Cross-check `work_orders`, `checklists`, and `pm_plans` tables
-    - `[ ]` Task 8.12.4 — Generate and apply any missing Django migrations
+    - `[x]` Task 8.12.1 — Cross-check `users` and `roles` tables
+    - `[x]` Task 8.12.2 — Cross-check `assets`, `locations`, and `categories` tables
+    - `[x]` Task 8.12.3 — Cross-check `work_orders`, `checklists`, and `pm_plans` tables
+    - `[x]` Task 8.12.4 — Generate and apply any missing Django migrations
   - `[ ]` **8.13 — API Route Protection & Security Parity**
     - `[ ]` Task 8.13.1 — Audit Legacy Spring Security Method-level `@PreAuthorize`
     - `[ ]` Task 8.13.2 — Map Legacy Permissions to Django views

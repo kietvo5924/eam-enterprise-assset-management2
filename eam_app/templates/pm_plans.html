@@ -173,8 +173,8 @@
           </thead>
           <tbody class="divide-y divide-neutral-100">
             {% for plan in pm_plans_data %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group">
-              <td class="px-6 py-4 cursor-pointer" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
+            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
+              <td class="px-6 py-4">
                 <p class="font-bold text-neutral-800 m-0 group-hover:text-primary transition-colors">{{ plan.pm.name }}</p>
                 <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.pm.description }}">{{ plan.pm.description|default:"No description" }}</p>
               </td>
@@ -1041,10 +1041,10 @@
       const data = {
           id: id,
           name: document.getElementById('pm-name').value,
-          description: document.getElementById('pm-desc').value,
+          description: document.getElementById('pm-desc').value || null,
           trigger_type: trigger,
-          interval_value: document.getElementById('pm-interval-value').value,
-          interval_unit: document.getElementById('pm-interval-unit').value,
+          interval_value: document.getElementById('pm-interval-value').value || null,
+          interval_unit: document.getElementById('pm-interval-unit').value || null,
           is_active: document.getElementById('pm-is-active').checked,
           lead_time_days: document.getElementById('pm-lead-time').value || 0,
           estimated_duration_minutes: document.getElementById('pm-est-duration').value || null,

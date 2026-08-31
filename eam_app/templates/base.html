@@ -115,7 +115,7 @@
                 <i class="{% if request.resolver_match.url_name == 'portal_pm_plans' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-calendar-check text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Maintenance</span>
               </a>
-              <a href="#" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_reports' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+              <a href="{% url 'portal_reports' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_reports' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_reports' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-chart-line-up text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Reports</span>
               </a>

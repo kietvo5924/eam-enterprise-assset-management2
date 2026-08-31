@@ -92,6 +92,94 @@ def portal_tenants(request):
     return render(request, 'tenants.html', {'tenants': tenants})
 
 @login_required(login_url='portal_login')
+def portal_tenant_admins(request):
+    from users.models import User, Role, Permission
+    from core.models import Tenant
+    import json
+    from django.http import JsonResponse, HttpResponseForbidden
+    from django.contrib.auth.hashers import make_password
+    
+    if not request.user.is_superuser and str(request.user.tenant_id) != '00000000-0000-0000-0000-000000000000':
+        return HttpResponseForbidden("Only system admins can manage tenants")
+        
+    if request.method == 'GET':
+        tenant_id = request.GET.get('tenant_id')
+        if not tenant_id:
+            return JsonResponse({'success': False, 'error': 'tenant_id is required'}, status=400)
+            
+        admins = User.objects.filter(tenant_id=tenant_id, roles__name='TENANT_ADMIN').distinct()
+        data = []
+        for a in admins:
+            data.append({
+                'id': str(a.id),
+                'username': a.username,
+                'status': a.status,
+                'created_at': a.created_at.isoformat() if a.created_at else None
+            })
+        return JsonResponse({'success': True, 'data': data})
+        
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            tenant_id = data.get('tenant_id')
+            username = data.get('username')
+            password = data.get('password')
+            
+            if User.objects.filter(tenant_id=tenant_id, username=username).exists():
+                return JsonResponse({'success': False, 'error': 'Username already exists in this tenant'}, status=400)
+                
+            tenant = Tenant.objects.get(id=tenant_id)
+            
+            admin_role, created = Role.objects.get_or_create(
+                tenant_id=tenant_id,
+                name='TENANT_ADMIN',
+                defaults={
+                    'description': 'Administrator for Tenant',
+                    'is_system': True
+                }
+            )
+            
+            if created:
+                perms = Permission.objects.exclude(id='system:admin')
+                admin_role.permissions.set(perms)
+                
+            u = User.objects.create(
+                tenant_id=tenant_id,
+                username=username,
+                email=username,
+                password=make_password(password),
+                status='ACTIVE'
+            )
+            u.roles.add(admin_role)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            admin_id = data.get('id')
+            u = User.objects.get(id=admin_id)
+            
+            if data.get('status'):
+                if str(u.id) == '00000000-0000-0000-0000-000000000000':
+                    return JsonResponse({'success': False, 'error': 'Cannot modify the Super Admin'}, status=400)
+                u.status = data.get('status')
+            
+            if data.get('username'):
+                u.username = data.get('username')
+                u.email = data.get('username')
+                
+            if data.get('password'):
+                u.password = make_password(data.get('password'))
+                
+            u.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+@login_required(login_url='portal_login')
 def portal_settings(request):
     from core.models import Tenant
     import json
@@ -196,12 +284,48 @@ def portal_reset_password(request):
 @login_required(login_url='portal_login')
 def portal_users(request):
     from users.models import User, Role
+    from users.permissions import HasPermission
     import json
-    from django.http import JsonResponse
+    from django.http import JsonResponse, HttpResponseForbidden
+    
+    tenant_id = request.user.tenant_id
     
     if request.method == 'POST':
+        if not HasPermission('user:create')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+            
+        action = request.GET.get('action')
+        if action == 'import':
+            file = request.FILES.get('file')
+            if not file:
+                return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
+            return JsonResponse({'success': True, 'data': {'successCount': 0, 'failureCount': 1, 'errors': ['Import functionality is not fully implemented in this demo']}})
+        
         try:
             data = json.loads(request.body)
+            if action == 'invite':
+                # Mock invite behavior
+                username = data.get('username')
+                if User.objects.filter(username=username).exists():
+                    return JsonResponse({'success': False, 'error': 'Username already exists'}, status=400)
+                u = User.objects.create(
+                    username=username,
+                    email=data.get('email'),
+                    status='PENDING',
+                    tenant_id=tenant_id
+                )
+                if data.get('password'):
+                    u.set_password(data.get('password'))
+                    u.save()
+                role_ids = data.get('roleIds', [])
+                if role_ids:
+                    roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
+                    for r in roles:
+                        if r.name == 'SUPER_ADMIN' and not request.user.is_superuser:
+                            return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
+                    u.roles.set(roles)
+                return JsonResponse({'success': True})
+
             username = data.get('username')
             if User.objects.filter(username=username).exists():
                 return JsonResponse({'success': False, 'error': 'Username already exists'}, status=400)
@@ -209,7 +333,8 @@ def portal_users(request):
             u = User.objects.create(
                 username=username,
                 email=data.get('email'),
-                status=data.get('status', 'ACTIVE')
+                status=data.get('status', 'ACTIVE'),
+                tenant_id=tenant_id
             )
             if data.get('password'):
                 u.set_password(data.get('password'))
@@ -217,17 +342,39 @@ def portal_users(request):
                 
             role_ids = data.get('roles', [])
             if role_ids:
-                roles = Role.objects.filter(id__in=role_ids)
+                roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
+                for r in roles:
+                    if r.name == 'SUPER_ADMIN' and not request.user.is_superuser:
+                        return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
                 u.roles.set(roles)
+            else:
+                u.roles.clear()
                 
             return JsonResponse({'success': True, 'id': str(u.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not HasPermission('user:update')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+            
+        action = request.GET.get('action')
         try:
+            if action in ['disable', 'enable']:
+                user_id = request.GET.get('id')
+                if not user_id:
+                    return JsonResponse({'success': False, 'error': 'Missing ID'}, status=400)
+                u = User.objects.get(id=user_id, tenant_id=tenant_id)
+                if u.id == request.user.id and action == 'disable':
+                    return JsonResponse({'success': False, 'error': 'Cannot block yourself'}, status=400)
+                if u.is_superuser and action == 'disable':
+                    return JsonResponse({'success': False, 'error': 'Cannot block superuser'}, status=400)
+                u.status = 'INACTIVE' if action == 'disable' else 'ACTIVE'
+                u.save()
+                return JsonResponse({'success': True})
+                
             data = json.loads(request.body)
-            u = User.objects.get(id=data.get('id'))
+            u = User.objects.get(id=data.get('id'), tenant_id=tenant_id)
             
             new_username = data.get('username')
             if new_username != u.username and User.objects.filter(username=new_username).exists():
@@ -235,14 +382,18 @@ def portal_users(request):
                 
             u.username = new_username
             u.email = data.get('email')
-            u.status = data.get('status', 'ACTIVE')
+            if 'status' in data:
+                u.status = data.get('status')
             
             if data.get('password'):
                 u.set_password(data.get('password'))
             u.save()
             
             role_ids = data.get('roles', [])
-            roles = Role.objects.filter(id__in=role_ids)
+            roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
+            for r in roles:
+                if r.name == 'SUPER_ADMIN' and not request.user.is_superuser:
+                    return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
             u.roles.set(roles)
             
             return JsonResponse({'success': True})
@@ -250,40 +401,70 @@ def portal_users(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not HasPermission('user:update')().has_permission(request, None): # delete is mapped to update block in legacy usually? No legacy has delete? Wait, legacy only has disable/enable.
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
-            u = User.objects.get(id=data.get('id'))
+            u = User.objects.get(id=data.get('id'), tenant_id=tenant_id)
             if u.id == request.user.id:
-                return JsonResponse({'success': False, 'error': 'Cannot delete your own account'}, status=400)
+                return JsonResponse({'success': False, 'error': 'Cannot block your own account'}, status=400)
             if u.is_superuser:
-                return JsonResponse({'success': False, 'error': 'Cannot delete superuser'}, status=400)
-            u.delete()
+                return JsonResponse({'success': False, 'error': 'Cannot block superuser'}, status=400)
+            # Soft delete by marking INACTIVE instead of deleting
+            u.status = 'INACTIVE'
+            u.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    users = User.objects.all().order_by('-created_at')
-    roles = Role.objects.all()
-    return render(request, 'users.html', {'users': users, 'roles': roles})
+    if not HasPermission('user:read')().has_permission(request, None):
+        return HttpResponseForbidden("You do not have permission to view users.")
+
+    if str(tenant_id) == '00000000-0000-0000-0000-000000000000' or request.user.is_superuser:
+        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').order_by('-created_at')
+    else:
+        users = User.objects.filter(tenant_id=tenant_id).order_by('-created_at')
+    
+    # Calculate metrics
+    total_users = users.count()
+    active_users = users.filter(status='ACTIVE').count()
+    blocked_users = users.filter(status='INACTIVE').count()
+    pending_users = users.filter(status='PENDING').count()
+    
+    roles = Role.objects.filter(tenant_id=tenant_id)
+    return render(request, 'users.html', {
+        'users': users, 
+        'roles': roles,
+        'total_users': total_users,
+        'active_users': active_users,
+        'blocked_users': blocked_users,
+        'pending_users': pending_users
+    })
 
 @login_required(login_url='portal_login')
 def portal_roles(request):
     from users.models import Role, Permission
     import json
-    from django.http import JsonResponse
+    from django.http import JsonResponse, HttpResponseForbidden
+    from users.permissions import HasPermission
+    
+    tenant_id = request.user.tenant_id
     
     if request.method == 'POST':
+        if not HasPermission('role:create')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             name = data.get('name')
             
-            if Role.objects.filter(name=name).exists():
-                return JsonResponse({'success': False, 'error': 'Role name already exists'}, status=400)
+            if Role.objects.filter(name=name, tenant_id=tenant_id).exists():
+                return JsonResponse({'success': False, 'error': f'Role with name {name} already exists in this tenant'}, status=400)
                 
             r = Role.objects.create(
                 name=name,
                 description=data.get('description'),
-                is_system=False
+                is_system=False,
+                tenant_id=tenant_id
             )
             
             perm_ids = data.get('permissions', [])
@@ -296,15 +477,17 @@ def portal_roles(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not HasPermission('role:update')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
-            r = Role.objects.get(id=data.get('id'))
+            r = Role.objects.get(id=data.get('id'), tenant_id=tenant_id)
             
             if r.is_system:
                 return JsonResponse({'success': False, 'error': 'Cannot edit system roles'}, status=400)
                 
             new_name = data.get('name')
-            if new_name != r.name and Role.objects.filter(name=new_name).exists():
+            if new_name != r.name and Role.objects.filter(name=new_name, tenant_id=tenant_id).exists():
                 return JsonResponse({'success': False, 'error': 'Role name already exists'}, status=400)
                 
             r.name = new_name
@@ -316,39 +499,52 @@ def portal_roles(request):
             r.permissions.set(perms)
             
             return JsonResponse({'success': True})
+        except Role.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Role not found in this tenant'}, status=400)
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not HasPermission('role:delete')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             from users.models import User
             data = json.loads(request.body)
-            r = Role.objects.get(id=data.get('id'))
+            r = Role.objects.get(id=data.get('id'), tenant_id=tenant_id)
             if r.is_system:
                 return JsonResponse({'success': False, 'error': 'Cannot delete system roles'}, status=400)
                 
             fallback_role_id = data.get('fallbackRoleId')
-            users_with_role = User.objects.filter(roles=r)
+            users_with_role = User.objects.filter(roles=r, tenant_id=tenant_id)
             
             if users_with_role.exists():
                 if not fallback_role_id:
                     return JsonResponse({'success': False, 'error': 'ROLE_HAS_USERS'}, status=400)
                 
                 try:
-                    fallback_role = Role.objects.get(id=fallback_role_id)
+                    fallback_role = Role.objects.get(id=fallback_role_id, tenant_id=tenant_id)
                     for user in users_with_role:
                         user.roles.remove(r)
                         user.roles.add(fallback_role)
                 except Role.DoesNotExist:
-                    return JsonResponse({'success': False, 'error': 'Fallback role not found'}, status=400)
+                    return JsonResponse({'success': False, 'error': 'Fallback role not found in this tenant'}, status=400)
                     
             r.delete()
             return JsonResponse({'success': True})
+        except Role.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Role not found in this tenant'}, status=400)
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    roles = Role.objects.all().order_by('-is_system', 'name')
-    permissions = Permission.objects.all()
+    if not HasPermission('role:read')().has_permission(request, None):
+        return HttpResponseForbidden("You do not have permission to view roles.")
+
+    roles = Role.objects.filter(tenant_id=tenant_id)
+    if not request.user.is_superuser:
+        roles = roles.exclude(name='SUPER_ADMIN')
+    
+    roles = roles.order_by('-is_system', 'name')
+    permissions = Permission.objects.exclude(id='system:admin').order_by('name')
     return render(request, 'roles.html', {'roles': roles, 'permissions': permissions})
 
 @login_required(login_url='portal_login')
@@ -415,11 +611,25 @@ def portal_asset_categories(request):
         return HttpResponseForbidden("Permission denied")
 
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
-    from assets.models import HierarchyTemplate
-    template_count = HierarchyTemplate.objects.filter(tenant_id=tenant_id).count()
+    from assets.models import HierarchyTemplate, Location
+    templates = HierarchyTemplate.objects.filter(tenant_id=tenant_id)
+    locations = Location.objects.filter(tenant_id=tenant_id)
+    
+    # Process locations for template hierarchy
+    loc_list = []
+    for loc in locations:
+        loc_list.append({
+            'id': str(loc.id),
+            'name': loc.name,
+            'description': loc.description or '',
+            'parent_id': loc.parent_id or '',
+            'is_active': loc.is_active
+        })
+
     return render(request, 'asset_categories.html', {
         'categories': categories,
-        'template_count': template_count
+        'templates': templates,
+        'locations': loc_list,
     })
 
 @login_required(login_url='portal_login')
@@ -494,6 +704,79 @@ def portal_hierarchy_templates(request):
         'templates': templates,
         'category_count': category_count
     })
+
+@login_required(login_url='portal_login')
+def portal_locations(request):
+    from assets.models import Location
+    import json
+    from django.http import JsonResponse, HttpResponseForbidden
+    from users.permissions import HasPermission
+    
+    tenant_id = request.user.tenant_id
+    
+    if not HasPermission('asset_category:read')().has_permission(request, None):
+        return HttpResponseForbidden("Permission denied")
+
+    if request.method == 'POST':
+        if not HasPermission('asset_category:create')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        try:
+            data = json.loads(request.body)
+            name = data.get('name')
+            parent_id = data.get('parentId')
+            
+            if Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exists():
+                return JsonResponse({'success': False, 'error': 'Location name already exists under this parent'}, status=400)
+            
+            l = Location.objects.create(
+                tenant_id=tenant_id,
+                name=name,
+                description=data.get('description'),
+                parent_id=parent_id,
+                is_active=data.get('is_active', True)
+            )
+            return JsonResponse({'success': True, 'id': str(l.id)})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            
+    elif request.method == 'PUT':
+        if not HasPermission('asset_category:update')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        try:
+            data = json.loads(request.body)
+            l = Location.objects.get(id=data.get('id'), tenant_id=tenant_id)
+            name = data.get('name')
+            parent_id = data.get('parentId')
+            
+            if (name != l.name or parent_id != l.parent_id) and Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exists():
+                return JsonResponse({'success': False, 'error': 'Location name already exists under this parent'}, status=400)
+                
+            l.name = name
+            if 'description' in data:
+                l.description = data.get('description')
+            if 'parentId' in data:
+                l.parent_id = parent_id
+            if 'is_active' in data:
+                l.is_active = data.get('is_active')
+            l.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            
+    elif request.method == 'DELETE':
+        if not HasPermission('asset_category:delete')().has_permission(request, None):
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        try:
+            data = json.loads(request.body)
+            l = Location.objects.get(id=data.get('id'), tenant_id=tenant_id)
+            l.is_active = False
+            l.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+    locations = Location.objects.filter(tenant_id=tenant_id)
+    return JsonResponse({'success': True, 'data': [{'id': str(loc.id), 'name': loc.name, 'description': loc.description, 'parentId': loc.parent_id, 'isActive': loc.is_active} for loc in locations]})
 
 @login_required(login_url='portal_login')
 def portal_asset_registry(request):
@@ -867,6 +1150,7 @@ def portal_pm_plans(request):
     from maintenance.models import PmPlan
     import json
     from django.http import JsonResponse
+    from django.db import transaction
     
     tenant_id = request.user.tenant_id
     
@@ -1128,6 +1412,10 @@ def portal_audit_logs(request):
     from core.models import AuditLog
     logs = AuditLog.objects.all().order_by('-timestamp')[:100]
     return render(request, 'audit_logs.html', {'logs': logs})
+
+@login_required(login_url='portal_login')
+def portal_reports(request):
+    return render(request, 'reports.html')
 
 
 

@@ -41,8 +41,9 @@ class WorkOrder(BaseTenantModel):
     actual_duration_minutes = models.IntegerField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_work_orders')
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'work_orders'
@@ -59,6 +60,10 @@ class WorkOrderChecklistItem(BaseTenantModel):
     expected_value = models.CharField(max_length=255, null=True, blank=True)
     actual_value = models.CharField(max_length=255, null=True, blank=True)
     is_mandatory = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'work_order_checklists'
@@ -70,6 +75,10 @@ class WorkOrderAttachment(BaseTenantModel):
     file_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=100)
     file_size = models.BigIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'work_order_attachments'
@@ -80,6 +89,10 @@ class WorkOrderMaterial(BaseTenantModel):
     spare_part = models.ForeignKey('assets.SparePart', on_delete=models.CASCADE)
     quantity = models.DecimalField(max_digits=19, decimal_places=2)
     actual_cost = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'work_order_materials'

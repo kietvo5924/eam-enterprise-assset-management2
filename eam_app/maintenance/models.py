@@ -32,6 +32,8 @@ class PmPlan(BaseTenantModel):
     assignee = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_pm_plans')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'pm_plans'
@@ -44,6 +46,10 @@ class PmPlanChecklistItem(BaseTenantModel):
     input_type = models.CharField(max_length=50, default='PASS_FAIL')
     expected_value = models.CharField(max_length=255, null=True, blank=True)
     is_mandatory = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
 
     class Meta:
         db_table = 'pm_plan_checklists'
@@ -54,6 +60,10 @@ class PmPlanMaterial(BaseTenantModel):
     pm_plan = models.ForeignKey(PmPlan, on_delete=models.CASCADE, related_name='materials')
     spare_part = models.ForeignKey(SparePart, on_delete=models.CASCADE)
     quantity = models.DecimalField(max_digits=19, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
 
     class Meta:
         db_table = 'pm_plan_materials'
@@ -74,6 +84,8 @@ class PmPlanAssignment(BaseTenantModel):
     last_triggered_at = models.DateTimeField(null=True, blank=True)
     last_triggered_meter = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='ACTIVE')
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
 
     class Meta:
         db_table = 'pm_plan_assignments'

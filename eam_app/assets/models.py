@@ -10,6 +10,8 @@ class Location(BaseTenantModel):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'locations'
@@ -24,9 +26,12 @@ class AssetCategory(BaseTenantModel):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'asset_categories'
+        unique_together = (('name', 'tenant'),)
 
     def __str__(self):
         return self.name
@@ -39,9 +44,12 @@ class HierarchyTemplate(BaseTenantModel):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
     class Meta:
         db_table = 'hierarchy_templates'
+        unique_together = (('name', 'tenant'),)
 
     def __str__(self):
         return self.name
@@ -74,21 +82,24 @@ class Asset(BaseTenantModel):
     category = models.ForeignKey(AssetCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets')
     parent_id = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255)
-    serial_number = models.CharField(max_length=255, null=True, blank=True)
-    model = models.CharField(max_length=255, null=True, blank=True)
-    manufacturer = models.CharField(max_length=255, null=True, blank=True)
+    serial_number = models.CharField(max_length=100, null=True, blank=True)
+    model = models.CharField(max_length=100, null=True, blank=True)
+    manufacturer = models.CharField(max_length=100, null=True, blank=True)
     purchase_date = models.DateField(null=True, blank=True)
     value = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='OPERATIONAL')
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets')
     hierarchy_template = models.ForeignKey(HierarchyTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets')
-    qr_code = models.CharField(max_length=255, unique=True)
+    qr_code = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
+    updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
 
     class Meta:
         db_table = 'assets'
+        unique_together = (('qr_code', 'tenant'),)
 
     def __str__(self):
         return self.name

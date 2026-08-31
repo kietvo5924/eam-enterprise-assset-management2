@@ -23,11 +23,11 @@ class AssetCategoriesPage(BasePage):
         self.navigate("/asset-categories/")
 
     def create_category(self, name, desc):
-        self.page.click('button[onclick="openCategoryModal()"]')
-        expect(self.page.locator('#category-modal')).to_be_visible()
-        self.page.fill('#category-name', name)
-        self.page.fill('#category-desc', desc)
-        self.page.click('#btn-save-category')
+        self.page.click('button[onclick="openModal()"]')
+        expect(self.page.locator('#unified-modal')).to_be_visible()
+        self.page.fill('#item-name', name)
+        self.page.fill('#item-desc', desc)
+        self.page.click('#btn-save')
 
 class AssetsPage(BasePage):
     def __init__(self, page: Page, base_url: str):

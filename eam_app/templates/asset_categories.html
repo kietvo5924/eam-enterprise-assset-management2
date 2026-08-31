@@ -1,20 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Asset Categories - EAM System{% endblock %}
-{% block breadcrumb %}Workspace / Asset Categories{% endblock %}
+{% block title %}Asset Configuration - EAM System{% endblock %}
+{% block breadcrumb %}Workspace / Asset Configuration{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-  <div class="flex gap-4 border-b border-neutral-200">
-    <a href="{% url 'portal_asset_registry' %}" class="px-4 py-2 text-sm font-semibold text-neutral-500 hover:text-primary transition-colors border-b-2 border-transparent">Asset Registry</a>
-    <a href="{% url 'portal_asset_categories' %}" class="px-4 py-2 text-sm font-semibold text-primary border-b-2 border-primary">Categories</a>
-    <a href="{% url 'portal_hierarchy_templates' %}" class="px-4 py-2 text-sm font-semibold text-neutral-500 hover:text-primary transition-colors border-b-2 border-transparent">Hierarchy Templates</a>
-  </div>
-</div>
-
 <div class="bg-transparent h-full flex flex-col space-y-6">
   <div class="bg-white backdrop-blur-2xl p-6 md:p-8 rounded-3xl border border-neutral-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden shrink-0 group">
     <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
+
     <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
 
     <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
@@ -34,22 +27,23 @@
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <button
-          onclick="openCategoryModal()"
+          onclick="openModal()"
           class="rounded-xl h-10 px-6 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-1 transform-gpu font-bold text-white flex items-center justify-center gap-2 text-base hover:scale-105"
         >
-          <i class="ph ph-plus font-bold"></i> Create Category
+          <i class="ph ph-plus font-bold"></i> Create <span id="create-btn-text">Category</span>
         </button>
       </div>
     </div>
   </div>
 
+  <!-- Metrics Dashboard -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 shrink-0">
     <div class="bg-gradient-to-br from-white to-neutral-50/80 rounded-2xl p-6 border border-neutral-200/80 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
       <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-center relative z-10">
         <div>
           <p class="text-sm font-extrabold text-neutral-400 uppercase tracking-widest mb-2">Total Categories</p>
-          <h3 class="text-4xl font-black text-neutral-900 m-0">{{ categories.count }}</h3>
+          <h3 class="text-4xl font-black text-neutral-900 m-0">{{ categories|length }}</h3>
         </div>
         <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] border border-neutral-100 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
           <i class="ph-fill ph-folders text-2xl"></i>
@@ -62,7 +56,7 @@
       <div class="flex justify-between items-center relative z-10">
         <div>
           <p class="text-sm font-extrabold text-success/70 uppercase tracking-widest mb-2">Active Categories</p>
-          <h3 class="text-4xl font-black text-success m-0" id="active-categories">0</h3>
+          <h3 class="text-4xl font-black text-success m-0" id="active-categories-count">0</h3>
         </div>
         <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(82,196,26,0.1)] border border-success/20 flex items-center justify-center text-success group-hover:scale-110 transition-transform">
           <i class="ph-fill ph-check-circle text-2xl"></i>
@@ -75,7 +69,7 @@
       <div class="flex justify-between items-center relative z-10">
         <div>
           <p class="text-sm font-extrabold text-info/70 uppercase tracking-widest mb-2">Total Templates</p>
-          <h3 class="text-4xl font-black text-info m-0">{{ template_count }}</h3>
+          <h3 class="text-4xl font-black text-info m-0">{{ templates|length }}</h3>
         </div>
         <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(22,119,255,0.1)] border border-info/20 flex items-center justify-center text-info group-hover:scale-110 transition-transform">
           <i class="ph-fill ph-tree-structure text-2xl"></i>
@@ -84,138 +78,324 @@
     </div>
   </div>
 
+  <!-- Main Table Container -->
   <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
-
+    
+    <!-- Search Bar -->
     <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
       <div class="relative w-full sm:max-w-md">
-        <i class="ph-bold ph-magnifying-glass text-neutral-400 text-lg absolute left-4 top-1/2 -translate-y-1/2"></i>
-        <input
-          type="text"
-          id="search-input"
-          onkeyup="filterCategories()"
-          placeholder="Search categories..."
-          class="w-full h-12 pl-12 pr-4 rounded-xl border border-neutral-200/80 hover:border-primary focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-base font-medium outline-none"
-        />
+        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
+        <input type="text" id="search-input" onkeyup="filterItems()" placeholder="Search..." class="w-full h-12 pl-12 pr-4 rounded-xl border border-neutral-200/80 hover:border-primary focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-base font-medium text-neutral-900 outline-none shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
       </div>
       <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100">
-        <i class="ph-fill ph-tag text-primary"></i>
-        <span id="items-found-count">{{ categories.count }} Items Found</span>
+         <i class="ph-fill ph-tag text-primary"></i>
+         <span id="items-count">0 Items Found</span>
       </div>
     </div>
 
-    <div class="overflow-x-auto p-3">
-      <table class="w-full text-sm text-left custom-beautiful-table" id="categories-table">
-        <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
-          <tr>
-            <th class="px-4 py-3 font-bold tracking-wider">Name</th>
-            <th class="px-4 py-3 font-bold tracking-wider">Description</th>
-            <th class="px-4 py-3 font-bold tracking-wider">Status</th>
-            <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-neutral-100">
-          {% for category in categories %}
-          <tr class="hover:bg-neutral-50/50 transition-colors category-row" data-name="{{ category.name|lower }}" data-desc="{{ category.description|default:''|lower }}">
-            <td class="px-4 py-3 font-semibold text-neutral-800">{{ category.name }}</td>
-            <td class="px-4 py-3 text-neutral-600">{{ category.description|default:"-" }}</td>
-            <td class="px-4 py-3">
-              {% if category.is_active %}
-                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold active-tag" data-active="true">Active</span>
-              {% else %}
-                <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold active-tag" data-active="false">Inactive</span>
-              {% endif %}
-            </td>
-            <td class="px-4 py-3 text-right">
-                <button onclick="openCategoryModal('{{ category.id }}', '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', '{{ category.is_active }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Category"><i class="ph ph-pencil-simple text-lg"></i></button>
-                <button onclick="toggleCategoryStatus('{{ category.id }}', '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', {{ category.is_active|yesno:'true,false' }})" class="{% if category.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if category.is_active %}Block Category{% else %}Unblock Category{% endif %}">
-                <i class="ph {% if category.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
-                </button>
-            </td>
-          </tr>
-          {% empty %}
-          <tr id="empty-state-row">
-            <td colspan="4" class="px-6 py-8 text-center text-neutral-500">
-              <div class="flex flex-col items-center justify-center">
-                <i class="ph ph-folder-dashed text-4xl text-neutral-300 mb-2"></i>
-                <p>No categories found</p>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-          <tr id="no-search-results" class="hidden">
-            <td colspan="4" class="px-6 py-8 text-center text-neutral-500">
-              <div class="flex flex-col items-center justify-center">
-                <i class="ph ph-magnifying-glass text-4xl text-neutral-300 mb-2"></i>
-                <p>No categories match your search</p>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Tabs Header -->
+    <div class="flex gap-4 border-b border-neutral-200 px-4 pt-4">
+        <button onclick="switchTab('categories')" id="tab-categories" class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors border-primary text-primary">Categories</button>
+        <button onclick="switchTab('templates')" id="tab-templates" class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors border-transparent text-neutral-500 hover:text-primary">Hierarchy Templates</button>
+        <button onclick="switchTab('locations')" id="tab-locations" class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors border-transparent text-neutral-500 hover:text-primary">Locations</button>
+    </div>
+
+    <!-- Tabs Content -->
+    <div class="p-2 flex-1 flex flex-col overflow-x-auto relative">
+        
+        <!-- Categories Tab -->
+        <div id="content-categories" class="tab-content block">
+            <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+                <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
+                    <tr class="border-b border-neutral-200/60">
+                        <th class="px-4 py-3 font-bold tracking-wider">Name</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Description</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-neutral-100 text-sm font-medium">
+                    {% for category in categories %}
+                    <tr class="hover:bg-primary-50/30 transition-colors list-row list-categories" data-name="{{ category.name|lower }}" data-desc="{{ category.description|default:''|lower }}">
+                        <td class="px-4 py-3 font-semibold text-neutral-800">{{ category.name }}</td>
+                        <td class="px-4 py-3 text-neutral-600">{{ category.description|default:"-" }}</td>
+                        <td class="px-4 py-3">
+                        {% if category.is_active %}
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold category-active" data-active="true">Active</span>
+                        {% else %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold category-active" data-active="false">Inactive</span>
+                        {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="openModal('categories', '{{ category.id }}', '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', null, '{{ category.is_active|yesno:"true,false" }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Category"><i class="ph ph-pencil-simple text-lg"></i></button>
+                            <button onclick="toggleStatus('categories', '{{ category.id }}', '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', null, {{ category.is_active|yesno:'true,false' }})" class="{% if category.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if category.is_active %}Block{% else %}Unblock{% endif %}">
+                            <i class="ph {% if category.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="empty-state-row">
+                        <td colspan="4" class="px-6 py-8 text-center text-neutral-500">
+                        <div class="flex flex-col items-center justify-center">
+                            <i class="ph ph-folder-dashed text-4xl text-neutral-300 mb-2"></i>
+                            <p>No categories found</p>
+                        </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Templates Tab -->
+        <div id="content-templates" class="tab-content hidden">
+            <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+                <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
+                    <tr class="border-b border-neutral-200/60">
+                        <th class="px-4 py-3 font-bold tracking-wider">Name</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Path Structure</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Description</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-neutral-100 text-sm font-medium">
+                    {% for tpl in templates %}
+                    <tr class="hover:bg-primary-50/30 transition-colors list-row list-templates" data-name="{{ tpl.name|lower }}" data-desc="{{ tpl.description|default:''|lower }}" data-path="{{ tpl.path|lower }}">
+                        <td class="px-4 py-3 font-semibold text-neutral-800">{{ tpl.name }}</td>
+                        <td class="px-4 py-3"><span class="font-mono text-xs bg-neutral-100 px-2 py-1 rounded">{{ tpl.path }}</span></td>
+                        <td class="px-4 py-3 text-neutral-600">{{ tpl.description|default:"-" }}</td>
+                        <td class="px-4 py-3">
+                        {% if tpl.is_active %}
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Active</span>
+                        {% else %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Inactive</span>
+                        {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="openModal('templates', '{{ tpl.id }}', '{{ tpl.name|escapejs }}', '{{ tpl.description|escapejs }}', '{{ tpl.path|escapejs }}', '{{ tpl.is_active|yesno:"true,false" }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Template"><i class="ph ph-pencil-simple text-lg"></i></button>
+                            <button onclick="toggleStatus('templates', '{{ tpl.id }}', '{{ tpl.name|escapejs }}', '{{ tpl.description|escapejs }}', '{{ tpl.path|escapejs }}', {{ tpl.is_active|yesno:'true,false' }})" class="{% if tpl.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if tpl.is_active %}Block{% else %}Unblock{% endif %}">
+                            <i class="ph {% if tpl.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr class="empty-state-row">
+                        <td colspan="5" class="px-6 py-8 text-center text-neutral-500">
+                        <div class="flex flex-col items-center justify-center">
+                            <i class="ph ph-folder-dashed text-4xl text-neutral-300 mb-2"></i>
+                            <p>No templates found</p>
+                        </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Locations Tab -->
+        <div id="content-locations" class="tab-content hidden">
+            <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+                <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
+                    <tr class="border-b border-neutral-200/60">
+                        <th class="px-4 py-3 font-bold tracking-wider">Name</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Description</th>
+                        <th class="px-4 py-3 font-bold tracking-wider">Status</th>
+                        <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-neutral-100 text-sm font-medium" id="locations-tbody">
+                    <!-- Tree rendered by JS -->
+                </tbody>
+            </table>
+        </div>
+
     </div>
   </div>
 </div>
 
-<!-- Category Modal -->
-<div id="category-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+<!-- Unified Modal -->
+<div id="unified-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
   <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] fancy-modal">
     <div class="px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
-        <h3 class="text-xl font-black text-neutral-900 m-0" id="category-modal-title">New Category</h3>
+        <h3 class="text-xl font-black text-neutral-900 m-0" id="unified-modal-title">New Item</h3>
       </div>
-      <button type="button" onclick="closeCategoryModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
+      <button type="button" onclick="closeModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
         <i class="ph ph-x text-xl font-bold"></i>
       </button>
     </div>
     <div class="overflow-y-auto p-6">
-        <form id="category-form" class="space-y-5">
-          <input type="hidden" id="category-id" />
-          <div id="category-msg" class="hidden p-3 rounded-lg text-sm font-medium mb-4"></div>
+        <form id="unified-form" class="space-y-5">
+          <input type="hidden" id="item-id" />
+          <div id="unified-msg" class="hidden p-3 rounded-lg text-sm font-medium mb-4"></div>
           
           <div>
             <label class="block text-sm font-extrabold text-neutral-700 uppercase mb-1.5">Name <span class="text-danger">*</span></label>
-            <input type="text" id="category-name" required placeholder="Name..." class="w-full h-12 px-4 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+            <input type="text" id="item-name" required placeholder="Name..." class="w-full h-12 px-4 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+          </div>
+
+          <div id="template-path-section" class="hidden">
+            <div class="mb-2">
+                <span class="font-extrabold text-neutral-700 text-sm uppercase">Cấu trúc phân nhánh (Path Structure)</span>
+                <p class="text-xs text-neutral-500 mt-1 mb-0">Thêm các cấp bậc từ cao xuống thấp (Ví dụ: Nhà máy &gt; Xưởng &gt; Máy móc)</p>
+            </div>
+            <div id="path-tags-container" class="space-y-2">
+                <!-- Injected via JS -->
+            </div>
+            <button type="button" onclick="addPathTag('')" class="w-full mt-2 h-10 border border-dashed border-primary/30 text-primary font-semibold rounded-xl bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2">
+                <i class="ph-bold ph-plus"></i> Thêm cấp con
+            </button>
+          </div>
+
+          <div id="location-parent-section" class="hidden">
+            <label class="block text-sm font-extrabold text-neutral-700 uppercase mb-1.5">Vị trí cấp trên (Parent Location)</label>
+            <select id="item-parent" class="w-full h-12 px-4 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium appearance-none">
+                <option value="">-- None (Top-level) --</option>
+                <!-- Injected via JS -->
+            </select>
           </div>
           
           <div>
             <label class="block text-sm font-extrabold text-neutral-700 uppercase mb-1.5">Description</label>
-            <textarea id="category-desc" rows="3" placeholder="Description..." class="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+            <textarea id="item-desc" rows="3" placeholder="Description..." class="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
           </div>
 
           <div class="flex items-center justify-between">
             <label class="text-sm font-extrabold text-neutral-700 uppercase">Active Status</label>
             <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="category-active" class="sr-only peer" checked>
+              <input type="checkbox" id="item-active" class="sr-only peer" checked>
               <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
           
           <div class="pt-2 flex justify-end gap-3 mt-6 border-t border-neutral-100 pt-6">
-            <button type="button" onclick="closeCategoryModal()" class="rounded-xl h-10 px-6 font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Cancel</button>
-            <button type="submit" id="btn-save-category" class="rounded-xl h-10 px-8 bg-primary hover:bg-primary-600 text-white font-bold transition-colors shadow-md shadow-primary/20">Save</button>
+            <button type="button" onclick="closeModal()" class="rounded-xl h-10 px-6 font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Cancel</button>
+            <button type="submit" id="btn-save" class="rounded-xl h-10 px-8 bg-primary hover:bg-primary-600 text-white font-bold transition-colors shadow-md shadow-primary/20">Save</button>
           </div>
         </form>
     </div>
   </div>
 </div>
 
+{{ locations|json_script:"locations-data" }}
+
 <script>
+    let activeTab = 'categories';
+    let locationsData = [];
+    
     document.addEventListener("DOMContentLoaded", function() {
-        const activeRows = document.querySelectorAll('.active-tag[data-active="true"]').length;
-        const activeCategoriesEl = document.getElementById('active-categories');
+        const storedTab = localStorage.getItem('assetConfigActiveTab');
+        if (storedTab) {
+            switchTab(storedTab);
+        } else {
+            switchTab('categories');
+        }
+
+        const activeRows = document.querySelectorAll('.category-active[data-active="true"]').length;
+        const activeCategoriesEl = document.getElementById('active-categories-count');
         if(activeCategoriesEl) activeCategoriesEl.innerText = activeRows;
+
+        // Parse locations JSON
+        locationsData = JSON.parse(document.getElementById('locations-data').textContent);
+        renderLocationsTree();
     });
 
-    function filterCategories() {
+    function renderLocationsTree() {
+        const formatLtree = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+        const map = new Map();
+        const roots = [];
+
+        locationsData.forEach(l => {
+            l.fullPath = l.parent_id ? `${l.parent_id}.${formatLtree(l.name)}` : formatLtree(l.name);
+            l.children = [];
+            map.set(l.fullPath, l);
+        });
+
+        locationsData.forEach(l => {
+            if(l.parent_id) {
+                const parent = map.get(l.parent_id);
+                if (parent) {
+                    parent.children.push(l);
+                } else {
+                    roots.push(l);
+                }
+            } else {
+                roots.push(l);
+            }
+        });
+
+        let html = '';
+        function renderNode(node, depth=0) {
+            const indent = depth * 24; // 24px per level
+            const isRoot = depth === 0;
+            const icon = isRoot ? 'ph-buildings text-neutral-400' : 'ph-factory text-neutral-400';
+            const statusHtml = node.is_active ? `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Active</span>` : `<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Inactive</span>`;
+            
+            html += `
+            <tr class="hover:bg-primary-50/30 transition-colors list-row list-locations" data-name="${node.name.toLowerCase()}" data-desc="${(node.description||'').toLowerCase()}">
+                <td class="px-4 py-3 font-semibold text-neutral-800">
+                    <div style="padding-left: ${indent}px" class="flex items-center gap-2">
+                        <i class="ph-fill ${icon}"></i>
+                        <div class="flex flex-col">
+                            <span>${node.name}</span>
+                            ${!isRoot ? `<span class="text-[10px] text-neutral-400 font-mono mt-0.5 truncate" title="${node.parent_id}">Thuộc: ${node.parent_id}</span>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td class="px-4 py-3 text-neutral-600">${node.description || "-"}</td>
+                <td class="px-4 py-3">${statusHtml}</td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="openModal('locations', '${node.id}', '${node.name.replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id}', '${node.is_active}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Location"><i class="ph ph-pencil-simple text-lg"></i></button>
+                    <button onclick="toggleStatus('locations', '${node.id}', '${node.name.replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id}', ${node.is_active})" class="${node.is_active ? 'text-danger hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'} transition-colors p-1.5 ml-1 rounded-lg" title="${node.is_active ? 'Block' : 'Unblock'}">
+                    <i class="ph ${node.is_active ? 'ph-lock' : 'ph-lock-open'} text-lg"></i>
+                    </button>
+                </td>
+            </tr>
+            `;
+            node.children.forEach(c => renderNode(c, depth+1));
+        }
+
+        roots.forEach(r => renderNode(r));
+
+        if (roots.length === 0) {
+            html = `<tr class="empty-state-row"><td colspan="4" class="px-6 py-8 text-center text-neutral-500"><div class="flex flex-col items-center justify-center"><i class="ph ph-folder-dashed text-4xl text-neutral-300 mb-2"></i><p>No locations found</p></div></td></tr>`;
+        }
+        document.getElementById('locations-tbody').innerHTML = html;
+    }
+
+    function switchTab(tab) {
+        activeTab = tab;
+        localStorage.setItem('assetConfigActiveTab', tab);
+        
+        ['categories', 'templates', 'locations'].forEach(t => {
+            const btn = document.getElementById(`tab-${t}`);
+            const content = document.getElementById(`content-${t}`);
+            if (t === tab) {
+                btn.className = "px-4 py-2 text-sm font-semibold border-b-2 transition-colors border-primary text-primary";
+                content.classList.remove('hidden');
+            } else {
+                btn.className = "px-4 py-2 text-sm font-semibold border-b-2 transition-colors border-transparent text-neutral-500 hover:text-primary";
+                content.classList.add('hidden');
+            }
+        });
+        
+        document.getElementById('create-btn-text').innerText = tab === 'categories' ? 'Category' : (tab === 'templates' ? 'Template' : 'Location');
+        
+        filterItems();
+    }
+
+    function filterItems() {
         const query = document.getElementById('search-input').value.toLowerCase();
-        const rows = document.querySelectorAll('.category-row');
+        const rows = document.querySelectorAll(`.list-${activeTab}`);
         let visibleCount = 0;
 
         rows.forEach(row => {
-            const name = row.getAttribute('data-name');
-            const desc = row.getAttribute('data-desc');
-            if (name.includes(query) || desc.includes(query)) {
+            const name = row.getAttribute('data-name') || '';
+            const desc = row.getAttribute('data-desc') || '';
+            const path = row.getAttribute('data-path') || '';
+            if (name.includes(query) || desc.includes(query) || path.includes(query)) {
                 row.style.display = '';
                 visibleCount++;
             } else {
@@ -223,51 +403,118 @@
             }
         });
 
-        document.getElementById('items-found-count').innerText = `${visibleCount} Items Found`;
-        const noResults = document.getElementById('no-search-results');
-        const emptyState = document.getElementById('empty-state-row');
+        document.getElementById('items-count').innerText = `${visibleCount} Items Found`;
+    }
 
-        if(noResults) {
-            if(visibleCount === 0 && rows.length > 0) {
-                noResults.classList.remove('hidden');
-            } else {
-                noResults.classList.add('hidden');
-            }
+    let pathTags = [];
+    function renderPathTags() {
+        const c = document.getElementById('path-tags-container');
+        c.innerHTML = '';
+        pathTags.forEach((tag, idx) => {
+            c.innerHTML += `
+            <div class="flex gap-2 items-start">
+                <div class="shrink-0 mt-2 bg-neutral-100 rounded-lg px-2.5 py-1 text-xs font-bold text-neutral-500 border border-neutral-200">
+                    Cấp ${idx + 1}
+                </div>
+                <input type="text" class="path-tag-input mb-0 flex-1 rounded-xl h-10 px-3 border border-neutral-200 focus:outline-none focus:border-primary" placeholder="VD: ${idx === 0 ? 'Nhà máy' : idx === 1 ? 'Xưởng' : 'Máy móc'}..." value="${tag}" onchange="updatePathTag(${idx}, this.value)">
+                <button type="button" class="shrink-0 mt-1 text-danger hover:bg-red-50 p-1.5 rounded-lg transition-colors ${pathTags.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}" onclick="removePathTag(${idx})" ${pathTags.length <= 1 ? 'disabled' : ''}>
+                    <i class="ph-bold ph-x text-base"></i>
+                </button>
+            </div>
+            `;
+        });
+    }
+
+    function addPathTag(val) {
+        pathTags.push(val);
+        renderPathTags();
+    }
+
+    function removePathTag(idx) {
+        if(pathTags.length > 1) {
+            pathTags.splice(idx, 1);
+            renderPathTags();
         }
     }
 
-    function openCategoryModal(id='', name='', desc='', isActive='True') {
-        document.getElementById('category-modal').classList.remove('hidden');
-        document.getElementById('category-id').value = id;
-        document.getElementById('category-name').value = name;
-        document.getElementById('category-desc').value = desc !== 'None' ? desc : '';
-        document.getElementById('category-active').checked = isActive === 'True';
+    function updatePathTag(idx, val) {
+        pathTags[idx] = val;
+    }
+
+    function populateParentSelect(currentId) {
+        const select = document.getElementById('item-parent');
+        select.innerHTML = '<option value="">-- None (Top-level) --</option>';
+        locationsData.forEach(l => {
+            if (currentId && l.id === currentId) return; // Cannot be parent of itself
+            select.innerHTML += `<option value="${l.fullPath}">${l.name} (${l.fullPath})</option>`;
+        });
+    }
+
+    function openModal(tab = activeTab, id='', name='', desc='', extra='', isActive='True') {
+        document.getElementById('unified-modal').classList.remove('hidden');
+        document.getElementById('item-id').value = id;
+        document.getElementById('item-name').value = name;
+        document.getElementById('item-desc').value = desc !== 'None' ? desc : '';
+        document.getElementById('item-active').checked = isActive === 'True' || isActive === 'true';
         
-        document.getElementById('category-modal-title').innerText = id ? 'Edit Category' : 'New Category';
-        document.getElementById('category-msg').classList.add('hidden');
+        let title = id ? 'Edit ' : 'New ';
+        
+        document.getElementById('template-path-section').classList.add('hidden');
+        document.getElementById('location-parent-section').classList.add('hidden');
+        
+        if (tab === 'categories') {
+            title += 'Category';
+        } else if (tab === 'templates') {
+            title += 'Template';
+            document.getElementById('template-path-section').classList.remove('hidden');
+            pathTags = (extra && extra !== 'None') ? extra.split('.') : [''];
+            renderPathTags();
+        } else if (tab === 'locations') {
+            title += 'Location';
+            document.getElementById('location-parent-section').classList.remove('hidden');
+            populateParentSelect(id);
+            document.getElementById('item-parent').value = (extra && extra !== 'None') ? extra : '';
+        }
+
+        document.getElementById('unified-modal-title').innerText = title;
+        document.getElementById('unified-msg').classList.add('hidden');
     }
 
-    function closeCategoryModal() {
-        document.getElementById('category-modal').classList.add('hidden');
-        document.getElementById('category-form').reset();
+    function closeModal() {
+        document.getElementById('unified-modal').classList.add('hidden');
+        document.getElementById('unified-form').reset();
     }
 
-    document.getElementById('category-form').addEventListener('submit', function(e) {
+    document.getElementById('unified-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        const id = document.getElementById('category-id').value;
+        const id = document.getElementById('item-id').value;
         const data = {
             id: id,
-            name: document.getElementById('category-name').value,
-            description: document.getElementById('category-desc').value,
-            is_active: document.getElementById('category-active').checked
+            name: document.getElementById('item-name').value,
+            description: document.getElementById('item-desc').value,
+            is_active: document.getElementById('item-active').checked
         };
+
+        if (activeTab === 'templates') {
+            // Re-read inputs to catch any unsaved changes
+            const inputs = document.querySelectorAll('.path-tag-input');
+            const formatLtree = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+            const p = Array.from(inputs).map(inp => formatLtree(inp.value)).filter(t => t.length > 0).join('.');
+            data.path = p;
+        } else if (activeTab === 'locations') {
+            data.parentId = document.getElementById('item-parent').value;
+        }
         
         const method = id ? 'PUT' : 'POST';
-        const btn = document.getElementById('btn-save-category');
-        const msg = document.getElementById('category-msg');
+        const btn = document.getElementById('btn-save');
+        const msg = document.getElementById('unified-msg');
         btn.disabled = true;
         
-        fetch('{% url "portal_asset_categories" %}', {
+        let url = '{% url "portal_asset_categories" %}';
+        if (activeTab === 'templates') url = '{% url "portal_hierarchy_templates" %}';
+        if (activeTab === 'locations') url = '{% url "portal_locations" %}';
+
+        fetch(url, {
             method: method,
             headers: {
                 'Content-Type': 'application/json',
@@ -290,21 +537,34 @@
         });
     });
 
-    function toggleCategoryStatus(id, name, desc, isActive) {
+    function toggleStatus(tab, id, name, desc, extra, isActive) {
         const action = isActive ? 'block' : 'unblock';
-        if(confirm(`Are you sure you want to ${action} this category?`)) {
-            fetch('{% url "portal_asset_categories" %}', {
+        if(confirm(`Are you sure you want to ${action} this item?`)) {
+            
+            const data = {
+                id: id,
+                name: name,
+                description: desc !== 'None' ? desc : '',
+                is_active: !isActive
+            };
+
+            if (tab === 'templates') {
+                data.path = extra !== 'None' ? extra : '';
+            } else if (tab === 'locations') {
+                data.parentId = extra !== 'None' ? extra : '';
+            }
+
+            let url = '{% url "portal_asset_categories" %}';
+            if (tab === 'templates') url = '{% url "portal_hierarchy_templates" %}';
+            if (tab === 'locations') url = '{% url "portal_locations" %}';
+
+            fetch(url, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 },
-                body: JSON.stringify({
-                    id: id,
-                    name: name,
-                    description: desc !== 'None' ? desc : '',
-                    is_active: !isActive
-                })
+                body: JSON.stringify(data)
             })
             .then(res => res.json())
             .then(data => {

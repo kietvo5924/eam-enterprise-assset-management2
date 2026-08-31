@@ -186,10 +186,10 @@
                 {% endif %}
               </td>
               <td class="px-4 py-3 text-neutral-600">
-                {{ wo.assigned_to.username|default:'-' }}
+                {% if wo.assigned_to %}{{ wo.assigned_to.username }}{% else %}-{% endif %}
               </td>
               <td class="px-4 py-3 text-neutral-600">
-                {{ wo.created_by.username|default:'-' }}
+                {% if wo.created_by %}{{ wo.created_by.username }}{% else %}-{% endif %}
               </td>
               <td class="px-4 py-3 text-neutral-600">
                 {{ wo.deadline|date:'Y-m-d H:i'|default:'-' }}
@@ -199,7 +199,7 @@
               </td>
               <td class="px-4 py-3 text-right">
                 <div class="flex gap-2 items-center justify-end">
-                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{{ wo.assigned_to.username|default:''|escapejs }}', '{{ wo.deadline|date:'Y-m-d' }}', {{ checklists_json|safe }})" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}', {{ checklists_json|safe }})" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-eye text-lg"></i>
                     </button>
                     

@@ -4,151 +4,378 @@
 {% block breadcrumb %}System Admin / Tenants{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden">
-  <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
-    <div>
-      <h2 class="text-lg font-bold text-neutral-800 m-0">Tenants</h2>
-      <p class="text-sm text-neutral-500 mt-1">Manage system tenants and their subscriptions.</p>
+<div class="bg-transparent h-full flex flex-col space-y-6">
+  <!-- Massive Beautiful Header -->
+  <div class="bg-white p-6 md:p-8 rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
+    <div class="absolute bottom-0 left-0 -ml-32 -mb-32 w-80 h-80 rounded-full bg-gradient-to-tr from-info/10 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
+    
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
+      <div class="flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.2)] border border-primary/20 transform -rotate-12 group-hover:rotate-12 group-hover:scale-110 transition duration-500">
+          <i class="ph-fill ph-buildings text-3xl drop-shadow-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
+            System Tenants
+          </h2>
+          <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+            Manage organizations, plans, and multi-tenant isolation.
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="openTenantModal()" class="rounded-xl h-11 px-8 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.3)] border-0 transition transform hover:-translate-y-1 hover:scale-105 font-bold text-white flex items-center justify-center gap-2">
+          <i class="ph-bold ph-plus text-lg"></i> New Tenant
+        </button>
+      </div>
     </div>
-    <button onclick="openTenantModal()" class="bg-primary hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
-      <i class="ph ph-plus font-bold"></i> New Tenant
-    </button>
   </div>
 
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm text-left">
-      <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200">
-        <tr>
-          <th class="px-6 py-4 font-bold tracking-wider">Tenant Name</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Code</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Plan</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Status</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Created</th>
-          <th class="px-6 py-4 text-right font-bold tracking-wider">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-neutral-100">
-        {% for tenant in tenants %}
-        <tr class="hover:bg-neutral-50/50 transition-colors">
-          <td class="px-6 py-4 font-semibold text-neutral-800">{{ tenant.name }}</td>
-          <td class="px-6 py-4 text-neutral-600 font-mono text-xs">{{ tenant.tenant_code|default:"-" }}</td>
-          <td class="px-6 py-4">
-            <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-semibold">{{ tenant.service_plan }}</span>
-          </td>
-          <td class="px-6 py-4">
-            {% if tenant.status == 'ACTIVE' %}
-              <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-semibold flex items-center gap-1 w-max">
-                <i class="ph-fill ph-check-circle"></i> Active
-              </span>
-            {% else %}
-              <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-semibold">{{ tenant.status }}</span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-neutral-500">{{ tenant.created_at|date:"M d, Y" }}</td>
-          <td class="px-6 py-4 text-right">
-            <button onclick="openTenantModal('{{ tenant.id }}', '{{ tenant.name }}', '{{ tenant.tenant_code }}', '{{ tenant.service_plan }}', '{{ tenant.status }}')" class="text-neutral-400 hover:text-primary transition-colors p-1"><i class="ph ph-pencil-simple text-lg"></i></button>
-            <button onclick="deleteTenant('{{ tenant.id }}')" class="text-neutral-400 hover:text-danger transition-colors p-1 ml-1"><i class="ph ph-trash text-lg"></i></button>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6" class="px-6 py-8 text-center text-neutral-500">
-            <div class="flex flex-col items-center justify-center">
-              <i class="ph ph-buildings text-4xl text-neutral-300 mb-2"></i>
-              <p>No tenants found</p>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  
-  {% if tenants %}
-  <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-neutral-50/50">
-    <span class="text-sm text-neutral-500">Showing {{ tenants|length }} entries</span>
-    <div class="flex items-center gap-2">
-      <button class="px-3 py-1 border border-neutral-200 rounded hover:bg-neutral-100 text-neutral-600 text-sm font-medium disabled:opacity-50" disabled>Previous</button>
-      <button class="px-3 py-1 border border-neutral-200 rounded hover:bg-neutral-100 text-neutral-600 text-sm font-medium disabled:opacity-50" disabled>Next</button>
+  <!-- Metrics Dashboard -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 shrink-0">
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-primary-50/50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Total Tenants</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0" id="kpi-total">{{ tenants|length }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-buildings text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-success/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Active</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0" id="kpi-active">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-check-circle text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-warning/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Enterprise</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0" id="kpi-enterprise">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-crown text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-info/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Pro Plan</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0" id="kpi-pro">0</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-rocket text-xl"></i>
+        </div>
+      </div>
     </div>
   </div>
-  {% endif %}
-</div>
+
+  <!-- Main Table Container -->
+  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+    
+    <!-- Search Bar -->
+    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+      <div class="relative w-full sm:max-w-md">
+        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
+        <input type="text" id="search-tenant" onkeyup="filterTenants()" placeholder="Search tenants by name..." class="w-full h-12 pl-12 pr-4 rounded-xl border border-neutral-200/80 hover:border-primary focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-base font-medium text-neutral-900 outline-none shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
+      </div>
+      <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100">
+         <i class="ph-fill ph-buildings text-primary"></i>
+         <span id="tenant-count">{{ tenants|length }} Tenants Found</span>
+      </div>
+    </div>
+
+    <div class="p-2 flex-1 flex flex-col overflow-x-auto">
+      <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+        <thead>
+          <tr class="text-neutral-500 text-sm border-b border-neutral-200/60">
+            <th class="px-6 py-4 font-bold">Name</th>
+            <th class="px-6 py-4 font-bold">Tenant Code</th>
+            <th class="px-6 py-4 font-bold">Service Plan</th>
+            <th class="px-6 py-4 font-bold">Status</th>
+            <th class="px-6 py-4 font-bold">Created At</th>
+            <th class="px-6 py-4 font-bold text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tenant-table-body" class="text-sm font-medium">
+          {% for tenant in tenants %}
+          <tr class="border-b border-neutral-50 hover:bg-primary-50/30 transition-colors tenant-row" data-name="{{ tenant.name|lower }}" data-status="{{ tenant.status }}" data-plan="{{ tenant.service_plan }}">
+            <td class="px-6 py-4 text-neutral-800 font-bold">{{ tenant.name }}</td>
+            <td class="px-6 py-4">
+                <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100">{{ tenant.tenant_code|default:"-" }}</span>
+            </td>
+            <td class="px-6 py-4">
+                <span class="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100">{{ tenant.service_plan }}</span>
+            </td>
+            <td class="px-6 py-4">
+              {% if tenant.status == 'ACTIVE' %}
+                <span class="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 flex items-center gap-1.5 w-max">
+                  <i class="ph-fill ph-check-circle"></i> ACTIVE
+                </span>
+              {% else %}
+                <span class="px-3 py-1 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 flex items-center gap-1.5 w-max">
+                  <i class="ph-fill ph-x-circle"></i> {{ tenant.status }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-neutral-500 font-medium">{{ tenant.created_at|date:"M d, Y, h:i A" }}</td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex justify-end items-center gap-2">
+                <button onclick="openAdminModal('{{ tenant.id }}')" title="Create Admin" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-primary hover:bg-primary-50 transition-colors">
+                  <i class="ph-bold ph-user-plus text-lg"></i>
+                </button>
+                <button onclick="openAdminsDrawer('{{ tenant.id }}')" title="View Admins" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-info hover:bg-info-50 transition-colors">
+                  <i class="ph-bold ph-users text-lg"></i>
+                </button>
+                <button onclick="openTenantModal('{{ tenant.id }}', '{{ tenant.name|escapejs }}', '{{ tenant.tenant_code|escapejs }}', '{{ tenant.service_plan }}', '{{ tenant.status }}')" title="Edit Tenant" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-warning hover:bg-warning-50 transition-colors">
+                  <i class="ph-bold ph-pencil-simple text-lg"></i>
+                </button>
+                {% if tenant.id|stringformat:"s" != "00000000-0000-0000-0000-000000000000" %}
+                <button onclick="toggleTenantStatus('{{ tenant.id }}', '{{ tenant.status }}')" title="Toggle Status" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-danger hover:bg-danger-50 transition-colors">
+                  {% if tenant.status == 'ACTIVE' %}
+                  <i class="ph-bold ph-prohibit text-lg text-danger"></i>
+                  {% else %}
+                  <i class="ph-bold ph-check-circle text-lg text-success"></i>
+                  {% endif %}
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Tenant Modal -->
-<div id="tenant-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
-    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
-      <h3 class="text-lg font-bold text-neutral-800 m-0" id="tenant-modal-title">New Tenant</h3>
-      <button onclick="closeTenantModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
-        <i class="ph ph-x text-xl"></i>
+<div id="tenant-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="tenant-modal-content">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
+          <i class="ph-fill ph-buildings text-2xl"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-black text-neutral-900 m-0" id="tenant-modal-title">New Tenant</h3>
+          <p class="text-sm font-medium text-neutral-500 m-0 mt-0.5" id="tenant-modal-subtitle">Register a new organization.</p>
+        </div>
+      </div>
+      <button onclick="closeTenantModal()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
       </button>
     </div>
-    <form id="tenant-form" class="p-6 space-y-4">
-      <input type="hidden" id="tenant-id" />
-      <div id="tenant-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
-      
-      <div>
-        <label class="block text-sm font-bold text-neutral-700 mb-1.5">Tenant Name <span class="text-danger">*</span></label>
-        <input type="text" id="tenant-name" required class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
-      </div>
-      
-      <div>
-        <label class="block text-sm font-bold text-neutral-700 mb-1.5">Code</label>
-        <input type="text" id="tenant-code" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
-      </div>
-
-      <div class="flex gap-4">
-        <div class="flex-1">
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Service Plan</label>
-            <select id="tenant-plan" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+    
+    <div class="p-6 overflow-y-auto">
+      <form id="tenant-form" class="space-y-6">
+        <input type="hidden" id="tenant-id" />
+        <div id="tenant-msg" class="hidden p-4 rounded-xl text-sm font-semibold mb-4"></div>
+        
+        <div>
+          <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Tenant Name <span class="text-danger">*</span></label>
+          <input type="text" id="tenant-name" required class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Tenant Code</label>
+          <input type="text" id="tenant-code" class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-medium text-neutral-900" />
+        </div>
+        
+        <div class="flex gap-4">
+          <div class="flex-1">
+            <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Service Plan</label>
+            <select id="tenant-plan" class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900 appearance-none">
                 <option value="FREE">FREE</option>
                 <option value="PRO">PRO</option>
                 <option value="ENTERPRISE">ENTERPRISE</option>
             </select>
-        </div>
-        <div class="flex-1">
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Status</label>
-            <select id="tenant-status" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          </div>
+          <div class="flex-1">
+            <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Status</label>
+            <select id="tenant-status" class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900 appearance-none">
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>
                 <option value="SUSPENDED">SUSPENDED</option>
             </select>
+          </div>
+        </div>
+      </form>
+    </div>
+    
+    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+      <button type="button" onclick="closeTenantModal()" class="px-6 h-12 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-base font-bold transition-colors">Cancel</button>
+      <button type="button" onclick="saveTenant()" id="btn-save-tenant" class="px-8 h-12 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl text-base font-bold shadow-lg shadow-primary/40 transition-transform active:scale-[0.98]">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Modal -->
+<div id="admin-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="admin-modal-content">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
+          <i class="ph-fill ph-user-plus text-2xl"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-black text-neutral-900 m-0" id="admin-modal-title">Create Tenant Admin</h3>
         </div>
       </div>
-      
-      <div class="pt-4 flex justify-end gap-3">
-        <button type="button" onclick="closeTenantModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Cancel</button>
-        <button type="submit" id="btn-save-tenant" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Save</button>
+      <button onclick="closeAdminModal()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    
+    <div class="p-6 overflow-y-auto">
+      <form id="admin-form" class="space-y-6">
+        <input type="hidden" id="admin-tenant-id" />
+        <input type="hidden" id="admin-id" />
+        <div id="admin-msg" class="hidden p-4 rounded-xl text-sm font-semibold mb-4"></div>
+        
+        <div>
+          <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Admin Email (Username) <span class="text-danger">*</span></label>
+          <input type="email" id="admin-username" required class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Temporary Password <span class="text-danger" id="admin-password-req">*</span></label>
+          <input type="password" id="admin-password" class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900" />
+        </div>
+      </form>
+    </div>
+    
+    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+      <button type="button" onclick="closeAdminModal()" class="px-6 h-12 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-base font-bold transition-colors">Cancel</button>
+      <button type="button" onclick="saveAdmin()" id="btn-save-admin" class="px-8 h-12 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl text-base font-bold shadow-lg shadow-primary/40 transition-transform active:scale-[0.98]">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drawer for Admins -->
+<div id="admins-drawer" class="hidden fixed inset-0 z-[100]">
+  <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" onclick="closeAdminsDrawer()"></div>
+  <div class="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl flex flex-col transform transition-transform translate-x-full duration-300" id="admins-drawer-content">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-info-50 to-info-100 border border-info/20 flex items-center justify-center text-info shadow-inner">
+          <i class="ph-fill ph-users text-2xl"></i>
+        </div>
+        <div>
+          <h3 class="text-xl font-black text-neutral-900 m-0">Tenant Admins</h3>
+        </div>
       </div>
-    </form>
+      <button onclick="closeAdminsDrawer()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    
+    <div class="p-6 overflow-y-auto flex-1 bg-neutral-50">
+      <div id="admins-loading" class="text-center py-8 hidden">
+        <i class="ph-bold ph-spinner animate-spin text-3xl text-primary mb-2"></i>
+        <p class="text-neutral-500">Loading admins...</p>
+      </div>
+      <div id="admins-list" class="space-y-4">
+        <!-- Admins list injected here -->
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        updateKPIs();
+    });
+
+    function updateKPIs() {
+        const rows = document.querySelectorAll('.tenant-row');
+        let active = 0, enterprise = 0, pro = 0;
+        
+        rows.forEach(r => {
+            if(r.dataset.status === 'ACTIVE') active++;
+            if(r.dataset.plan === 'ENTERPRISE') enterprise++;
+            if(r.dataset.plan === 'PRO') pro++;
+        });
+
+        document.getElementById('kpi-active').innerText = active;
+        document.getElementById('kpi-enterprise').innerText = enterprise;
+        document.getElementById('kpi-pro').innerText = pro;
+    }
+
+    function filterTenants() {
+        const val = document.getElementById('search-tenant').value.toLowerCase();
+        const rows = document.querySelectorAll('.tenant-row');
+        let count = 0;
+        rows.forEach(row => {
+            const name = row.dataset.name;
+            if(name.includes(val)) {
+                row.style.display = '';
+                count++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        document.getElementById('tenant-count').innerText = `${count} Tenants Found`;
+    }
+
+    // Tenant Modal
     function openTenantModal(id='', name='', code='', plan='FREE', status='ACTIVE') {
         document.getElementById('tenant-modal').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('tenant-modal-content').classList.remove('scale-95');
+            document.getElementById('tenant-modal-content').classList.add('scale-100');
+        }, 10);
         document.getElementById('tenant-id').value = id;
         document.getElementById('tenant-name').value = name;
         document.getElementById('tenant-code').value = code !== 'None' ? code : '';
         document.getElementById('tenant-plan').value = plan;
         document.getElementById('tenant-status').value = status;
         document.getElementById('tenant-modal-title').innerText = id ? 'Edit Tenant' : 'New Tenant';
+        document.getElementById('tenant-modal-subtitle').innerText = id ? 'Update organization details.' : 'Register a new organization.';
         document.getElementById('tenant-msg').classList.add('hidden');
     }
 
     function closeTenantModal() {
-        document.getElementById('tenant-modal').classList.add('hidden');
-        document.getElementById('tenant-form').reset();
+        document.getElementById('tenant-modal-content').classList.remove('scale-100');
+        document.getElementById('tenant-modal-content').classList.add('scale-95');
+        setTimeout(() => {
+            document.getElementById('tenant-modal').classList.add('hidden');
+            document.getElementById('tenant-form').reset();
+        }, 200);
     }
 
-    document.getElementById('tenant-form').addEventListener('submit', function(e) {
-        e.preventDefault();
+    function saveTenant() {
         const id = document.getElementById('tenant-id').value;
+        const name = document.getElementById('tenant-name').value;
+        if(!name) {
+            alert('Tenant name is required');
+            return;
+        }
+
         const data = {
             id: id,
-            name: document.getElementById('tenant-name').value,
+            name: name,
             tenant_code: document.getElementById('tenant-code').value,
             service_plan: document.getElementById('tenant-plan').value,
             status: document.getElementById('tenant-status').value
@@ -158,6 +385,7 @@
         const btn = document.getElementById('btn-save-tenant');
         const msg = document.getElementById('tenant-msg');
         btn.disabled = true;
+        btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Saving...';
         
         fetch('{% url "portal_tenants" %}', {
             method: method,
@@ -172,30 +400,208 @@
             if(resData.success) {
                 window.location.reload();
             } else {
-                msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+                msg.className = 'mb-4 p-4 rounded-xl text-sm bg-danger/10 text-danger border border-danger/20';
                 msg.innerText = resData.error || 'An error occurred';
                 msg.classList.remove('hidden');
             }
         })
         .finally(() => {
             btn.disabled = false;
+            btn.innerHTML = 'Save';
         });
-    });
+    }
 
-    function deleteTenant(id) {
-        if(confirm('Are you sure you want to delete this tenant? All data will be lost.')) {
+    function toggleTenantStatus(id, currentStatus) {
+        if(confirm(`Are you sure you want to ${currentStatus === 'ACTIVE' ? 'block' : 'unblock'} this tenant?`)) {
+            const data = {
+                id: id,
+                status: currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+            };
             fetch('{% url "portal_tenants" %}', {
-                method: 'DELETE',
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 },
-                body: JSON.stringify({id: id})
+                body: JSON.stringify(data)
             })
             .then(res => res.json())
             .then(data => {
                 if(data.success) {
                     window.location.reload();
+                } else {
+                    alert(data.error);
+                }
+            });
+        }
+    }
+
+    // Admin Modal
+    function openAdminModal(tenantId, adminId='', username='') {
+        document.getElementById('admin-modal').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('admin-modal-content').classList.remove('scale-95');
+            document.getElementById('admin-modal-content').classList.add('scale-100');
+        }, 10);
+        document.getElementById('admin-tenant-id').value = tenantId;
+        document.getElementById('admin-id').value = adminId;
+        document.getElementById('admin-username').value = username;
+        document.getElementById('admin-password').value = '';
+        
+        if (adminId) {
+            document.getElementById('admin-password-req').classList.add('hidden');
+        } else {
+            document.getElementById('admin-password-req').classList.remove('hidden');
+        }
+
+        document.getElementById('admin-modal-title').innerText = adminId ? 'Edit Admin' : 'Create Tenant Admin';
+        document.getElementById('admin-msg').classList.add('hidden');
+    }
+
+    function closeAdminModal() {
+        document.getElementById('admin-modal-content').classList.remove('scale-100');
+        document.getElementById('admin-modal-content').classList.add('scale-95');
+        setTimeout(() => {
+            document.getElementById('admin-modal').classList.add('hidden');
+            document.getElementById('admin-form').reset();
+        }, 200);
+    }
+
+    function saveAdmin() {
+        const tenantId = document.getElementById('admin-tenant-id').value;
+        const adminId = document.getElementById('admin-id').value;
+        const username = document.getElementById('admin-username').value;
+        const password = document.getElementById('admin-password').value;
+
+        if(!username) {
+            alert('Username is required'); return;
+        }
+        if(!adminId && !password) {
+            alert('Password is required'); return;
+        }
+
+        const data = {
+            id: adminId,
+            tenant_id: tenantId,
+            username: username,
+            password: password
+        };
+        
+        const method = adminId ? 'PUT' : 'POST';
+        const btn = document.getElementById('btn-save-admin');
+        const msg = document.getElementById('admin-msg');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Saving...';
+        
+        fetch('{% url "portal_tenant_admins" %}', {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if(resData.success) {
+                closeAdminModal();
+                if(document.getElementById('admins-drawer').classList.contains('hidden') === false) {
+                    loadAdmins(tenantId); // reload drawer
+                } else {
+                    alert('Admin saved successfully');
+                }
+            } else {
+                msg.className = 'mb-4 p-4 rounded-xl text-sm bg-danger/10 text-danger border border-danger/20';
+                msg.innerText = resData.error || 'An error occurred';
+                msg.classList.remove('hidden');
+            }
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = 'Save';
+        });
+    }
+
+    // Admins Drawer
+    function openAdminsDrawer(tenantId) {
+        document.getElementById('admins-drawer').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('admins-drawer-content').classList.remove('translate-x-full');
+            document.getElementById('admins-drawer-content').classList.add('translate-x-0');
+        }, 10);
+        loadAdmins(tenantId);
+    }
+
+    function closeAdminsDrawer() {
+        document.getElementById('admins-drawer-content').classList.remove('translate-x-0');
+        document.getElementById('admins-drawer-content').classList.add('translate-x-full');
+        setTimeout(() => {
+            document.getElementById('admins-drawer').classList.add('hidden');
+        }, 300);
+    }
+
+    function loadAdmins(tenantId) {
+        document.getElementById('admins-loading').classList.remove('hidden');
+        document.getElementById('admins-list').innerHTML = '';
+
+        fetch(`{% url "portal_tenant_admins" %}?tenant_id=${tenantId}`)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('admins-loading').classList.add('hidden');
+            if(data.success) {
+                const list = document.getElementById('admins-list');
+                if(data.data.length === 0) {
+                    list.innerHTML = `<div class="text-center py-8 text-neutral-500">No admins found</div>`;
+                    return;
+                }
+                
+                let html = '';
+                data.data.forEach(a => {
+                    const isSuper = a.id === '00000000-0000-0000-0000-000000000000';
+                    const isBlock = a.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                    html += `
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-neutral-100 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-600">
+                                    <i class="ph-fill ph-user"></i>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-neutral-900 m-0">${a.username}</p>
+                                    <p class="text-xs text-neutral-500 m-0">${a.status}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="openAdminModal('${tenantId}', '${a.id}', '${a.username}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-warning hover:bg-warning-50 transition-colors">
+                                  <i class="ph-bold ph-pencil-simple text-lg"></i>
+                                </button>
+                                ${!isSuper ? `
+                                <button onclick="toggleAdminStatus('${a.id}', '${isBlock}', '${tenantId}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-danger hover:bg-danger-50 transition-colors">
+                                  <i class="ph-bold ph-prohibit text-lg"></i>
+                                </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                list.innerHTML = html;
+            }
+        });
+    }
+
+    function toggleAdminStatus(adminId, newStatus, tenantId) {
+        if(confirm(`Are you sure you want to change the status to ${newStatus}?`)) {
+            fetch('{% url "portal_tenant_admins" %}', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({id: adminId, status: newStatus})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    loadAdmins(tenantId);
                 } else {
                     alert(data.error);
                 }

@@ -25,6 +25,7 @@ class Role(BaseTenantModel):
 
     class Meta:
         db_table = 'roles'
+        unique_together = (('name', 'tenant'),)
 
     def __str__(self):
         return self.name
@@ -59,7 +60,7 @@ class User(AbstractBaseUser, BaseTenantModel):
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    username = models.CharField(max_length=255, unique=True)
+    username = models.CharField(max_length=255)
     email = models.EmailField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
     
@@ -83,6 +84,18 @@ class User(AbstractBaseUser, BaseTenantModel):
 
     class Meta:
         db_table = 'users'
+        unique_together = (('username', 'tenant'), ('email', 'tenant'))
 
     def __str__(self):
         return self.username
+
+class InviteToken(BaseTenantModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(max_length=255)
+    token = models.CharField(max_length=255, unique=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'invite_tokens'

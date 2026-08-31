@@ -11,7 +11,7 @@ class UsersPage(BasePage):
         self.page.wait_for_url("**/users/")
 
     def open_create_modal(self):
-        self.page.get_by_role("button", name="Invite User").click()
+        self.page.get_by_role("button", name="Add User").click()
         expect(self.page.locator('#user-modal')).to_be_visible()
 
     def fill_user_form(self, username: str, email: str, password: str, status: str = "ACTIVE"):

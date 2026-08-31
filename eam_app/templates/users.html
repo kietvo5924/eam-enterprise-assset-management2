@@ -4,116 +4,192 @@
 {% block breadcrumb %}System Admin / Users{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden">
-  <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
-    <div>
-      <h2 class="text-lg font-bold text-neutral-800 m-0">Users</h2>
-      <p class="text-sm text-neutral-500 mt-1">Manage system users and access levels.</p>
+<div class="bg-transparent h-full flex flex-col space-y-6">
+  <!-- Massive Beautiful Header -->
+  <div class="bg-white p-6 md:p-8 rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
+    <div class="absolute bottom-0 left-0 -ml-32 -mb-32 w-80 h-80 rounded-full bg-gradient-to-tr from-info/10 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
+    
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
+      <div class="flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.2)] border border-primary/20 transform -rotate-12 group-hover:rotate-12 group-hover:scale-110 transition duration-500">
+          <i class="ph-fill ph-users-three text-3xl drop-shadow-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
+            User Management
+          </h2>
+          <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+            Manage your organization's members, roles, and access controls in one place.
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button onclick="openImportModal()" class="rounded-xl h-11 px-5 border border-neutral-200/80 font-bold hover:border-primary hover:text-primary transition shadow-sm bg-white hover:bg-primary-50/50 flex items-center justify-center gap-2 text-neutral-700">
+          <i class="ph ph-upload-simple text-lg font-bold"></i> Import CSV/XLSX
+        </button>
+        <button onclick="openInviteModal()" class="rounded-xl h-11 px-5 border border-neutral-200/80 font-bold hover:border-primary hover:text-primary transition shadow-sm bg-white hover:bg-primary-50/50 flex items-center justify-center gap-2 text-neutral-700">
+          <i class="ph ph-envelope-simple text-lg font-bold"></i> Invite User
+        </button>
+        <button onclick="openUserModal()" class="rounded-xl h-11 px-6 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.3)] border-0 transition transform hover:-translate-y-1 hover:scale-105 font-bold text-white flex items-center justify-center gap-2">
+          <i class="ph ph-user-plus text-lg font-bold"></i> Add User
+        </button>
+      </div>
     </div>
-    <button onclick="openUserModal()" class="bg-primary hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors">
-      <i class="ph ph-user-plus font-bold"></i> Invite User
-    </button>
   </div>
 
-  <div class="p-4 border-b border-neutral-100 bg-neutral-50/30 flex gap-4">
-    <div class="relative flex-1 max-w-md">
-      <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
-      <input type="text" placeholder="Search users by name or email..." class="w-full pl-10 pr-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+  <!-- Metrics Dashboard -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 shrink-0">
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-primary-50/50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Total Users</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0">{{ total_users }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-users text-xl"></i>
+        </div>
+      </div>
     </div>
-    <select class="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
-      <option value="">All Statuses</option>
-      <option value="ACTIVE">Active</option>
-      <option value="PENDING">Pending</option>
-      <option value="INACTIVE">Inactive</option>
-    </select>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-success/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Active</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0">{{ active_users }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-check-circle text-xl"></i>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center text-xs font-semibold text-success">
+        <div class="w-full bg-neutral-100 rounded-full h-1.5 mt-1 overflow-hidden">
+          <div class="bg-success h-1.5 rounded-full" style="width: {% widthratio active_users total_users|default:1 100 %}%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-danger/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Blocked</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0">{{ blocked_users }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-prohibit text-xl"></i>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center text-xs font-semibold text-neutral-400">
+        Users restricted from login
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-warning/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Pending</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0">{{ pending_users }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-hourglass text-xl"></i>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center text-xs font-semibold text-warning">
+        Awaiting activation
+      </div>
+    </div>
   </div>
 
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm text-left">
-      <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200">
-        <tr>
-          <th class="px-6 py-4 font-bold tracking-wider">User</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Roles</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Status</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Joined</th>
-          <th class="px-6 py-4 text-right font-bold tracking-wider">Actions</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-neutral-100">
-        {% for u in users %}
-        <tr class="hover:bg-neutral-50/50 transition-colors">
-          <td class="px-6 py-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold">
-                {{ u.username|make_list|first|upper }}
+  <!-- Main Table Container -->
+  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+    
+    <!-- Search Bar -->
+    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+      <div class="relative w-full sm:max-w-md">
+        <i class="ph-bold ph-magnifying-glass text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 text-lg"></i>
+        <input type="text" id="searchInput" onkeyup="filterUsers()" placeholder="Search users by name or email..." class="w-full pl-11 pr-4 h-12 rounded-xl border border-neutral-200/80 hover:border-primary focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-base font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)]" />
+      </div>
+      <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100">
+         <i class="ph-fill ph-users text-primary"></i>
+         <span id="userCount">{{ total_users }} Users Found</span>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto p-2">
+      <table class="w-full text-sm text-left">
+        <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200/80">
+          <tr>
+            <th class="px-4 py-3 font-bold">Username</th>
+            <th class="px-4 py-3 font-bold">Email</th>
+            <th class="px-4 py-3 font-bold">Status</th>
+            <th class="px-4 py-3 font-bold">Roles</th>
+            <th class="px-4 py-3 font-bold text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-neutral-100" id="userTableBody">
+          {% for u in users %}
+          <tr class="hover:bg-neutral-50/50 transition-colors user-row">
+            <td class="px-4 py-3 font-semibold text-gray-800 user-username">{{ u.username }}</td>
+            <td class="px-4 py-3 text-neutral-600 user-email">{{ u.email|default:"" }}</td>
+            <td class="px-4 py-3">
+              {% if u.status == 'ACTIVE' %}
+                <span class="px-3 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs font-semibold">ACTIVE</span>
+              {% elif u.status == 'PENDING' %}
+                <span class="px-3 py-1 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-full text-xs font-semibold">PENDING</span>
+              {% else %}
+                <span class="px-3 py-1 bg-red-50 border border-red-200 text-red-700 rounded-full text-xs font-semibold">INACTIVE</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                {% for role in u.roles.all %}
+                  <span class="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-xs">{{ role.name }}</span>
+                {% endfor %}
               </div>
-              <div>
-                <p class="font-semibold text-neutral-800 m-0">{{ u.username }}</p>
-                <p class="text-xs text-neutral-500 m-0">{{ u.email|default:"No email" }}</p>
-              </div>
-            </div>
-          </td>
-          <td class="px-6 py-4">
-            <div class="flex flex-wrap gap-1">
-              {% for role in u.roles.all %}
-                <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded text-xs border border-neutral-200">{{ role.name }}</span>
-              {% empty %}
-                <span class="text-neutral-400 text-xs italic">No roles</span>
-              {% endfor %}
-            </div>
-          </td>
-          <td class="px-6 py-4">
-            {% if u.status == 'ACTIVE' %}
-              <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-semibold flex items-center gap-1 w-max">
-                <i class="ph-fill ph-check-circle"></i> Active
-              </span>
-            {% elif u.status == 'PENDING' %}
-              <span class="px-2 py-1 bg-warning/10 text-warning rounded text-xs font-semibold flex items-center gap-1 w-max">
-                <i class="ph-fill ph-clock"></i> Pending
-              </span>
-            {% else %}
-              <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-semibold">{{ u.status }}</span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 text-neutral-500">{{ u.created_at|date:"M d, Y" }}</td>
-          <td class="px-6 py-4 text-right">
-            <button onclick="openUserModal('{{ u.id }}', '{{ u.username }}', '{{ u.email|default:'' }}', '{{ u.status }}', [{% for r in u.roles.all %}'{{ r.id }}',{% endfor %}])" class="text-neutral-400 hover:text-primary transition-colors p-1"><i class="ph ph-pencil-simple text-lg"></i></button>
-            <button onclick="deleteUser('{{ u.id }}')" class="text-neutral-400 hover:text-danger transition-colors p-1 ml-1"><i class="ph ph-trash text-lg"></i></button>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5" class="px-6 py-8 text-center text-neutral-500">
-            <div class="flex flex-col items-center justify-center">
-              <i class="ph ph-users text-4xl text-neutral-300 mb-2"></i>
-              <p>No users found</p>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  
-  {% if users %}
-  <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-neutral-50/50">
-    <span class="text-sm text-neutral-500">Showing {{ users|length }} entries</span>
-    <div class="flex items-center gap-2">
-      <button class="px-3 py-1 border border-neutral-200 rounded hover:bg-neutral-100 text-neutral-600 text-sm font-medium disabled:opacity-50" disabled>Previous</button>
-      <button class="px-3 py-1 border border-neutral-200 rounded hover:bg-neutral-100 text-neutral-600 text-sm font-medium disabled:opacity-50" disabled>Next</button>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <button onclick="openUserModal('{{ u.id }}', '{{ u.username }}', '{{ u.email|default:'' }}', '{{ u.status }}', [{% for r in u.roles.all %}'{{ r.id }}',{% endfor %}])" class="text-gray-500 hover:text-primary transition-colors p-1" title="Edit User">
+                <i class="ph ph-pencil-simple text-lg font-bold"></i>
+              </button>
+              {% if u.status == 'INACTIVE' %}
+                <button onclick="enableUser('{{ u.id }}')" class="text-gray-500 hover:text-green-500 transition-colors p-1 ml-2" title="Unblock User">
+                  <i class="ph-fill ph-check-circle text-lg"></i>
+                </button>
+              {% else %}
+                <button onclick="disableUser('{{ u.id }}')" class="text-gray-500 hover:text-danger transition-colors p-1 ml-2" title="Block User">
+                  <i class="ph ph-prohibit text-lg font-bold"></i>
+                </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
-  {% endif %}
-</div>
 </div>
 
-<!-- User Modal -->
-<div id="user-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
-      <h3 class="text-lg font-bold text-neutral-800 m-0" id="user-modal-title">New User</h3>
-      <button onclick="closeUserModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
-        <i class="ph ph-x text-xl"></i>
+<!-- Add/Edit User Modal -->
+<div id="user-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-[500px] overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary" id="user-modal-icon">
+          <i class="ph-fill ph-user-plus text-xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-neutral-900 m-0" id="user-modal-title">Add New User</h3>
+          <p class="text-xs text-neutral-500 m-0" id="user-modal-subtitle">Fill in the details to create a new user account.</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeUserModal()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 transition-colors">
+        <i class="ph ph-x"></i>
       </button>
     </div>
     <div class="overflow-y-auto p-6">
@@ -123,33 +199,31 @@
           
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Username <span class="text-danger">*</span></label>
-            <input type="text" id="user-username" required class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+            <input type="text" id="user-username" required class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.2)] focus:bg-white hover:border-primary transition" placeholder="e.g. john_doe" />
           </div>
           
-          <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Email</label>
-            <input type="email" id="user-email" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+          <div id="email-field">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Email Address</label>
+            <input type="email" id="user-email" class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.2)] focus:bg-white hover:border-primary transition" placeholder="john@company.com" />
+          </div>
+
+          <div id="password-field">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5" id="pwd-label">Initial Password <span class="text-danger">*</span></label>
+            <input type="password" id="user-password" class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.2)] focus:bg-white hover:border-primary transition" placeholder="••••••••" />
+          </div>
+          
+          <div id="status-field" class="hidden">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Status</label>
+            <select id="user-status" class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.2)] focus:bg-white hover:border-primary transition">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="PENDING">PENDING</option>
+              <option value="INACTIVE">INACTIVE</option>
+            </select>
           </div>
 
           <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Password <span class="text-neutral-400 font-normal" id="pwd-help">(Leave blank to keep current)</span></label>
-            <input type="password" id="user-password" minlength="6" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
-          </div>
-
-          <div class="flex gap-4">
-            <div class="flex-1">
-                <label class="block text-sm font-bold text-neutral-700 mb-1.5">Status</label>
-                <select id="user-status" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="PENDING">PENDING</option>
-                    <option value="INACTIVE">INACTIVE</option>
-                </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Roles</label>
-            <select id="user-roles" multiple class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium h-24">
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Assigned Roles</label>
+            <select id="user-roles" multiple class="w-full px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.2)] focus:bg-white hover:border-primary transition h-32">
                 {% for r in roles %}
                 <option value="{{ r.id }}">{{ r.name }}</option>
                 {% endfor %}
@@ -157,16 +231,154 @@
             <p class="text-xs text-neutral-500 mt-1">Hold Ctrl/Cmd to select multiple roles.</p>
           </div>
           
-          <div class="pt-4 flex justify-end gap-3 border-t border-neutral-100 mt-6 pt-4">
-            <button type="button" onclick="closeUserModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Cancel</button>
-            <button type="submit" id="btn-save-user" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Save</button>
+          <div class="pt-4 flex justify-end gap-3 mt-6">
+            <button type="button" onclick="closeUserModal()" class="h-10 px-6 font-semibold rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition">Cancel</button>
+            <button type="submit" id="btn-save-user" class="h-10 px-6 font-bold rounded-lg bg-gradient-to-r from-primary to-primary-600 border-0 shadow-md shadow-primary/30 text-white hover:scale-105 transition-transform disabled:opacity-50">Create User</button>
           </div>
         </form>
     </div>
   </div>
 </div>
 
+<!-- Invite User Modal -->
+<div id="invite-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-[500px] overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center text-primary">
+          <i class="ph-fill ph-envelope-simple text-xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-neutral-900 m-0">Invite New User</h3>
+          <p class="text-xs text-neutral-500 m-0">Send an invitation email to a new member.</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeInviteModal()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 transition-colors">
+        <i class="ph ph-x"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto p-6">
+        <form id="invite-form" class="space-y-4">
+          <div id="invite-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+          
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Username <span class="text-danger">*</span></label>
+            <input type="text" id="invite-username" required class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="Enter username" />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Email Address <span class="text-danger">*</span></label>
+            <input type="email" id="invite-email" required class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="user@company.com" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Temporary Password <span class="text-danger">*</span></label>
+            <input type="password" id="invite-password" required minlength="6" class="w-full px-4 h-12 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="Enter temporary password" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Roles</label>
+            <select id="invite-roles" multiple class="w-full px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition h-32">
+                {% for r in roles %}
+                <option value="{{ r.id }}">{{ r.name }}</option>
+                {% endfor %}
+            </select>
+          </div>
+          
+          <div class="pt-4 flex justify-end gap-3 mt-6">
+            <button type="button" onclick="closeInviteModal()" class="h-10 px-6 font-semibold rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition">Cancel</button>
+            <button type="submit" id="btn-invite-user" class="h-10 px-6 font-bold rounded-lg bg-gradient-to-r from-primary to-primary-600 border-0 shadow-md shadow-primary/30 text-white hover:scale-105 transition-transform disabled:opacity-50">Send Invitation</button>
+          </div>
+        </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- Import Users Modal -->
+<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-3xl shadow-xl w-full max-w-[560px] overflow-hidden flex flex-col p-0">
+    <div class="absolute top-4 right-4 z-50">
+      <button type="button" onclick="closeImportModal()" class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white hover:bg-danger hover:border-danger transition-all">
+        <i class="ph ph-x text-base"></i>
+      </button>
+    </div>
+    
+    <div class="relative overflow-hidden bg-white flex flex-col">
+      <!-- Header Section -->
+      <div class="relative p-6 pb-10 bg-gradient-to-br from-primary-600 to-info overflow-hidden shrink-0">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div class="relative z-10 flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg transform -rotate-3 transition-all duration-300">
+            <i class="ph-fill ph-file-xls text-3xl drop-shadow-sm"></i>
+          </div>
+          <div>
+            <h3 class="text-2xl font-black text-white m-0 tracking-tight drop-shadow-sm">Bulk Import Users</h3>
+            <p class="text-primary-100 font-medium m-0 mt-1 text-[13px] opacity-90">Onboard members via spreadsheet</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Content Section -->
+      <div class="p-6 -mt-6 bg-white rounded-t-3xl relative z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] flex-1">
+        <!-- Instruction Banner -->
+        <div class="mb-5 p-3.5 bg-info/5 rounded-xl border border-info/20 flex items-start gap-3">
+          <i class="ph-fill ph-info text-info text-xl mt-0.5 shrink-0"></i>
+          <div>
+            <p class="text-[13px] font-bold text-neutral-800 m-0 mb-1 flex items-center gap-2">
+              Format: <span class="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-info font-bold tracking-wide">username, email, password, role1...</span>
+            </p>
+            <p class="text-[12px] text-neutral-500 m-0 leading-relaxed font-medium">
+              First row is header. Extra columns map to roles automatically. Upload a CSV file.
+            </p>
+          </div>
+        </div>
+
+        <!-- Upload Dragger -->
+        <div class="rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary bg-neutral-50/50 hover:bg-primary/5 transition-all duration-300 overflow-hidden relative">
+          <input type="file" id="import-file" accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" onchange="handleFileSelect(event)" />
+          <div class="py-10 px-6 flex flex-col items-center justify-center relative">
+            <div class="w-20 h-20 mb-4 relative flex items-center justify-center">
+              <div class="absolute inset-0 bg-primary/20 rounded-full blur-xl transition-colors"></div>
+              <div class="w-16 h-16 bg-white rounded-2xl shadow-[0_8px_20px_rgba(0,160,226,0.12)] border border-primary/10 flex items-center justify-center text-primary relative z-10 rotate-3 transition-transform duration-300" id="upload-icon-container">
+                <i class="ph ph-upload-simple text-3xl drop-shadow-sm"></i>
+              </div>
+            </div>
+            <h4 class="text-lg font-black text-neutral-800 m-0 mb-1 relative z-10" id="upload-text">Select or drop file</h4>
+            <p class="text-neutral-500 font-medium text-[13px] text-center max-w-[250px] relative z-10" id="upload-subtext">
+              Upload <span class="font-bold text-info">.CSV</span> files.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-end gap-3 hidden" id="import-actions">
+           <button type="button" onclick="document.getElementById('import-file').value = ''; resetImportUI();" class="px-4 py-2 text-sm font-bold text-neutral-600 bg-neutral-100 rounded-lg">Clear</button>
+           <button type="button" onclick="submitImport()" id="btn-submit-import" class="px-6 py-2 bg-primary text-white text-sm font-bold rounded-lg shadow-md shadow-primary/20">Upload & Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+    function filterUsers() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('.user-row');
+        let count = 0;
+        rows.forEach(row => {
+            const username = row.querySelector('.user-username').innerText.toLowerCase();
+            const email = row.querySelector('.user-email').innerText.toLowerCase();
+            if (username.includes(query) || email.includes(query)) {
+                row.style.display = '';
+                count++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        document.getElementById('userCount').innerText = `${count} Users Found`;
+    }
+
     function openUserModal(id='', username='', email='', status='ACTIVE', roleIds=[]) {
         document.getElementById('user-modal').classList.remove('hidden');
         document.getElementById('user-id').value = id;
@@ -174,19 +386,34 @@
         document.getElementById('user-email').value = email !== 'None' ? email : '';
         document.getElementById('user-status').value = status;
         
-        document.getElementById('user-modal-title').innerText = id ? 'Edit User' : 'New User';
-        document.getElementById('pwd-help').innerText = id ? '(Leave blank to keep current)' : '*';
-        if(!id) {
-            document.getElementById('user-password').required = true;
-        } else {
+        const title = document.getElementById('user-modal-title');
+        const subtitle = document.getElementById('user-modal-subtitle');
+        const btn = document.getElementById('btn-save-user');
+        const icon = document.getElementById('user-modal-icon');
+        const pwdLabel = document.getElementById('pwd-label');
+
+        if (id) {
+            title.innerText = 'Edit User';
+            subtitle.innerText = 'Update the details of the existing user.';
+            btn.innerText = 'Save Changes';
+            icon.innerHTML = '<i class="ph-fill ph-pencil-simple text-xl"></i>';
             document.getElementById('user-password').required = false;
+            pwdLabel.innerHTML = 'Password <span class="text-neutral-400 font-normal text-xs">(Leave blank to keep current)</span>';
+            document.getElementById('status-field').classList.remove('hidden');
+        } else {
+            title.innerText = 'Add New User';
+            subtitle.innerText = 'Fill in the details to create a new user account.';
+            btn.innerText = 'Create User';
+            icon.innerHTML = '<i class="ph-fill ph-user-plus text-xl"></i>';
+            document.getElementById('user-password').required = true;
+            pwdLabel.innerHTML = 'Initial Password <span class="text-danger">*</span>';
+            document.getElementById('status-field').classList.add('hidden');
         }
 
         const roleSelect = document.getElementById('user-roles');
         for (let i = 0; i < roleSelect.options.length; i++) {
             roleSelect.options[i].selected = roleIds.includes(roleSelect.options[i].value);
         }
-
         document.getElementById('user-msg').classList.add('hidden');
     }
 
@@ -198,7 +425,6 @@
     document.getElementById('user-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const id = document.getElementById('user-id').value;
-        
         const roleSelect = document.getElementById('user-roles');
         const selectedRoles = Array.from(roleSelect.selectedOptions).map(opt => opt.value);
 
@@ -229,7 +455,7 @@
             if(resData.success) {
                 window.location.reload();
             } else {
-                msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+                msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
                 msg.innerText = resData.error || 'An error occurred';
                 msg.classList.remove('hidden');
             }
@@ -239,15 +465,14 @@
         });
     });
 
-    function deleteUser(id) {
-        if(confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-            fetch('{% url "portal_users" %}', {
-                method: 'DELETE',
+    function disableUser(id) {
+        if(confirm('Are you sure you want to block this user? This user will no longer be able to log in.')) {
+            fetch(`{% url "portal_users" %}?action=disable&id=${id}`, {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify({id: id})
+                }
             })
             .then(res => res.json())
             .then(data => {
@@ -258,6 +483,142 @@
                 }
             });
         }
+    }
+
+    function enableUser(id) {
+        if(confirm('Are you sure you want to unblock this user? This user will regain access.')) {
+            fetch(`{% url "portal_users" %}?action=enable&id=${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.error);
+                }
+            });
+        }
+    }
+
+    function openInviteModal() {
+        document.getElementById('invite-modal').classList.remove('hidden');
+        document.getElementById('invite-form').reset();
+        document.getElementById('invite-msg').classList.add('hidden');
+    }
+
+    function closeInviteModal() {
+        document.getElementById('invite-modal').classList.add('hidden');
+    }
+
+    document.getElementById('invite-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const roleSelect = document.getElementById('invite-roles');
+        const selectedRoles = Array.from(roleSelect.selectedOptions).map(opt => opt.value);
+
+        const data = {
+            username: document.getElementById('invite-username').value,
+            email: document.getElementById('invite-email').value,
+            password: document.getElementById('invite-password').value,
+            roleIds: selectedRoles
+        };
+        
+        const btn = document.getElementById('btn-invite-user');
+        const msg = document.getElementById('invite-msg');
+        btn.disabled = true;
+        
+        fetch('{% url "portal_users" %}?action=invite', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if(resData.success) {
+                window.location.reload();
+            } else {
+                msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+                msg.innerText = resData.error || 'An error occurred';
+                msg.classList.remove('hidden');
+            }
+        })
+        .finally(() => {
+            btn.disabled = false;
+        });
+    });
+
+    function openImportModal() {
+        document.getElementById('import-modal').classList.remove('hidden');
+        resetImportUI();
+    }
+
+    function closeImportModal() {
+        document.getElementById('import-modal').classList.add('hidden');
+    }
+
+    function resetImportUI() {
+        document.getElementById('upload-text').innerText = 'Select or drop file';
+        document.getElementById('upload-subtext').innerHTML = 'Upload <span class="font-bold text-info">.CSV</span> files.';
+        document.getElementById('import-actions').classList.add('hidden');
+        const iconContainer = document.getElementById('upload-icon-container');
+        iconContainer.className = "w-16 h-16 bg-white rounded-2xl shadow-[0_8px_20px_rgba(0,160,226,0.12)] border border-primary/10 flex items-center justify-center text-primary relative z-10 rotate-3 transition-transform duration-300";
+        iconContainer.innerHTML = '<i class="ph ph-upload-simple text-3xl drop-shadow-sm"></i>';
+    }
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            document.getElementById('upload-text').innerText = file.name;
+            document.getElementById('upload-subtext').innerText = `${(file.size / 1024).toFixed(2)} KB`;
+            document.getElementById('import-actions').classList.remove('hidden');
+            
+            const iconContainer = document.getElementById('upload-icon-container');
+            iconContainer.className = "w-16 h-16 bg-primary rounded-2xl shadow-[0_8px_20px_rgba(0,160,226,0.3)] border border-primary flex items-center justify-center text-white relative z-10 scale-110 transition-transform duration-300";
+            iconContainer.innerHTML = '<i class="ph-fill ph-file-csv text-3xl drop-shadow-sm"></i>';
+        }
+    }
+
+    function submitImport() {
+        const fileInput = document.getElementById('import-file');
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const btn = document.getElementById('btn-submit-import');
+        btn.disabled = true;
+        btn.innerText = 'Uploading...';
+        
+        fetch('{% url "portal_users" %}?action=import', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                const results = data.data;
+                alert(`Import successful: ${results.successCount} added. Failed: ${results.failureCount}. ${results.errors.join(', ')}`);
+                window.location.reload();
+            } else {
+                alert('Import failed: ' + data.error);
+                resetImportUI();
+            }
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerText = 'Upload & Import';
+        });
     }
 </script>
 {% endblock %}
