@@ -165,6 +165,18 @@
         </tbody>
       </table>
     </div>
+    </div>
+    
+    <!-- Pagination UI -->
+    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
+      <div class="text-sm text-neutral-500 font-medium" id="page-info">
+        Page 1 of 1
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+        <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -304,15 +316,24 @@
 </div>
 
 <script>
+    let currentPage = 1;
+    const rowsPerPage = 15;
+    let allRows = [];
+    
     document.addEventListener('DOMContentLoaded', () => {
+        allRows = Array.from(document.querySelectorAll('.tenant-row'));
         updateKPIs();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
+        if(urlParams.has('q')) document.getElementById('search-tenant').value = urlParams.get('q');
+        
+        filterTenants();
     });
 
     function updateKPIs() {
-        const rows = document.querySelectorAll('.tenant-row');
         let active = 0, enterprise = 0, pro = 0;
-        
-        rows.forEach(r => {
+        allRows.forEach(r => {
             if(r.dataset.status === 'ACTIVE') active++;
             if(r.dataset.plan === 'ENTERPRISE') enterprise++;
             if(r.dataset.plan === 'PRO') pro++;
@@ -325,18 +346,38 @@
 
     function filterTenants() {
         const val = document.getElementById('search-tenant').value.toLowerCase();
-        const rows = document.querySelectorAll('.tenant-row');
-        let count = 0;
-        rows.forEach(row => {
+        
+        let filtered = allRows.filter(row => {
             const name = row.dataset.name;
-            if(name.includes(val)) {
-                row.style.display = '';
-                count++;
-            } else {
-                row.style.display = 'none';
-            }
+            return name.includes(val);
         });
-        document.getElementById('tenant-count').innerText = `${count} Tenants Found`;
+        
+        const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+        
+        allRows.forEach(row => row.style.display = 'none');
+        
+        const paged = filtered.slice(startIdx, endIdx);
+        paged.forEach(row => row.style.display = '');
+        
+        document.getElementById('tenant-count').innerText = `${filtered.length} Tenants Found`;
+        document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} items)`;
+        document.getElementById('btn-prev').disabled = currentPage === 1;
+        document.getElementById('btn-next').disabled = currentPage === totalPages;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', currentPage);
+        if(val) urlParams.set('q', val); else urlParams.delete('q');
+        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+    }
+    
+    function changePage(delta) {
+        currentPage += delta;
+        filterTenants();
     }
 
     // Tenant Modal

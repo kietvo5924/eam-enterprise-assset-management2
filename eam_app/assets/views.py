@@ -952,3 +952,32 @@ class AssetExportView(APIView):
             writer.writerow(row)
             
         return response
+
+class AssetImportTemplateView(APIView):
+    def get(self, request):
+        if not HasPermission('asset:create')().has_permission(request, self):
+            self.permission_denied(request)
+            
+        from django.http import HttpResponse
+        import csv
+        
+        response = HttpResponse(content_type='text/csv; charset=UTF-8')
+        response['Content-Disposition'] = 'attachment; filename="assets_import_template.csv"'
+        
+        writer = csv.writer(response, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        header = [
+            "Name", "Category", "Template", "Serial Number", "Model", 
+            "Manufacturer", "Purchase Date", "Value", "Status", "Location", 
+            "QR Code", "IsActive"
+        ]
+        writer.writerow(header)
+        
+        # Sample row to help user understand the format
+        sample_row = [
+            "Sample Asset", "Category Name", "Template Name", "SN-12345", "Model-X",
+            "Manufacturer Y", "2023-01-01", "1000.50", "OPERATIONAL", "Location Z",
+            "", "true"
+        ]
+        writer.writerow(sample_row)
+        
+        return response

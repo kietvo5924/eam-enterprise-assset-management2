@@ -189,13 +189,13 @@
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="permissions-grid">
             {% for p in permissions %}
             <label class="relative group cursor-pointer h-full">
-              <input type="checkbox" name="permissions" value="{{ p.id }}" class="peer hidden">
-              <div class="border border-neutral-200/80 rounded-2xl p-4 bg-white peer-checked:bg-primary-50/50 peer-checked:border-primary/40 peer-checked:shadow-primary/10 transition shadow-sm hover:shadow-md h-full flex flex-col group-hover:-translate-y-1 transform-gpu duration-300 relative overflow-hidden">
-                <div class="absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-neutral-300 peer-checked:border-primary flex items-center justify-center transition-colors bg-white">
-                  <div class="w-2.5 h-2.5 rounded-full bg-primary opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+              <input type="checkbox" name="permissions" value="{{ p.id }}" class="peer sr-only">
+              <div class="border border-neutral-200/80 rounded-2xl p-4 bg-white peer-checked:bg-primary-50/50 peer-checked:border-primary/40 peer-checked:shadow-primary/10 peer-checked:[&_.check-circle]:border-primary peer-checked:[&_.check-dot]:opacity-100 peer-checked:[&_.icon-box]:bg-primary/10 peer-checked:[&_.icon-box]:text-primary transition shadow-sm hover:shadow-md h-full flex flex-col group-hover:-translate-y-1 transform-gpu duration-300 relative overflow-hidden">
+                <div class="check-circle absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-neutral-300 flex items-center justify-center transition-colors bg-white">
+                  <div class="check-dot w-2.5 h-2.5 rounded-full bg-primary opacity-0 transition-opacity"></div>
                 </div>
                 <div class="flex items-center gap-2 mb-2 pr-6">
-                  <div class="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-600 group-hover:bg-primary/10 group-hover:text-primary peer-checked:bg-primary/10 peer-checked:text-primary transition-colors shrink-0">
+                  <div class="icon-box w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-600 group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
                     <i class="ph-fill ph-shield text-lg"></i>
                   </div>
                   <span class="font-bold text-neutral-800 text-sm leading-tight">{{ p.name }}</span>
@@ -291,13 +291,19 @@
     document.getElementById("roles-count").innerText = `${count} Roles Found`;
   }
 
-  function sortTable(colIdx) {
+  function sortTable(colIdx, forceDir = null) {
     const table = document.getElementById("rolesTable");
     const tbody = document.getElementById("rolesTbody");
     const rows = Array.from(tbody.querySelectorAll("tr"));
     
-    let sortDir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+    let sortDir = forceDir || (table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc');
     table.setAttribute('data-sort-dir', sortDir);
+    table.setAttribute('data-sort-col', colIdx);
+
+    const url = new URL(window.location);
+    url.searchParams.set('sortCol', colIdx);
+    url.searchParams.set('sortDir', sortDir);
+    window.history.replaceState({}, '', url);
 
     rows.sort((a, b) => {
         const aVal = a.cells[colIdx].innerText.trim();
@@ -482,5 +488,14 @@
           btn.innerHTML = 'Reassign and Delete';
       });
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('sortCol') && params.has('sortDir')) {
+      const colIdx = parseInt(params.get('sortCol'));
+      const sortDir = params.get('sortDir');
+      sortTable(colIdx, sortDir);
+    }
+  });
 </script>
 {% endblock %}

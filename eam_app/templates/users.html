@@ -122,19 +122,28 @@
     </div>
 
     <div class="flex-1 overflow-auto p-2">
-      <table class="w-full text-sm text-left">
+      <table class="w-full text-sm text-left custom-beautiful-table min-w-max">
         <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200/80">
           <tr>
-            <th class="px-4 py-3 font-bold">Username</th>
-            <th class="px-4 py-3 font-bold">Email</th>
-            <th class="px-4 py-3 font-bold">Status</th>
+            <th class="px-4 py-3 font-bold cursor-pointer select-none" onclick="setSort('username')">Username <i id="sort-icon-username" class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon"></i></th>
+            <th class="px-4 py-3 font-bold cursor-pointer select-none" onclick="setSort('email')">Email <i id="sort-icon-email" class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon"></i></th>
+            <th class="px-4 py-3 font-bold relative group">
+                <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'user-status-filter')">
+                    Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                </div>
+                <div id="user-status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
+                    <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ACTIVE" checked onchange="filterUsers()"> Active</label>
+                    <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="PENDING" checked onchange="filterUsers()"> Pending</label>
+                    <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="INACTIVE" checked onchange="filterUsers()"> Inactive</label>
+                </div>
+            </th>
             <th class="px-4 py-3 font-bold">Roles</th>
             <th class="px-4 py-3 font-bold text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100" id="userTableBody">
           {% for u in users %}
-          <tr class="hover:bg-neutral-50/50 transition-colors user-row">
+          <tr class="hover:bg-neutral-50/50 transition-colors user-row" data-status="{{ u.status }}" data-roles="{% for role in u.roles.all %}{{ role.id }},{% endfor %}">
             <td class="px-4 py-3 font-semibold text-gray-800 user-username">{{ u.username }}</td>
             <td class="px-4 py-3 text-neutral-600 user-email">{{ u.email|default:"" }}</td>
             <td class="px-4 py-3">
@@ -169,8 +178,28 @@
             </td>
           </tr>
           {% endfor %}
+          <tr id="empty-state" class="hidden">
+            <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+              <div class="flex flex-col items-center justify-center">
+                <i class="ph ph-users text-4xl text-neutral-300 mb-3"></i>
+                <p class="text-base font-semibold text-neutral-700 m-0">No users found</p>
+                <p class="text-sm mt-1">Try adjusting your filters or search query.</p>
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
+    </div>
+    
+    <!-- Pagination UI -->
+    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
+      <div class="text-sm text-neutral-500 font-medium" id="page-info">
+        Page 1 of 1
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+        <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+      </div>
     </div>
   </div>
 </div>
@@ -223,12 +252,11 @@
 
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Assigned Roles</label>
-            <select id="user-roles" multiple class="w-full px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.2)] focus:bg-white hover:border-primary transition h-32">
+            <select id="user-roles" multiple placeholder="Select roles..." autocomplete="off">
                 {% for r in roles %}
                 <option value="{{ r.id }}">{{ r.name }}</option>
                 {% endfor %}
             </select>
-            <p class="text-xs text-neutral-500 mt-1">Hold Ctrl/Cmd to select multiple roles.</p>
           </div>
           
           <div class="pt-4 flex justify-end gap-3 mt-6">
@@ -278,7 +306,7 @@
 
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Roles</label>
-            <select id="invite-roles" multiple class="w-full px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition h-32">
+            <select id="invite-roles" multiple placeholder="Select roles..." autocomplete="off">
                 {% for r in roles %}
                 <option value="{{ r.id }}">{{ r.name }}</option>
                 {% endfor %}
@@ -362,21 +390,133 @@
 </div>
 
 <script>
+    let currentPage = 1;
+    const rowsPerPage = 15;
+    let allRows = [];
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        allRows = Array.from(document.getElementById("userTableBody").querySelectorAll("tr.user-row"));
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
+        if(urlParams.has('q')) document.getElementById('searchInput').value = urlParams.get('q');
+        
+        const statusParam = urlParams.get('status');
+        if (statusParam) {
+            const statusList = statusParam.split(',');
+            document.querySelectorAll('.status-cb').forEach(cb => {
+                cb.checked = statusList.includes(cb.value);
+            });
+        }
+        
+        filterUsers();
+    });
+    
+    let currentSort = { col: null, dir: 'asc' };
+
+    function setSort(colName) {
+        if (currentSort.col === colName) {
+            currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.col = colName;
+            currentSort.dir = 'asc';
+        }
+        document.querySelectorAll('.sort-icon').forEach(icon => {
+            icon.className = 'ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon';
+        });
+        const activeIcon = document.getElementById(`sort-icon-${colName}`);
+        if (activeIcon) {
+            activeIcon.className = `ph-bold ${currentSort.dir === 'asc' ? 'ph-arrow-up' : 'ph-arrow-down'} text-[10px] ml-1 text-primary sort-icon`;
+        }
+        filterUsers();
+    }
+    
+    function toggleFilterDropdown(event, id) {
+        event.stopPropagation();
+        const dropdown = document.getElementById(id);
+        document.querySelectorAll('[id$="-filter"]').forEach(el => {
+            if (el.id !== id) el.classList.add('hidden');
+        });
+        dropdown.classList.toggle('hidden');
+    }
+  
+    document.addEventListener('click', () => {
+        document.querySelectorAll('[id$="-filter"]').forEach(el => el.classList.add('hidden'));
+    });
+    
     function filterUsers() {
         const query = document.getElementById('searchInput').value.toLowerCase();
-        const rows = document.querySelectorAll('.user-row');
-        let count = 0;
-        rows.forEach(row => {
+        
+        const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
+        
+        let filtered = allRows.filter(row => {
             const username = row.querySelector('.user-username').innerText.toLowerCase();
             const email = row.querySelector('.user-email').innerText.toLowerCase();
-            if (username.includes(query) || email.includes(query)) {
-                row.style.display = '';
-                count++;
-            } else {
-                row.style.display = 'none';
-            }
+            const rowStatus = row.dataset.status || '';
+            
+            const matchSearch = username.includes(query) || email.includes(query);
+            const matchStatus = activeStatuses.includes(rowStatus);
+            
+            return matchSearch && matchStatus;
         });
-        document.getElementById('userCount').innerText = `${count} Users Found`;
+        
+        if (currentSort.col) {
+            filtered.sort((a, b) => {
+                let valA = a.querySelector(`.user-${currentSort.col}`).innerText.toLowerCase();
+                let valB = b.querySelector(`.user-${currentSort.col}`).innerText.toLowerCase();
+                if (valA < valB) return currentSort.dir === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+            const tbody = document.getElementById("userTableBody");
+            const emptyState = document.getElementById("empty-state");
+            filtered.forEach(row => {
+                if (emptyState) tbody.insertBefore(row, emptyState);
+                else tbody.appendChild(row);
+            });
+        }
+        
+        const emptyState = document.getElementById('empty-state');
+        if (filtered.length === 0) {
+            if (emptyState) emptyState.classList.remove('hidden');
+        } else {
+            if (emptyState) emptyState.classList.add('hidden');
+        }
+        
+        const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+        
+        allRows.forEach(row => row.style.display = 'none');
+        
+        const paged = filtered.slice(startIdx, endIdx);
+        paged.forEach(row => row.style.display = '');
+        
+        document.getElementById('userCount').innerText = `${filtered.length} Users Found`;
+        document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} items)`;
+        document.getElementById('btn-prev').disabled = currentPage === 1;
+        document.getElementById('btn-next').disabled = currentPage === totalPages;
+        
+        // Save URL State
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', currentPage);
+        if(query) urlParams.set('q', query); else urlParams.delete('q');
+        
+        if (activeStatuses.length > 0 && activeStatuses.length < document.querySelectorAll('.status-cb').length) {
+            urlParams.set('status', activeStatuses.join(','));
+        } else {
+            urlParams.delete('status');
+        }
+        
+        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+    }
+    
+    function changePage(delta) {
+        currentPage += delta;
+        filterUsers();
     }
 
     function openUserModal(id='', username='', email='', status='ACTIVE', roleIds=[]) {
@@ -410,9 +550,8 @@
             document.getElementById('status-field').classList.add('hidden');
         }
 
-        const roleSelect = document.getElementById('user-roles');
-        for (let i = 0; i < roleSelect.options.length; i++) {
-            roleSelect.options[i].selected = roleIds.includes(roleSelect.options[i].value);
+        if (window.userRolesSelect) {
+            window.userRolesSelect.setValue(roleIds);
         }
         document.getElementById('user-msg').classList.add('hidden');
     }
@@ -420,6 +559,9 @@
     function closeUserModal() {
         document.getElementById('user-modal').classList.add('hidden');
         document.getElementById('user-form').reset();
+        if (window.userRolesSelect) {
+            window.userRolesSelect.clear();
+        }
     }
 
     document.getElementById('user-form').addEventListener('submit', function(e) {
@@ -509,10 +651,16 @@
         document.getElementById('invite-modal').classList.remove('hidden');
         document.getElementById('invite-form').reset();
         document.getElementById('invite-msg').classList.add('hidden');
+        if (window.inviteRolesSelect) {
+            window.inviteRolesSelect.clear();
+        }
     }
 
     function closeInviteModal() {
         document.getElementById('invite-modal').classList.add('hidden');
+        if (window.inviteRolesSelect) {
+            window.inviteRolesSelect.clear();
+        }
     }
 
     document.getElementById('invite-form').addEventListener('submit', function(e) {
@@ -620,5 +768,63 @@
             btn.innerText = 'Upload & Import';
         });
     }
+</script>
+
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<style>
+  /* Custom styling for TomSelect to match Tailwind theme */
+  .ts-control {
+    border-radius: 0.75rem !important;
+    border-color: #d4d4d8 !important;
+    background-color: #f9fafb !important;
+    padding: 0.5rem 1rem !important;
+    min-height: 3rem !important;
+    box-shadow: none !important;
+    display: flex;
+    align-items: center;
+  }
+  .ts-control.focus {
+    border-color: #00a0e2 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 0 0 2px rgba(0,160,226,0.2) !important;
+  }
+  .ts-dropdown {
+    border-radius: 0.75rem !important;
+    overflow: hidden;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    border-color: #e5e7eb !important;
+    margin-top: 4px;
+  }
+  .ts-dropdown .option {
+    padding: 0.5rem 1rem !important;
+  }
+  .ts-dropdown .option.active {
+    background-color: #e6f6fc !important;
+    color: #00a0e2 !important;
+  }
+  .tom-select .ts-control > .item {
+    background-color: #e6f6fc !important;
+    color: #0080b5 !important;
+    border-radius: 0.375rem !important;
+    border: 1px solid #b3e3f5 !important;
+    font-weight: 600;
+  }
+</style>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const tsSettings = {
+          plugins: ['remove_button'],
+          create: false,
+          maxItems: null,
+          hideSelected: true
+      };
+      if (document.getElementById('user-roles')) {
+          window.userRolesSelect = new TomSelect('#user-roles', tsSettings);
+      }
+      if (document.getElementById('invite-roles')) {
+          window.inviteRolesSelect = new TomSelect('#invite-roles', tsSettings);
+      }
+  });
 </script>
 {% endblock %}

@@ -206,8 +206,8 @@
     - `[x]` Task 8.12.3 — Cross-check `work_orders`, `checklists`, and `pm_plans` tables
     - `[x]` Task 8.12.4 — Generate and apply any missing Django migrations
   - `[ ]` **8.13 — API Route Protection & Security Parity**
-    - `[ ]` Task 8.13.1 — Audit Legacy Spring Security Method-level `@PreAuthorize`
-    - `[ ]` Task 8.13.2 — Map Legacy Permissions to Django views
+    - `[x]` Task 8.13.1 — Audit Legacy Spring Security Method-level `@PreAuthorize`
+    - `[x]` Task 8.13.2 — Map Legacy Permissions to Django views
     - `[ ]` Task 8.13.3 — Apply `@permission_required` to all Django portal views
   - `[ ]` **8.14 — End-to-End Functional Parity Sign-off**
     - `[ ]` Task 8.14.1 — Update Pytest E2E scripts to cover Settings

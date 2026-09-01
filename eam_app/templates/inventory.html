@@ -36,9 +36,11 @@
     </select>
   </div>
 
-  <!-- Table Area -->
-  <div class="flex-1 overflow-auto bg-white border border-neutral-200 rounded-3xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] custom-scrollbar">
-    <table class="w-full text-sm text-left custom-beautiful-table" id="inventoryTable">
+  <!-- Table & Pagination Container -->
+  <div class="flex-1 flex flex-col bg-white border border-neutral-200 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden">
+    <!-- Table Area -->
+    <div class="flex-1 overflow-auto p-4 custom-scrollbar">
+      <table class="w-full text-sm text-left custom-beautiful-table" id="inventoryTable">
       <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
         <tr>
           <th class="px-4 py-3 font-semibold cursor-pointer" onclick="sortTable(0)">Name <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
@@ -80,6 +82,17 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
+    
+    <!-- Pagination UI -->
+    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0">
+      <div class="text-sm text-neutral-500 font-medium" id="page-info">
+      Page 1 of 1
+    </div>
+    <div class="flex gap-2">
+      <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+      <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+    </div>
   </div>
 </div>
 
@@ -132,13 +145,36 @@
 
 {% block extra_js %}
 <script>
+  let currentPage = 1;
+  const rowsPerPage = 15;
+  let allRows = [];
+  
+  document.addEventListener('DOMContentLoaded', () => {
+      allRows = Array.from(document.getElementById("inventoryTbody").querySelectorAll("tr:not(#empty-row)"));
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
+      if(urlParams.has('q')) document.getElementById('searchInput').value = urlParams.get('q');
+      if(urlParams.has('stock')) document.getElementById('filterStock').value = urlParams.get('stock');
+      
+      const sortCol = urlParams.get('sortCol');
+      const sortDir = urlParams.get('sortDir');
+      const isNumeric = urlParams.get('isNumeric') === 'true';
+      
+      if (sortCol) {
+          const table = document.getElementById("inventoryTable");
+          table.setAttribute('data-sort-dir', sortDir === 'asc' ? 'desc' : 'asc'); 
+          sortTable(parseInt(sortCol), isNumeric);
+      } else {
+          filterTable();
+      }
+  });
+
   function filterTable() {
     const searchVal = document.getElementById("searchInput").value.toLowerCase();
     const stockFilter = document.getElementById("filterStock").value;
-    const tbody = document.getElementById("inventoryTbody");
-    const rows = tbody.querySelectorAll("tr:not(#empty-row)");
     
-    rows.forEach(row => {
+    let filtered = allRows.filter(row => {
       const name = row.querySelector(".name-cell").textContent.toLowerCase();
       const partNumber = row.querySelector(".part-cell").textContent.toLowerCase();
       const qty = parseInt(row.getAttribute("data-qty") || "0", 10);
@@ -150,22 +186,57 @@
       else if (stockFilter === 'low') matchStock = (qty > 0 && qty <= 10);
       else if (stockFilter === 'instock') matchStock = (qty > 0);
       
-      if (matchSearch && matchStock) {
-        row.style.display = "";
-      } else {
-        row.style.display = "none";
-      }
+      return matchSearch && matchStock;
     });
+    
+    // Paginate
+    const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const endIdx = startIdx + rowsPerPage;
+    
+    allRows.forEach(row => row.style.display = 'none');
+    
+    const paged = filtered.slice(startIdx, endIdx);
+    paged.forEach(row => row.style.display = '');
+    
+    document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} items)`;
+    document.getElementById('btn-prev').disabled = currentPage === 1;
+    document.getElementById('btn-next').disabled = currentPage === totalPages;
+    
+    const emptyRow = document.getElementById('empty-row');
+    if (emptyRow) emptyRow.style.display = filtered.length === 0 ? '' : 'none';
+    
+    // Save URL State
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', currentPage);
+    if(searchVal) urlParams.set('q', searchVal); else urlParams.delete('q');
+    if(stockFilter) urlParams.set('stock', stockFilter); else urlParams.delete('stock');
+    window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
   }
 
-  function sortTable(colIdx, isNumeric = false) {
+  function changePage(delta) {
+    currentPage += delta;
+    filterTable();
+  }
+
+  function sortTable(colIdx, isNumeric = false, forceDir = null) {
     const table = document.getElementById("inventoryTable");
     const tbody = document.getElementById("inventoryTbody");
-    const rows = Array.from(tbody.querySelectorAll("tr:not(#empty-row)"));
+    const rows = allRows; // Sort the underlying array, not just DOM nodes
+
     
-    let sortDir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+    let sortDir = forceDir || (table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc');
     table.setAttribute('data-sort-dir', sortDir);
     table.setAttribute('data-sort-col', colIdx);
+
+    const url = new URL(window.location);
+    url.searchParams.set('sortCol', colIdx);
+    url.searchParams.set('sortDir', sortDir);
+    url.searchParams.set('isNumeric', isNumeric);
+    window.history.replaceState({}, '', url);
 
     rows.sort((a, b) => {
         const aVal = a.cells[colIdx].innerText.trim();
@@ -180,7 +251,11 @@
         }
     });
 
+    // Re-append sorted rows to tbody to reflect DOM order
     rows.forEach(row => tbody.appendChild(row));
+    
+    // Apply pagination visibility after sorting
+    filterTable();
   }
 
   function openInventoryModal(id='', name='', part_number='', desc='', quantity='', cost='') {
@@ -273,5 +348,15 @@
           });
       }
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('sortCol') && params.has('sortDir')) {
+      const colIdx = parseInt(params.get('sortCol'));
+      const sortDir = params.get('sortDir');
+      const isNumeric = params.get('isNumeric') === 'true';
+      sortTable(colIdx, isNumeric, sortDir);
+    }
+  });
 </script>
 {% endblock %}

@@ -499,7 +499,7 @@
               Format: <span class="font-mono text-[11px] bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-info font-bold tracking-wide">Name, Category, Template, Serial...</span>
             </p>
             <p class="text-[12px] text-neutral-500 m-0 leading-relaxed font-medium">
-              First row is header. <a href="/api/assets/importtemplate/" target="_blank" class="text-primary hover:underline cursor-pointer">Download template</a> to see the required structure.
+              First row is header. <a href="/api/v1/assets/import-template" target="_blank" class="text-primary hover:underline cursor-pointer">Download template</a> to see the required structure.
             </p>
           </div>
         </div>
@@ -621,6 +621,10 @@
   };
 
   function selectAsset(id) {
+    const url = new URL(window.location);
+    url.searchParams.set('assetId', id);
+    window.history.replaceState({}, '', url);
+
     // UI update for tree
     document.querySelectorAll('.asset-item').forEach(el => {
       el.classList.remove('bg-primary-50', 'text-primary', 'font-semibold', 'relative');
@@ -1381,11 +1385,15 @@
 
     fetch(`/api/v1/work-orders/calendar?assetId=${assetId}&startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`, {
       credentials: 'same-origin',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-        'Content-Type': 'application/json',
-        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
-      }
+      headers: (() => {
+        const h = {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : ''
+        };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        return h;
+      })()
     })
     .then(res => res.json())
     .then(resData => {
@@ -1467,10 +1475,12 @@
   function fetchMeterReadings(assetId) {
     fetch(`/api/v1/assets/${assetId}/meter-readings`, {
       credentials: 'same-origin',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-        'Content-Type': 'application/json'
-      }
+      headers: (() => {
+        const h = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        return h;
+      })()
     })
     .then(res => res.json())
     .then(resData => {
@@ -1568,7 +1578,25 @@
     
     document.getElementById('empty-state').classList.remove('hidden');
     document.getElementById('details-view').classList.add('hidden');
+    
+    const url = new URL(window.location);
+    url.searchParams.delete('assetId');
+    window.history.replaceState({}, '', url);
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('assetId')) {
+      const id = params.get('assetId');
+      if (assetsData[id]) {
+        setTimeout(() => {
+          selectAsset(id);
+          const el = document.getElementById('asset-item-' + id);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+    }
+  });
 
 
 </script>

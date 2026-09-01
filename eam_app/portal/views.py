@@ -321,7 +321,8 @@ def portal_users(request):
                 if role_ids:
                     roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
                     for r in roles:
-                        if r.name == 'SUPER_ADMIN' and not request.user.is_superuser:
+                        is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+                        if r.name == 'SUPER_ADMIN' and not is_super:
                             return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
                     u.roles.set(roles)
                 return JsonResponse({'success': True})
@@ -344,7 +345,8 @@ def portal_users(request):
             if role_ids:
                 roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
                 for r in roles:
-                    if r.name == 'SUPER_ADMIN' and not request.user.is_superuser:
+                    is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+                    if r.name == 'SUPER_ADMIN' and not is_super:
                         return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
                 u.roles.set(roles)
             else:
@@ -392,7 +394,8 @@ def portal_users(request):
             role_ids = data.get('roles', [])
             roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
             for r in roles:
-                if r.name == 'SUPER_ADMIN' and not request.user.is_superuser:
+                is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+                if r.name == 'SUPER_ADMIN' and not is_super:
                     return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
             u.roles.set(roles)
             
@@ -431,7 +434,11 @@ def portal_users(request):
     blocked_users = users.filter(status='INACTIVE').count()
     pending_users = users.filter(status='PENDING').count()
     
+    is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
     roles = Role.objects.filter(tenant_id=tenant_id)
+    if not is_super:
+        roles = roles.exclude(name='SUPER_ADMIN')
+    
     return render(request, 'users.html', {
         'users': users, 
         'roles': roles,
@@ -540,7 +547,8 @@ def portal_roles(request):
         return HttpResponseForbidden("You do not have permission to view roles.")
 
     roles = Role.objects.filter(tenant_id=tenant_id)
-    if not request.user.is_superuser:
+    is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+    if not is_super:
         roles = roles.exclude(name='SUPER_ADMIN')
     
     roles = roles.order_by('-is_system', 'name')
@@ -1410,8 +1418,18 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
 @login_required(login_url='portal_login')
 def portal_audit_logs(request):
     from core.models import AuditLog
-    logs = AuditLog.objects.all().order_by('-timestamp')[:100]
-    return render(request, 'audit_logs.html', {'logs': logs})
+    logs = AuditLog.objects.all().order_by('-timestamp')[:500]
+    
+    creates = sum(1 for log in logs if log.action_type == 'CREATE')
+    updates = sum(1 for log in logs if log.action_type == 'UPDATE')
+    deletes = sum(1 for log in logs if log.action_type == 'DELETE')
+    
+    return render(request, 'audit_logs.html', {
+        'logs': logs,
+        'creates': creates,
+        'updates': updates,
+        'deletes': deletes
+    })
 
 @login_required(login_url='portal_login')
 def portal_reports(request):

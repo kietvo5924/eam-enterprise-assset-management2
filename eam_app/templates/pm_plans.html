@@ -153,11 +153,7 @@
           <p class="text-sm text-neutral-500 mt-1 mb-0">Configure time-based and meter-based automated maintenance schedules.</p>
         </div>
         <div class="flex items-center gap-2">
-           <select class="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
-            <option value="">All Triggers</option>
-            <option value="TIME">Time Based</option>
-            <option value="METER">Meter Based</option>
-          </select>
+           <input type="text" id="search-plan" onkeyup="filterPlans()" placeholder="Search plans..." class="w-[200px] px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
         </div>
       </div>
       <div class="flex-1 overflow-x-auto custom-scrollbar">
@@ -165,15 +161,31 @@
           <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
             <tr>
               <th class="px-6 py-4 font-bold tracking-wider">Plan Name</th>
-              <th class="px-6 py-4 font-bold tracking-wider">Trigger</th>
+              <th class="px-6 py-4 font-bold tracking-wider relative group">
+                  <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'trigger-filter')">
+                      Trigger <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                  </div>
+                  <div id="trigger-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-40" onclick="event.stopPropagation()">
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="trigger-cb" value="TIME" checked onchange="filterPlans()"> Time Based</label>
+                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="trigger-cb" value="METER" checked onchange="filterPlans()"> Meter Based</label>
+                  </div>
+              </th>
               <th class="px-6 py-4 font-bold tracking-wider">Interval</th>
-              <th class="px-6 py-4 font-bold tracking-wider">Status</th>
+              <th class="px-6 py-4 font-bold tracking-wider relative group">
+                  <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'pm-status-filter')">
+                      Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                  </div>
+                  <div id="pm-status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="pm-status-cb" value="true" checked onchange="filterPlans()"> Active</label>
+                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="pm-status-cb" value="false" checked onchange="filterPlans()"> Inactive</label>
+                  </div>
+              </th>
               <th class="px-6 py-4 font-bold tracking-wider text-right">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-neutral-100">
+          <tbody class="divide-y divide-neutral-100" id="plans-tbody">
             {% for plan in pm_plans_data %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
+            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer plan-row" data-name="{{ plan.pm.name|lower }}" data-trigger="{{ plan.pm.trigger_type }}" data-status="{{ plan.pm.is_active|yesno:'true,false' }}" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
               <td class="px-6 py-4">
                 <p class="font-bold text-neutral-800 m-0 group-hover:text-primary transition-colors">{{ plan.pm.name }}</p>
                 <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.pm.description }}">{{ plan.pm.description|default:"No description" }}</p>
@@ -232,8 +244,28 @@
               </td>
             </tr>
             {% endfor %}
+            <tr id="empty-state" class="hidden">
+              <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+                <div class="flex flex-col items-center justify-center">
+                  <i class="ph ph-calendar-check text-4xl text-neutral-300 mb-3"></i>
+                  <p class="text-base font-semibold text-neutral-700 m-0">No PM Plans found</p>
+                  <p class="text-sm mt-1">Try adjusting your filters or search query.</p>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination UI -->
+      <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
+        <div class="text-sm text-neutral-500 font-medium" id="page-info">
+          Page 1 of 1
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+          <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+        </div>
       </div>
     </div>
 
@@ -509,7 +541,119 @@
       }
   });
 
-  function switchView(mode) {
+    let currentPage = 1;
+    const rowsPerPage = 15;
+    let allPlans = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        allPlans = Array.from(document.querySelectorAll('.plan-row'));
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
+        if(urlParams.has('q')) document.getElementById('search-plan').value = urlParams.get('q');
+        
+        const triggerParam = urlParams.get('trigger');
+        if (triggerParam) {
+            const triggerList = triggerParam.split(',');
+            document.querySelectorAll('.trigger-cb').forEach(cb => {
+                cb.checked = triggerList.includes(cb.value);
+            });
+        }
+        
+        const statusParam = urlParams.get('status');
+        if (statusParam) {
+            const statusList = statusParam.split(',');
+            document.querySelectorAll('.pm-status-cb').forEach(cb => {
+                cb.checked = statusList.includes(cb.value);
+            });
+        }
+        
+        filterPlans();
+    });
+
+    function toggleFilterDropdown(event, id) {
+        event.stopPropagation();
+        const dropdown = document.getElementById(id);
+        document.querySelectorAll('[id$="-filter"]').forEach(el => {
+            if (el.id !== id) el.classList.add('hidden');
+        });
+        dropdown.classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', () => {
+        document.querySelectorAll('[id$="-filter"]').forEach(el => el.classList.add('hidden'));
+    });
+
+    function filterPlans() {
+        const query = document.getElementById('search-plan').value.toLowerCase();
+        
+        const activeTriggers = Array.from(document.querySelectorAll('.trigger-cb:checked')).map(cb => cb.value);
+        const activeStatuses = Array.from(document.querySelectorAll('.pm-status-cb:checked')).map(cb => cb.value);
+        
+        let filtered = allPlans.filter(row => {
+            const name = row.dataset.name || '';
+            const rowTrigger = row.dataset.trigger || '';
+            const rowStatus = row.dataset.status || '';
+            
+            const matchSearch = name.includes(query);
+            const matchTrigger = activeTriggers.includes(rowTrigger);
+            const matchStatus = activeStatuses.includes(rowStatus);
+            
+            return matchSearch && matchTrigger && matchStatus;
+        });
+        
+        const emptyState = document.getElementById('empty-state');
+        if (filtered.length === 0) {
+            if (emptyState) emptyState.classList.remove('hidden');
+        } else {
+            if (emptyState) emptyState.classList.add('hidden');
+        }
+        
+        const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+        
+        allPlans.forEach(row => row.style.display = 'none');
+        
+        const paged = filtered.slice(startIdx, endIdx);
+        paged.forEach(row => row.style.display = '');
+        
+        const pageInfo = document.getElementById('page-info');
+        if (pageInfo) pageInfo.innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} items)`;
+        
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        if (btnPrev) btnPrev.disabled = currentPage === 1;
+        if (btnNext) btnNext.disabled = currentPage === totalPages;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('page', currentPage);
+        if(query) urlParams.set('q', query); else urlParams.delete('q');
+        
+        if (activeTriggers.length > 0 && activeTriggers.length < document.querySelectorAll('.trigger-cb').length) {
+            urlParams.set('trigger', activeTriggers.join(','));
+        } else {
+            urlParams.delete('trigger');
+        }
+        
+        if (activeStatuses.length > 0 && activeStatuses.length < document.querySelectorAll('.pm-status-cb').length) {
+            urlParams.set('status', activeStatuses.join(','));
+        } else {
+            urlParams.delete('status');
+        }
+        
+        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+    }
+
+    function changePage(delta) {
+        currentPage += delta;
+        filterPlans();
+    }
+
+    function switchView(mode) {
       viewMode = mode;
       localStorage.setItem('maintenanceViewMode', mode);
       
@@ -785,7 +929,7 @@
       const container = document.getElementById('assignments-list-container');
       container.innerHTML = '<p class="text-center text-neutral-500 py-4"><i class="ph-bold ph-spinner animate-spin text-xl"></i></p>';
       
-      fetch(`/portal/pm-plans/${currentPlanIdForAssign}/assignments/`, {
+      fetch(`/pm-plans/${currentPlanIdForAssign}/assignments/`, {
           method: 'GET',
           headers: {
               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
@@ -825,6 +969,10 @@
           } else {
               container.innerHTML = '<p class="text-center text-danger py-4">Failed to load assignments.</p>';
           }
+      })
+      .catch(err => {
+          console.error(err);
+          container.innerHTML = '<p class="text-center text-danger py-4">Network error or invalid response.</p>';
       });
   }
   
@@ -832,7 +980,7 @@
       const assetId = document.getElementById('new-assign-asset').value;
       if(!assetId || !currentPlanIdForAssign) return;
       
-      fetch(`/portal/pm-plans/${currentPlanIdForAssign}/assignments/`, {
+      fetch(`/pm-plans/${currentPlanIdForAssign}/assignments/`, {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json',
@@ -853,7 +1001,7 @@
   
   function removeAssignment(assignmentId) {
       if(!confirm("Are you sure you want to remove this assignment?")) return;
-      fetch(`/portal/pm-plans/assignments/${assignmentId}/`, {
+      fetch(`/pm-plans/assignments/${assignmentId}/`, {
           method: 'DELETE',
           headers: {
               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
@@ -867,7 +1015,7 @@
   }
   
   function updateAssignmentStatus(assignmentId, newStatus) {
-      fetch(`/portal/pm-plans/assignments/${assignmentId}/`, {
+      fetch(`/pm-plans/assignments/${assignmentId}/`, {
           method: 'PATCH',
           headers: {
               'Content-Type': 'application/json',

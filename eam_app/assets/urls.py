@@ -5,7 +5,8 @@ from assets.views import (
     HierarchyTemplateListView, HierarchyTemplateDetailView,
     SparePartListView, SparePartDetailView,
     AssetListView, AssetDetailView, MeterReadingListView,
-    AssetTreeView, AssetQRCodeView, AssetImportView, AssetExportView
+    AssetTreeView, AssetQRCodeView, AssetImportView, AssetExportView,
+    AssetImportTemplateView
 )
 
 urlpatterns = [
@@ -25,6 +26,7 @@ urlpatterns = [
     path('assets/tree', AssetTreeView.as_view(), name='asset_tree'),
     path('assets/qr/<str:qr_code>', AssetQRCodeView.as_view(), name='asset_qr'),
     path('assets/import', AssetImportView.as_view(), name='asset_import'),
+    path('assets/import-template', AssetImportTemplateView.as_view(), name='asset_import_template'),
     path('assets/export', AssetExportView.as_view(), name='asset_export'),
     path('assets/<uuid:asset_id>', AssetDetailView.as_view(), name='asset_detail'),
     

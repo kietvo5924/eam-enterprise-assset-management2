@@ -4,80 +4,401 @@
 {% block breadcrumb %}System Admin / Audit Logs{% endblock %}
 
 {% block content %}
-<div class="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden flex flex-col h-full">
-  <div class="p-6 border-b border-neutral-100 flex flex-wrap justify-between items-center gap-4 bg-white">
-    <div>
-      <h2 class="text-lg font-bold text-neutral-800 m-0">System Audit Logs</h2>
-      <p class="text-sm text-neutral-500 mt-1">Track all system activities, data changes, and user actions.</p>
-    </div>
+<div class="space-y-6 h-full flex flex-col relative z-0">
+  <!-- Page Header -->
+  <div class="bg-white p-6 md:p-8 rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
     
-    <div class="flex items-center gap-2">
-      <button class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-        <i class="ph ph-export"></i> Export Logs
-      </button>
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
+      <div class="flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.2)] border border-primary/20 transform -rotate-12 group-hover:rotate-12 group-hover:scale-110 transition duration-500">
+          <i class="ph-fill ph-file-text text-3xl drop-shadow-sm"></i>
+        </div>
+        <div>
+          <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
+            Audit Logs
+          </h1>
+          <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+            Monitor system activities, operations, and data changes securely.
+          </p>
+        </div>
+      </div>
     </div>
-  </div>
-  
-  <div class="p-4 border-b border-neutral-100 bg-neutral-50/50 flex gap-4">
-    <div class="relative flex-1 max-w-md">
-      <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
-      <input type="text" placeholder="Search logs by User, Entity, or Action..." class="w-full pl-10 pr-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
-    </div>
-    <select class="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
-      <option value="">All Actions</option>
-      <option value="CREATE">CREATE</option>
-      <option value="UPDATE">UPDATE</option>
-      <option value="DELETE">DELETE</option>
-    </select>
   </div>
 
-  <div class="overflow-x-auto flex-1">
-    <table class="w-full text-sm text-left">
-      <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
-        <tr>
-          <th class="px-6 py-4 font-bold tracking-wider">Timestamp</th>
-          <th class="px-6 py-4 font-bold tracking-wider">User</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Action</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Entity Type</th>
-          <th class="px-6 py-4 font-bold tracking-wider">Entity ID</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-neutral-100">
-        {% for log in logs %}
-        <tr class="hover:bg-neutral-50/50 transition-colors">
-          <td class="px-6 py-4 text-neutral-500 text-xs font-mono">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
-          <td class="px-6 py-4">
-            <div class="flex items-center gap-2">
-              <i class="ph-fill ph-user-circle text-neutral-400 text-lg"></i>
-              <span class="font-medium text-neutral-700">{{ log.user_id }}</span>
-            </div>
-          </td>
-          <td class="px-6 py-4">
-            {% if log.action_type == 'CREATE' %}
-              <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border border-green-200">CREATE</span>
-            {% elif log.action_type == 'UPDATE' %}
-              <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-bold border border-blue-200">UPDATE</span>
-            {% elif log.action_type == 'DELETE' %}
-              <span class="px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold border border-red-200">DELETE</span>
-            {% else %}
-              <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border border-neutral-200">{{ log.action_type }}</span>
-            {% endif %}
-          </td>
-          <td class="px-6 py-4 font-semibold text-neutral-800">{{ log.entity_type }}</td>
-          <td class="px-6 py-4 text-neutral-500 text-xs font-mono">{{ log.entity_id }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
-            <div class="flex flex-col items-center justify-center">
-              <i class="ph ph-file-search text-4xl text-neutral-300 mb-3"></i>
-              <p class="text-base font-semibold text-neutral-700 m-0">No audit logs found</p>
-            </div>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <!-- Metrics Dashboard -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6 shrink-0">
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-primary-50/50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Total Loaded</p>
+          <h3 class="text-3xl font-black text-neutral-900 m-0">{{ logs|length }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-list-numbers text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-success/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Creates</p>
+          <h3 class="text-3xl font-black text-success m-0">{{ creates }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-plus-circle text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-info/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Updates</p>
+          <h3 class="text-3xl font-black text-info m-0">{{ updates }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-pencil-circle text-xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-danger/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Deletes</p>
+          <h3 class="text-3xl font-black text-danger m-0">{{ deletes }}</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-trash text-xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+    
+    <!-- Filter Bar -->
+    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md shrink-0 relative z-10 flex flex-wrap gap-3 items-center">
+      <select id="filter-action" onchange="applyFilters()" class="w-[160px] h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm focus:outline-none focus:border-primary">
+        <option value="">Filter by Action</option>
+        <option value="CREATE">CREATE</option>
+        <option value="UPDATE">UPDATE</option>
+        <option value="DELETE">DELETE</option>
+      </select>
+      
+      <input type="text" id="filter-entity" onkeyup="applyFilters()" placeholder="Entity Type (e.g., User)" class="w-[200px] h-10 px-3 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:border-primary">
+      
+      <input type="text" id="filter-user" onkeyup="applyFilters()" placeholder="User ID" class="w-[200px] h-10 px-3 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:border-primary">
+      <div class="ml-auto flex gap-3">
+        <button onclick="resetFilters()" class="h-10 px-5 rounded-lg font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-colors">Reset</button>
+        <button onclick="applyFilters()" class="h-10 px-6 rounded-lg bg-primary text-white font-bold shadow-md shadow-primary/30 hover:bg-primary-600 transition-colors">
+          Filter
+        </button>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="flex-1 flex flex-col p-2 overflow-auto relative">
+      <table class="w-full text-sm text-left whitespace-nowrap" id="auditTable">
+        <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/80 backdrop-blur-sm border-b border-neutral-200 sticky top-0 z-10">
+          <tr>
+            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(0)">Time <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(1)">User <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(2)">Action <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(3)">Entity <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(4)">Entity ID <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-6 py-4 font-bold tracking-wider text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-neutral-100" id="auditTbody">
+          {% for log in logs %}
+          <tr class="hover:bg-neutral-50/80 transition-colors">
+            <td class="px-6 py-4 text-neutral-800 text-sm">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+            <td class="px-6 py-4">
+              <span class="font-medium text-neutral-800">{{ log.user_id }}</span>
+            </td>
+            <td class="px-6 py-4">
+              {% if log.action_type == 'CREATE' %}
+                <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border-0">CREATE</span>
+              {% elif log.action_type == 'UPDATE' %}
+                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-bold border-0">UPDATE</span>
+              {% elif log.action_type == 'DELETE' %}
+                <span class="px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold border-0">DELETE</span>
+              {% else %}
+                <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border-0">{{ log.action_type }}</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 font-semibold text-neutral-600">{{ log.entity_type }}</td>
+            <td class="px-6 py-4 text-neutral-500"><span class="text-xs text-neutral-500 font-mono bg-neutral-100 px-1.5 py-0.5 rounded">{{ log.entity_id }}</span></td>
+            <td class="px-6 py-4 text-right">
+              <button onclick="showDetails('{{ log.id }}', '{{ log.action_type }}', '{{ log.timestamp|date:"d/m/Y H:i:s" }}', '{{ log.user_id }}', '{{ log.entity_type }}', '{{ log.entity_id }}')" class="text-primary hover:text-primary-600 font-medium text-sm transition-colors">Chi tiết</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="empty-row">
+            <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
+              <div class="flex flex-col items-center justify-center">
+                <i class="ph-fill ph-file-search text-4xl text-neutral-200 mb-3"></i>
+                <p class="text-base font-semibold text-neutral-700 m-0">No audit logs found</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination UI -->
+    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
+      <div class="text-sm text-neutral-500 font-medium" id="page-info">
+        Page 1 of 1
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+        <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- Details Drawer -->
+<div id="details-drawer" class="fixed inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col hidden">
+  <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
+    <h3 class="text-lg font-bold text-neutral-800 m-0">Chi tiết Sự kiện</h3>
+    <button onclick="closeDetails()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 transition-colors">
+      <i class="ph-bold ph-x"></i>
+    </button>
+  </div>
+  
+  <div class="p-6 overflow-y-auto flex-1 space-y-6">
+    <div class="flex items-center gap-3 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
+      <div class="bg-white p-3 rounded-full shadow-sm" id="detail-icon-bg">
+        <i class="ph-fill text-2xl" id="detail-icon"></i>
+      </div>
+      <div>
+        <h3 class="m-0 font-bold text-neutral-800" id="detail-title">Thao tác</h3>
+        <p class="m-0 text-sm text-neutral-500" id="detail-time"></p>
+      </div>
+    </div>
+
+    <div class="border border-neutral-200 rounded-lg overflow-hidden">
+      <table class="w-full text-sm">
+        <tbody class="divide-y divide-neutral-100">
+          <tr>
+            <td class="w-1/3 p-3 font-semibold text-neutral-600 bg-neutral-50/50">Mã sự kiện</td>
+            <td class="p-3"><span class="font-mono text-xs" id="detail-id"></span></td>
+          </tr>
+          <tr>
+            <td class="p-3 font-semibold text-neutral-600 bg-neutral-50/50">Loại thao tác</td>
+            <td class="p-3"><span id="detail-action" class="font-bold border-0 px-2 py-1 rounded text-xs"></span></td>
+          </tr>
+          <tr>
+            <td class="p-3 font-semibold text-neutral-600 bg-neutral-50/50">Người thực hiện</td>
+            <td class="p-3">
+              <span class="font-mono text-xs bg-neutral-100 px-2 py-1 rounded inline-block w-fit text-neutral-500" id="detail-user"></span>
+            </td>
+          </tr>
+          <tr>
+            <td class="p-3 font-semibold text-neutral-600 bg-neutral-50/50">Loại dữ liệu</td>
+            <td class="p-3"><span class="font-semibold text-neutral-700" id="detail-entity-type"></span></td>
+          </tr>
+          <tr>
+            <td class="p-3 font-semibold text-neutral-600 bg-neutral-50/50">Mã dữ liệu</td>
+            <td class="p-3"><span class="font-mono text-xs bg-neutral-100 px-2 py-1 rounded" id="detail-entity-id"></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm flex gap-3 mt-4">
+      <i class="ph-fill ph-info text-lg shrink-0"></i>
+      <p class="m-0">
+        Nhật ký truy vết được tối ưu hóa hiển thị. Dữ liệu thay đổi chi tiết cấp độ trường (field-level change) được lược bỏ theo chuẩn MVP.
+      </p>
+    </div>
+  </div>
+</div>
+<!-- Overlay -->
+<div id="drawer-overlay" class="fixed inset-0 bg-neutral-900/20 backdrop-blur-sm z-40 hidden" onclick="closeDetails()"></div>
+
+<script>
+  let currentPage = 1;
+  const rowsPerPage = 15;
+  let sortCol = -1;
+  let sortDir = 'asc';
+  
+  let allRows = [];
+  let currentFilteredRows = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    allRows = Array.from(document.getElementById("auditTbody").querySelectorAll("tr:not(#empty-row)"));
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
+    if(urlParams.has('action')) document.getElementById('filter-action').value = urlParams.get('action');
+    if(urlParams.has('entity')) document.getElementById('filter-entity').value = urlParams.get('entity');
+    if(urlParams.has('user')) document.getElementById('filter-user').value = urlParams.get('user');
+    if(urlParams.has('sortCol')) sortCol = parseInt(urlParams.get('sortCol'));
+    if(urlParams.has('sortDir')) sortDir = urlParams.get('sortDir');
+    
+    renderTable();
+  });
+
+  function renderTable() {
+    const actionFilter = document.getElementById('filter-action').value.toUpperCase();
+    const entityFilter = document.getElementById('filter-entity').value.toUpperCase();
+    const userFilter = document.getElementById('filter-user').value.toUpperCase();
+    
+    // Filter
+    let filtered = allRows.filter(row => {
+      const action = row.cells[2].innerText.trim().toUpperCase();
+      const entity = row.cells[3].innerText.trim().toUpperCase();
+      const user = row.cells[1].innerText.trim().toUpperCase();
+      
+      const matchAction = !actionFilter || action.includes(actionFilter);
+      const matchEntity = !entityFilter || entity.includes(entityFilter);
+      const matchUser = !userFilter || user.includes(userFilter);
+      
+      return matchAction && matchEntity && matchUser;
+    });
+    
+    // Sort
+    if (sortCol >= 0) {
+      filtered.sort((a, b) => {
+          const aVal = a.cells[sortCol].innerText.trim();
+          const bVal = b.cells[sortCol].innerText.trim();
+          return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      });
+    }
+    
+    currentFilteredRows = filtered;
+    
+    // Paginate
+    const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const endIdx = startIdx + rowsPerPage;
+    
+    // Hide all
+    allRows.forEach(row => row.style.display = 'none');
+    
+    // Show paginated
+    const paged = filtered.slice(startIdx, endIdx);
+    paged.forEach(row => row.style.display = '');
+    
+    // Update pagination UI
+    document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} logs)`;
+    document.getElementById('btn-prev').disabled = currentPage === 1;
+    document.getElementById('btn-next').disabled = currentPage === totalPages;
+    
+    // Update empty state
+    const emptyRow = document.getElementById('empty-row');
+    if (emptyRow) {
+        emptyRow.style.display = filtered.length === 0 ? '' : 'none';
+    }
+    
+    // Re-append to DOM to apply sort visually
+    const tbody = document.getElementById("auditTbody");
+    paged.forEach(row => tbody.appendChild(row));
+    
+    // Save state
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', currentPage);
+    if(actionFilter) urlParams.set('action', actionFilter); else urlParams.delete('action');
+    if(entityFilter) urlParams.set('entity', entityFilter); else urlParams.delete('entity');
+    if(userFilter) urlParams.set('user', userFilter); else urlParams.delete('user');
+    if(sortCol >= 0) {
+        urlParams.set('sortCol', sortCol);
+        urlParams.set('sortDir', sortDir);
+    }
+    window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+  }
+
+  function sortTable(colIdx) {
+    if (sortCol === colIdx) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortCol = colIdx;
+        sortDir = 'asc';
+    }
+    renderTable();
+  }
+
+  function applyFilters() {
+    currentPage = 1;
+    renderTable();
+  }
+
+  function resetFilters() {
+    document.getElementById('filter-action').value = '';
+    document.getElementById('filter-entity').value = '';
+    document.getElementById('filter-user').value = '';
+    currentPage = 1;
+    renderTable();
+  }
+  
+  function changePage(delta) {
+    currentPage += delta;
+    renderTable();
+  }
+
+  function showDetails(id, action, time, user, entityType, entityId) {
+    document.getElementById('detail-id').innerText = id;
+    document.getElementById('detail-time').innerText = time;
+    document.getElementById('detail-user').innerText = 'ID: ' + user;
+    document.getElementById('detail-entity-type').innerText = entityType;
+    document.getElementById('detail-entity-id').innerText = entityId;
+    
+    const actionSpan = document.getElementById('detail-action');
+    const icon = document.getElementById('detail-icon');
+    
+    document.getElementById('detail-title').innerText = 'Thao tác ' + action;
+    actionSpan.innerText = action;
+    
+    if (action === 'CREATE') {
+        actionSpan.className = 'font-bold border-0 px-2 py-1 rounded text-xs bg-green-50 text-green-600';
+        icon.className = 'ph-fill ph-plus-circle text-2xl text-green-500';
+    } else if (action === 'UPDATE') {
+        actionSpan.className = 'font-bold border-0 px-2 py-1 rounded text-xs bg-blue-50 text-blue-600';
+        icon.className = 'ph-fill ph-pencil-circle text-2xl text-blue-500';
+    } else if (action === 'DELETE') {
+        actionSpan.className = 'font-bold border-0 px-2 py-1 rounded text-xs bg-red-50 text-red-600';
+        icon.className = 'ph-fill ph-trash text-2xl text-red-500';
+    } else {
+        actionSpan.className = 'font-bold border-0 px-2 py-1 rounded text-xs bg-neutral-100 text-neutral-600';
+        icon.className = 'ph-fill ph-info text-2xl text-neutral-500';
+    }
+    
+    const drawer = document.getElementById('details-drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    
+    drawer.classList.remove('hidden');
+    overlay.classList.remove('hidden');
+    // Allow display block to apply before animating transform
+    setTimeout(() => {
+        drawer.classList.remove('translate-x-full');
+    }, 10);
+  }
+
+  function closeDetails() {
+    const drawer = document.getElementById('details-drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    
+    drawer.classList.add('translate-x-full');
+    setTimeout(() => {
+        drawer.classList.add('hidden');
+        overlay.classList.add('hidden');
+    }, 300);
+  }
+</script>
 {% endblock %}

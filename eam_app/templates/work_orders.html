@@ -128,8 +128,29 @@
             <tr>
               <th class="px-4 py-3 font-semibold">Title</th>
               <th class="px-4 py-3 font-semibold">Asset</th>
-              <th class="px-4 py-3 font-semibold">Priority</th>
-              <th class="px-4 py-3 font-semibold">Status</th>
+              <th class="px-4 py-3 font-semibold relative group">
+                  <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'priority-filter')">
+                      Priority <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                  </div>
+                  <div id="priority-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="LOW" checked onchange="filterTable()"> Low</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="MEDIUM" checked onchange="filterTable()"> Medium</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="HIGH" checked onchange="filterTable()"> High</label>
+                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="CRITICAL" checked onchange="filterTable()"> Critical</label>
+                  </div>
+              </th>
+              <th class="px-4 py-3 font-semibold relative group">
+                  <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'status-filter')">
+                      Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                  </div>
+                  <div id="status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-36" onclick="event.stopPropagation()">
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CREATED" checked onchange="filterTable()"> Created</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ASSIGNED" checked onchange="filterTable()"> Assigned</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="IN_PROGRESS" checked onchange="filterTable()"> In Progress</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="COMPLETED" checked onchange="filterTable()"> Completed</label>
+                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CANCELED" checked onchange="filterTable()"> Canceled</label>
+                  </div>
+              </th>
               <th class="px-4 py-3 font-semibold">Assignee</th>
               <th class="px-4 py-3 font-semibold">Requested By</th>
               <th class="px-4 py-3 font-semibold">Deadline</th>
@@ -137,10 +158,10 @@
               <th class="px-4 py-3 font-semibold text-right">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-neutral-100">
+          <tbody class="divide-y divide-neutral-100" id="wo-tbody">
             {% for item in work_orders_data %}
             {% with wo=item.wo checklists_json=item.checklists_json follow_ups_count=item.follow_ups_count %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group">
+            <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
               <td class="px-4 py-3 w-[250px] max-w-[250px]">
                 <div class="flex flex-col items-start">
                   <strong class="text-neutral-800 truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
@@ -242,13 +263,33 @@
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-clipboard-text text-4xl text-neutral-300 mb-3"></i>
                   <p class="text-base font-semibold text-neutral-700 m-0">No work orders found</p>
-                  <p class="text-sm mt-1">Create a new work order to start tracking maintenance tasks.</p>
+                  <p class="text-sm mt-1">Create your first work order to get started.</p>
                 </div>
               </td>
             </tr>
             {% endfor %}
+            <tr id="empty-state" class="hidden">
+              <td colspan="9" class="px-4 py-12 text-center text-neutral-500">
+                <div class="flex flex-col items-center justify-center">
+                  <i class="ph ph-clipboard-text text-4xl text-neutral-300 mb-3"></i>
+                  <p class="text-base font-semibold text-neutral-700 m-0">No work orders found</p>
+                  <p class="text-sm mt-1">Try adjusting your filters or search query.</p>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
+      </div>
+      
+      <!-- Pagination UI -->
+      <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
+        <div class="text-sm text-neutral-500 font-medium" id="page-info">
+          Page 1 of 1
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+          <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+        </div>
       </div>
     </div>
   </div>
@@ -432,26 +473,118 @@
 <script>
   let currentWo = null;
 
+  let currentPage = 1;
+  const rowsPerPage = 15;
+  let allWoRows = [];
+  
+  document.addEventListener('DOMContentLoaded', () => {
+      allWoRows = Array.from(document.querySelectorAll('.wo-row'));
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
+      if(urlParams.has('q')) document.getElementById('searchInput').value = urlParams.get('q');
+      
+      const statusParam = urlParams.get('status');
+      if (statusParam) {
+          const statusList = statusParam.split(',');
+          document.querySelectorAll('.status-cb').forEach(cb => {
+              cb.checked = statusList.includes(cb.value);
+          });
+      }
+      const priorityParam = urlParams.get('priority');
+      if (priorityParam) {
+          const priorityList = priorityParam.split(',');
+          document.querySelectorAll('.priority-cb').forEach(cb => {
+              cb.checked = priorityList.includes(cb.value);
+          });
+      }
+      
+      filterTable();
+  });
+
+  function toggleFilterDropdown(event, id) {
+      event.stopPropagation();
+      const dropdown = document.getElementById(id);
+      document.querySelectorAll('[id$="-filter"]').forEach(el => {
+          if (el.id !== id) el.classList.add('hidden');
+      });
+      dropdown.classList.toggle('hidden');
+  }
+
+  document.addEventListener('click', () => {
+      document.querySelectorAll('[id$="-filter"]').forEach(el => el.classList.add('hidden'));
+  });
+
   function filterTable() {
     const input = document.getElementById("searchInput");
     const filter = input.value.toLowerCase();
-    const table = document.getElementById("woTable");
-    const tr = table.getElementsByTagName("tr");
-    let count = 0;
-
-    for (let i = 1; i < tr.length; i++) {
-      const tdTitle = tr[i].getElementsByTagName("td")[0];
-      if (tdTitle) {
-        const txtValue = tdTitle.textContent || tdTitle.innerText;
-        if (txtValue.toLowerCase().indexOf(filter) > -1) {
-          tr[i].style.display = "";
-          count++;
-        } else {
-          tr[i].style.display = "none";
-        }
-      }
+    
+    const activeStatuses = Array.from(document.querySelectorAll('.status-cb:checked')).map(cb => cb.value);
+    const activePriorities = Array.from(document.querySelectorAll('.priority-cb:checked')).map(cb => cb.value);
+    
+    let filtered = allWoRows.filter(row => {
+        const title = row.dataset.title || '';
+        const asset = row.dataset.asset || '';
+        const rowStatus = row.dataset.status || '';
+        const rowPriority = row.dataset.priority || '';
+        
+        const matchSearch = title.includes(filter) || asset.includes(filter);
+        const matchStatus = activeStatuses.includes(rowStatus);
+        const matchPriority = activePriorities.includes(rowPriority);
+        
+        return matchSearch && matchStatus && matchPriority;
+    });
+    
+    const emptyState = document.getElementById('empty-state');
+    if (filtered.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+    } else {
+        if (emptyState) emptyState.classList.add('hidden');
     }
-    document.getElementById("wo-count").innerText = `${count} Work Orders`;
+
+    const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const endIdx = startIdx + rowsPerPage;
+    
+    allWoRows.forEach(row => row.style.display = 'none');
+    
+    const paged = filtered.slice(startIdx, endIdx);
+    paged.forEach(row => row.style.display = '');
+    
+    document.getElementById("wo-count").innerText = `${filtered.length} Work Orders`;
+    const pageInfo = document.getElementById('page-info');
+    if(pageInfo) pageInfo.innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} items)`;
+    
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    if(btnPrev) btnPrev.disabled = currentPage === 1;
+    document.getElementById('btn-next').disabled = currentPage === totalPages;
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', currentPage);
+    if(filter) urlParams.set('q', filter); else urlParams.delete('q');
+    
+    if (activeStatuses.length > 0 && activeStatuses.length < document.querySelectorAll('.status-cb').length) {
+        urlParams.set('status', activeStatuses.join(','));
+    } else {
+        urlParams.delete('status');
+    }
+    
+    if (activePriorities.length > 0 && activePriorities.length < document.querySelectorAll('.priority-cb').length) {
+        urlParams.set('priority', activePriorities.join(','));
+    } else {
+        urlParams.delete('priority');
+    }
+    
+    window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+  }
+  
+  function changePage(delta) {
+      currentPage += delta;
+      filterTable();
   }
 
   function openWoModal(id='', title='', desc='', priority='MEDIUM', status='CREATED', asset_id='', assignee_id='', deadline='') {

@@ -106,18 +106,30 @@
         
         <!-- Categories Tab -->
         <div id="content-categories" class="tab-content block">
-            <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+            <table id="categories-table" class="w-full text-left border-collapse custom-beautiful-table min-w-max">
                 <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
                     <tr class="border-b border-neutral-200/60">
-                        <th class="px-4 py-3 font-bold tracking-wider">Name</th>
-                        <th class="px-4 py-3 font-bold tracking-wider">Description</th>
-                        <th class="px-4 py-3 font-bold tracking-wider">Status</th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('categories-table', 0)">Name <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('categories-table', 1)">Description <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none relative group">
+                            <div class="flex items-center" onclick="toggleFilterDropdown(event, 'categories-status-filter')">
+                                Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                            </div>
+                            <div id="categories-status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
+                                <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer">
+                                    <input type="checkbox" class="status-filter-cb" value="true" checked onchange="filterItems()"> Active
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer">
+                                    <input type="checkbox" class="status-filter-cb" value="false" checked onchange="filterItems()"> Inactive
+                                </label>
+                            </div>
+                        </th>
                         <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 text-sm font-medium">
                     {% for category in categories %}
-                    <tr class="hover:bg-primary-50/30 transition-colors list-row list-categories" data-name="{{ category.name|lower }}" data-desc="{{ category.description|default:''|lower }}">
+                    <tr class="hover:bg-primary-50/30 transition-colors list-row list-categories" data-name="{{ category.name|lower }}" data-desc="{{ category.description|default:''|lower }}" data-active="{{ category.is_active|yesno:'true,false' }}">
                         <td class="px-4 py-3 font-semibold text-neutral-800">{{ category.name }}</td>
                         <td class="px-4 py-3 text-neutral-600">{{ category.description|default:"-" }}</td>
                         <td class="px-4 py-3">
@@ -150,19 +162,31 @@
 
         <!-- Templates Tab -->
         <div id="content-templates" class="tab-content hidden">
-            <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+            <table id="templates-table" class="w-full text-left border-collapse custom-beautiful-table min-w-max">
                 <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
                     <tr class="border-b border-neutral-200/60">
-                        <th class="px-4 py-3 font-bold tracking-wider">Name</th>
-                        <th class="px-4 py-3 font-bold tracking-wider">Path Structure</th>
-                        <th class="px-4 py-3 font-bold tracking-wider">Description</th>
-                        <th class="px-4 py-3 font-bold tracking-wider">Status</th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('templates-table', 0)">Name <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('templates-table', 1)">Path Structure <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('templates-table', 2)">Description <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none relative group">
+                            <div class="flex items-center" onclick="toggleFilterDropdown(event, 'templates-status-filter')">
+                                Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                            </div>
+                            <div id="templates-status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
+                                <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer">
+                                    <input type="checkbox" class="status-filter-cb" value="true" checked onchange="filterItems()"> Active
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer">
+                                    <input type="checkbox" class="status-filter-cb" value="false" checked onchange="filterItems()"> Inactive
+                                </label>
+                            </div>
+                        </th>
                         <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-neutral-100 text-sm font-medium">
                     {% for tpl in templates %}
-                    <tr class="hover:bg-primary-50/30 transition-colors list-row list-templates" data-name="{{ tpl.name|lower }}" data-desc="{{ tpl.description|default:''|lower }}" data-path="{{ tpl.path|lower }}">
+                    <tr class="hover:bg-primary-50/30 transition-colors list-row list-templates" data-name="{{ tpl.name|lower }}" data-desc="{{ tpl.description|default:''|lower }}" data-path="{{ tpl.path|lower }}" data-active="{{ tpl.is_active|yesno:'true,false' }}">
                         <td class="px-4 py-3 font-semibold text-neutral-800">{{ tpl.name }}</td>
                         <td class="px-4 py-3"><span class="font-mono text-xs bg-neutral-100 px-2 py-1 rounded">{{ tpl.path }}</span></td>
                         <td class="px-4 py-3 text-neutral-600">{{ tpl.description|default:"-" }}</td>
@@ -201,7 +225,19 @@
                     <tr class="border-b border-neutral-200/60">
                         <th class="px-4 py-3 font-bold tracking-wider">Name</th>
                         <th class="px-4 py-3 font-bold tracking-wider">Description</th>
-                        <th class="px-4 py-3 font-bold tracking-wider">Status</th>
+                        <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none relative group">
+                            <div class="flex items-center" onclick="toggleFilterDropdown(event, 'locations-status-filter')">
+                                Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                            </div>
+                            <div id="locations-status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
+                                <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer">
+                                    <input type="checkbox" class="status-filter-cb" value="true" checked onchange="filterItems()"> Active
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer">
+                                    <input type="checkbox" class="status-filter-cb" value="false" checked onchange="filterItems()"> Inactive
+                                </label>
+                            </div>
+                        </th>
                         <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
                     </tr>
                 </thead>
@@ -211,6 +247,17 @@
             </table>
         </div>
 
+    </div>
+    
+    <!-- Pagination UI (Shared) -->
+    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
+      <div class="text-sm text-neutral-500 font-medium" id="page-info">
+        Page 1 of 1
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
+        <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+      </div>
     </div>
   </div>
 </div>
@@ -284,14 +331,12 @@
 <script>
     let activeTab = 'categories';
     let locationsData = [];
+    let currentPage = 1;
+    const rowsPerPage = 15;
     
     document.addEventListener("DOMContentLoaded", function() {
-        const storedTab = localStorage.getItem('assetConfigActiveTab');
-        if (storedTab) {
-            switchTab(storedTab);
-        } else {
-            switchTab('categories');
-        }
+        const tab = localStorage.getItem('assetConfigActiveTab') || 'categories';
+        switchTab(tab);
 
         const activeRows = document.querySelectorAll('.category-active[data-active="true"]').length;
         const activeCategoriesEl = document.getElementById('active-categories-count');
@@ -300,7 +345,43 @@
         // Parse locations JSON
         locationsData = JSON.parse(document.getElementById('locations-data').textContent);
         renderLocationsTree();
+        
+        // Restore Sorting State
+        const urlParams = new URLSearchParams(window.location.search);
+        ['categories-table', 'templates-table'].forEach(tableId => {
+            const sortCol = urlParams.get(`${tableId}-sortCol`);
+            const sortDir = urlParams.get(`${tableId}-sortDir`);
+            if (sortCol) {
+                const table = document.getElementById(tableId);
+                table.setAttribute('data-sort-dir', sortDir === 'asc' ? 'desc' : 'asc'); 
+                sortTable(tableId, parseInt(sortCol));
+            }
+        });
     });
+
+    function sortTable(tableId, colIdx) {
+        const table = document.getElementById(tableId);
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr:not(.empty-state-row)"));
+        if (rows.length === 0) return;
+        
+        let sortDir = table.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+        table.setAttribute('data-sort-dir', sortDir);
+
+        rows.sort((a, b) => {
+            const aVal = a.cells[colIdx].innerText.trim();
+            const bVal = b.cells[colIdx].innerText.trim();
+            return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        
+        // Save state
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set(`${tableId}-sortCol`, colIdx);
+        urlParams.set(`${tableId}-sortDir`, sortDir);
+        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+    }
 
     function renderLocationsTree() {
         const formatLtree = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
@@ -334,7 +415,7 @@
             const statusHtml = node.is_active ? `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Active</span>` : `<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Inactive</span>`;
             
             html += `
-            <tr class="hover:bg-primary-50/30 transition-colors list-row list-locations" data-name="${node.name.toLowerCase()}" data-desc="${(node.description||'').toLowerCase()}">
+            <tr class="hover:bg-primary-50/30 transition-colors list-row list-locations" data-name="${node.name.toLowerCase()}" data-desc="${(node.description||'').toLowerCase()}" data-active="${node.is_active ? 'true' : 'false'}">
                 <td class="px-4 py-3 font-semibold text-neutral-800">
                     <div style="padding-left: ${indent}px" class="flex items-center gap-2">
                         <i class="ph-fill ${icon}"></i>
@@ -363,10 +444,12 @@
             html = `<tr class="empty-state-row"><td colspan="4" class="px-6 py-8 text-center text-neutral-500"><div class="flex flex-col items-center justify-center"><i class="ph ph-folder-dashed text-4xl text-neutral-300 mb-2"></i><p>No locations found</p></div></td></tr>`;
         }
         document.getElementById('locations-tbody').innerHTML = html;
+        if(activeTab === 'locations') filterItems();
     }
 
     function switchTab(tab) {
         activeTab = tab;
+        currentPage = 1;
         localStorage.setItem('assetConfigActiveTab', tab);
         
         ['categories', 'templates', 'locations'].forEach(t => {
@@ -388,23 +471,87 @@
 
     function filterItems() {
         const query = document.getElementById('search-input').value.toLowerCase();
-        const rows = document.querySelectorAll(`.list-${activeTab}`);
-        let visibleCount = 0;
-
-        rows.forEach(row => {
+        const allRows = Array.from(document.querySelectorAll(`.list-${activeTab}`));
+        
+        const filterDropdown = document.getElementById(`${activeTab}-status-filter`);
+        let showActive = true;
+        let showInactive = true;
+        if (filterDropdown) {
+            const cbs = filterDropdown.querySelectorAll('.status-filter-cb');
+            showActive = cbs[0].checked;
+            showInactive = cbs[1].checked;
+        }
+        
+        let filtered = allRows.filter(row => {
             const name = row.getAttribute('data-name') || '';
             const desc = row.getAttribute('data-desc') || '';
             const path = row.getAttribute('data-path') || '';
-            if (name.includes(query) || desc.includes(query) || path.includes(query)) {
-                row.style.display = '';
-                visibleCount++;
-            } else {
-                row.style.display = 'none';
+            const isActiveStr = row.getAttribute('data-active');
+            const isActive = isActiveStr === 'true';
+            
+            const matchSearch = name.includes(query) || desc.includes(query) || path.includes(query);
+            const matchStatus = (isActive && showActive) || (!isActive && showInactive);
+            
+            return matchSearch && matchStatus;
+        });
+        
+        // Paginate
+        const totalPages = Math.ceil(filtered.length / rowsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIdx = (currentPage - 1) * rowsPerPage;
+        const endIdx = startIdx + rowsPerPage;
+        
+        // Hide all rows in THIS tab
+        allRows.forEach(row => row.style.display = 'none');
+        
+        // Show only the page's rows
+        const paged = filtered.slice(startIdx, endIdx);
+        paged.forEach(row => row.style.display = '');
+        
+        document.getElementById('items-count').innerText = `${filtered.length} Items Found`;
+        
+        document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} items)`;
+        document.getElementById('btn-prev').disabled = currentPage === 1;
+        document.getElementById('btn-next').disabled = currentPage === totalPages;
+        
+        // Handle empty state
+        const tbody = document.querySelector(`#content-${activeTab} tbody`);
+        if(tbody) {
+            let emptyRow = tbody.querySelector('.empty-state-row');
+            if (emptyRow) emptyRow.style.display = filtered.length === 0 ? '' : 'none';
+        }
+    }
+    
+    function changePage(delta) {
+        currentPage += delta;
+        filterItems();
+    }
+    
+    function toggleFilterDropdown(event, id) {
+        event.stopPropagation();
+        const dropdown = document.getElementById(id);
+        
+        // Hide other dropdowns
+        ['categories-status-filter', 'templates-status-filter', 'locations-status-filter'].forEach(dId => {
+            if (dId !== id) {
+                const d = document.getElementById(dId);
+                if(d) d.classList.add('hidden');
             }
         });
 
-        document.getElementById('items-count').innerText = `${visibleCount} Items Found`;
+        if (dropdown) {
+            dropdown.classList.toggle('hidden');
+        }
     }
+    
+    document.addEventListener('click', () => {
+        ['categories-status-filter', 'templates-status-filter', 'locations-status-filter'].forEach(dId => {
+            const d = document.getElementById(dId);
+            if(d) d.classList.add('hidden');
+        });
+    });
 
     let pathTags = [];
     function renderPathTags() {
