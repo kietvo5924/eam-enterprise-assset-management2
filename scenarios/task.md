@@ -214,7 +214,7 @@
     - `[x]` Task 8.14.3 — Run full E2E suite against Django implementation
 - `[ ]` **Phase 9 — EAM Mobile App Parity & Integration (Backend API Focus)**
   - `[ ]` **9.1 — Mobile API Routing & Structure Parity**
-    - `[ ]` Task 9.1.1 — Audit Flutter app API calls to map all required legacy endpoints.
+    - `[x]` Task 9.1.1 — Audit Flutter app API calls to map all required legacy endpoints.
     - `[ ]` Task 9.1.2 — Update Django `urls.py` if necessary to match exact legacy routes expected by mobile.
   - `[ ]` **9.2 — Mobile Authentication & Token JSON Parity**
     - `[ ]` Task 9.2.1 — Ensure Django JWT login response matches the exact JSON keys expected by Flutter (e.g., `accessToken` vs `access`, user profile shape).
