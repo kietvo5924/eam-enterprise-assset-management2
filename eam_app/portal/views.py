@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from users.decorators import permission_required
 from django.contrib import messages
 
 def portal_login(request):
@@ -42,13 +43,12 @@ def portal_dashboard(request):
     return render(request, 'dashboard.html', context)
 
 @login_required(login_url='portal_login')
+@permission_required('system:admin')
 def portal_tenants(request):
     from core.models import Tenant
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     
-    if not request.user.is_superuser and str(request.user.tenant_id) != '00000000-0000-0000-0000-000000000000':
-        return HttpResponseForbidden("Only system admins can manage tenants")
     
     if request.method == 'POST':
         try:
@@ -92,6 +92,7 @@ def portal_tenants(request):
     return render(request, 'tenants.html', {'tenants': tenants})
 
 @login_required(login_url='portal_login')
+@permission_required('system:admin')
 def portal_tenant_admins(request):
     from users.models import User, Role, Permission
     from core.models import Tenant
@@ -99,8 +100,6 @@ def portal_tenant_admins(request):
     from django.http import JsonResponse, HttpResponseForbidden
     from django.contrib.auth.hashers import make_password
     
-    if not request.user.is_superuser and str(request.user.tenant_id) != '00000000-0000-0000-0000-000000000000':
-        return HttpResponseForbidden("Only system admins can manage tenants")
         
     if request.method == 'GET':
         tenant_id = request.GET.get('tenant_id')
@@ -180,6 +179,7 @@ def portal_tenant_admins(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 @login_required(login_url='portal_login')
+@permission_required('tenant:read')
 def portal_settings(request):
     from core.models import Tenant
     import json
@@ -204,9 +204,6 @@ def portal_settings(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     # GET method
-    checker = HasPermission('tenant:read')()
-    if not checker.has_permission(request, None):
-        return HttpResponseForbidden("You do not have permission to view tenant settings (tenant:read required).")
         
     return render(request, 'settings.html', {'tenant': tenant})
 
@@ -282,6 +279,7 @@ def portal_reset_password(request):
     return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
 
 @login_required(login_url='portal_login')
+@permission_required('user:read')
 def portal_users(request):
     from users.models import User, Role
     from users.permissions import HasPermission
@@ -420,8 +418,6 @@ def portal_users(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    if not HasPermission('user:read')().has_permission(request, None):
-        return HttpResponseForbidden("You do not have permission to view users.")
 
     if str(tenant_id) == '00000000-0000-0000-0000-000000000000' or request.user.is_superuser:
         users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').order_by('-created_at')
@@ -449,6 +445,7 @@ def portal_users(request):
     })
 
 @login_required(login_url='portal_login')
+@permission_required('role:read')
 def portal_roles(request):
     from users.models import Role, Permission
     import json
@@ -543,8 +540,6 @@ def portal_roles(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    if not HasPermission('role:read')().has_permission(request, None):
-        return HttpResponseForbidden("You do not have permission to view roles.")
 
     roles = Role.objects.filter(tenant_id=tenant_id)
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
@@ -556,6 +551,7 @@ def portal_roles(request):
     return render(request, 'roles.html', {'roles': roles, 'permissions': permissions})
 
 @login_required(login_url='portal_login')
+@permission_required(('asset_category:read', 'asset:read'))
 def portal_asset_categories(request):
     from assets.models import AssetCategory
     import json
@@ -615,8 +611,6 @@ def portal_asset_categories(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    if not (HasPermission('asset_category:read')().has_permission(request, None) or HasPermission('asset:read')().has_permission(request, None)):
-        return HttpResponseForbidden("Permission denied")
 
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
     from assets.models import HierarchyTemplate, Location
@@ -641,6 +635,7 @@ def portal_asset_categories(request):
     })
 
 @login_required(login_url='portal_login')
+@permission_required(('asset_category:read', 'asset:read'))
 def portal_hierarchy_templates(request):
     from assets.models import HierarchyTemplate, AssetCategory
     import json
@@ -649,8 +644,6 @@ def portal_hierarchy_templates(request):
     
     tenant_id = request.user.tenant_id
     
-    if not (HasPermission('asset_category:read')().has_permission(request, None) or HasPermission('asset:read')().has_permission(request, None)):
-        return HttpResponseForbidden("Permission denied")
 
     if request.method == 'POST':
         if not HasPermission('asset_category:create')().has_permission(request, None):
@@ -714,6 +707,7 @@ def portal_hierarchy_templates(request):
     })
 
 @login_required(login_url='portal_login')
+@permission_required(('asset_category:read', 'asset:read'))
 def portal_locations(request):
     from assets.models import Location
     import json
@@ -722,8 +716,6 @@ def portal_locations(request):
     
     tenant_id = request.user.tenant_id
     
-    if not HasPermission('asset_category:read')().has_permission(request, None):
-        return HttpResponseForbidden("Permission denied")
 
     if request.method == 'POST':
         if not HasPermission('asset_category:create')().has_permission(request, None):
@@ -787,6 +779,7 @@ def portal_locations(request):
     return JsonResponse({'success': True, 'data': [{'id': str(loc.id), 'name': loc.name, 'description': loc.description, 'parentId': loc.parent_id, 'isActive': loc.is_active} for loc in locations]})
 
 @login_required(login_url='portal_login')
+@permission_required('asset:read')
 def portal_asset_registry(request):
     from assets.models import Asset, AssetCategory, Location, HierarchyTemplate
     import json
@@ -853,8 +846,6 @@ def portal_asset_registry(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    if not HasPermission('asset:read')().has_permission(request, None):
-        return HttpResponseForbidden("You do not have permission to access the asset registry.")
 
     assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True).select_related('category', 'location', 'hierarchy_template')
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
@@ -902,6 +893,7 @@ def portal_asset_registry(request):
     return render(request, 'asset_registry.html', context)
 
 @login_required(login_url='portal_login')
+@permission_required('work_order:read')
 def portal_work_orders(request):
     from workorders.models import WorkOrder, WorkOrderChecklistItem
     from assets.models import Asset
@@ -1089,6 +1081,7 @@ def portal_work_orders(request):
     return render(request, 'work_orders.html', {'work_orders_data': wo_data, 'assets': assets, 'users': users, 'kpis': kpis})
 
 @login_required(login_url='portal_login')
+@permission_required('inventory:read')
 def portal_inventory(request):
     from assets.models import SparePart
     import json
@@ -1097,9 +1090,6 @@ def portal_inventory(request):
     tenant_id = request.user.tenant_id
     is_admin = request.user.is_superuser or request.user.roles.filter(permissions__id='system:admin').exists()
     
-    if request.method == 'GET':
-        if not (is_admin or request.user.roles.filter(permissions__id='inventory:read').exists()):
-            return HttpResponseForbidden("Permission denied")
             
     if request.method == 'POST':
         if not (is_admin or request.user.roles.filter(permissions__id='inventory:create').exists()):
@@ -1154,6 +1144,7 @@ def portal_inventory(request):
     return render(request, 'inventory.html', {'spare_parts': spare_parts})
 
 @login_required(login_url='portal_login')
+@permission_required('pm_plan:read')
 def portal_pm_plans(request):
     from maintenance.models import PmPlan
     import json
@@ -1357,6 +1348,7 @@ def portal_pm_plans(request):
     })
 
 @login_required(login_url='portal_login')
+@permission_required('pm_plan:read')
 def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
     from maintenance.models import PmPlanAssignment, PmPlan
     from assets.models import Asset
@@ -1416,6 +1408,7 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
 
 @login_required(login_url='portal_login')
+@permission_required('audit_logs:read')
 def portal_audit_logs(request):
     from core.models import AuditLog
     logs = AuditLog.objects.all().order_by('-timestamp')[:500]
@@ -1432,6 +1425,7 @@ def portal_audit_logs(request):
     })
 
 @login_required(login_url='portal_login')
+@permission_required('audit_logs:read')
 def portal_reports(request):
     return render(request, 'reports.html')
 

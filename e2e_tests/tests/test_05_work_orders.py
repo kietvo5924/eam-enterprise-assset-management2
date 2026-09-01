@@ -1,3 +1,4 @@
+import re
 import pytest
 from playwright.sync_api import expect
 from faker import Faker
@@ -20,14 +21,14 @@ def test_work_order_crud_and_lifecycle(auth_page, base_url, wo_data):
     page.go_to()
     
     page.create_work_order(wo_data["title"], "E2E Asset", wo_data["priority"])
-    auth_page.wait_for_url("**/work-orders/")
+    auth_page.wait_for_url(re.compile(r".*\/work-orders\/.*"))
     
     # Check if WO appears in the table
     expect(auth_page.locator(f'tr:has-text("{wo_data["title"]}")').first).to_be_visible()
     
     # Transition status to IN_PROGRESS
     page.change_status(wo_data["title"], wo_data["new_status"])
-    auth_page.wait_for_url("**/work-orders/")
+    auth_page.wait_for_url(re.compile(r".*\/work-orders\/.*"))
     
     # Verify status badge updated
     row = auth_page.locator(f'tr:has-text("{wo_data["title"]}")').first

@@ -1,3 +1,4 @@
+import re
 import pytest
 from playwright.sync_api import expect
 from faker import Faker
@@ -30,7 +31,7 @@ def test_users_crud(auth_page, base_url, user_data):
     users_page.submit_form()
     
     # Wait for page reload
-    auth_page.wait_for_url("**/users/")
+    auth_page.wait_for_url(re.compile(r".*\/users\/.*"))
     
     # Verify user appears
     users_page.verify_user_exists(user_data["username"])
@@ -44,16 +45,16 @@ def test_users_crud(auth_page, base_url, user_data):
     )
     
     # Wait for page reload
-    auth_page.wait_for_url("**/users/")
+    auth_page.wait_for_url(re.compile(r".*\/users\/.*"))
     
     # Verify edited user exists
     users_page.verify_user_exists(user_data["username_edited"])
     
-    # Delete user
-    users_page.delete_user(user_data["username_edited"])
+    # Disable user
+    users_page.disable_user(user_data["username_edited"])
     
     # Wait for reload
-    auth_page.wait_for_url("**/users/")
+    auth_page.wait_for_url(re.compile(r".*\/users\/.*"))
     
-    # Verify deletion
-    expect(auth_page.locator(f'tr:has-text("{user_data["username_edited"]}")').first).not_to_be_visible()
+    # Verify disabled
+    users_page.verify_user_status(user_data["username_edited"], "INACTIVE")

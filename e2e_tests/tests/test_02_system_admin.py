@@ -24,13 +24,26 @@ def test_tenant_settings(auth_page, base_url, admin_data):
     expect(auth_page.locator('#input-name')).not_to_be_empty(timeout=5000)
     
     # Update settings
-    settings_page.update_settings(admin_data["org_name"], "Asia/Ho_Chi_Minh")
-    # Form does standard post and reload, so wait for reload
-    auth_page.wait_for_url(f"{base_url}/settings/")
+    logo_url = "https://example.com/logo.png"
+    settings_page.update_settings(admin_data["org_name"], "Asia/Ho_Chi_Minh", logo_url)
+    
+    # Wait for the success message to ensure API call finished
+    settings_page.wait_for_success()
+    
+    # Reload page to verify persistence
+    auth_page.reload()
+    
+    # Wait for reload to complete
+    expect(auth_page.locator('#input-name')).not_to_be_empty(timeout=5000)
     
     # Verify the UI reflects the new name in the left panel
     expect(auth_page.locator('#display-name')).to_have_text(admin_data["org_name"])
     expect(auth_page.locator('#display-timezone')).to_have_text("Asia/Ho_Chi_Minh")
+    
+    # Verify inputs have the saved values
+    expect(auth_page.locator('#input-name')).to_have_value(admin_data["org_name"])
+    expect(auth_page.locator('#input-timezone')).to_have_value("Asia/Ho_Chi_Minh")
+    expect(auth_page.locator('#input-logoUrl')).to_have_value(logo_url)
 
 def test_roles_crud(auth_page, base_url, admin_data):
     roles_page = RolesPage(auth_page, base_url)

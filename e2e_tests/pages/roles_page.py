@@ -9,7 +9,7 @@ class RolesPage(BasePage):
         self.navigate("/roles/")
 
     def create_role(self, name, description, permission_names=None):
-        self.page.click('button:has-text("New Role")')
+        self.page.click('button:has-text("Create Role")')
         expect(self.page.locator('#role-modal')).to_be_visible()
         self.page.fill('#role-name', name)
         self.page.fill('#role-desc', description)

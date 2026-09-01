@@ -2,17 +2,20 @@
 
 The Enterprise Asset Management (EAM) system provides a multi-tenant architecture to manage assets, maintenance, work orders, and reports.
 
+> **Note**: This project has been modernized and rewritten from a legacy Spring Boot/React stack into a full-stack **Django** monolith to improve maintainability, development speed, and reduce infrastructure complexity.
+
 ## Technology Stack
-- Backend: Java 17, Spring Boot 3.2, PostgreSQL, Kafka, MinIO, OpenTelemetry, Flyway.
-- Frontend: React, Vite, TypeScript, Ant Design, Zustand, Axios.
-- Mobile App: Flutter, Dart, Dio, Provider, GoRouter.
-- Infrastructure: Docker, Docker Compose.
+- **Backend & Core**: Python 3.11, Django 4.8, PostgreSQL, Redis, MinIO
+- **Frontend**: Django Templates, TailwindCSS, Phosphor Icons, Vanilla JavaScript
+- **Mobile App**: Flutter, Dart, Dio, Provider, GoRouter
+- **Testing**: Pytest, Microsoft Playwright (End-to-End Testing)
+- **Infrastructure**: Docker, Docker Compose (for databases and object storage)
 
 ---
 
 ## Local Setup Instructions
 
-The system is fully containerized with Docker Compose, allowing you to start the entire environment and seed default data with just a few commands.
+The infrastructure (PostgreSQL, Redis, MinIO) is containerized with Docker Compose, while the Django application runs locally via a virtual environment.
 
 ### Step 1: Environment Variables
 Open a terminal at the project root and create a `.env` file from the example:
@@ -30,43 +33,73 @@ Open the `.env` file and fill in your Resend API Key (used for system email noti
 RESEND_API_KEY=your_resend_api_key_here
 ```
 
-### Step 2: Start the System
-Run the following command to build and start all services (Database, Kafka, MinIO, Backend, Frontend, etc.):
+### Step 2: Start the Infrastructure
+Run the following command to start PostgreSQL, pgAdmin, Redis, and MinIO in the background:
 
 ```bash
-docker-compose up -d --build
+docker-compose up -d
 ```
-> Note: The first run may take 2-5 minutes to download Docker images and build the source code. The backend will automatically execute Flyway migrations (V1 to V12) to initialize the robust database schema and seed all necessary default data (including the `superadmin@eam.local` account).
+> Note: The first run may take 2-5 minutes to download Docker images.
 
-### Step 3: Access the System
+### Step 3: Set up Virtual Environment & Dependencies
+Create a Python virtual environment and install the required dependencies:
 
-Once all containers are Running/Healthy, you can access the system at the following addresses:
+```bash
+# Create Virtual Environment
+python -m venv venv
 
-- Web Portal (Frontend): http://localhost:5173
-  - Default login credentials:
-    - Email: superadmin@eam.local
-    - Password: admin123
+# Activate (Windows PowerShell)
+.\venv\Scripts\activate
+# Activate (Mac/Linux)
+source venv/bin/activate
 
-- Backend API: http://localhost:8080
+# Install dependencies
+pip install -r requirements.txt
+```
 
-- Database Management (pgAdmin): http://localhost:5050
-  - Email: admin@admin.com
-  - Password: admin
-  - To view the database, click "Add New Server" in pgAdmin and use these settings:
-    - General > Name: EAM Database
-    - Connection > Host name/address: postgres
-    - Connection > Port: 5432
-    - Connection > Maintenance database: eam_db
-    - Connection > Username: eam_user
-    - Connection > Password: eam_password
+### Step 4: Run Database Migrations
+Initialize the database schema and seed default data:
 
-- File/Object Storage (MinIO Console): http://localhost:9001
-  - Username: minioadmin
-  - Password: minioadmin
+```bash
+python manage.py migrate
+```
+
+### Step 5: Start the System
+Start the Django development server:
+
+```bash
+python manage.py runserver
+```
 
 ---
 
-### Step 4: Run the Mobile App (EAM Mobile)
+### Step 6: Access the System
+
+Once the server and containers are Running/Healthy, you can access the system at the following addresses:
+
+- **Web Portal (Django Admin/Frontend)**: http://localhost:8000
+  - Default login credentials (if seeded):
+    - Username/Email: `superadmin@eam.local`
+    - Password: `admin` (or your default seeded password)
+
+- **Database Management (pgAdmin)**: http://localhost:5050
+  - Email: `admin@admin.com`
+  - Password: `admin`
+  - To view the database, click "Add New Server" in pgAdmin and use these settings:
+    - General > Name: EAM Database
+    - Connection > Host name/address: `postgres`
+    - Connection > Port: `5432`
+    - Connection > Maintenance database: `eam_db`
+    - Connection > Username: `eam_user`
+    - Connection > Password: `eam_password`
+
+- **File/Object Storage (MinIO Console)**: http://localhost:9001
+  - Username: `minioadmin`
+  - Password: `minioadmin`
+
+---
+
+### Step 7: Run the Mobile App (EAM Mobile)
 
 The EAM system includes a native mobile application for technicians and supervisors.
 
@@ -87,14 +120,30 @@ The EAM system includes a native mobile application for technicians and supervis
 
 ---
 
+## Testing (End-to-End)
+
+This project utilizes **Pytest** and **Playwright** to run comprehensive End-to-End (E2E) tests simulating real user interactions on a Chromium browser.
+
+To run the full test suite:
+```bash
+# Make sure your virtual environment is activated
+pytest -v e2e_tests
+```
+*(If you are using playwright for the first time, you may need to install the browser binaries: `playwright install chromium`)*
+
+---
+
 ## Troubleshooting
 
-1. Port Conflict (Port is already allocated)
-If you encounter port errors (e.g., 5432, 8080, 5173), ensure no local services are using these ports, or change the mapped ports in `docker-compose.yml`.
+1. **Port Conflict (Port is already allocated)**
+If you encounter port errors (e.g., 5433, 5050, 8000), ensure no local services are using these ports, or change the mapped ports in `docker-compose.yml`.
 
-2. Full System Reset (Wipe all data)
-If you want to completely clean up and start fresh as a new installation, use the following command:
+2. **Missing Module Errors**
+If you see `ModuleNotFoundError`, ensure your virtual environment is activated (`.\venv\Scripts\activate`) and all dependencies are installed.
+
+3. **Full System Reset (Wipe all data)**
+If you want to completely clean up the databases and start fresh as a new installation, use the following command:
 ```bash
 docker-compose down -v --rmi all
 ```
-Warning: This command will permanently delete all database records and uploaded files.
+Warning: This command will permanently delete all database records and uploaded files in MinIO/PostgreSQL.

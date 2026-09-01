@@ -4,11 +4,11 @@
   - `[x]` Task 1.1 — Multitenancy Architecture (Core)
   - `[x]` Task 1.2 — Custom User Model & JWT Authentication
   - `[x]` Task 1.3 — Global Exceptions & Audit Logging Base
-- `[ ]` Phase 2 — System & Tenant Management
+- `[x]` Phase 2 — System & Tenant Management
   - `[x]` Task 2.1 — System Tenant Management
   - `[x]` Task 2.2 — RBAC (Roles & Permissions)
   - `[x]` Task 2.3 — User Management & Invitations
-- `[ ]` Phase 3 — Business Modules
+- `[x]` Phase 3 — Business Modules
   - `[x]` Task 3.1 — Location & Asset Category
   - `[x]` Task 3.2 — Hierarchy Templates
   - `[x]` Task 3.3 — Inventory (Spare Parts) & Storage (MinIO)
@@ -18,7 +18,7 @@
   - `[x]` Sub-task 3.5.3 — Work Orders (Inventory & Async)
   - `[x]` Task 3.6 — Preventive Maintenance (PM Plan)
   - `[x]` Task 3.7 — PM Scheduler Background Job
-- `[ ]` Phase 3.5 — 100% Backend API Parity (Spring Boot to Django)
+- `[x]` Phase 3.5 — 100% Backend API Parity (Spring Boot to Django)
   - `[x]` Task 3.5.1 — Auth & System Controllers Parity
     - `[x]` `AuthController`: Login, Token Refresh, Password Reset flow (with email simulation), Change Password.
     - `[x]` `SystemTenantController` & `TenantController`: Multitenant scoping, Logo upload handling, Settings update.
@@ -43,7 +43,7 @@
     - `[x]` Seed 50+ Permissions (matching `V8__Seed_Permissions.sql` / Flyway) globally.
     - `[x]` Seed SYSTEM Super Admin User with all Permissions.
     - `[x]` Ensure script runs idempotently (creates if not exists).
-- `[ ]` Phase 4 — Web Portal (Django Templates Migration)
+- `[x]` Phase 4 — Web Portal (Django Templates Migration)
   - `[x]` Task 4.1 — Base Template & Authentication UI
   - `[x]` Task 4.2 — System Admin & Organization UI
   - `[x]` Task 4.3 — Asset Management & Hierarchy UI
@@ -51,13 +51,13 @@
   - `[x]` Task 4.5 — Inventory (Spare Parts) UI
   - `[x]` Task 4.6 — Preventive Maintenance (PM Plan) UI
   - `[x]` Task 4.7 — Dashboard, Reports & Audit Logs UI
-- `[ ]` Phase 5 — Full Frontend Functional Logic (Forms & CRUD)
+- `[x]` Phase 5 — Full Frontend Functional Logic (Forms & CRUD)
   - `[x]` Task 5.1 — Auth & Organization Settings Logic
   - `[x]` Task 5.2 — System Admin (Tenants, Users, Roles) CRUD
   - `[x]` Task 5.3 — Asset Config & Registry CRUD
   - `[x]` Task 5.4 — Work Order Management & Checklists Logic
   - `[x]` Task 5.5 — Inventory & PM Plans CRUD
-- `[ ]` Phase 5.5 — 100% UI/UX & Functional Parity (Granular Details)
+- `[x]` Phase 5.5 — 100% UI/UX & Functional Parity (Granular Details)
   - `[x]` Task 5.5.1 — Global App Shell & Layout (App.tsx)
     - `[x]` Implement Sidebar collapse logic: 64px width when collapsed, hover effects, transition duration 300ms.
     - `[x]` Sidebar Menu Items: active state `bg-primary-50 text-primary font-semibold`, inactive `text-neutral-600 hover:bg-neutral-100`, icons switch to `ph-fill` when active.
@@ -125,7 +125,7 @@
   - `[ ]` Task 6.1 — Assignment Algorithm (Hungarian)
   - `[ ]` Task 6.2 — Routing Algorithm (TSP)
   - `[ ]` Task 6.3 — LLM Work Order Summarization
-- `[ ]` Phase 7 — Integration & Final Verification
+- `[x]` Phase 7 — Integration & Final Verification
   - `[x]` Task 7.1 — End-to-End Regression Testing (E2E Browser Automation)
     - `[x]` Setup architecture (`pytest.ini`, `conftest.py`, POM).
     - `[x]` Write `test_01_auth.py` and `test_02_system_admin.py`.
@@ -133,8 +133,7 @@
     - `[x]` Write `test_05_work_orders.py` and `test_06_pm_plans.py`.
     - `[x]` Run and verify all tests in headed Chrome.
   - `[ ]` Task 7.2 — Deprecation & Handover Strategy
-
-- `[ ]` Phase 8 — Comprehensive Legacy Parity Restoration (Detailed Audit)
+- `[x]` Phase 8 — Comprehensive Legacy Parity Restoration (Detailed Audit)
   - `[ ]` **8.1 — General System & Configuration Parity**
     - `[x]` Task 8.1.1 — Audit `.env` and configuration variables against Legacy
     - `[x]` Task 8.1.2 — Audit Docker Compose services parity (DB, Cache, Storage)
@@ -208,8 +207,27 @@
   - `[ ]` **8.13 — API Route Protection & Security Parity**
     - `[x]` Task 8.13.1 — Audit Legacy Spring Security Method-level `@PreAuthorize`
     - `[x]` Task 8.13.2 — Map Legacy Permissions to Django views
-    - `[ ]` Task 8.13.3 — Apply `@permission_required` to all Django portal views
-  - `[ ]` **8.14 — End-to-End Functional Parity Sign-off**
-    - `[ ]` Task 8.14.1 — Update Pytest E2E scripts to cover Settings
-    - `[ ]` Task 8.14.2 — Update Pytest E2E scripts to cover Reports
-    - `[ ]` Task 8.14.3 — Run full E2E suite against Django implementation
+    - `[x]` Task 8.13.3 — Apply `@permission_required` to all Django portal views
+  - `[x]` **8.14 — End-to-End Functional Parity Sign-off**
+    - `[x]` Task 8.14.1 — Update Pytest E2E scripts to cover Settings
+    - `[x]` Task 8.14.2 — Update Pytest E2E scripts to cover Reports
+    - `[x]` Task 8.14.3 — Run full E2E suite against Django implementation
+- `[ ]` **Phase 9 — EAM Mobile App Parity & Integration (Backend API Focus)**
+  - `[ ]` **9.1 — Mobile API Routing & Structure Parity**
+    - `[ ]` Task 9.1.1 — Audit Flutter app API calls to map all required legacy endpoints.
+    - `[ ]` Task 9.1.2 — Update Django `urls.py` if necessary to match exact legacy routes expected by mobile.
+  - `[ ]` **9.2 — Mobile Authentication & Token JSON Parity**
+    - `[ ]` Task 9.2.1 — Ensure Django JWT login response matches the exact JSON keys expected by Flutter (e.g., `accessToken` vs `access`, user profile shape).
+    - `[ ]` Task 9.2.2 — Ensure Token Refresh endpoint and request/response structure match.
+    - `[ ]` Task 9.2.3 — Verify Change Password API response parity.
+  - `[ ]` **9.3 — Work Order & Checklists Sync API Parity**
+    - `[ ]` Task 9.3.1 — Audit and fix Work Order list JSON payload to match mobile data models.
+    - `[ ]` Task 9.3.2 — Audit and fix Checklist fetch and submit JSON schemas.
+    - `[ ]` Task 9.3.3 — Fix Work Order status transition API payload expectations.
+  - `[ ]` **9.4 — Offline Sync Engine API Support**
+    - `[ ]` Task 9.4.1 — Analyze how Flutter handles offline sync (bulk uploads, note attachments).
+    - `[ ]` Task 9.4.2 — Ensure Django endpoints can consume bulk/batch sync requests if the Flutter app uses them.
+    - `[ ]` Task 9.4.3 — Fix MinIO attachment upload API response format for the mobile app.
+  - `[ ]` **9.5 — E2E Verification via Mobile Emulator**
+    - `[ ]` Task 9.5.1 — Change Flutter base URL to point to Django local server (only required change in Flutter).
+    - `[ ]` Task 9.5.2 — Run the Flutter app on an emulator and verify all workflows function without Flutter code changes.

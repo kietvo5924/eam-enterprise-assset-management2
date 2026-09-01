@@ -1,3 +1,4 @@
+import re
 import pytest
 from playwright.sync_api import expect
 from faker import Faker
@@ -25,6 +26,6 @@ def test_inventory_crud(auth_page, base_url, inventory_data):
         inventory_data["min_stock"]
     )
     
-    auth_page.wait_for_url("**/inventory/")
+    auth_page.wait_for_url(re.compile(r".*\/inventory\/.*"))
     expect(auth_page.locator(f'tr:has-text("{inventory_data["part_sku"]}")').first).to_be_visible()
 

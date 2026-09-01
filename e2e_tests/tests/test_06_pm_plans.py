@@ -1,3 +1,4 @@
+import re
 import pytest
 from playwright.sync_api import expect
 from faker import Faker
@@ -17,7 +18,7 @@ def test_pm_plans_crud(auth_page, base_url, pm_data):
     page.go_to()
     
     page.create_pm_plan(pm_data["title"], pm_data["frequency"])
-    auth_page.wait_for_url("**/pm-plans/")
+    auth_page.wait_for_url(re.compile(r".*\/pm-plans\/.*"))
     page.switch_to_plans_view()
     
     # Check if PM plan appears

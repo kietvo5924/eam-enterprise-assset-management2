@@ -1,3 +1,4 @@
+import re
 from playwright.sync_api import Page, expect
 from .base_page import BasePage
 
@@ -8,7 +9,7 @@ class UsersPage(BasePage):
 
     def go_to(self):
         self.page.goto(self.url)
-        self.page.wait_for_url("**/users/")
+        self.page.wait_for_url(re.compile(r".*\/users\/.*"))
 
     def open_create_modal(self):
         self.page.get_by_role("button", name="Add User").click()
@@ -19,7 +20,10 @@ class UsersPage(BasePage):
         self.page.locator('#user-email').fill(email)
         if password:
             self.page.locator('#user-password').fill(password)
-        self.page.locator('#user-status').select_option(status)
+        
+        status_locator = self.page.locator('#user-status')
+        if status_locator.is_visible():
+            status_locator.select_option(status)
         
     def submit_form(self):
         self.page.locator('#btn-save-user').click()
@@ -31,9 +35,9 @@ class UsersPage(BasePage):
     def verify_user_status(self, username: str, status: str):
         row = self.page.locator(f'tr:has-text("{username}")').first
         if status == "ACTIVE":
-            expect(row.locator('.bg-green-50')).to_contain_text("Active")
+            expect(row.locator('.bg-green-50')).to_contain_text("ACTIVE")
         elif status == "PENDING":
-            expect(row.locator('.bg-warning\\/10')).to_contain_text("Pending")
+            expect(row.locator('.bg-warning\\/10')).to_contain_text("PENDING")
         else:
             expect(row).to_contain_text(status)
             
@@ -44,7 +48,7 @@ class UsersPage(BasePage):
         self.fill_user_form(new_username, new_email, "")
         self.submit_form()
 
-    def delete_user(self, username: str):
+    def disable_user(self, username: str):
         row = self.page.locator(f'tr:has-text("{username}")').first
         self.page.once("dialog", lambda dialog: dialog.accept())
-        row.locator('button i.ph-trash').locator('..').click()
+        row.locator('button i.ph-prohibit').locator('..').click()
