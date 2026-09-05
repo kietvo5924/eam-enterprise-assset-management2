@@ -29,12 +29,16 @@
           Plans
         </button>
       </div>
+      {% if 'pm_plan:create' in user_permissions or 'pm_plan:update' in user_permissions %}
       <button onclick="openAssignModal()" class="bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl h-10 px-4 font-semibold flex items-center gap-2 shadow-sm transition-colors">
         <i class="ph-bold ph-link"></i> Assign Plan
       </button>
+      {% endif %}
+      {% if 'pm_plan:create' in user_permissions %}
       <button onclick="openPmModal()" class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
         <i class="ph-bold ph-plus"></i> New Plan
       </button>
+      {% endif %}
     </div>
   </div>
 
@@ -221,15 +225,22 @@
               </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex gap-2 items-center justify-end">
+                    {% if 'pm_plan:update' in user_permissions %}
                     <button onclick="event.stopPropagation(); openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})" title="Edit Plan" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-pencil-simple text-lg"></i>
                     </button>
+                    {% endif %}
                     <button onclick="event.stopPropagation(); openAssignments('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}')" title="View Assignments" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-link text-lg"></i>
                     </button>
+                    {% if 'pm_plan:delete' in user_permissions %}
                     <button onclick="event.stopPropagation(); deletePm('{{ plan.pm.id }}')" title="Delete" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
                         <i class="ph-bold ph-trash text-lg"></i>
                     </button>
+                    {% endif %}
+                    {% if 'pm_plan:update' not in user_permissions and 'pm_plan:delete' not in user_permissions %}
+                    <span class="text-xs text-neutral-400 font-medium px-2 py-0.5 bg-neutral-100 rounded-md border border-neutral-200/60">Chỉ đọc</span>
+                    {% endif %}
                 </div>
               </td>
             </tr>

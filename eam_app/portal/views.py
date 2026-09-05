@@ -4,6 +4,23 @@ from django.contrib.auth.decorators import login_required
 from users.decorators import permission_required
 from django.contrib import messages
 
+def check_perm(request, perm):
+    if not request.user or not request.user.is_authenticated:
+        return False
+    if request.user.is_superuser:
+        return True
+    if not hasattr(request, '_user_permissions_cache'):
+        perms = set()
+        for role in request.user.roles.prefetch_related('permissions').all():
+            for p in role.permissions.all():
+                perms.add(p.id)
+        request._user_permissions_cache = perms
+    if 'system:admin' in request._user_permissions_cache:
+        return True
+    if isinstance(perm, (list, tuple, set)):
+        return any(p in request._user_permissions_cache for p in perm)
+    return perm in request._user_permissions_cache
+
 def portal_login(request):
     if request.user.is_authenticated:
         return redirect('portal_dashboard')
@@ -12,6 +29,11 @@ def portal_login(request):
         u = request.POST.get('username')
         p = request.POST.get('password')
         user = authenticate(request, username=u, password=p)
+        if user is None and u and '@' in u:
+            from users.models import User
+            found_user = User.all_objects.filter(email__iexact=u).first()
+            if found_user:
+                user = authenticate(request, username=found_user.username, password=p)
         if user is not None:
             login(request, user)
             return redirect('portal_dashboard')
@@ -106,7 +128,7 @@ def portal_tenant_admins(request):
         if not tenant_id:
             return JsonResponse({'success': False, 'error': 'tenant_id is required'}, status=400)
             
-        admins = User.objects.filter(tenant_id=tenant_id, roles__name='TENANT_ADMIN').distinct()
+        admins = User.all_objects.filter(tenant_id=tenant_id, roles__name='TENANT_ADMIN').distinct()
         data = []
         for a in admins:
             data.append({
@@ -124,12 +146,12 @@ def portal_tenant_admins(request):
             username = data.get('username')
             password = data.get('password')
             
-            if User.objects.filter(tenant_id=tenant_id, username=username).exists():
+            if User.all_objects.filter(tenant_id=tenant_id, username=username).exists():
                 return JsonResponse({'success': False, 'error': 'Username already exists in this tenant'}, status=400)
                 
             tenant = Tenant.objects.get(id=tenant_id)
             
-            admin_role, created = Role.objects.get_or_create(
+            admin_role, created = Role.all_objects.get_or_create(
                 tenant_id=tenant_id,
                 name='TENANT_ADMIN',
                 defaults={
@@ -142,7 +164,7 @@ def portal_tenant_admins(request):
                 perms = Permission.objects.exclude(id='system:admin')
                 admin_role.permissions.set(perms)
                 
-            u = User.objects.create(
+            u = User.all_objects.create(
                 tenant_id=tenant_id,
                 username=username,
                 email=username,
@@ -159,7 +181,7 @@ def portal_tenant_admins(request):
         try:
             data = json.loads(request.body)
             admin_id = data.get('id')
-            u = User.objects.get(id=admin_id)
+            u = User.all_objects.get(id=admin_id)
             
             if data.get('status'):
                 if str(u.id) == '00000000-0000-0000-0000-000000000000':
@@ -326,12 +348,15 @@ def portal_users(request):
                 return JsonResponse({'success': True})
 
             username = data.get('username')
-            if User.objects.filter(username=username).exists():
-                return JsonResponse({'success': False, 'error': 'Username already exists'}, status=400)
+            if User.all_objects.filter(tenant_id=tenant_id, username=username).exists():
+                return JsonResponse({'success': False, 'error': 'Username already exists in this organization'}, status=400)
+            email = data.get('email')
+            if email and User.all_objects.filter(tenant_id=tenant_id, email=email).exists():
+                return JsonResponse({'success': False, 'error': 'Email already exists in this organization'}, status=400)
                 
-            u = User.objects.create(
+            u = User.all_objects.create(
                 username=username,
-                email=data.get('email'),
+                email=email,
                 status=data.get('status', 'ACTIVE'),
                 tenant_id=tenant_id
             )
@@ -431,9 +456,10 @@ def portal_users(request):
     pending_users = users.filter(status='PENDING').count()
     
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
-    roles = Role.objects.filter(tenant_id=tenant_id)
-    if not is_super:
-        roles = roles.exclude(name='SUPER_ADMIN')
+    if is_super:
+        roles = Role.all_objects.all()
+    else:
+        roles = Role.objects.filter(tenant_id=tenant_id).exclude(name='SUPER_ADMIN')
     
     return render(request, 'users.html', {
         'users': users, 
@@ -910,6 +936,8 @@ def portal_work_orders(request):
             action = data.get('action')
             
             if action == 'toggle_checklist':
+                if not check_perm(request, ('work_order:execute', 'work_order:update')):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:execute required'}, status=403)
                 item = WorkOrderChecklistItem.objects.get(id=data.get('item_id'), tenant_id=tenant_id)
                 item.is_completed = data.get('is_completed')
                 if 'actual_value' in data:
@@ -918,6 +946,8 @@ def portal_work_orders(request):
                 return JsonResponse({'success': True})
                 
             elif action == 'add_checklist':
+                if not check_perm(request, 'work_order:update'):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
                 wo = WorkOrder.objects.get(id=data.get('work_order_id'), tenant_id=tenant_id)
                 item = WorkOrderChecklistItem.objects.create(
                     tenant_id=tenant_id,
@@ -927,6 +957,8 @@ def portal_work_orders(request):
                 return JsonResponse({'success': True, 'id': str(item.id)})
                 
             else:
+                if not check_perm(request, 'work_order:create'):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:create required'}, status=403)
                 asset_id = data.get('asset_id')
                 assigned_to_id = data.get('assigned_to_id')
                 
@@ -952,9 +984,13 @@ def portal_work_orders(request):
             from django.utils import timezone
             
             # 1. Update Status Action
-            if len(data) == 2 and 'status' in data:
+            if 'status' in data and (len(data) == 2 or ('resolution_notes' in data and len(data) <= 4)):
+                if not check_perm(request, ('work_order:execute', 'work_order:update')):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:execute required'}, status=403)
                 new_status = data.get('status')
                 current_status = wo.status
+                if data.get('resolution_notes'):
+                    wo.resolution_notes = data.get('resolution_notes')
                 
                 if current_status != new_status:
                     if new_status == 'ASSIGNED':
@@ -991,6 +1027,8 @@ def portal_work_orders(request):
                 
             # 2. Assign Action
             elif len(data) == 2 and 'assigned_to_id' in data:
+                if not check_perm(request, ('work_order:reassign', 'work_order:update')):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:reassign required'}, status=403)
                 if wo.status in ['COMPLETED', 'CANCELED', 'CANCELLED']:
                     raise Exception("Cannot reassign a completed or canceled work order")
                     
@@ -1009,6 +1047,8 @@ def portal_work_orders(request):
                 
             # 3. Full Update Action
             else:
+                if not check_perm(request, 'work_order:update'):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
                 asset_id = data.get('asset_id')
                 assigned_to_id = data.get('assigned_to_id')
                 
@@ -1034,9 +1074,13 @@ def portal_work_orders(request):
             data = json.loads(request.body)
             action = data.get('action')
             if action == 'delete_checklist':
+                if not check_perm(request, 'work_order:update'):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
                 item = WorkOrderChecklistItem.objects.get(id=data.get('item_id'), tenant_id=tenant_id)
                 item.delete()
             else:
+                if not check_perm(request, 'work_order:delete'):
+                    return JsonResponse({'success': False, 'error': 'Permission denied: work_order:delete required'}, status=403)
                 wo = WorkOrder.objects.get(id=data.get('id'), tenant_id=tenant_id)
                 wo.delete()
             return JsonResponse({'success': True})
@@ -1154,6 +1198,8 @@ def portal_pm_plans(request):
     tenant_id = request.user.tenant_id
     
     if request.method == 'POST':
+        if not check_perm(request, 'pm_plan:create'):
+            return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:create required'}, status=403)
         try:
             data = json.loads(request.body)
             with transaction.atomic():
@@ -1199,6 +1245,8 @@ def portal_pm_plans(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PUT':
+        if not check_perm(request, 'pm_plan:update'):
+            return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:update required'}, status=403)
         try:
             data = json.loads(request.body)
             with transaction.atomic():
@@ -1245,6 +1293,8 @@ def portal_pm_plans(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
+        if not check_perm(request, 'pm_plan:delete'):
+            return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:delete required'}, status=403)
         try:
             data = json.loads(request.body)
             pm = PmPlan.objects.get(id=data.get('id'), tenant_id=tenant_id)
@@ -1274,35 +1324,14 @@ def portal_pm_plans(request):
 
     upcoming_pms_count = 0
     from maintenance.models import PmPlanAssignment
-    from dateutil.relativedelta import relativedelta
-    now_time = timezone.now()
-    next_7_days = now_time + timezone.timedelta(days=7)
-
-    active_assignments = PmPlanAssignment.objects.filter(tenant_id=tenant_id, status='ACTIVE', pm_plan__trigger_type='TIME')
-    for assignment in active_assignments:
-        plan = assignment.pm_plan
-        interval = plan.interval_value
-        unit = plan.interval_unit
-        if not interval or interval <= 0 or not unit:
-            continue
-            
-        ref_date = assignment.last_triggered_at or assignment.created_at
-        due_date = ref_date
-        
-        while due_date <= next_7_days:
-            if unit == 'DAYS':
-                due_date += relativedelta(days=int(interval))
-            elif unit == 'WEEKS':
-                due_date += relativedelta(weeks=int(interval))
-            elif unit == 'MONTHS':
-                due_date += relativedelta(months=int(interval))
-            elif unit == 'YEARS':
-                due_date += relativedelta(years=int(interval))
-            else:
-                break
-                
-            if now_time <= due_date <= next_7_days:
-                upcoming_pms_count += 1
+    from datetime import timedelta
+    next_week = timezone.now() + timedelta(days=7)
+    upcoming_pms_count = PmPlanAssignment.objects.filter(
+        tenant_id=tenant_id,
+        status='ACTIVE',
+        next_due_date__lte=next_week,
+        next_due_date__gte=timezone.now()
+    ).count()
 
     kpis = {
         'totalPlans': total_plans,
@@ -1332,19 +1361,19 @@ def portal_pm_plans(request):
                 } for m in pm.materials.all()
             ])
         })
-        
-    from users.models import User
+
     from assets.models import Asset, SparePart
-    users = User.objects.all()
+    from users.models import User
+    assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True)
+    users = User.objects.filter(tenant_id=tenant_id, status='ACTIVE')
     spare_parts = SparePart.objects.filter(tenant_id=tenant_id)
-    assets = Asset.objects.filter(tenant_id=tenant_id)
 
     return render(request, 'pm_plans.html', {
         'pm_plans_data': pm_plans_data,
         'kpis': kpis,
+        'assets': assets,
         'users': users,
         'spare_parts': spare_parts,
-        'assets': assets
     })
 
 @login_required(login_url='portal_login')
@@ -1370,6 +1399,8 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
         return JsonResponse({'success': True, 'data': data})
         
     elif request.method == 'POST' and plan_id:
+        if not check_perm(request, ('pm_plan:create', 'pm_plan:update')):
+            return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:create required'}, status=403)
         try:
             data = json.loads(request.body)
             asset_ids = data.get('asset_ids', [])
@@ -1387,6 +1418,8 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'PATCH' and assignment_id:
+        if not check_perm(request, 'pm_plan:update'):
+            return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:update required'}, status=403)
         try:
             data = json.loads(request.body)
             assignment = PmPlanAssignment.objects.get(id=assignment_id, tenant_id=tenant_id)
@@ -1398,6 +1431,8 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE' and assignment_id:
+        if not check_perm(request, 'pm_plan:delete'):
+            return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:delete required'}, status=403)
         try:
             assignment = PmPlanAssignment.objects.get(id=assignment_id, tenant_id=tenant_id)
             assignment.delete()
@@ -1428,6 +1463,37 @@ def portal_audit_logs(request):
 @permission_required('audit_logs:read')
 def portal_reports(request):
     return render(request, 'reports.html')
+
+def custom_403_view(request, exception=None):
+    import re
+    error_msg = str(exception) if exception else "Bạn không có quyền truy cập tài nguyên này."
+    match = re.search(r'\((.*?)\s+required\)', error_msg)
+    required_perm = match.group(1) if match else None
+
+    perm_names = {
+        'user:read': 'Xem danh sách người dùng (Read Users)',
+        'user:create': 'Tạo người dùng mới (Create User)',
+        'role:read': 'Xem danh sách vai trò (Read Roles)',
+        'role:create': 'Tạo & phân quyền vai trò (Manage Roles)',
+        'tenant:read': 'Cấu hình hệ thống Tenant (Tenant Settings)',
+        'asset:read': 'Xem danh mục tài sản (Read Assets)',
+        'work_order:read': 'Xem lệnh làm việc (Read Work Orders)',
+        'work_order:execute': 'Thực thi lệnh làm việc (Execute Work Orders)',
+        'pm_plan:read': 'Xem kế hoạch bảo trì PM (Read PM Plans)',
+        'inventory:read': 'Xem kho & phụ tùng (Read Inventory)',
+        'audit_logs:read': 'Xem nhật ký kiểm toán (Read Audit Logs)',
+        'system:admin': 'Quản trị viên toàn hệ thống (Super Admin)',
+        'asset_category:read': 'Cấu hình phân loại tài sản (Asset Config)',
+    }
+
+    context = {
+        'error_message': error_msg,
+        'required_perm': required_perm,
+        'required_perm_title': perm_names.get(required_perm, required_perm),
+        'requested_path': request.path,
+    }
+    return render(request, '403.html', context, status=403)
+
 
 
 

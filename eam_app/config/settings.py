@@ -67,6 +67,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.tenant.TenantMiddleware',
     'core.middleware.audit.AuditMiddleware',
+    'core.middleware.permission_denied.PermissionDeniedMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -81,6 +82,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'users.context_processors.user_permissions',
             ],
         },
     },

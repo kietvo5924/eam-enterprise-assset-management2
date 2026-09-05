@@ -26,12 +26,14 @@
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
+        {% if 'asset_category:create' in user_permissions %}
         <button
           onclick="openModal()"
           class="rounded-xl h-10 px-6 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-1 transform-gpu font-bold text-white flex items-center justify-center gap-2 text-base hover:scale-105"
         >
           <i class="ph ph-plus font-bold"></i> Create <span id="create-btn-text">Category</span>
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -140,10 +142,16 @@
                         {% endif %}
                         </td>
                         <td class="px-4 py-3 text-right">
+                            {% if 'asset_category:update' in user_permissions %}
                             <button onclick="openModal('categories', '{{ category.id }}', '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', null, '{{ category.is_active|yesno:"true,false" }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Category"><i class="ph ph-pencil-simple text-lg"></i></button>
                             <button onclick="toggleStatus('categories', '{{ category.id }}', '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', null, {{ category.is_active|yesno:'true,false' }})" class="{% if category.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if category.is_active %}Block{% else %}Unblock{% endif %}">
                             <i class="ph {% if category.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
                             </button>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
+                                <i class="ph ph-eye text-xs"></i> Chỉ đọc
+                            </span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -198,10 +206,16 @@
                         {% endif %}
                         </td>
                         <td class="px-4 py-3 text-right">
+                            {% if 'asset_category:update' in user_permissions %}
                             <button onclick="openModal('templates', '{{ tpl.id }}', '{{ tpl.name|escapejs }}', '{{ tpl.description|escapejs }}', '{{ tpl.path|escapejs }}', '{{ tpl.is_active|yesno:"true,false" }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Template"><i class="ph ph-pencil-simple text-lg"></i></button>
                             <button onclick="toggleStatus('templates', '{{ tpl.id }}', '{{ tpl.name|escapejs }}', '{{ tpl.description|escapejs }}', '{{ tpl.path|escapejs }}', {{ tpl.is_active|yesno:'true,false' }})" class="{% if tpl.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if tpl.is_active %}Block{% else %}Unblock{% endif %}">
                             <i class="ph {% if tpl.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
                             </button>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
+                                <i class="ph ph-eye text-xs"></i> Chỉ đọc
+                            </span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -329,6 +343,7 @@
 {{ locations|json_script:"locations-data" }}
 
 <script>
+    const canUpdateCategory = {% if 'asset_category:update' in user_permissions %}true{% else %}false{% endif %};
     let activeTab = 'categories';
     let locationsData = [];
     let currentPage = 1;
@@ -414,6 +429,17 @@
             const icon = isRoot ? 'ph-buildings text-neutral-400' : 'ph-factory text-neutral-400';
             const statusHtml = node.is_active ? `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Active</span>` : `<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Inactive</span>`;
             
+            const actionBtns = canUpdateCategory ? `
+                <button onclick="openModal('locations', '${node.id}', '${node.name.replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id}', '${node.is_active}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Location"><i class="ph ph-pencil-simple text-lg"></i></button>
+                <button onclick="toggleStatus('locations', '${node.id}', '${node.name.replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id}', ${node.is_active})" class="${node.is_active ? 'text-danger hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'} transition-colors p-1.5 ml-1 rounded-lg" title="${node.is_active ? 'Block' : 'Unblock'}">
+                <i class="ph ${node.is_active ? 'ph-lock' : 'ph-lock-open'} text-lg"></i>
+                </button>
+            ` : `
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
+                    <i class="ph ph-eye text-xs"></i> Chỉ đọc
+                </span>
+            `;
+
             html += `
             <tr class="hover:bg-primary-50/30 transition-colors list-row list-locations" data-name="${node.name.toLowerCase()}" data-desc="${(node.description||'').toLowerCase()}" data-active="${node.is_active ? 'true' : 'false'}">
                 <td class="px-4 py-3 font-semibold text-neutral-800">
@@ -428,10 +454,7 @@
                 <td class="px-4 py-3 text-neutral-600">${node.description || "-"}</td>
                 <td class="px-4 py-3">${statusHtml}</td>
                 <td class="px-4 py-3 text-right">
-                    <button onclick="openModal('locations', '${node.id}', '${node.name.replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id}', '${node.is_active}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Location"><i class="ph ph-pencil-simple text-lg"></i></button>
-                    <button onclick="toggleStatus('locations', '${node.id}', '${node.name.replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id}', ${node.is_active})" class="${node.is_active ? 'text-danger hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'} transition-colors p-1.5 ml-1 rounded-lg" title="${node.is_active ? 'Block' : 'Unblock'}">
-                    <i class="ph ${node.is_active ? 'ph-lock' : 'ph-lock-open'} text-lg"></i>
-                    </button>
+                    ${actionBtns}
                 </td>
             </tr>
             `;

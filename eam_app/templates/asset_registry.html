@@ -16,8 +16,10 @@
         <i class="ph-fill ph-list-tree text-primary"></i> Cây Tài Sản
       </h2>
       <div class="flex gap-1 shrink-0">
+        {% if 'asset:create' in user_permissions %}
         <button onclick="openAssetModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Thêm tài sản mới"><i class="ph-bold ph-plus"></i></button>
         <button onclick="openImportModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Nhập (Import)"><i class="ph ph-upload-simple"></i></button>
+        {% endif %}
         <button onclick="openBulkFilterModal()" class="w-7 h-7 rounded hover:bg-primary/10 hover:text-primary flex items-center justify-center text-neutral-500 transition-colors" title="Xuất/In (Export/Print)"><i class="ph ph-printer"></i></button>
         <div class="relative">
           <button onclick="toggleAssetFilter()" class="w-7 h-7 rounded hover:bg-neutral-100 flex items-center justify-center text-neutral-500 transition-colors" title="Lọc tài sản"><i class="ph ph-funnel"></i></button>
@@ -144,18 +146,27 @@
             </div>
           </div>
           <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
-            <button onclick="handleDelete()" class="w-10 h-10 text-neutral-400 hover:text-danger hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors">
+            {% if 'asset:delete' in user_permissions %}
+            <button onclick="handleDelete()" class="w-10 h-10 text-neutral-400 hover:text-danger hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors" title="Xóa tài sản">
               <i class="ph-bold ph-trash"></i>
             </button>
+            {% endif %}
+            {% if 'asset:update' in user_permissions %}
             <button onclick="handleMove()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 font-semibold text-sm hover:bg-neutral-50 rounded-xl flex items-center gap-2 transition-colors h-10">
               <i class="ph-bold ph-arrows-left-right text-lg"></i> Di chuyển
             </button>
             <button onclick="handleEdit()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 font-semibold text-sm hover:bg-neutral-50 rounded-xl flex items-center gap-2 transition-colors h-10">
               <i class="ph-bold ph-pencil-simple text-lg"></i> Sửa
             </button>
+            {% endif %}
+            {% if 'work_order:create' in user_permissions %}
             <a id="btn-create-wo" href="{% url 'portal_work_orders' %}" class="px-5 py-2 bg-primary text-white font-bold text-sm hover:bg-primary-600 rounded-xl flex items-center gap-2 transition-colors shadow-sm shadow-primary/30 h-10">
               <i class="ph-bold ph-plus text-lg"></i> Tạo Work Order
             </a>
+            {% endif %}
+            {% if 'asset:update' not in user_permissions and 'asset:delete' not in user_permissions and 'work_order:create' not in user_permissions %}
+            <span class="text-xs font-semibold px-3 py-1.5 bg-neutral-100 text-neutral-500 rounded-xl border border-neutral-200">Chỉ xem (Read-only)</span>
+            {% endif %}
           </div>
         </div>
       </div>

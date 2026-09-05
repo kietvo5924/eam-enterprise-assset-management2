@@ -17,9 +17,11 @@
         Spare Parts Management
       </h2>
     </div>
+    {% if 'inventory:create' in user_permissions %}
     <button onclick="openInventoryModal()" class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
       <i class="ph-bold ph-plus"></i> New Part
     </button>
+    {% endif %}
   </div>
   
   <!-- Filter Row -->
@@ -61,12 +63,19 @@
           <td class="px-4 py-3 text-neutral-600">{% if part.unit_cost %}${{ part.unit_cost|floatformat:2 }}{% else %}-{% endif %}</td>
           <td class="px-4 py-3">
             <div class="flex gap-3 items-center">
+              {% if 'inventory:update' in user_permissions %}
               <button onclick="openInventoryModal('{{ part.id }}', '{{ part.name|escapejs }}', '{{ part.part_number|escapejs }}', '{{ part.description|escapejs }}', '{{ part.quantity_in_stock }}', '{{ part.unit_cost }}')" class="text-neutral-400 hover:text-primary transition-colors" title="Edit">
                 <i class="ph-bold ph-pencil-simple text-lg"></i>
               </button>
+              {% endif %}
+              {% if 'inventory:delete' in user_permissions %}
               <button onclick="deleteInventory('{{ part.id }}')" class="text-neutral-400 hover:text-danger transition-colors" title="Delete">
                 <i class="ph-bold ph-trash text-lg"></i>
               </button>
+              {% endif %}
+              {% if 'inventory:update' not in user_permissions and 'inventory:delete' not in user_permissions %}
+              <span class="text-xs text-neutral-400 font-medium px-2 py-0.5 bg-neutral-100 rounded-md border border-neutral-200/60">Chỉ đọc</span>
+              {% endif %}
             </div>
           </td>
         </tr>

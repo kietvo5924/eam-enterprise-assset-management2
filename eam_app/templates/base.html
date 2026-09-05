@@ -98,58 +98,159 @@
               <p class="sidebar-text text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-2 whitespace-nowrap transition-opacity duration-300 opacity-100">WORKSPACE</p>
             </div>
             <div class="flex flex-col gap-0.5 px-3">
+              <!-- Dashboard (Everyone) -->
               <a href="{% url 'portal_dashboard' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_dashboard' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_dashboard' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-squares-four text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Dashboard</span>
               </a>
+
+              <!-- Asset Registry -->
+              {% if 'asset:read' in user_permissions %}
               <a href="{% url 'portal_asset_registry' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_registry' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_asset_registry' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-cube text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Registry</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Asset Registry', 'asset:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: asset:read">
+                <i class="ph ph-cube text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Registry</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Work Orders -->
+              {% if 'work_order:read' in user_permissions %}
               <a href="{% url 'portal_work_orders' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_work_orders' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_work_orders' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-clipboard-text text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Work Orders</span>
-                <span class="sidebar-text ml-auto bg-danger text-white text-[10px] px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap transition-opacity duration-300 opacity-100">12</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Work Orders', 'work_order:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: work_order:read">
+                <i class="ph ph-clipboard-text text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Work Orders</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Maintenance (PM Plans) -->
+              {% if 'pm_plan:read' in user_permissions %}
               <a href="{% url 'portal_pm_plans' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_pm_plans' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_pm_plans' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-calendar-check text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Maintenance</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Maintenance (PM Plans)', 'pm_plan:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: pm_plan:read">
+                <i class="ph ph-calendar-check text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Maintenance</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Reports -->
+              {% if 'audit_logs:read' in user_permissions %}
               <a href="{% url 'portal_reports' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_reports' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_reports' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-chart-line-up text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Reports</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Reports', 'audit_logs:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: audit_logs:read">
+                <i class="ph ph-chart-line-up text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Reports</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Inventory -->
+              {% if 'inventory:read' in user_permissions %}
               <a href="{% url 'portal_inventory' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_inventory' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_inventory' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-package text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Inventory</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Inventory', 'inventory:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: inventory:read">
+                <i class="ph ph-package text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Inventory</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
             </div>
             
             <div class="px-4 pt-6 pb-2">
               <p class="sidebar-text text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-2 whitespace-nowrap transition-opacity duration-300 opacity-100">ADMIN</p>
             </div>
             <div class="flex flex-col gap-0.5 px-3">
+              <!-- Users -->
+              {% if 'user:read' in user_permissions %}
               <a href="{% url 'portal_users' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_users' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_users' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-users text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Users</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Users Management', 'user:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: user:read">
+                <i class="ph ph-users text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Users</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Roles -->
+              {% if 'role:read' in user_permissions %}
               <a href="{% url 'portal_roles' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_roles' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_roles' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-shield-check text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Roles</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Roles Management', 'role:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: role:read">
+                <i class="ph ph-shield-check text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Roles</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Asset Config -->
+              {% if 'asset_category:read' in user_permissions or 'asset:read' in user_permissions %}
               <a href="{% url 'portal_asset_categories' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_categories' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_asset_categories' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-tag text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Config</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Asset Config', 'asset_category:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: asset_category:read">
+                <i class="ph ph-tag text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Config</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Settings -->
+              {% if 'tenant:read' in user_permissions %}
               <a href="{% url 'portal_settings' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_settings' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_settings' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-gear text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Settings</span>
               </a>
+              {% else %}
+              <div onclick="showPermissionNotice('Tenant Settings', 'tenant:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: tenant:read">
+                <i class="ph ph-gear text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Settings</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Audit Logs -->
+              {% if 'audit_logs:read' in user_permissions %}
               <a href="{% url 'portal_audit_logs' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_audit_logs' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_audit_logs' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-file-text text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Audit Logs</span>
               </a>
-              {% if user.tenant.tenant_code == 'SYSTEM' %}
+              {% else %}
+              <div onclick="showPermissionNotice('Audit Logs', 'audit_logs:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: audit_logs:read">
+                <i class="ph ph-file-text text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Audit Logs</span>
+                <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
+              </div>
+              {% endif %}
+
+              <!-- Multi-tenant Superadmin Only (Hidden completely for non-SYSTEM tenants) -->
+              {% if user.tenant.tenant_code == 'SYSTEM' and is_system_admin %}
               <a href="{% url 'portal_tenants' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_tenants' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_tenants' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-buildings text-lg shrink-0"></i>
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Tenants (Super Admin)</span>
@@ -166,7 +267,7 @@
               </div>
               <div class="flex-1 overflow-hidden">
                 <p class="text-sm font-bold text-neutral-900 truncate leading-tight">{{ user.username }}</p>
-                <p class="text-[11px] text-neutral-500 truncate">System User</p>
+                <p class="text-[11px] text-neutral-500 truncate font-medium">{{ user_role_names }}</p>
               </div>
               <form action="{% url 'portal_logout' %}" method="post" class="m-0 shrink-0">
                   {% csrf_token %}
@@ -355,7 +456,57 @@
               });
           });
       }
+
+      // RBAC Permission Notice Toast Function
+      window.showPermissionNotice = function(featureTitle, permCode) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'toast-container';
+          container.className = 'fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm w-full px-4';
+          document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'pointer-events-auto bg-white border border-neutral-200/90 shadow-2xl rounded-2xl p-4 flex items-start gap-3.5 transform translate-y-3 opacity-0 transition-all duration-300 backdrop-blur-md';
+        
+        toast.innerHTML = `
+          <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0 shadow-sm">
+            <i class="ph ph-lock-key text-xl"></i>
+          </div>
+          <div class="flex-1 min-w-0 pr-1">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">Phân quyền</span>
+            </div>
+            <p class="text-sm font-bold text-neutral-900 m-0">Không có quyền truy cập</p>
+            <p class="text-xs text-neutral-500 mt-1 mb-2 leading-relaxed">
+              Tài khoản chưa được phân quyền mở <strong class="text-neutral-800">${featureTitle}</strong>.
+            </p>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-50 border border-neutral-200 text-xs font-mono text-neutral-700">
+              <i class="ph ph-key text-amber-500 text-sm"></i>
+              <span class="font-semibold">${permCode}</span>
+            </div>
+          </div>
+          <button onclick="this.closest('.pointer-events-auto').remove()" class="text-neutral-400 hover:text-neutral-600 p-1 rounded-lg transition-colors shrink-0">
+            <i class="ph ph-x text-sm"></i>
+          </button>
+        `;
+
+        container.appendChild(toast);
+
+        // Animate slide-in
+        requestAnimationFrame(() => {
+          toast.classList.remove('translate-y-3', 'opacity-0');
+        });
+
+        // Auto remove after 4.5s
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'translate-y-3');
+          setTimeout(() => toast.remove(), 300);
+        }, 4500);
+      };
     </script>
+    <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm w-full px-4"></div>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

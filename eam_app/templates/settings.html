@@ -72,7 +72,7 @@
                 <i class="ph-fill ph-text-t text-primary"></i>
                 Organization Name <span class="text-danger">*</span>
               </label>
-              <input type="text" name="name" id="input-name" required value="{{ tenant.name }}" placeholder="e.g. Acme Corporation" class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300" oninput="document.getElementById('display-name').innerText = this.value || 'Your Organization'" />
+              <input type="text" name="name" id="input-name" required value="{{ tenant.name }}" placeholder="e.g. Acme Corporation" {% if 'tenant:update' not in user_permissions %}disabled class="w-full px-5 h-14 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-xl text-base font-semibold cursor-not-allowed"{% else %}class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300"{% endif %} oninput="document.getElementById('display-name').innerText = this.value || 'Your Organization'" />
               <p class="text-xs font-medium text-neutral-500 mt-2 ml-1">This name will be displayed on reports, dashboards, and emails sent to users.</p>
             </div>
 
@@ -84,14 +84,16 @@
               </label>
               <div class="flex items-center gap-4">
                 <div class="flex-1">
-                  <input type="url" name="logoUrl" id="input-logoUrl" value="{{ tenant.logo_url|default:'' }}" placeholder="https://example.com/logo.png" class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300" onchange="updateLogoPreview(this.value)" />
+                  <input type="url" name="logoUrl" id="input-logoUrl" value="{{ tenant.logo_url|default:'' }}" placeholder="https://example.com/logo.png" {% if 'tenant:update' not in user_permissions %}disabled class="w-full px-5 h-14 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-xl text-base font-semibold cursor-not-allowed"{% else %}class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300"{% endif %} onchange="updateLogoPreview(this.value)" />
                 </div>
+                {% if 'tenant:update' in user_permissions %}
                 <div class="shrink-0">
                   <label class="px-6 h-14 bg-gradient-to-br from-neutral-50 to-neutral-100 hover:from-white hover:to-neutral-50 text-neutral-800 rounded-xl font-black text-sm shadow-[0_4px_10px_rgba(0,0,0,0.05)] transition-all active:scale-[0.98] flex items-center gap-2.5 border border-neutral-200/80 hover:border-neutral-300 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transform-gpu cursor-pointer" id="upload-label">
                     <input type="file" accept="image/*" class="hidden" id="logo-upload-input" onchange="handleLogoUpload(this)" />
                     <i class="ph-bold ph-upload-simple text-lg text-primary" id="upload-icon"></i> <span class="tracking-wide" id="upload-text">UPLOAD</span>
                   </label>
                 </div>
+                {% endif %}
               </div>
               <p class="text-xs font-medium text-neutral-500 mt-2 ml-1">Upload an image or provide a URL (recommended size: 256x256px, max 2MB).</p>
             </div>
@@ -103,7 +105,7 @@
                 Default Timezone <span class="text-danger">*</span>
               </label>
               <div class="relative">
-                <select name="timezone" id="input-timezone" required class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 appearance-none pr-12 shadow-sm group-hover:border-neutral-300 cursor-pointer" onchange="document.getElementById('display-timezone').innerText = this.value">
+                <select name="timezone" id="input-timezone" required {% if 'tenant:update' not in user_permissions %}disabled class="w-full px-5 h-14 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-xl text-base font-semibold appearance-none pr-12 cursor-not-allowed"{% else %}class="w-full px-5 h-14 bg-white border border-neutral-200/80 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition font-semibold text-neutral-900 appearance-none pr-12 shadow-sm group-hover:border-neutral-300 cursor-pointer"{% endif %} onchange="document.getElementById('display-timezone').innerText = this.value">
                   <option value="UTC" {% if tenant.timezone == 'UTC' %}selected{% endif %}>UTC</option>
                   <option value="Asia/Ho_Chi_Minh" {% if tenant.timezone == 'Asia/Ho_Chi_Minh' %}selected{% endif %}>Asia/Ho_Chi_Minh</option>
                   <option value="America/New_York" {% if tenant.timezone == 'America/New_York' %}selected{% endif %}>America/New_York</option>
@@ -122,9 +124,15 @@
                 <i class="ph-fill ph-shield-check text-success text-xl"></i>
                 Changes apply immediately across all sessions.
               </div>
+              {% if 'tenant:update' in user_permissions %}
               <button type="submit" id="save-btn" class="px-8 h-14 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl font-black text-base shadow-[0_8px_20px_rgba(0,160,226,0.3)] transition active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 flex items-center gap-3 hover:-translate-y-1 transform-gpu hover:shadow-[0_12px_25px_rgba(0,160,226,0.4)]">
                 <i class="ph-bold ph-floppy-disk text-xl" id="save-icon"></i> <span id="save-text">SAVE CHANGES</span>
               </button>
+              {% else %}
+              <span class="inline-flex items-center gap-2 px-6 h-12 rounded-xl bg-neutral-100 text-neutral-500 text-sm font-bold border border-neutral-200">
+                <i class="ph-bold ph-lock-key text-base text-neutral-400"></i> Chỉ xem (Read-only)
+              </span>
+              {% endif %}
             </div>
           </form>
         </div>

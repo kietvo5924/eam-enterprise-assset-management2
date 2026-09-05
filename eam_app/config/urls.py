@@ -43,3 +43,6 @@ urlpatterns = [
     path('api/v1/', include('workorders.urls')),
     path('api/v1/', include('maintenance.urls')),
 ]
+
+handler403 = 'portal.views.custom_403_view'
+

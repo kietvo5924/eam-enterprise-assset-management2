@@ -33,12 +33,14 @@
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-3">
+        {% if 'asset_category:create' in user_permissions %}
         <button
           onclick="openTemplateModal()"
           class="rounded-xl h-10 px-6 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-1 transform-gpu font-bold text-white flex items-center justify-center gap-2 text-base hover:scale-105"
         >
           <i class="ph ph-plus font-bold"></i> Create Template
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -129,10 +131,16 @@
               {% endif %}
             </td>
             <td class="px-4 py-3 text-right">
+                {% if 'asset_category:update' in user_permissions %}
                 <button onclick="openTemplateModal('{{ template.id }}', '{{ template.name|escapejs }}', '{{ template.description|escapejs }}', '{{ template.path|escapejs }}', '{{ template.is_active }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Template"><i class="ph ph-pencil-simple text-lg"></i></button>
                 <button onclick="toggleTemplateStatus('{{ template.id }}', '{{ template.name|escapejs }}', '{{ template.description|escapejs }}', '{{ template.path|escapejs }}', {{ template.is_active|yesno:'true,false' }})" class="{% if template.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if template.is_active %}Block Template{% else %}Unblock Template{% endif %}">
                 <i class="ph {% if template.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
                 </button>
+                {% else %}
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
+                    <i class="ph ph-eye text-xs"></i> Chỉ đọc
+                </span>
+                {% endif %}
             </td>
           </tr>
           {% empty %}

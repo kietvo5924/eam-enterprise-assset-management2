@@ -546,11 +546,7 @@
         .then(resData => {
             if(resData.success) {
                 closeAdminModal();
-                if(document.getElementById('admins-drawer').classList.contains('hidden') === false) {
-                    loadAdmins(tenantId); // reload drawer
-                } else {
-                    alert('Admin saved successfully');
-                }
+                openAdminsDrawer(tenantId);
             } else {
                 msg.className = 'mb-4 p-4 rounded-xl text-sm bg-danger/10 text-danger border border-danger/20';
                 msg.innerText = resData.error || 'An error occurred';

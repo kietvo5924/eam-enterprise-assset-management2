@@ -96,12 +96,14 @@
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+            {% if 'work_order:create' in user_permissions %}
             <button 
               onclick="openWoModal()"
               class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
             >
               <i class="ph-bold ph-plus"></i> Tạo Work Order
             </button>
+            {% endif %}
         </div>
       </div>
     </div>
@@ -164,7 +166,7 @@
             <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
               <td class="px-4 py-3 w-[250px] max-w-[250px]">
                 <div class="flex flex-col items-start">
-                  <strong class="text-neutral-800 truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
+                  <strong onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}')" class="text-neutral-800 hover:text-primary cursor-pointer transition-colors truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
                   <div class="flex gap-1 mt-1 flex-wrap w-full">
                     {% if wo.parent_id %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-bold truncate max-w-full" title="Kế thừa từ: {{ wo.parent_id.title }}">
@@ -219,36 +221,41 @@
                 {{ wo.created_at|date:'Y-m-d H:i'|default:'-' }}
               </td>
               <td class="px-4 py-3 text-right">
+                <script type="application/json" id="checklists-{{ wo.id }}">{{ checklists_json|safe }}</script>
                 <div class="flex gap-2 items-center justify-end">
-                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}', {{ checklists_json|safe }})" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}')" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-eye text-lg"></i>
                     </button>
                     
-                    {% if wo.status == 'CREATED' or wo.status == 'ASSIGNED' %}
-                    <button onclick="openWoModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.assigned_to_id|default:'' }}', '{{ wo.deadline|date:'Y-m-d' }}')" title="Chỉnh sửa" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
-                        <i class="ph-bold ph-pencil-simple text-lg"></i>
-                    </button>
+                    {% if 'work_order:update' in user_permissions %}
+                      {% if wo.status == 'CREATED' or wo.status == 'ASSIGNED' %}
+                      <button onclick="openWoModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.assigned_to_id|default:'' }}', '{{ wo.deadline|date:'Y-m-d' }}')" title="Chỉnh sửa" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                          <i class="ph-bold ph-pencil-simple text-lg"></i>
+                      </button>
+                      {% endif %}
                     {% endif %}
 
-                    {% if wo.status != 'COMPLETED' and wo.status != 'CANCELLED' %}
+                    {% if 'work_order:reassign' in user_permissions and wo.status != 'COMPLETED' and wo.status != 'CANCELLED' %}
                     <button onclick="openAssignModal('{{ wo.id }}', '{{ wo.assigned_to_id|default:'' }}')" title="Phân công" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-user-switch text-lg"></i>
                     </button>
                     {% endif %}
 
-                    {% if wo.status == 'CREATED' or wo.status == 'ASSIGNED' %}
-                    <button onclick="deleteWo('{{ wo.id }}', {{ follow_ups_count }})" title="Xóa" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
-                        <i class="ph-bold ph-trash text-lg"></i>
-                    </button>
+                    {% if 'work_order:delete' in user_permissions %}
+                      {% if wo.status == 'CREATED' or wo.status == 'ASSIGNED' %}
+                      <button onclick="deleteWo('{{ wo.id }}', {{ follow_ups_count }})" title="Xóa" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
+                          <i class="ph-bold ph-trash text-lg"></i>
+                      </button>
+                      {% endif %}
                     {% endif %}
 
-                    {% if wo.status == 'ASSIGNED' and wo.assigned_to == request.user %}
+                    {% if 'work_order:execute' in user_permissions and wo.status == 'ASSIGNED' and wo.assigned_to == request.user %}
                     <button onclick="updateStatus('{{ wo.id }}', 'IN_PROGRESS')" title="Bắt đầu" class="w-8 h-8 flex items-center justify-center text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm">
                         <i class="ph-fill ph-play-circle text-lg"></i>
                     </button>
                     {% endif %}
 
-                    {% if wo.status == 'IN_PROGRESS' and wo.assigned_to == request.user %}
+                    {% if 'work_order:execute' in user_permissions and wo.status == 'IN_PROGRESS' and wo.assigned_to == request.user %}
                     <button onclick="updateStatus('{{ wo.id }}', 'COMPLETED')" title="Hoàn thành" class="w-8 h-8 flex items-center justify-center text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors shadow-sm">
                         <i class="ph-fill ph-check-circle text-lg"></i>
                     </button>
@@ -414,10 +421,18 @@
         </h3>
         <span id="detail-status" class="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold border border-neutral-200">Status</span>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 items-center">
+        <button id="detail-btn-start" onclick="updateStatus(currentWo.id, 'IN_PROGRESS')" class="hidden px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+          <i class="ph-fill ph-play-circle text-base"></i> Bắt đầu
+        </button>
+        <button id="detail-btn-complete" onclick="updateStatus(currentWo.id, 'COMPLETED')" class="hidden px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+          <i class="ph-fill ph-check-circle text-base"></i> Hoàn thành
+        </button>
+        {% if 'work_order:update' in user_permissions %}
         <button onclick="editCurrentWo()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
           <i class="ph-bold ph-pencil-simple"></i> Sửa
         </button>
+        {% endif %}
         <button onclick="closeWoDetailModal()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
           <i class="ph-bold ph-x text-lg"></i>
         </button>
@@ -456,13 +471,40 @@
         <div class="bg-white border border-neutral-200 rounded-2xl p-2 mb-4 space-y-1" id="detail-checklists">
           <!-- Populated by JS -->
         </div>
+        {% if 'work_order:update' in user_permissions %}
         <div class="flex gap-2">
             <input type="text" id="new-checklist-item" placeholder="Tên công việc cần làm..." class="flex-1 px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
             <button onclick="addChecklistItem()" class="bg-primary hover:bg-primary-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm shadow-primary/20 transition-colors flex items-center gap-2">
               <i class="ph-bold ph-plus"></i> Thêm
             </button>
         </div>
+        {% endif %}
       </div>
+    </div>
+  <!-- Completion Modal -->
+<div id="completion-modal" class="fixed inset-0 z-[110] hidden flex items-center justify-center">
+  <div class="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm" onclick="closeCompletionModal()"></div>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative z-10">
+    <div class="p-6 border-b border-neutral-100 flex items-center justify-between">
+      <h3 class="font-black text-xl text-neutral-800 flex items-center gap-2">
+        <i class="ph-fill ph-check-circle text-green-500"></i> Hoàn thành Work Order
+      </h3>
+      <button onclick="closeCompletionModal()" class="text-neutral-400 hover:text-neutral-600">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="complete-wo-id" />
+      <div>
+        <label class="block text-sm font-bold text-neutral-700 mb-2">Ghi chú giải quyết / sửa chữa <span class="text-danger">*</span></label>
+        <textarea id="complete-notes" rows="4" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-white transition-all font-medium" placeholder="Nhập chi tiết các bước đã xử lý, tình trạng sau sửa chữa...">Đã hoàn thành kiểm tra, bảo dưỡng và hiệu chuẩn toàn bộ các hạng mục theo tiêu chuẩn kỹ thuật.</textarea>
+      </div>
+    </div>
+    <div class="p-4 border-t border-neutral-100 flex justify-end gap-3 bg-neutral-50/50">
+      <button onclick="closeCompletionModal()" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy</button>
+      <button onclick="submitCompletion()" id="btn-submit-complete" class="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2">
+        <i class="ph-bold ph-check"></i> Xác nhận hoàn thành
+      </button>
     </div>
   </div>
 </div>
@@ -674,6 +716,11 @@
   }
 
   function updateStatus(id, status) {
+    if (status === 'COMPLETED') {
+        document.getElementById('complete-wo-id').value = id;
+        document.getElementById('completion-modal').classList.remove('hidden');
+        return;
+    }
     fetch('{% url "portal_work_orders" %}', {
         method: 'PUT',
         headers: {
@@ -687,9 +734,43 @@
         if(data.success) {
             window.location.reload();
         } else {
-            alert(data.error);
+            alert(data.error || 'Có lỗi xảy ra khi cập nhật trạng thái');
         }
     });
+  }
+
+  function closeCompletionModal() {
+      document.getElementById('completion-modal').classList.add('hidden');
+  }
+
+  function submitCompletion() {
+      const id = document.getElementById('complete-wo-id').value;
+      const notes = document.getElementById('complete-notes').value;
+      if (!notes || !notes.trim()) {
+          alert('Vui lòng nhập ghi chú sửa chữa trước khi hoàn thành.');
+          return;
+      }
+      const btn = document.getElementById('btn-submit-complete');
+      btn.disabled = true;
+      fetch('{% url "portal_work_orders" %}', {
+          method: 'PUT',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: JSON.stringify({id: id, status: 'COMPLETED', resolution_notes: notes.trim()})
+      })
+      .then(res => res.json())
+      .then(data => {
+          if(data.success) {
+              window.location.reload();
+          } else {
+              alert(data.error || 'Không thể hoàn thành Work Order');
+          }
+      })
+      .finally(() => {
+          btn.disabled = false;
+      });
   }
 
   function openAssignModal(id, currentAssignee) {
@@ -747,6 +828,33 @@
       document.getElementById('detail-assignee-name').innerText = assignee_id ? assignee_name : 'Chưa phân công';
       document.getElementById('detail-deadline').innerText = deadline && deadline !== 'None' ? deadline : 'Chưa thiết lập';
       
+      const canExecute = {% if 'work_order:execute' in user_permissions or 'work_order:update' in user_permissions %}true{% else %}false{% endif %};
+      const isAssignee = assignee_id && String(assignee_id).toLowerCase() === String(currentUserId).toLowerCase();
+      const btnStart = document.getElementById('detail-btn-start');
+      const btnComplete = document.getElementById('detail-btn-complete');
+      if (btnStart) {
+          if (status === 'ASSIGNED' && isAssignee && canExecute) btnStart.classList.remove('hidden');
+          else btnStart.classList.add('hidden');
+      }
+      if (btnComplete) {
+          if (status === 'IN_PROGRESS' && isAssignee && canExecute) btnComplete.classList.remove('hidden');
+          else btnComplete.classList.add('hidden');
+      }
+
+      if (!checklists || typeof checklists !== 'object') {
+          const scriptEl = document.getElementById('checklists-' + id);
+          if (scriptEl) {
+              try {
+                  checklists = JSON.parse(scriptEl.textContent);
+              } catch(e) {
+                  console.error("Error parsing checklists", e);
+                  checklists = [];
+              }
+          } else {
+              checklists = [];
+          }
+      }
+
       renderChecklists(id, checklists);
   }
 
@@ -770,8 +878,8 @@
           return;
       }
       
-      const canEditChecklist = currentWo && currentWo.assignee_id === currentUserId && currentWo.status !== 'COMPLETED' && currentWo.status !== 'CANCELED' && currentWo.status !== 'CANCELLED';
-      const canUpdateWO = true; // simple fallback
+      const canEditChecklist = canExecute && currentWo && currentWo.assignee_id === currentUserId && currentWo.status !== 'COMPLETED' && currentWo.status !== 'CANCELED' && currentWo.status !== 'CANCELLED';
+      const canUpdateWO = {% if 'work_order:update' in user_permissions %}true{% else %}false{% endif %};
       
       checklists.forEach(item => {
           const isChecked = item.is_completed ? 'checked' : '';
