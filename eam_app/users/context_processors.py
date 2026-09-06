@@ -10,6 +10,7 @@ def user_permissions(request):
             'user_roles': [],
             'user_role_names': 'Guest',
             'is_system_admin': False,
+            'current_tenant': None,
         }
     
     if not hasattr(request, '_user_permissions_cache'):
@@ -34,10 +35,13 @@ def user_permissions(request):
         
     role_names = getattr(request, '_user_roles_cache', [])
     display_roles = ', '.join(role_names) if role_names else ('Super Admin' if request.user.is_superuser else 'Không có vai trò')
+    current_tenant = getattr(request.user, 'tenant', None)
     
     return {
         'user_permissions': request._user_permissions_cache,
         'user_roles': getattr(request, '_user_roles_cache', []),
         'user_role_names': display_roles,
         'is_system_admin': getattr(request, '_is_system_admin_cache', False),
+        'current_tenant': current_tenant,
     }
+

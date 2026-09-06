@@ -821,6 +821,8 @@ def portal_asset_registry(request):
         try:
             data = json.loads(request.body)
             category_id = data.get('category_id')
+            location_id = data.get('location_id')
+            template_id = data.get('hierarchy_template_id')
             a = Asset.objects.create(
                 tenant_id=tenant_id,
                 name=data.get('name'),
@@ -828,7 +830,14 @@ def portal_asset_registry(request):
                 serial_number=data.get('serial_number'),
                 qr_code=data.get('qr_code') or ("AST-" + str(uuid.uuid4())[:8].upper()),
                 status=data.get('status', 'OPERATIONAL'),
-                category_id=category_id if category_id else None
+                category_id=category_id if category_id else None,
+                location_id=location_id if location_id else None,
+                hierarchy_template_id=template_id if template_id else None,
+                parent_id=data.get('parent_id') or None,
+                manufacturer=data.get('manufacturer') or None,
+                purchase_date=data.get('purchase_date') or None,
+                value=data.get('value') or None,
+                is_active=data.get('is_active', True)
             )
             return JsonResponse({'success': True, 'id': str(a.id)})
         except Exception as e:
@@ -839,7 +848,7 @@ def portal_asset_registry(request):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
-            a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id, is_active=True)
+            a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id)
             
             if 'name' in data: a.name = data.get('name')
             if 'model' in data: a.model = data.get('model')
@@ -854,6 +863,21 @@ def portal_asset_registry(request):
             if 'location_id' in data:
                 location_id = data.get('location_id')
                 a.location_id = location_id if location_id else None
+
+            if 'hierarchy_template_id' in data:
+                template_id = data.get('hierarchy_template_id')
+                a.hierarchy_template_id = template_id if template_id else None
+                
+            if 'parent_id' in data:
+                a.parent_id = data.get('parent_id') or None
+            if 'manufacturer' in data:
+                a.manufacturer = data.get('manufacturer') or None
+            if 'purchase_date' in data:
+                a.purchase_date = data.get('purchase_date') or None
+            if 'value' in data:
+                a.value = data.get('value') or None
+            if 'is_active' in data:
+                a.is_active = data.get('is_active', True)
                 
             a.save()
             return JsonResponse({'success': True})
@@ -1325,13 +1349,37 @@ def portal_pm_plans(request):
     upcoming_pms_count = 0
     from maintenance.models import PmPlanAssignment
     from datetime import timedelta
-    next_week = timezone.now() + timedelta(days=7)
-    upcoming_pms_count = PmPlanAssignment.objects.filter(
+    from dateutil.relativedelta import relativedelta
+    now = timezone.now()
+    next_week = now + timedelta(days=7)
+    
+    active_assignments = PmPlanAssignment.objects.filter(
         tenant_id=tenant_id,
         status='ACTIVE',
-        next_due_date__lte=next_week,
-        next_due_date__gte=timezone.now()
-    ).count()
+        pm_plan__trigger_type='TIME'
+    ).select_related('pm_plan')
+    
+    for assignment in active_assignments:
+        plan = assignment.pm_plan
+        interval = plan.interval_value
+        unit = plan.interval_unit
+        if not interval or interval <= 0 or not unit:
+            continue
+            
+        ref_date = assignment.last_triggered_at or assignment.created_at
+        due_date = ref_date
+        if unit == 'DAYS':
+            due_date += relativedelta(days=int(interval))
+        elif unit == 'WEEKS':
+            due_date += relativedelta(weeks=int(interval))
+        elif unit == 'MONTHS':
+            due_date += relativedelta(months=int(interval))
+        elif unit == 'YEARS':
+            due_date += relativedelta(years=int(interval))
+            
+        if now <= due_date <= next_week:
+            upcoming_pms_count += 1
+
 
     kpis = {
         'totalPlans': total_plans,

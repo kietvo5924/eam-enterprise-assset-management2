@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" width="200" height="160">
+  <defs>
+    <linearGradient id="vf-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1455FE"/>
+      <stop offset="100%" stop-color="#00A0E2"/>
+    </linearGradient>
+  </defs>
+  <!-- VinFast Wing V Icon -->
+  <path d="M20,25 L85,125 L100,105 L55,35 Z" fill="url(#vf-grad)"/>
+  <path d="M180,25 L115,125 L100,105 L145,35 Z" fill="url(#vf-grad)"/>
+  <path d="M45,20 L100,100 L155,20 L130,20 L100,68 L70,20 Z" fill="#00A0E2"/>
+</svg>
