@@ -36,9 +36,16 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             
             return {
                 'token': str(access_token),
+                'refreshToken': str(refresh),
                 'tenantId': str(tenant.id),
                 'roles': roles_str,
-                'permissions': perms_str
+                'permissions': perms_str,
+                'user': {
+                    'id': str(user.id),
+                    'username': user.username,
+                    'email': user.email,
+                    'roles': roles_str,
+                }
             }
         
         return {'error': 'Account does not exist' if not user else 'Incorrect password'}
@@ -79,3 +86,29 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             "message": "Success",
             "data": data
         }, status=status.HTTP_200_OK)
+
+from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+class CustomTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        # Support both 'refreshToken' (Flutter) and 'refresh' (SimpleJWT)
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if 'refreshToken' in data and 'refresh' not in data:
+            data['refresh'] = data['refreshToken']
+        
+        serializer = self.get_serializer(data=data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as e:
+            raise InvalidToken(e.args[0])
+            
+        res_data = serializer.validated_data
+        if 'access' in res_data:
+            res_data['token'] = res_data['access']
+        if 'refresh' in res_data and 'refreshToken' not in res_data:
+            res_data['refreshToken'] = res_data['refresh']
+        elif 'refreshToken' not in res_data:
+            res_data['refreshToken'] = data.get('refresh') or data.get('refreshToken')
+            
+        return Response(res_data, status=status.HTTP_200_OK)

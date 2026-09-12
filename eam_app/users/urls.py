@@ -1,8 +1,5 @@
-# pyrefly: ignore [missing-import]
-from django.urls import path
-from users.authentication import CustomTokenObtainPairView
-# pyrefly: ignore [missing-import]
-from rest_framework_simplejwt.views import TokenRefreshView
+from django.urls import path, re_path
+from users.authentication import CustomTokenObtainPairView, CustomTokenRefreshView
 from users.views import (
     RoleListView, RoleDetailView, PermissionListView,
     UserListView, UserDetailView, UserDisableView, UserEnableView,
@@ -11,11 +8,11 @@ from users.views import (
 )
 
 urlpatterns = [
-    path('auth/login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('auth/change-password/', ChangePasswordView.as_view(), name='auth_change_password'),
-    path('auth/forgot-password/', ForgotPasswordView.as_view(), name='auth_forgot_password'),
-    path('auth/reset-password/', ResetPasswordView.as_view(), name='auth_reset_password'),
+    re_path(r'^auth/login/?$', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    re_path(r'^auth/refresh/?$', CustomTokenRefreshView.as_view(), name='token_refresh'),
+    re_path(r'^auth/change-password/?$', ChangePasswordView.as_view(), name='auth_change_password'),
+    re_path(r'^auth/forgot-password/?$', ForgotPasswordView.as_view(), name='auth_forgot_password'),
+    re_path(r'^auth/reset-password/?$', ResetPasswordView.as_view(), name='auth_reset_password'),
     
     path('roles', RoleListView.as_view(), name='role_list'),
     path('roles/<uuid:role_id>', RoleDetailView.as_view(), name='role_detail'),

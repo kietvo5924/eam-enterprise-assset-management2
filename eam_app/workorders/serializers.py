@@ -6,6 +6,7 @@ from users.serializers import UserSerializer
 class WorkOrderChecklistItemSerializer(serializers.ModelSerializer):
     itemName = serializers.CharField(source='item_name')
     isCompleted = serializers.BooleanField(source='is_completed')
+    completed = serializers.BooleanField(source='is_completed')
     inputType = serializers.CharField(source='input_type')
     expectedValue = serializers.CharField(source='expected_value', required=False, allow_null=True)
     actualValue = serializers.CharField(source='actual_value', required=False, allow_null=True)
@@ -13,7 +14,7 @@ class WorkOrderChecklistItemSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = WorkOrderChecklistItem
-        fields = ['id', 'itemName', 'isCompleted', 'inputType', 'expectedValue', 'actualValue', 'isMandatory']
+        fields = ['id', 'itemName', 'isCompleted', 'completed', 'inputType', 'expectedValue', 'actualValue', 'isMandatory']
 
 class WorkOrderAttachmentSerializer(serializers.ModelSerializer):
     fileUrl = serializers.CharField(source='file_url')
@@ -46,6 +47,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     completedAt = serializers.DateTimeField(source='completed_at', read_only=True)
     resolutionNotes = serializers.CharField(source='resolution_notes', read_only=True)
     assigneeName = serializers.CharField(source='assigned_to.username', read_only=True, default=None)
+    assignee = UserSerializer(source='assigned_to', read_only=True)
     
     asset = AssetSerializer(read_only=True)
     checklists = WorkOrderChecklistItemSerializer(many=True, read_only=True)
@@ -57,6 +59,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'assetId', 'parentId', 'title', 'description', 
             'priority', 'status', 'deadline', 'assignedTo', 'assigneeName',
+            'assignee',
             'estimatedDurationMinutes', 'actualDurationMinutes',
             'sourceReference', 'actualStartTime', 'assignedAt',
             'completedAt', 'resolutionNotes', 'created_at', 'updated_at',
@@ -89,9 +92,31 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     actualDurationMinutes = serializers.IntegerField(required=False, allow_null=True)
     
 class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
-    itemName = serializers.CharField(max_length=255)
-    isCompleted = serializers.BooleanField()
+    itemName = serializers.CharField(max_length=255, required=False)
+    item_name = serializers.CharField(max_length=255, required=False)
+    isCompleted = serializers.BooleanField(required=False)
+    completed = serializers.BooleanField(required=False)
     actualValue = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
+    def validate(self, attrs):
+        name = attrs.get('itemName') or attrs.get('item_name')
+        if not name:
+            raise serializers.ValidationError("itemName or item_name is required")
+        attrs['itemName'] = name
+
+        comp = attrs.get('isCompleted')
+        if comp is None:
+            comp = attrs.get('completed')
+        if comp is None:
+            comp = False
+        attrs['isCompleted'] = comp
+        return attrs
+
 class WorkOrderNoteUpdateRequestSerializer(serializers.Serializer):
-    resolutionNotes = serializers.CharField(required=True)
+    resolutionNotes = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get('resolutionNotes') and not attrs.get('notes'):
+            raise serializers.ValidationError("resolutionNotes or notes is required")
+        return attrs

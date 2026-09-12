@@ -13,14 +13,14 @@ def user_permissions(request):
             'current_tenant': None,
         }
     
-    if not hasattr(request, '_user_permissions_cache'):
-        perms = set()
+    if not hasattr(request, '_user_roles_cache') or not hasattr(request, '_is_system_admin_cache') or not hasattr(request, '_user_permissions_cache'):
         roles = list(request.user.roles.prefetch_related('permissions').all())
+        perms = set()
         for role in roles:
             for p in role.permissions.all():
                 perms.add(p.id)
         
-        is_sys_admin = request.user.is_superuser or ('system:admin' in perms)
+        is_sys_admin = request.user.is_superuser or ('system:admin' in perms) or any(r.name == 'SUPER_ADMIN' for r in roles)
         if is_sys_admin:
             try:
                 all_perms = set(Permission.objects.values_list('id', flat=True))
@@ -38,8 +38,8 @@ def user_permissions(request):
     current_tenant = getattr(request.user, 'tenant', None)
     
     return {
-        'user_permissions': request._user_permissions_cache,
-        'user_roles': getattr(request, '_user_roles_cache', []),
+        'user_permissions': getattr(request, '_user_permissions_cache', set()),
+        'user_roles': role_names,
         'user_role_names': display_roles,
         'is_system_admin': getattr(request, '_is_system_admin_cache', False),
         'current_tenant': current_tenant,

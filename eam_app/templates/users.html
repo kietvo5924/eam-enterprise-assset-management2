@@ -129,6 +129,9 @@
           <tr>
             <th class="px-4 py-3 font-bold cursor-pointer select-none" onclick="setSort('username')">Username <i id="sort-icon-username" class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon"></i></th>
             <th class="px-4 py-3 font-bold cursor-pointer select-none" onclick="setSort('email')">Email <i id="sort-icon-email" class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon"></i></th>
+            {% if is_system_admin or user.tenant.tenant_code == 'SYSTEM' %}
+            <th class="px-4 py-3 font-bold cursor-pointer select-none" onclick="setSort('tenant')">Tenant <i id="sort-icon-tenant" class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon"></i></th>
+            {% endif %}
             <th class="px-4 py-3 font-bold relative group">
                 <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'user-status-filter')">
                     Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
@@ -148,6 +151,13 @@
           <tr class="hover:bg-neutral-50/50 transition-colors user-row" data-status="{{ u.status }}" data-roles="{% for role in u.roles.all %}{{ role.id }},{% endfor %}">
             <td class="px-4 py-3 font-semibold text-gray-800 user-username">{{ u.username }}</td>
             <td class="px-4 py-3 text-neutral-600 user-email">{{ u.email|default:"" }}</td>
+            {% if is_system_admin or user.tenant.tenant_code == 'SYSTEM' %}
+            <td class="px-4 py-3 text-neutral-700 font-medium user-tenant">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 border border-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold">
+                <i class="ph ph-buildings text-primary"></i> {{ u.tenant.name|default:"EAM System" }}
+              </span>
+            </td>
+            {% endif %}
             <td class="px-4 py-3">
               {% if u.status == 'ACTIVE' %}
                 <span class="px-3 py-1 bg-green-50 border border-green-200 text-green-700 rounded-full text-xs font-semibold">ACTIVE</span>
@@ -458,9 +468,11 @@
         let filtered = allRows.filter(row => {
             const username = row.querySelector('.user-username').innerText.toLowerCase();
             const email = row.querySelector('.user-email').innerText.toLowerCase();
+            const tenantEl = row.querySelector('.user-tenant');
+            const tenant = tenantEl ? tenantEl.innerText.toLowerCase() : '';
             const rowStatus = row.dataset.status || '';
             
-            const matchSearch = username.includes(query) || email.includes(query);
+            const matchSearch = username.includes(query) || email.includes(query) || tenant.includes(query);
             const matchStatus = activeStatuses.includes(rowStatus);
             
             return matchSearch && matchStatus;

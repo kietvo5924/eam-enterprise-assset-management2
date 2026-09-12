@@ -38,9 +38,10 @@ class TenantMiddleware:
                     except Exception:
                         pass
 
-            if not tenant_id and hasattr(request, 'user') and request.user.is_authenticated:
-                if hasattr(request.user, 'tenant_id'):
-                    tenant_id = request.user.tenant_id
+            if not tenant_id:
+                forced_user = getattr(request, '_force_auth_user', None) or (request.user if hasattr(request, 'user') and request.user.is_authenticated else None)
+                if forced_user and hasattr(forced_user, 'tenant_id'):
+                    tenant_id = forced_user.tenant_id
 
             if not tenant_id:
                 if path.startswith('/api/'):

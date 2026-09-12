@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from assets.views import (
     LocationListView, LocationDetailView,
     AssetCategoryListView, AssetCategoryDetailView,
@@ -10,25 +10,25 @@ from assets.views import (
 )
 
 urlpatterns = [
-    path('locations', LocationListView.as_view(), name='location_list'),
-    path('locations/<uuid:location_id>', LocationDetailView.as_view(), name='location_detail'),
+    re_path(r'^locations/?$', LocationListView.as_view(), name='location_list'),
+    re_path(r'^locations/(?P<location_id>[0-9a-fA-F-]+)/?$', LocationDetailView.as_view(), name='location_detail'),
     
-    path('asset-categories', AssetCategoryListView.as_view(), name='asset_category_list'),
-    path('asset-categories/<uuid:category_id>', AssetCategoryDetailView.as_view(), name='asset_category_detail'),
+    re_path(r'^asset-categories/?$', AssetCategoryListView.as_view(), name='asset_category_list'),
+    re_path(r'^asset-categories/(?P<category_id>[0-9a-fA-F-]+)/?$', AssetCategoryDetailView.as_view(), name='asset_category_detail'),
     
-    path('hierarchy-templates', HierarchyTemplateListView.as_view(), name='hierarchy_template_list'),
-    path('hierarchy-templates/<uuid:template_id>', HierarchyTemplateDetailView.as_view(), name='hierarchy_template_detail'),
+    re_path(r'^hierarchy-templates/?$', HierarchyTemplateListView.as_view(), name='hierarchy_template_list'),
+    re_path(r'^hierarchy-templates/(?P<template_id>[0-9a-fA-F-]+)/?$', HierarchyTemplateDetailView.as_view(), name='hierarchy_template_detail'),
     
-    path('spare-parts', SparePartListView.as_view(), name='spare_part_list'),
-    path('spare-parts/<uuid:part_id>', SparePartDetailView.as_view(), name='spare_part_detail'),
+    re_path(r'^spare-parts/?$', SparePartListView.as_view(), name='spare_part_list'),
+    re_path(r'^spare-parts/(?P<part_id>[0-9a-fA-F-]+)/?$', SparePartDetailView.as_view(), name='spare_part_detail'),
     
-    path('assets', AssetListView.as_view(), name='asset_list'),
-    path('assets/tree', AssetTreeView.as_view(), name='asset_tree'),
-    path('assets/qr/<str:qr_code>', AssetQRCodeView.as_view(), name='asset_qr'),
-    path('assets/import', AssetImportView.as_view(), name='asset_import'),
-    path('assets/import-template', AssetImportTemplateView.as_view(), name='asset_import_template'),
-    path('assets/export', AssetExportView.as_view(), name='asset_export'),
-    path('assets/<uuid:asset_id>', AssetDetailView.as_view(), name='asset_detail'),
+    re_path(r'^assets/?$', AssetListView.as_view(), name='asset_list'),
+    re_path(r'^assets/tree/?$', AssetTreeView.as_view(), name='asset_tree'),
+    re_path(r'^assets/qr/(?P<qr_code>[^/]+)/?$', AssetQRCodeView.as_view(), name='asset_qr'),
+    re_path(r'^assets/import/?$', AssetImportView.as_view(), name='asset_import'),
+    re_path(r'^assets/import-template/?$', AssetImportTemplateView.as_view(), name='asset_import_template'),
+    re_path(r'^assets/export/?$', AssetExportView.as_view(), name='asset_export'),
+    re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/?$', AssetDetailView.as_view(), name='asset_detail'),
     
-    path('assets/<uuid:asset_id>/meter-readings', MeterReadingListView.as_view(), name='meter_reading_list'),
+    re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/meter-readings/?$', MeterReadingListView.as_view(), name='meter_reading_list'),
 ]

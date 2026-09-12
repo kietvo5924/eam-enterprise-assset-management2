@@ -209,25 +209,25 @@
     - `[x]` Task 8.14.1 — Update Pytest E2E scripts to cover Settings
     - `[x]` Task 8.14.2 — Update Pytest E2E scripts to cover Reports
     - `[x]` Task 8.14.3 — Run full E2E suite against Django implementation
-- `[ ]` **Phase 9 — EAM Mobile App Parity & Integration (Backend API Focus)**
-  - `[ ]` **9.1 — Mobile API Routing & Structure Parity**
+- `[x]` **Phase 9 — EAM Mobile App Parity & Integration (Backend API Focus)**
+  - `[x]` **9.1 — Mobile API Routing & Structure Parity**
     - `[x]` Task 9.1.1 — Audit Flutter app API calls to map all required legacy endpoints.
-    - `[ ]` Task 9.1.2 — Update Django `urls.py` if necessary to match exact legacy routes expected by mobile.
-  - `[ ]` **9.2 — Mobile Authentication & Token JSON Parity**
-    - `[ ]` Task 9.2.1 — Ensure Django JWT login response matches the exact JSON keys expected by Flutter (e.g., `accessToken` vs `access`, user profile shape).
-    - `[ ]` Task 9.2.2 — Ensure Token Refresh endpoint and request/response structure match.
-    - `[ ]` Task 9.2.3 — Verify Change Password API response parity.
-  - `[ ]` **9.3 — Work Order & Checklists Sync API Parity**
-    - `[ ]` Task 9.3.1 — Audit and fix Work Order list JSON payload to match mobile data models.
-    - `[ ]` Task 9.3.2 — Audit and fix Checklist fetch and submit JSON schemas.
-    - `[ ]` Task 9.3.3 — Fix Work Order status transition API payload expectations.
-  - `[ ]` **9.4 — Offline Sync Engine API Support**
-    - `[ ]` Task 9.4.1 — Analyze how Flutter handles offline sync (bulk uploads, note attachments).
-    - `[ ]` Task 9.4.2 — Ensure Django endpoints can consume bulk/batch sync requests if the Flutter app uses them.
-    - `[ ]` Task 9.4.3 — Fix MinIO attachment upload API response format for the mobile app.
-  - `[ ]` **9.5 — E2E Verification via Mobile Emulator**
-    - `[ ]` Task 9.5.1 — Change Flutter base URL to point to Django local server (only required change in Flutter).
-    - `[ ]` Task 9.5.2 — Run the Flutter app on an emulator and verify all workflows function without Flutter code changes.
+    - `[x]` Task 9.1.2 — Update Django `urls.py` if necessary to match exact legacy routes expected by mobile.
+  - `[x]` **9.2 — Mobile Authentication & Token JSON Parity**
+    - `[x]` Task 9.2.1 — Ensure Django JWT login response matches the exact JSON keys expected by Flutter (e.g., `accessToken` vs `access`, user profile shape).
+    - `[x]` Task 9.2.2 — Ensure Token Refresh endpoint and request/response structure match.
+    - `[x]` Task 9.2.3 — Verify Change Password API response parity.
+  - `[x]` **9.3 — Work Order & Checklists Sync API Parity**
+    - `[x]` Task 9.3.1 — Audit and fix Work Order list JSON payload to match mobile data models.
+    - `[x]` Task 9.3.2 — Audit and fix Checklist fetch and submit JSON schemas.
+    - `[x]` Task 9.3.3 — Fix Work Order status transition API payload expectations.
+  - `[x]` **9.4 — Offline Sync Engine API Support**
+    - `[x]` Task 9.4.1 — Analyze how Flutter handles offline sync (bulk uploads, note attachments).
+    - `[x]` Task 9.4.2 — Ensure Django endpoints can consume bulk/batch sync requests if the Flutter app uses them.
+    - `[x]` Task 9.4.3 — Fix MinIO attachment upload API response format for the mobile app.
+  - `[x]` **9.5 — E2E Verification via Mobile Emulator**
+    - `[x]` Task 9.5.1 — Change Flutter base URL to point to Django local server (only required change in Flutter).
+    - `[x]` Task 9.5.2 — Run the Flutter app on an emulator and verify all workflows function without Flutter code changes.
 - `[ ]` **Phase 10 — Enterprise Dashboard, Reports Engine & Real-time Notifications**
   - `[ ]` **10.1 — Real-time Notification System (Celery & Polling)**
     - `[ ]` Task 10.1.1 — Create `Notification` model (`recipient`, `tenant`, `title`, `message`, `link`, `is_read`, `created_at`).

@@ -34,10 +34,18 @@ class WorkOrderListView(APIView):
         start = page * size
         end = start + size
         
+        total_elements = wos.count()
+        total_pages = (total_elements + size - 1) // size if size > 0 else 1
+        is_last = (page + 1) >= total_pages or total_elements == 0
+
         serializer = WorkOrderSerializer(wos[start:end], many=True)
         return success_response({
             "content": serializer.data,
-            "totalElements": wos.count()
+            "totalElements": total_elements,
+            "totalPages": total_pages,
+            "page": page,
+            "size": size,
+            "last": is_last
         })
         
     @transaction.atomic
@@ -286,14 +294,14 @@ class WorkOrderStatusView(APIView):
         if new_status == 'IN_PROGRESS':
             if wo.status != 'ASSIGNED':
                 raise ValidationError('Work Order can only be started from ASSIGNED state')
-            if wo.assigned_to_id != request.user.id:
+            if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can start the Work Order')
             wo.actual_start_time = timezone.now()
             
         if new_status == 'COMPLETED':
             if wo.status != 'IN_PROGRESS':
                 raise ValidationError('Work Order can only be completed from IN_PROGRESS state')
-            if wo.assigned_to_id != request.user.id:
+            if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can complete the Work Order')
                 
             resolution_notes = data.get('resolutionNotes')
@@ -388,13 +396,25 @@ class WorkOrderChecklistDeleteView(APIView):
             self.permission_denied(request)
             
         from workorders.models import WorkOrderChecklistItem
+        import uuid
+        is_uuid = False
         try:
-            item = WorkOrderChecklistItem.objects.get(id=checklist_id, work_order=wo)
+            uuid.UUID(str(checklist_id))
+            is_uuid = True
+        except ValueError:
+            is_uuid = False
+
+        item = None
+        if is_uuid:
+            item = WorkOrderChecklistItem.objects.filter(id=checklist_id, work_order=wo).first()
+        if not item:
+            item = WorkOrderChecklistItem.objects.filter(item_name=str(checklist_id), work_order=wo).first()
+
+        if item:
             item.delete()
-        except WorkOrderChecklistItem.DoesNotExist:
-            raise ValidationError("Checklist item not found")
+            return success_response(None)
             
-        return success_response(None)
+        raise ValidationError("Checklist item not found")
 
 class WorkOrderNoteUpdateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -419,7 +439,7 @@ class WorkOrderNoteUpdateView(APIView):
         if not serializer.is_valid():
             raise ValidationError(serializer.errors)
             
-        wo.resolution_notes = serializer.validated_data['resolutionNotes']
+        wo.resolution_notes = serializer.validated_data.get('resolutionNotes') or serializer.validated_data.get('notes', '')
         wo.save()
         return success_response(WorkOrderSerializer(wo).data)
 
@@ -452,9 +472,58 @@ class WorkOrderAttachmentView(APIView):
         if not content_type or not content_type.startswith('image/'):
             raise ValidationError("Only image files are allowed")
             
-        from django.core.files.storage import default_storage
-        file_path = default_storage.save(f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{file_obj.name}", file_obj)
-        file_url = default_storage.url(file_path)
+        import os
+        import uuid
+        from django.conf import settings
+        from minio import Minio
+
+        file_url = None
+        bucket_name = getattr(settings, 'MINIO_BUCKET_NAME', 'tenant-assets')
+        extension = os.path.splitext(file_obj.name)[1]
+        object_name = f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{uuid.uuid4()}{extension}"
+
+        # Upload directly to MinIO
+        try:
+            client = Minio(
+                settings.MINIO_ENDPOINT,
+                access_key=settings.MINIO_ACCESS_KEY,
+                secret_key=settings.MINIO_SECRET_KEY,
+                secure=getattr(settings, 'MINIO_SECURE', False)
+            )
+            if not client.bucket_exists(bucket_name):
+                client.make_bucket(bucket_name)
+                import json
+                policy = {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"AWS": "*"},
+                            "Action": ["s3:GetObject"],
+                            "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
+                        }
+                    ]
+                }
+                client.set_bucket_policy(bucket_name, json.dumps(policy))
+
+            file_obj.seek(0)
+            client.put_object(
+                bucket_name,
+                object_name,
+                file_obj,
+                length=file_obj.size,
+                content_type=content_type
+            )
+            file_url = f"/{bucket_name}/{object_name}"
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"MinIO upload failed, falling back to default_storage: {e}")
+            from django.core.files.storage import default_storage
+            file_obj.seek(0)
+            file_path = default_storage.save(f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{file_obj.name}", file_obj)
+            file_url = default_storage.url(file_path)
+            if not file_url.startswith('/') and not file_url.startswith('http'):
+                file_url = f"/{file_url}"
         
         from workorders.models import WorkOrderAttachment
         from workorders.serializers import WorkOrderAttachmentSerializer

@@ -392,11 +392,11 @@ class ChangePasswordView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        old_password = request.data.get('oldPassword')
+        old_password = request.data.get('oldPassword') or request.data.get('currentPassword')
         new_password = request.data.get('newPassword')
 
         if not old_password or not new_password:
-            raise ValidationError("oldPassword and newPassword are required")
+            raise ValidationError("oldPassword (or currentPassword) and newPassword are required")
 
         user = request.user
         if not user.check_password(old_password):

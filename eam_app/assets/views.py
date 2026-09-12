@@ -477,6 +477,9 @@ class AssetListView(APIView):
             page, size = 0, 20
 
         total_elements = assets.count()
+        total_pages = (total_elements + size - 1) // size if size > 0 else 1
+        is_last = (page + 1) >= total_pages or total_elements == 0
+
         start = page * size
         end = start + size
         assets_page = assets[start:end]
@@ -485,8 +488,10 @@ class AssetListView(APIView):
         return success_response({
             "content": serializer.data,
             "totalElements": total_elements,
+            "totalPages": total_pages,
             "page": page,
-            "size": size
+            "size": size,
+            "last": is_last
         })
 
     @transaction.atomic
@@ -637,7 +642,7 @@ class MeterReadingListView(APIView):
 
     @transaction.atomic
     def post(self, request, asset_id):
-        if not HasPermission('asset:update')().has_permission(request, self):
+        if not (HasPermission('asset:update')().has_permission(request, self) or HasPermission('work_order:execute')().has_permission(request, self)):
             self.permission_denied(request)
             
         try:

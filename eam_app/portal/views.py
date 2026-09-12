@@ -445,9 +445,9 @@ def portal_users(request):
 
 
     if str(tenant_id) == '00000000-0000-0000-0000-000000000000' or request.user.is_superuser:
-        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').order_by('-created_at')
+        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').select_related('tenant').order_by('-created_at')
     else:
-        users = User.objects.filter(tenant_id=tenant_id).order_by('-created_at')
+        users = User.objects.filter(tenant_id=tenant_id).select_related('tenant').order_by('-created_at')
     
     # Calculate metrics
     total_users = users.count()
