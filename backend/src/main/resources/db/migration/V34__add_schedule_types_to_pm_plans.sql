@@ -1,2 +1,0 @@
-ALTER TABLE pm_plans ADD COLUMN is_floating_schedule BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE pm_plans ADD COLUMN suppress_if_pending BOOLEAN NOT NULL DEFAULT TRUE;

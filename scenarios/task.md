@@ -129,7 +129,7 @@
     - `[x]` Write `test_03_assets.py` and `test_04_inventory.py`.
     - `[x]` Write `test_05_work_orders.py` and `test_06_pm_plans.py`.
     - `[x]` Run and verify all tests in headed Chrome.
-  - `[ ]` Task 7.2 — Deprecation & Handover Strategy
+  - `[x]` Task 7.2 — Deprecation & Handover Strategy (Decommissioned and deleted legacy Spring Boot Java backend & React web-portal)
 - `[x]` Phase 8 — Comprehensive Legacy Parity Restoration (Detailed Audit)
   - `[ ]` **8.1 — General System & Configuration Parity**
     - `[x]` Task 8.1.1 — Audit `.env` and configuration variables against Legacy
@@ -255,20 +255,66 @@
     - `[ ]` Task 11.1.3 — Implement auto-assignment API endpoint: `POST /api/v1/work-orders/auto-assign/`.
     - `[ ]` Task 11.1.4 — Build Web Portal UI integration: "Tự động phân công tối ưu (Hungary)" button on Work Orders list with preview modal showing cost matrix breakdown.
     - `[ ]` Task 11.1.5 — Write unit tests for balanced, unbalanced, and edge-case assignment matrices.
-  - `[ ]` **11.2 — Technician Routing Optimization (Traveling Salesperson Problem - TSP)**
-    - `[ ]` Task 11.2.1 — Construct location distance matrix between assigned work orders for a technician.
-    - `[ ]` Task 11.2.2 — Implement TSP solver: Nearest Neighbor + 2-Opt heuristic and exact dynamic programming.
-    - `[ ]` Task 11.2.3 — Build API endpoint: `GET /api/v1/technicians/{id}/daily-route/` returning optimal travel sequence.
-    - `[ ]` Task 11.2.4 — Integrate route recommendation and estimated travel savings into technician view.
-  - `[ ]` **11.3 — Deep Learning Predictive Maintenance (LSTM for Remaining Useful Life - RUL)**
-    - `[ ]` Task 11.3.1 — Dataset preparation: Integrate benchmark NASA C-MAPSS turbofan degradation dataset and asset `MeterReading` sensor histories (vibration, temperature, pressure).
-    - `[ ]` Task 11.3.2 — Data preprocessing pipeline: MinMax normalization and sliding time-window sequence generation (sequence length = 30).
-    - `[ ]` Task 11.3.3 — Model Architecture: Multi-layer LSTM network with Dropout layers and Dense regression head for RUL prediction.
-    - `[ ]` Task 11.3.4 — Model Training & Evaluation script: Compute validation loss, RMSE, MAE, and export degradation curves.
-    - `[ ]` Task 11.3.5 — Model Persistence & Inference Service: Export trained weights (`lstm_rul_model.pt`), build inference service.
-    - `[ ]` Task 11.3.6 — API Endpoint: `GET /api/v1/assets/{id}/predict-rul/` returning predicted RUL days and failure risk category (LOW, MEDIUM, HIGH, CRITICAL).
-    - `[ ]` Task 11.3.7 — UI Integration: Asset Registry "Bảo Trì Dự Đoán (AI)" card with health gauge and early-warning alert badges.
+  - `[ ]` **11.2 — Genetic Algorithm (GA) Multi-Objective Task Assignment Optimization** *(Đề Cương Mục 3.1.3 & 108)*
+    - `[ ]` Task 11.2.1 — Formalize GA chromosome encoding (integer-based representation mapping work orders to qualified technicians).
+    - `[ ]` Task 11.2.2 — Design multi-objective fitness function combining: (1) Skill match score, (2) Workload balance / makespan penalty, (3) Operational travel cost.
+    - `[ ]` Task 11.2.3 — Implement GA genetic operators: Tournament/Roulette-wheel selection, Order/Selected Crossover (OX), and Permutation/Swap mutation.
+    - `[ ]` Task 11.2.4 — Build GA auto-assignment API endpoint: `POST /api/v1/work-orders/ga-auto-assign/` with convergence stats (iterations, best fitness).
+    - `[ ]` Task 11.2.5 — Web Portal UI Integration: "Phân công đa mục tiêu (Genetic Algorithm)" drawer showing iteration progress, fitness score chart, and schedule comparison vs Hungarian solver.
+    - `[ ]` Task 11.2.6 — Unit tests & performance benchmark comparing GA vs Hungarian algorithm execution time and solution optimality.
+  - `[ ]` **11.3 — Technician Routing Optimization (Traveling Salesperson Problem - TSP)**
+    - `[ ]` Task 11.3.1 — Construct location distance matrix between assigned work orders for a technician.
+    - `[ ]` Task 11.3.2 — Implement TSP solver: Nearest Neighbor initial heuristic + 2-Opt local search improvement.
+    - `[ ]` Task 11.3.3 — Build API endpoint: `GET /api/v1/technicians/{id}/daily-route/` returning optimal travel sequence and total estimated distance.
+    - `[ ]` Task 11.3.4 — Web & Mobile UI Integration: Route visualizer showing ordered station sequence and percentage of travel distance saved vs unoptimized route.
+  - `[ ]` **11.4 — Real-time Sensor Anomaly Detection (Sliding Z-score & Isolation Forest)** *(Đề Cương Mục 3.1.3 & 103)*
+    - `[ ]` Task 11.4.1 — Data pipeline: Stream ingestion for sensor telemetry (vibration, operating temperature, oil pressure) from asset `MeterReading`.
+    - `[ ]` Task 11.4.2 — Implement Sliding-Window Dynamic Z-score statistical test (window size $W$, dynamic mean $\mu$, std $\sigma$, threshold $k=3.0$).
+    - `[ ]` Task 11.4.3 — Implement Multivariate Isolation Forest model (`sklearn.ensemble.IsolationForest`) to detect complex multi-sensor anomaly interactions.
+    - `[ ]` Task 11.4.4 — Build Anomaly Detection Service & API: `POST /api/v1/meter-readings/anomaly-check/` and automated Celery background streaming job.
+    - `[ ]` Task 11.4.5 — Early Warning Alert trigger: Automatically push high-severity anomaly notifications and trigger draft emergency Work Order when anomaly score exceeds threshold.
+    - `[ ]` Task 11.4.6 — Web Portal UI: Sensor telemetry chart with dynamic upper/lower Z-score threshold bands and red-flagged anomaly points.
+  - `[ ]` **11.5 — Deep Learning Predictive Maintenance (LSTM for Remaining Useful Life - RUL)**
+    - `[ ]` Task 11.5.1 — Dataset preparation: Integrate benchmark NASA C-MAPSS turbofan degradation dataset and asset `MeterReading` sensor histories (vibration, temperature, pressure).
+    - `[ ]` Task 11.5.2 — Data preprocessing pipeline: MinMax normalization and sliding time-window sequence generation (sequence length = 30).
+    - `[ ]` Task 11.5.3 — Model Architecture: Multi-layer LSTM network with Dropout layers and Dense regression head for RUL prediction.
+    - `[ ]` Task 11.5.4 — Model Training & Evaluation script: Compute validation loss, RMSE, MAE, and export degradation curves.
+    - `[ ]` Task 11.5.5 — Model Persistence & Inference Service: Export trained weights (`lstm_rul_model.pt`), build inference service.
+    - `[ ]` Task 11.5.6 — API Endpoint: `GET /api/v1/assets/{id}/predict-rul/` returning predicted RUL days and failure risk category (LOW, MEDIUM, HIGH, CRITICAL).
+    - `[ ]` Task 11.5.7 — UI Integration: Asset Registry "Bảo Trì Dự Đoán (AI)" card with health gauge and early-warning alert badges.
+  - `[ ]` **11.6 — Maintenance Cost & Budget Forecasting (Random Forest Regressor)** *(Đề Cương Mục 3.1.3 & 105)*
+    - `[ ]` Task 11.6.1 — Cost data tracking schema: Record granular spare parts cost (from inventory disbursements) and technician labor cost (hourly rate $\times$ actual hours) per Work Order.
+    - `[ ]` Task 11.6.2 — Historical time-series cost aggregation & feature engineering: Rolling monthly/quarterly expenditures, asset category cost distributions, and MTBF breakdown correlations.
+    - `[ ]` Task 11.6.3 — Model Training: Implement Random Forest Regressor (`sklearn.ensemble.RandomForestRegressor`) with hyperparameter tuning to forecast future maintenance cycles budget.
+    - `[ ]` Task 11.6.4 — Evaluation: Measure model performance using $R^2$ score, RMSE, and feature importance analysis (identifying top cost drivers).
+    - `[ ]` Task 11.6.5 — Budget Overrun Early Warning Engine: Compare forecasted expenditure with allocated tenant budget; trigger risk alert if forecasted cost exceeds quota.
+    - `[ ]` Task 11.6.6 — API Endpoint: `GET /api/v1/costs/forecast-budget/` returning periodic forecast numbers, confidence intervals, and risk warning status.
+    - `[ ]` Task 11.6.7 — Web Portal UI: Dedicated "Dự Báo Ngân Sách (AI)" chart in Reports module with historical vs predicted expenditure lines and budget threshold markers.
+  - `[ ]` **11.7 — Smart Field Biometric Attendance & Geofencing (MobileFaceNet & Haversine)** *(Đề Cương Mục 3.1.3 & 106)*
+    - `[ ]` Task 11.7.1 — Implement Haversine geodetic distance formula on Backend and Flutter Mobile to verify technician location within **50-meter** radius of asset GPS coordinates.
+    - `[ ]` Task 11.7.2 — Integrate MobileFaceNet deep convolutional neural network (TFLite/ONNX) to extract 128-d/512-d facial biometric feature embeddings on mobile camera feed.
+    - `[ ]` Task 11.7.3 — Biometric Matching Engine: Calculate cosine similarity between live captured face embedding and technician's registered biometric profile.
+    - `[ ]` Task 11.7.4 — Field Attendance Verification API: `POST /api/v1/attendance/check-in/` logging technician, timestamp, asset ID, verified GPS coordinates, face similarity score, and MinIO photo snapshot.
+    - `[ ]` Task 11.7.5 — Work Order Execution Compliance Gate: Restrict "Bắt đầu làm việc" (Start Work Order) action on Flutter until both GPS $\le 50m$ and Face Recognition verification pass.
+    - `[ ]` Task 11.7.6 — Flutter Mobile UI: Biometric scanner screen with circular face framing guide, live distance-to-asset radar display, and instant compliance pass/fail indicator.
+  - `[ ]` **11.8 — Complex Maintenance Workflow & Facility Management (Decision Tree & HSM)** *(Đề Cương Mục 3.1.2, 3.1.3 & 104)*
+    - `[ ]` Task 11.8.1 — Facility Component Catalog: Enhance Asset module to support fine-grained facility structures, component sub-assemblies, and operational units.
+    - `[ ]` Task 11.8.2 — Incident Classification Decision Tree: Train/configure a Decision Tree classifier (`DecisionTreeClassifier`) to categorize breakdown severity (Low, Medium, Severe, Critical Overhaul) based on downtime impact, safety hazard, sensor telemetry, and estimated cost.
+    - `[ ]` Task 11.8.3 — Hierarchical State Machine (HSM) Engine:
+      - Implement nested state transitions for complex multi-stage repairs / major overhauls (`OVERHAUL_ROOT` $\rightarrow$ `DIAGNOSIS` $\rightarrow$ `PART_ORDERING` $\rightarrow$ `DISASSEMBLY` $\rightarrow$ `REPAIR_EXECUTION` $\rightarrow$ `REASSEMBLY` $\rightarrow$ `LOAD_TESTING` $\rightarrow$ `QUALITY_AUDIT` $\rightarrow$ `COMPLETED`).
+      - Support parent Work Order with hierarchical sub-work-orders and dependency DAG constraints.
+    - `[ ]` Task 11.8.4 — HSM Workflow APIs: `POST /api/v1/work-orders/{id}/evaluate-severity/` and state transition enforcement endpoints.
+    - `[ ]` Task 11.8.5 — Web Portal UI: Interactive HSM lifecycle stepper component and dynamic management report for complex facility overhaul cases.
+  - `[ ]` **11.9 — Intelligent AI Assistant / Chatbot (RAG & Sentence-Transformers)** *(Đề Cương Mục 3.1.3 & 107)*
+    - `[ ]` Task 11.9.1 — Document Ingestion & Chunking Pipeline: Ingest equipment technical manuals, operating procedures (SOP), fault code dictionaries, and safety protocols into text chunks.
+    - `[ ]` Task 11.9.2 — Vector Embedding & Storage: Generate semantic dense embeddings using `Sentence-Transformers` (e.g. `all-MiniLM-L6-v2` or multilingual variant) and store vectors in PGVector/FAISS index.
+    - `[ ]` Task 11.9.3 — Hybrid RAG Retrieval Engine: Implement semantic similarity search combined with asset context metadata (asset model, category, error code).
+    - `[ ]` Task 11.9.4 — Generation & Troubleshooting Response Engine: Connect retrieved contexts to LLM/RAG generation service to produce step-by-step troubleshooting recommendations and citations.
+    - `[ ]` Task 11.9.5 — Real-time Assistant API: `POST /api/v1/assistant/chat/` with conversation history and streaming token capability.
+    - `[ ]` Task 11.9.6 — User Interface Integration:
+      - Floating AI Chatbot widget on Web Portal (`base.html`) for dispatchers and managers.
+      - Integrated "Trợ lý kỹ thuật" chat screen on Flutter Mobile App for field technicians to query equipment procedures and error codes on the spot.
 - `[ ]` **Phase 12 — Final Graduation Thesis Polish, Demo Seeding & Defense Readiness**
-  - `[ ]` Task 12.1 — Master Demo Seeding Script: Seed 50+ realistic industrial assets with complete hierarchies, meter readings, spare parts, and work order histories.
-  - `[ ]` Task 12.2 — Complete End-to-End Regression Test Suite run across all modules and algorithms.
-  - `[ ]` Task 12.3 — Defense Artifacts Package: Architecture diagrams, ERD, API Postman collection, and one-click Docker startup verification.
+  - `[ ]` Task 12.1 — Master Demo Seeding Script: Seed 50+ realistic industrial assets with complete facility hierarchies, historical meter readings with anomalies, cost records, technician biometric profiles, and technical manuals for RAG.
+  - `[ ]` Task 12.2 — Comprehensive Model & Algorithm Benchmark Suite: Run quantitative evaluations across all 8 core models/algorithms (GA vs Hungarian, TSP, Isolation Forest/Z-score, LSTM RUL, Random Forest, MobileFaceNet, Decision Tree HSM, RAG Chatbot) and generate benchmark evaluation tables/curves.
+  - `[ ]` Task 12.3 — Defense Artifacts & Demonstration Package: System architecture diagrams, complete ERD, Postman API collection, and 1-click Docker startup verification for defense day.
