@@ -33,7 +33,7 @@ SECRET_KEY = 'django-insecure-o-vpz0i87++$s)sl9y4&0n80ux*241i^ht#y356h+frf4v9e0=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '10.0.2.2']
 
 
 # Application definition
@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'workorders',
     'maintenance',
     'portal',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -196,3 +197,36 @@ MINIO_SECURE = env('MINIO_SECURE', default=False, cast=bool)
 MINIO_PUBLIC_URL = env('MINIO_PUBLIC_URL', default='http://localhost:9000')
 
 RESEND_API_KEY = env('RESEND_API_KEY', default='')
+
+# Redis and Celery Configuration
+REDIS_URL = env('REDIS_URL', default='redis://127.0.0.1:6379/0')
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=REDIS_URL)
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default=REDIS_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_QUEUES = {
+    'default': {},
+    'notifications': {},
+    'periodic': {},
+}
+CELERY_TASK_ROUTES = {
+    'notifications.async_send_notification': {'queue': 'notifications'},
+    'notifications.async_dispatch_notification_channels': {'queue': 'notifications'},
+    'notifications.periodic_escalation_scan': {'queue': 'periodic'},
+    'maintenance.tasks.evaluate_triggers': {'queue': 'periodic'},
+}
+
+# Cache Configuration with Redis
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'TIMEOUT': 300,
+    }
+}
+
+# Firebase Admin SDK Configuration
+FIREBASE_CREDENTIALS_PATH = BASE_DIR / 'config' / 'firebase_credentials.json'

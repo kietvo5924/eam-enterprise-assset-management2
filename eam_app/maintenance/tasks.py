@@ -95,6 +95,10 @@ def evaluate_triggers():
                     assigned_to=pm_plan.assignee
                 )
                 
+                # Dispatch PM generation notification
+                from notifications.services import notify_pm_work_order_generated, notify_spare_part_low_stock
+                notify_pm_work_order_generated(pm_plan, wo, asset=assignment.asset)
+                
                 # Create Checklists
                 for pc in pm_plan.checklists.all():
                     WorkOrderChecklistItem.objects.create(
@@ -123,6 +127,9 @@ def evaluate_triggers():
                             # We'll just deduct what we can or leave it. We'll leave it as is to simulate deducting
                             part.quantity_in_stock -= req_qty
                             part.save()
+                            
+                        # Check low-stock warning
+                        notify_spare_part_low_stock(part)
                             
                     WorkOrderMaterial.objects.create(
                         tenant_id=assignment.tenant_id,

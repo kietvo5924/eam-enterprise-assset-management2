@@ -447,6 +447,10 @@ class SparePartDetailView(APIView):
             part.unit_cost = data['unitCost']
             
         part.save()
+
+        from notifications.services import notify_spare_part_low_stock
+        notify_spare_part_low_stock(part)
+
         return success_response(SparePartSerializer(part).data)
 
     @transaction.atomic

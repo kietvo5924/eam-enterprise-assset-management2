@@ -73,10 +73,67 @@
         </div>
 
         <div class="flex items-center gap-4 pr-6 shrink-0 h-full">
-          <button class="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-600 relative transition-colors">
-            <i class="ph ph-bell text-lg"></i>
-            <span class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger text-white text-[9px] font-bold rounded-full flex items-center justify-center">5</span>
-          </button>
+          <!-- Notification Bell Component -->
+          <div class="relative" id="notification-bell-container">
+            <button id="notification-bell-btn" type="button" aria-label="Notifications" class="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-600 hover:text-primary relative transition-colors cursor-pointer focus:outline-none">
+              <i class="ph ph-bell text-lg"></i>
+              <span id="notification-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-danger text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm ring-2 ring-white">0</span>
+            </button>
+            
+            <!-- Notification Dropdown -->
+            <div id="notification-dropdown" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-neutral-200 rounded-2xl shadow-2xl z-50 overflow-hidden text-neutral-800">
+              <!-- Header -->
+              <div class="px-4 pt-3 pb-2 bg-neutral-50/80 border-b border-neutral-100">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-sm text-neutral-800 flex items-center gap-1.5">
+                      <i class="ph-fill ph-bell-simple text-primary text-base"></i> Thông báo
+                    </span>
+                    <span id="notification-header-badge" class="hidden text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-50 text-primary-600">0 mới</span>
+                  </div>
+                  <button id="notification-mark-all-read-btn" type="button" class="text-xs font-medium text-primary hover:text-primary-700 flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="ph ph-checks text-sm"></i> Đọc tất cả
+                  </button>
+                </div>
+                <!-- 3 Filter Tabs (Rule 7 & Spec 4.3) -->
+                <div class="flex items-center gap-1 border-t border-neutral-200/60 pt-2 text-xs font-medium" id="notification-tabs">
+                  <button type="button" class="notif-tab px-2.5 py-1 rounded-md text-neutral-700 hover:bg-neutral-200/70 font-semibold active-tab bg-white shadow-xs" data-tab="all">Tất cả</button>
+                  <button type="button" class="notif-tab px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70" data-tab="unread">Chưa đọc</button>
+                  <button type="button" class="notif-tab px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 flex items-center gap-1" data-tab="actionable">
+                    <span>Cần hành động</span>
+                    <span id="notification-actionable-badge" class="hidden w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Notification List Container -->
+              <div id="notification-list" class="max-h-[360px] overflow-y-auto divide-y divide-neutral-100">
+                <!-- Loading State -->
+                <div id="notification-loading" class="py-8 text-center text-neutral-400 text-xs flex flex-col items-center gap-2">
+                  <i class="ph ph-spinner animate-spin text-xl text-primary"></i>
+                  <span>Đang tải thông báo...</span>
+                </div>
+                <!-- Empty State -->
+                <div id="notification-empty" class="hidden py-10 text-center flex flex-col items-center justify-center px-4">
+                  <div class="w-12 h-12 rounded-full bg-neutral-100 text-neutral-400 flex items-center justify-center mb-2 text-2xl">
+                    <i class="ph ph-bell-slash"></i>
+                  </div>
+                  <p class="text-xs font-semibold text-neutral-600 mb-0.5">Không có thông báo mới</p>
+                  <p class="text-[11px] text-neutral-400">Bạn đã xem hết tất cả thông báo gần đây.</p>
+                </div>
+                <!-- Dynamic notification items injected here -->
+                <div id="notification-items" class="divide-y divide-neutral-100"></div>
+              </div>
+
+              <!-- Footer -->
+              <div class="p-2.5 bg-neutral-50/90 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-500">
+                <span class="text-[11px] text-neutral-400">Thông báo thời gian thực</span>
+                <button id="notification-refresh-btn" type="button" class="text-[11px] font-medium text-neutral-600 hover:text-primary flex items-center gap-1 cursor-pointer transition-colors">
+                  <i class="ph ph-arrows-clockwise text-xs"></i> Làm mới
+                </button>
+              </div>
+            </div>
+          </div>
           <div class="relative">
             <button id="user-menu-btn" class="w-8 h-8 rounded-full bg-gradient-to-tr from-primary-400 to-primary-600 text-white flex items-center justify-center font-bold shadow-sm text-sm hover:opacity-90 transition-opacity cursor-pointer">
               {% if user.is_authenticated %}
@@ -358,6 +415,73 @@
       </div>
     </div>
 
+    <!-- Notification Detail Modal -->
+    <div id="notification-detail-modal" class="hidden fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50/90">
+          <div class="flex items-center gap-2.5">
+            <div id="notif-modal-icon-container" class="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-lg shrink-0">
+              <i id="notif-modal-icon" class="ph ph-bell"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-neutral-800 m-0 leading-tight">Chi tiết thông báo</h3>
+              <p id="notif-modal-category" class="text-[11px] text-neutral-400 font-medium m-0">Hệ thống</p>
+            </div>
+          </div>
+          <button type="button" onclick="document.getElementById('notification-detail-modal').classList.add('hidden')" class="text-neutral-400 hover:text-neutral-600 transition-colors p-1 rounded-lg hover:bg-neutral-200/60">
+            <i class="ph ph-x text-xl"></i>
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <!-- Badges & Time Row -->
+          <div class="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-neutral-100 text-xs">
+            <div class="flex items-center gap-2" id="notif-modal-badges">
+              <!-- Dynamically populated -->
+            </div>
+            <span id="notif-modal-time" class="text-neutral-400 text-xs flex items-center gap-1 font-medium">
+              <i class="ph ph-clock text-xs"></i> <span>Vừa xong</span>
+            </span>
+          </div>
+
+          <!-- Title -->
+          <div>
+            <label class="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Tiêu đề</label>
+            <h4 id="notif-modal-title" class="text-sm font-bold text-neutral-900 leading-snug"></h4>
+          </div>
+
+          <!-- Message -->
+          <div>
+            <label class="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Nội dung chi tiết</label>
+            <div id="notif-modal-message" class="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-700 leading-relaxed whitespace-pre-wrap"></div>
+          </div>
+
+          <!-- Sender & Target Info -->
+          <div id="notif-modal-meta" class="text-xs text-neutral-500 bg-neutral-50/50 p-2.5 rounded-lg border border-neutral-100 flex items-center justify-between">
+            <span id="notif-modal-sender" class="flex items-center gap-1.5"><i class="ph ph-user"></i> Người gửi: Hệ thống</span>
+            <span id="notif-modal-target" class="text-[11px] text-neutral-400"></span>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-6 py-3.5 bg-neutral-50 border-t border-neutral-200 flex justify-between items-center gap-3">
+          <button type="button" onclick="document.getElementById('notification-detail-modal').classList.add('hidden')" class="px-4 py-2 text-xs font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-200/80 hover:bg-neutral-300/80 rounded-lg transition-colors">
+            Đóng
+          </button>
+          <div class="flex items-center gap-2">
+            <button id="notif-modal-resolve-btn" type="button" class="hidden px-3.5 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center gap-1.5">
+              <i class="ph ph-check-circle text-sm"></i> Xác nhận đã xử lý
+            </button>
+            <button id="notif-modal-link-btn" type="button" class="hidden px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-600 rounded-lg transition-colors shadow-sm shadow-primary/20 flex items-center gap-1.5">
+              <span>Đi đến trang liên kết</span> <i class="ph ph-arrow-square-out text-sm"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
       // Sidebar Toggle Logic
       const sidebarToggle = document.getElementById('sidebar-toggle');
@@ -406,18 +530,643 @@
       });
       resetInactivityTimeout();
 
-      // User Dropdown Logic
+      // Helper to get CSRF token
+      function getCsrfToken() {
+          const el = document.querySelector('[name=csrfmiddlewaretoken]');
+          return el ? el.value : '';
+      }
+
+      function escapeHtml(str) {
+          if (!str) return '';
+          return String(str)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+      }
+
+      function formatTimeAgo(dateString) {
+          if (!dateString) return '';
+          const date = new Date(dateString);
+          const now = new Date();
+          const diffSec = Math.floor((now - date) / 1000);
+          if (diffSec < 60) return 'Vừa xong';
+          const diffMin = Math.floor(diffSec / 60);
+          if (diffMin < 60) return `${diffMin} phút trước`;
+          const diffHour = Math.floor(diffMin / 60);
+          if (diffHour < 24) return `${diffHour} giờ trước`;
+          const diffDay = Math.floor(diffHour / 24);
+          if (diffDay === 1) return 'Hôm qua';
+          if (diffDay < 7) return `${diffDay} ngày trước`;
+          return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+      }
+
+      // Notification Bell Logic
+      const tenantId = '{{ current_tenant.id|default:"" }}';
+      const isUserAuthenticated = {% if user.is_authenticated %}true{% else %}false{% endif %};
+
+      window.NotificationBell = {
+          unreadCount: 0,
+          isLoading: false,
+          pollInterval: 10000,
+          isPolling: false,
+          isChecking: false,
+          pollTimer: null,
+          previousUnreadCount: null,
+          currentTab: 'all',
+          hasCritical: false,
+
+          updateBadge(count, hasCritical = false) {
+              this.unreadCount = Math.max(0, count);
+              this.hasCritical = Boolean(hasCritical);
+              const badge = document.getElementById('notification-badge');
+              const headerBadge = document.getElementById('notification-header-badge');
+              const markAllBtn = document.getElementById('notification-mark-all-read-btn');
+
+              if (badge) {
+                  if (this.unreadCount > 0) {
+                      badge.innerText = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                      badge.classList.remove('hidden');
+                      if (this.hasCritical) {
+                          badge.classList.add('animate-pulse', 'ring-danger-400');
+                      } else {
+                          badge.classList.remove('animate-pulse', 'ring-danger-400');
+                      }
+                  } else {
+                      badge.classList.add('hidden');
+                      badge.classList.remove('animate-pulse', 'ring-danger-400');
+                  }
+              }
+
+              if (headerBadge) {
+                  if (this.unreadCount > 0) {
+                      headerBadge.innerText = `${this.unreadCount} mới`;
+                      headerBadge.classList.remove('hidden');
+                  } else {
+                      headerBadge.classList.add('hidden');
+                  }
+              }
+
+              if (markAllBtn) {
+                  markAllBtn.disabled = this.unreadCount === 0;
+              }
+          },
+
+          async checkUpdates() {
+              if (!isUserAuthenticated || this.isChecking) return;
+              this.isChecking = true;
+              try {
+                  const headers = { 'Accept': 'application/json' };
+                  if (tenantId) headers['X-Tenant-Id'] = tenantId;
+                  const res = await fetch('/api/v1/notifications/unread-count/', { credentials: 'same-origin', headers });
+                  if (res.ok) {
+                      const data = await res.json();
+                      const payload = data.data || {};
+                      const count = payload.unread_count ?? payload.unreadCount ?? 0;
+                      const hasCrit = Boolean(payload.has_critical);
+                      const countChanged = this.previousUnreadCount !== null && this.previousUnreadCount !== count;
+                      this.previousUnreadCount = count;
+                      this.updateBadge(count, hasCrit);
+
+                      // If unread count changed and dropdown is open, live refresh the list
+                      const notifDropdown = document.getElementById('notification-dropdown');
+                      const isDropdownOpen = notifDropdown && !notifDropdown.classList.contains('hidden');
+                      if (isDropdownOpen && countChanged) {
+                          this.fetchNotifications();
+                      }
+                  }
+              } catch (e) {
+                  console.debug('Polling check failed:', e);
+              } finally {
+                  this.isChecking = false;
+              }
+          },
+
+          startPolling() {
+              if (!isUserAuthenticated || this.isPolling) return;
+              this.isPolling = true;
+
+              const scheduleNext = () => {
+                  if (!this.isPolling) return;
+                  this.pollTimer = setTimeout(async () => {
+                      if (!this.isPolling) return;
+                      await this.checkUpdates();
+                      scheduleNext();
+                  }, this.pollInterval);
+              };
+
+              scheduleNext();
+          },
+
+          stopPolling() {
+              this.isPolling = false;
+              if (this.pollTimer) {
+                  clearTimeout(this.pollTimer);
+                  this.pollTimer = null;
+              }
+          },
+
+          async fetchUnreadCount() {
+              await this.checkUpdates();
+          },
+
+          async fetchNotifications() {
+              if (!isUserAuthenticated) return;
+              const loadingEl = document.getElementById('notification-loading');
+              const emptyEl = document.getElementById('notification-empty');
+              const itemsEl = document.getElementById('notification-items');
+              const refreshBtn = document.getElementById('notification-refresh-btn');
+              if (!itemsEl) return;
+
+              const hasExistingItems = itemsEl.children.length > 0;
+              const refreshIcon = refreshBtn ? refreshBtn.querySelector('i') : null;
+              if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+              if (!hasExistingItems && loadingEl) {
+                  loadingEl.classList.remove('hidden');
+              }
+              if (emptyEl) emptyEl.classList.add('hidden');
+              this.isLoading = true;
+
+              let endpoint = '/api/v1/notifications/?size=20';
+              if (this.currentTab === 'unread') {
+                  endpoint += '&is_read=false';
+              } else if (this.currentTab === 'actionable') {
+                  endpoint += '&is_actionable=true&action_status=PENDING';
+              }
+
+              try {
+                  const headers = { 'Accept': 'application/json' };
+                  if (tenantId) headers['X-Tenant-Id'] = tenantId;
+                  const res = await fetch(endpoint, { credentials: 'same-origin', headers });
+                  if (res.ok) {
+                      const resData = await res.json();
+                      const payload = resData.data || {};
+                      const items = payload.content || [];
+                      const count = payload.unread_count ?? payload.unreadCount ?? 0;
+                      this.updateBadge(count, this.hasCritical);
+
+                      // Update actionable badge indicator in tab header
+                      const actBadge = document.getElementById('notification-actionable-badge');
+                      const hasPending = items.some(it => (it.isActionable || it.is_actionable) && (it.actionStatus === 'PENDING' || it.action_status === 'PENDING'));
+                      if (actBadge) {
+                          if (hasPending) actBadge.classList.remove('hidden');
+                          else actBadge.classList.add('hidden');
+                      }
+
+                      this.itemsMap = new Map();
+                      items.forEach(it => this.itemsMap.set(String(it.id), it));
+
+                      if (items.length === 0) {
+                          itemsEl.innerHTML = '';
+                          if (emptyEl) emptyEl.classList.remove('hidden');
+                      } else {
+                          itemsEl.innerHTML = items.map(item => this.renderItem(item)).join('');
+                      }
+                  } else {
+                      if (!hasExistingItems && emptyEl) emptyEl.classList.remove('hidden');
+                  }
+              } catch (e) {
+                  console.error('Failed to load notifications', e);
+                  if (!hasExistingItems && emptyEl) emptyEl.classList.remove('hidden');
+              } finally {
+                  if (loadingEl) loadingEl.classList.add('hidden');
+                  if (refreshIcon) {
+                      setTimeout(() => refreshIcon.classList.remove('animate-spin'), 300);
+                  }
+                  this.isLoading = false;
+              }
+          },
+
+          itemsMap: new Map(),
+
+          renderItem(item) {
+              const isRead = Boolean(item.is_read || item.isRead);
+              const timeAgo = formatTimeAgo(item.created_at || item.createdAt);
+              const hasLink = Boolean(item.link);
+              const severity = (item.severity || 'INFO').toUpperCase();
+              const category = (item.category || 'SYSTEM').toUpperCase();
+              const isActionable = Boolean(item.is_actionable || item.isActionable);
+              const actionStatus = (item.action_status || item.actionStatus || 'NOT_APPLICABLE').toUpperCase();
+
+              // Icon mapping by category
+              let iconClass = 'ph-bell';
+              if (category === 'WORK_ORDER') iconClass = 'ph-wrench';
+              else if (category === 'MAINTENANCE') iconClass = 'ph-gear';
+              else if (category === 'INVENTORY') iconClass = 'ph-package';
+              else if (category === 'ASSET') iconClass = 'ph-cpu';
+              else if (category === 'FINANCE') iconClass = 'ph-currency-circle-dollar';
+              else if (category === 'SYSTEM') iconClass = 'ph-shield-warning';
+
+              // Severity badge
+              let severityBadge = '';
+              if (severity === 'CRITICAL') {
+                  severityBadge = '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-danger-50 text-danger border border-danger-200">KHẨN CẤP</span>';
+              } else if (severity === 'URGENT') {
+                  severityBadge = '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-orange-50 text-orange-700 border border-orange-200">CẤP BÁCH</span>';
+              } else if (severity === 'WARNING') {
+                  severityBadge = '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-50 text-amber-700 border border-amber-200">CẢNH BÁO</span>';
+              } else {
+                  severityBadge = '<span class="text-[9px] px-1.5 py-0.5 rounded font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">THÔNG TIN</span>';
+              }
+
+              // Actionable tag
+              let actionBadge = '';
+              if (isActionable) {
+                  if (actionStatus === 'PENDING') {
+                      actionBadge = '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-0.5"><i class="ph ph-hourglass text-[10px]"></i> Chờ duyệt</span>';
+                  } else if (actionStatus === 'RESOLVED') {
+                      actionBadge = '<span class="text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-0.5"><i class="ph ph-check text-[10px]"></i> Đã xử lý</span>';
+                  }
+              }
+
+              // Sender name snapshot
+              const senderName = (item.sender && item.sender.name) ? item.sender.name : (item.sender_name_snapshot || '');
+              const senderHtml = senderName ? `<span class="text-[10px] text-neutral-400 flex items-center gap-1" title="Người gửi: ${escapeHtml(senderName)}"><i class="ph ph-user text-[10px]"></i> ${escapeHtml(senderName)}</span>` : '';
+
+              return `
+                <div class="notification-item group relative flex items-start gap-3 p-3.5 hover:bg-neutral-50/90 transition-colors cursor-pointer ${isRead ? 'opacity-70 bg-white' : 'bg-primary-50/25'}"
+                     data-id="${item.id}" data-link="${item.link || ''}" title="Bấm để xem chi tiết đầy đủ thông báo">
+                  <div class="w-8 h-8 rounded-full ${isRead ? 'bg-neutral-100 text-neutral-400' : (severity === 'CRITICAL' ? 'bg-danger-100 text-danger animate-pulse' : 'bg-primary-100 text-primary-600')} flex items-center justify-center shrink-0 mt-0.5">
+                    <i class="ph ${iconClass} text-base"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <!-- Hàng 1: Tiêu đề rộng rãi, không bị badge chèn + Thời gian -->
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                      <h4 class="text-xs ${isRead ? 'font-medium text-neutral-700' : 'font-bold text-neutral-900'} leading-snug line-clamp-2 hover:text-primary transition-colors flex-1"
+                          title="${escapeHtml(item.title)}">
+                        ${escapeHtml(item.title)}
+                      </h4>
+                      <span class="text-[10px] text-neutral-400 shrink-0 whitespace-nowrap mt-0.5">${timeAgo}</span>
+                    </div>
+
+                    <!-- Hàng 2: Nội dung mô tả kèm tooltip toàn văn -->
+                    <p class="text-xs text-neutral-600 line-clamp-2 leading-relaxed mb-2" title="${escapeHtml(item.message)}">
+                      ${escapeHtml(item.message)}
+                    </p>
+
+                    <!-- Hàng 3: Badge mức độ (Cảnh báo/Khẩn cấp) nằm cạnh Chờ duyệt + Nút Chi tiết/Xem -->
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-neutral-100/80">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        ${severityBadge}
+                        ${actionBadge}
+                        ${senderHtml}
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" class="btn-detail-item text-[11px] font-medium text-primary hover:text-primary-700 hover:underline flex items-center gap-0.5"
+                                onclick="event.stopPropagation(); window.NotificationBell.openDetailModal('${item.id}');"
+                                title="Xem toàn văn nội dung thông báo">
+                          <i class="ph ph-eye text-[11px]"></i> Chi tiết
+                        </button>
+                        ${hasLink ? `
+                          <button type="button" class="btn-goto-item text-[11px] font-medium text-neutral-500 hover:text-primary hover:underline flex items-center gap-0.5"
+                                  onclick="event.stopPropagation(); window.NotificationBell.markAsRead('${item.id}', '${item.link}');"
+                                  title="Chuyển ngay tới trang đối tượng liên kết">
+                            <i class="ph ph-arrow-square-out text-[11px]"></i> Xem ↗
+                          </button>
+                        ` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  ${!isRead ? `
+                    <button type="button" class="btn-mark-item-read w-5 h-5 rounded-full hover:bg-primary-100 text-primary-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-1 self-start mt-0.5" title="Đánh dấu đã đọc" onclick="event.stopPropagation(); window.NotificationBell.markAsRead('${item.id}');">
+                      <i class="ph ph-check text-xs"></i>
+                    </button>
+                    <span class="unread-dot w-2 h-2 rounded-full bg-primary shrink-0 self-center group-hover:hidden"></span>
+                  ` : ''}
+                </div>
+              `;
+          },
+
+          openDetailModal(notificationId) {
+              const item = this.itemsMap.get(String(notificationId));
+              if (!item) return;
+
+              const modal = document.getElementById('notification-detail-modal');
+              if (!modal) return;
+
+              // Mark read in background if unread
+              const isRead = Boolean(item.is_read || item.isRead);
+              if (!isRead) {
+                  this.markAsRead(notificationId);
+                  item.is_read = true;
+                  item.isRead = true;
+              }
+
+              // Set Title & Message
+              const titleEl = document.getElementById('notif-modal-title');
+              const msgEl = document.getElementById('notif-modal-message');
+              if (titleEl) titleEl.innerText = item.title || '';
+              if (msgEl) msgEl.innerText = item.message || '';
+
+              // Set Time
+              const timeAgo = formatTimeAgo(item.created_at || item.createdAt);
+              const exactDate = (item.created_at || item.createdAt) ? new Date(item.created_at || item.createdAt).toLocaleString('vi-VN') : '';
+              const timeEl = document.getElementById('notif-modal-time');
+              if (timeEl) timeEl.innerHTML = `<i class="ph ph-clock text-xs"></i> <span>${timeAgo} (${exactDate})</span>`;
+
+              // Category & Icon
+              const cat = (item.category || 'SYSTEM').toUpperCase();
+              let iconClass = 'ph-bell';
+              let catName = 'Hệ thống';
+              if (cat === 'WORK_ORDER') { iconClass = 'ph-wrench'; catName = 'Phiếu công việc (Work Order)'; }
+              else if (cat === 'MAINTENANCE') { iconClass = 'ph-gear'; catName = 'Bảo trì định kỳ'; }
+              else if (cat === 'INVENTORY') { iconClass = 'ph-package'; catName = 'Kho & Phụ tùng'; }
+              else if (cat === 'ASSET') { iconClass = 'ph-cpu'; catName = 'Thiết bị tài sản'; }
+              else if (cat === 'FINANCE') { iconClass = 'ph-currency-circle-dollar'; catName = 'Tài chính & Ngân sách'; }
+              
+              const catEl = document.getElementById('notif-modal-category');
+              if (catEl) catEl.innerText = catName;
+              const iconEl = document.getElementById('notif-modal-icon');
+              if (iconEl) iconEl.className = `ph ${iconClass}`;
+
+              // Badges
+              const severity = (item.severity || 'INFO').toUpperCase();
+              let sevBadge = '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-neutral-100 text-neutral-700">THÔNG TIN</span>';
+              if (severity === 'CRITICAL') {
+                  sevBadge = '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-danger-50 text-danger border border-danger-200">KHẨN CẤP</span>';
+              } else if (severity === 'URGENT') {
+                  sevBadge = '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-orange-50 text-orange-700 border border-orange-200">CẤP BÁCH</span>';
+              } else if (severity === 'WARNING') {
+                  sevBadge = '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-700 border border-amber-200">CẢNH BÁO</span>';
+              }
+
+              const isActionable = Boolean(item.is_actionable || item.isActionable);
+              const actionStatus = (item.action_status || item.actionStatus || 'NOT_APPLICABLE').toUpperCase();
+              let actBadge = '';
+              if (isActionable) {
+                  if (actionStatus === 'PENDING') {
+                      actBadge = '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1"><i class="ph ph-hourglass text-[11px]"></i> Chờ duyệt</span>';
+                  } else if (actionStatus === 'RESOLVED') {
+                      actBadge = '<span class="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"><i class="ph ph-check text-[11px]"></i> Đã xử lý</span>';
+                  }
+              }
+
+              const badgesEl = document.getElementById('notif-modal-badges');
+              if (badgesEl) badgesEl.innerHTML = `${sevBadge} ${actBadge}`;
+
+              // Sender
+              const senderName = (item.sender && item.sender.name) ? item.sender.name : (item.sender_name_snapshot || 'Hệ thống tự động');
+              const senderEl = document.getElementById('notif-modal-sender');
+              if (senderEl) senderEl.innerHTML = `<i class="ph ph-user"></i> Người gửi: <b>${escapeHtml(senderName)}</b>`;
+
+              // Action Buttons
+              const resolveBtn = document.getElementById('notif-modal-resolve-btn');
+              if (resolveBtn) {
+                  if (isActionable && actionStatus === 'PENDING') {
+                      resolveBtn.classList.remove('hidden');
+                      resolveBtn.onclick = async () => {
+                          try {
+                              const res = await fetch(`/api/v1/notifications/${notificationId}/resolve-action/`, {
+                                  method: 'POST',
+                                  credentials: 'same-origin',
+                                  headers: {
+                                      'Content-Type': 'application/json',
+                                      'X-CSRFToken': getCsrfToken(),
+                                      ...(tenantId ? { 'X-Tenant-Id': tenantId } : {})
+                                  },
+                                  body: JSON.stringify({ action_status: 'RESOLVED' })
+                              });
+                              if (res.ok) {
+                                  item.action_status = 'RESOLVED';
+                                  item.actionStatus = 'RESOLVED';
+                                  resolveBtn.classList.add('hidden');
+                                  window.NotificationBell.fetchNotifications();
+                                  if (typeof showToast === 'function') {
+                                      showToast('Đã xác nhận xử lý thành công!', 'success');
+                                  }
+                              }
+                          } catch (e) {
+                              console.error(e);
+                          }
+                      };
+                  } else {
+                      resolveBtn.classList.add('hidden');
+                  }
+              }
+
+              const linkBtn = document.getElementById('notif-modal-link-btn');
+              if (linkBtn) {
+                  if (item.link) {
+                      linkBtn.classList.remove('hidden');
+                      linkBtn.onclick = () => {
+                          modal.classList.add('hidden');
+                          window.NotificationBell.markAsRead(notificationId, item.link);
+                      };
+                  } else {
+                      linkBtn.classList.add('hidden');
+                  }
+              }
+
+              modal.classList.remove('hidden');
+          },
+
+          async markAsRead(notificationId, link = null) {
+              if (!isUserAuthenticated || !notificationId) return;
+              try {
+                  const headers = {
+                      'Content-Type': 'application/json',
+                      'X-CSRFToken': getCsrfToken()
+                  };
+                  if (tenantId) headers['X-Tenant-Id'] = tenantId;
+                  const res = await fetch(`/api/v1/notifications/${notificationId}/read/`, {
+                      method: 'POST',
+                      credentials: 'same-origin',
+                      headers
+                  });
+                  if (res.ok) {
+                      this.updateBadge(Math.max(0, this.unreadCount - 1), this.hasCritical);
+                      const itemEl = document.querySelector(`.notification-item[data-id="${notificationId}"]`);
+                      if (itemEl) {
+                          itemEl.classList.remove('bg-primary-50/25');
+                          itemEl.classList.add('opacity-70', 'bg-white');
+                          const dot = itemEl.querySelector('.unread-dot');
+                          if (dot) dot.remove();
+                          const checkBtn = itemEl.querySelector('.btn-mark-item-read');
+                          if (checkBtn) checkBtn.remove();
+                      }
+                  }
+              } catch (e) {
+                  console.error('Failed to mark notification as read', e);
+              } finally {
+                  if (link) {
+                      let targetLink = (link || '').trim();
+                      if (targetLink.startsWith('/portal/')) {
+                          targetLink = targetLink.replace(/^\/portal/, '');
+                      }
+                      if (targetLink) {
+                          // Safe navigation checking permission drift (Rule 9 / TC-DRIFT-01)
+                          try {
+                              const checkRes = await fetch(targetLink, { method: 'HEAD', credentials: 'same-origin' });
+                              if (checkRes.status === 403) {
+                                  if (typeof showToast === 'function') {
+                                      showToast('Bạn không còn quyền truy cập dữ liệu này hoặc dữ liệu đã được điều chuyển.', 'warning');
+                                  } else {
+                                      alert('Bạn không còn quyền truy cập dữ liệu này hoặc dữ liệu đã được điều chuyển.');
+                                  }
+                                  return;
+                              } else if (checkRes.status === 404) {
+                                  if (typeof showToast === 'function') {
+                                      showToast('Đối tượng liên kết không còn tồn tại hoặc đã bị gỡ bỏ.', 'error');
+                                  } else {
+                                      alert('Đối tượng liên kết không còn tồn tại hoặc đã bị gỡ bỏ.');
+                                  }
+                                  return;
+                              }
+                          } catch (err) {
+                              // If HEAD request fails due to network/CORS, fallback to direct navigation
+                          }
+                          window.location.href = targetLink;
+                      }
+                  }
+              }
+          },
+
+          async markAllAsRead() {
+              if (!isUserAuthenticated || this.unreadCount === 0) return;
+              const markAllBtn = document.getElementById('notification-mark-all-read-btn');
+              if (markAllBtn) markAllBtn.disabled = true;
+
+              try {
+                  const headers = {
+                      'Content-Type': 'application/json',
+                      'X-CSRFToken': getCsrfToken()
+                  };
+                  if (tenantId) headers['X-Tenant-Id'] = tenantId;
+                  const res = await fetch('/api/v1/notifications/read-all/', {
+                      method: 'POST',
+                      credentials: 'same-origin',
+                      headers
+                  });
+                  if (res.ok) {
+                      this.updateBadge(0, false);
+                      // Update visible items
+                      document.querySelectorAll('.notification-item').forEach(itemEl => {
+                          itemEl.classList.remove('bg-primary-50/25');
+                          itemEl.classList.add('opacity-70', 'bg-white');
+                          const dot = itemEl.querySelector('.unread-dot');
+                          if (dot) dot.remove();
+                          const checkBtn = itemEl.querySelector('.btn-mark-item-read');
+                          if (checkBtn) checkBtn.remove();
+                      });
+                  }
+              } catch (e) {
+                  console.error('Failed to mark all as read', e);
+              }
+          }
+      };
+
+      // Coordinate Dropdowns: Bell & User Menu
+      const notifBellBtn = document.getElementById('notification-bell-btn');
+      const notifDropdown = document.getElementById('notification-dropdown');
       const userMenuBtn = document.getElementById('user-menu-btn');
       const userDropdown = document.getElementById('user-dropdown');
-      
-      if(userMenuBtn && userDropdown) {
+
+      if (notifBellBtn && notifDropdown) {
+          notifBellBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (userDropdown) userDropdown.classList.add('hidden');
+              const isHidden = notifDropdown.classList.contains('hidden');
+              notifDropdown.classList.toggle('hidden');
+              if (isHidden) {
+                  window.NotificationBell.fetchNotifications();
+              }
+          });
+      }
+
+      if (userMenuBtn && userDropdown) {
           userMenuBtn.addEventListener('click', (e) => {
               e.stopPropagation();
+              if (notifDropdown) notifDropdown.classList.add('hidden');
               userDropdown.classList.toggle('hidden');
           });
-          document.addEventListener('click', () => {
+      }
+
+      document.addEventListener('click', (e) => {
+          if (notifDropdown && !notifDropdown.contains(e.target)) {
+              notifDropdown.classList.add('hidden');
+          }
+          if (userDropdown && !userDropdown.contains(e.target)) {
               userDropdown.classList.add('hidden');
+          }
+      });
+
+      // Delegate item clicks inside notification list: open detail modal
+      const notifItemsContainer = document.getElementById('notification-items');
+      if (notifItemsContainer) {
+          notifItemsContainer.addEventListener('click', (e) => {
+              const item = e.target.closest('.notification-item');
+              if (!item) return;
+              const id = item.getAttribute('data-id');
+              window.NotificationBell.openDetailModal(id);
           });
+      }
+
+      // Bind mark all read button
+      const markAllBtn = document.getElementById('notification-mark-all-read-btn');
+      if (markAllBtn) {
+          markAllBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.NotificationBell.markAllAsRead();
+          });
+      }
+
+      // Bind refresh button
+      const refreshBtn = document.getElementById('notification-refresh-btn');
+      if (refreshBtn) {
+          refreshBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.NotificationBell.fetchNotifications();
+          });
+      }
+
+      // Bind 3 Filter Tabs (All, Unread, Actionable)
+      const tabButtons = document.querySelectorAll('#notification-tabs .notif-tab');
+      tabButtons.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              tabButtons.forEach(b => {
+                  b.classList.remove('bg-white', 'shadow-xs', 'font-semibold', 'text-neutral-700');
+                  b.classList.add('text-neutral-500');
+              });
+              btn.classList.add('bg-white', 'shadow-xs', 'font-semibold', 'text-neutral-700');
+              btn.classList.remove('text-neutral-500');
+
+              window.NotificationBell.currentTab = btn.getAttribute('data-tab');
+              window.NotificationBell.fetchNotifications();
+          });
+      });
+
+      // Page Visibility API & Window Focus Optimization (Adaptive Lightweight Polling)
+      document.addEventListener('visibilitychange', () => {
+          if (!isUserAuthenticated) return;
+          if (document.hidden) {
+              // Throttle polling frequency to 60s when tab is hidden
+              window.NotificationBell.pollInterval = 60000;
+          } else {
+              // Restore regular 10s polling and trigger immediate check
+              window.NotificationBell.pollInterval = 10000;
+              window.NotificationBell.checkUpdates();
+              if (!window.NotificationBell.isPolling) {
+                  window.NotificationBell.startPolling();
+              }
+          }
+      });
+
+      window.addEventListener('focus', () => {
+          if (isUserAuthenticated && !document.hidden) {
+              window.NotificationBell.checkUpdates();
+          }
+      });
+
+      // Initial unread count fetch and start polling on page load
+      if (isUserAuthenticated) {
+          window.NotificationBell.fetchUnreadCount();
+          window.NotificationBell.startPolling();
       }
 
       // Change Password Submit Logic

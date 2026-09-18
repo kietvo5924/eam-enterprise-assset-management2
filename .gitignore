@@ -13,3 +13,5 @@ eam_app/venv/
 __pycache__/
 *.pyc
 db.sqlite3
+*firebase*.json
+firebase_credentials.json

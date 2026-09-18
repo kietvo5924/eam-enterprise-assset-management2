@@ -22,6 +22,13 @@ def setup_periodic_tasks(sender, **kwargs):
     # Run every 60 seconds
     sender.add_periodic_task(60.0, evaluate_triggers.s(), name='evaluate-pm-triggers-every-60s')
 
+    # Run critical SLA escalation scanner every 60 seconds
+    try:
+        from notifications.tasks import periodic_escalation_scan
+        sender.add_periodic_task(60.0, periodic_escalation_scan.s(), name='scan-critical-escalations-every-60s')
+    except ImportError:
+        pass
+
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     print(f'Request: {self.request!r}')

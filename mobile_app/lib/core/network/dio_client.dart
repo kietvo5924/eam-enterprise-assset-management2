@@ -44,6 +44,11 @@ class DioClient {
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
+        final prefs = await SharedPreferences.getInstance();
+        final tenantId = prefs.getString('tenantId');
+        if (tenantId != null && tenantId.isNotEmpty) {
+          options.headers['X-Tenant-Id'] = tenantId;
+        }
         return handler.next(options);
       },
       onError: (DioException e, handler) async {

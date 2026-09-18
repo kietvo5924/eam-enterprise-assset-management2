@@ -12,8 +12,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController(text: 'vf_admin@vinfast.local');
+  final _passwordController = TextEditingController(text: 'Admin@123456');
   bool _obscurePassword = true;
   bool _isLoading = false;
 

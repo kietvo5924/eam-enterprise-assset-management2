@@ -95,6 +95,8 @@ class WorkOrderListView(APIView):
                     raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name}")
                 part.quantity_in_stock -= req_qty
                 part.save()
+                from notifications.services import notify_spare_part_low_stock
+                notify_spare_part_low_stock(part)
                 
             WorkOrderMaterial.objects.create(
                 work_order=wo,
@@ -256,6 +258,10 @@ class WorkOrderAssignView(APIView):
             
         wo.save()
         
+        # Dispatch Notification to Assignee
+        from notifications.services import notify_work_order_assigned
+        notify_work_order_assigned(wo, assignee=assignee, is_reassigned=is_reassigned)
+
         # Mock Async Event
         import logging
         logger = logging.getLogger(__name__)

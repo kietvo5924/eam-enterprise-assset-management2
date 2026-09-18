@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/v1/', include('assets.urls')),
     path('api/v1/', include('workorders.urls')),
     path('api/v1/', include('maintenance.urls')),
+    path('api/v1/', include('notifications.urls')),
 ]
 
 handler403 = 'portal.views.custom_403_view'

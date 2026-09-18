@@ -7,6 +7,7 @@ import '../../work_orders/providers/work_order_provider.dart';
 import '../../work_orders/screens/work_order_detail_screen.dart';
 import '../../work_orders/screens/work_order_list_screen.dart';
 import 'notifications_screen.dart';
+import '../services/notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,12 +17,33 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _unreadCount = 0;
+  final NotificationService _notificationService = NotificationService();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WorkOrderProvider>().fetchHomeWorkOrders();
+      _fetchUnreadCount();
+      _notificationService.initFCM(
+        onMessageReceived: (_) {
+          _fetchUnreadCount();
+          if (mounted) {
+            context.read<WorkOrderProvider>().fetchHomeWorkOrders();
+          }
+        },
+      );
     });
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    final count = await _notificationService.getUnreadCount();
+    if (mounted) {
+      setState(() {
+        _unreadCount = count;
+      });
+    }
   }
 
   @override
@@ -127,40 +149,45 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppTheme.neutral700,
                         size: 20,
                       ),
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async {
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => const NotificationsScreen(),
                           ),
                         );
+                        _fetchUnreadCount();
                       },
                     ),
                   ),
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: AppTheme.dangerColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          '3',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            height: 1,
+                  if (_unreadCount > 0)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.dangerColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$_unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              height: 1,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
