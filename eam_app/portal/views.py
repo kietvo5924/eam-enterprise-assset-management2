@@ -48,19 +48,57 @@ def portal_logout(request):
 
 @login_required(login_url='portal_login')
 def portal_dashboard(request):
-    from workorders.models import WorkOrder
-    from assets.models import Asset
+    from analytics.services import DashboardCacheService
+    import json
     
-    total_assets = Asset.objects.count()
-    operational_assets = Asset.objects.filter(status='OPERATIONAL').count()
-    active_work_orders = WorkOrder.objects.filter(status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS']).count()
-    completed_work_orders = WorkOrder.objects.filter(status='COMPLETED').count()
+    tenant = getattr(request.user, 'tenant', None)
+    if tenant:
+        summary_data = DashboardCacheService.get_summary(tenant)
+        trends_data = DashboardCacheService.get_trends(tenant)
+        activities = DashboardCacheService.get_activity_feed(tenant)
+    else:
+        summary_data = {
+            "kpis": {
+                "totalAssets": {"value": 0, "delta": "0", "deltaType": "neutral", "deltaLabel": "N/A", "label": "Thiết bị đang quản lý", "drillDownUrl": "/portal/assets/"},
+                "activeWorkOrders": {"value": 0, "delta": "0", "deltaType": "neutral", "deltaLabel": "N/A", "label": "Phiếu đang xử lý", "drillDownUrl": "/portal/work-orders/"},
+                "completedWorkOrders": {"value": 0, "delta": "0", "deltaType": "neutral", "deltaLabel": "N/A", "label": "Phiếu hoàn tất (30 ngày)", "drillDownUrl": "/portal/work-orders/"},
+                "plantAvailability": {"value": "100.0%", "delta": "0", "deltaType": "neutral", "deltaLabel": "N/A", "label": "Độ sẵn sàng vận hành", "drillDownUrl": None},
+                "pmComplianceRate": {"value": "100.0%", "delta": "0", "deltaType": "neutral", "deltaLabel": "N/A", "label": "Tuân thủ bảo trì định kỳ", "drillDownUrl": "/portal/work-orders/?type=PREVENTIVE"}
+            },
+            "assetHealth": {
+                "totalActive": 0,
+                "operating": {"count": 0, "percentage": 0.0},
+                "maintenance": {"count": 0, "percentage": 0.0},
+                "down": {"count": 0, "percentage": 0.0},
+                "plantStatus": "NORMAL",
+                "plantStatusLabel": "Bình thường"
+            },
+            "reliability": {
+                "mtbfHours": None,
+                "mtbfDisplay": "100% Khả dụng (0 Sự cố)",
+                "isZeroFailure": True,
+                "mttrHours": None,
+                "mttrDisplay": "N/A",
+                "ongoingDownCount": 0
+            }
+        }
+        trends_data = {"timezone": "Asia/Ho_Chi_Minh", "series": []}
+        activities = []
 
+    kpis = summary_data.get("kpis", {})
     context = {
-        'total_assets': total_assets,
-        'operational_assets': operational_assets,
-        'active_work_orders': active_work_orders,
-        'completed_work_orders': completed_work_orders,
+        'summary': summary_data,
+        'kpis': kpis,
+        'asset_health': summary_data.get("assetHealth", {}),
+        'reliability': summary_data.get("reliability", {}),
+        'trends': trends_data,
+        'trends_json': json.dumps(trends_data.get("series", [])),
+        'activities': activities,
+        # Backward-compatible keys
+        'total_assets': kpis.get("totalAssets", {}).get("value", 0),
+        'operational_assets': summary_data.get("assetHealth", {}).get("operating", {}).get("count", 0),
+        'active_work_orders': kpis.get("activeWorkOrders", {}).get("value", 0),
+        'completed_work_orders': kpis.get("completedWorkOrders", {}).get("value", 0),
     }
     return render(request, 'dashboard.html', context)
 
@@ -256,46 +294,78 @@ def portal_change_password(request):
 
 def portal_forgot_password(request):
     import json
+    import random
+    import datetime
+    from django.utils import timezone
     from django.http import JsonResponse
     from users.models import User
+    from django.core.mail import send_mail
+    from django.conf import settings
     
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            email = data.get('email')
-            # Mock sending email. In a real app, generate a 6-digit code, save to DB, and send via Resend/SMTP
-            user = User.objects.filter(email=email).first()
-            if user:
-                # Code generated, normally saved to cache/DB
-                pass
+            email = (data.get('email') or '').strip()
+            user = User.all_objects.filter(email__iexact=email).first()
+            if not user:
+                return JsonResponse({'success': False, 'error': f"User with email '{email}' not found."}, status=404)
+            
+            # Generate random 6-digit code
+            code = f"{random.randint(100000, 999999):06d}"
+            user.reset_token = code
+            user.reset_token_expiry = timezone.now() + datetime.timedelta(minutes=15)
+            user.save(update_fields=['reset_token', 'reset_token_expiry'])
+            
+            # Attempt to send real email via SMTP
+            send_mail(
+                subject="[EAM System] Password Reset Code",
+                message=(
+                    f"Hello {user.username},\n\n"
+                    f"You requested a password reset for your EAM account.\n"
+                    f"Your 6-digit verification code is: {code}\n\n"
+                    f"This code will expire in 15 minutes.\n"
+                    f"If you did not request this, please ignore this email.\n\n"
+                    f"Best regards,\nEAM Technical Team"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL or 'noreply@eam.local',
+                recipient_list=[email],
+                fail_silently=False,
+            )
             return JsonResponse({'success': True})
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            return JsonResponse({'success': False, 'error': f"SMTP Error: {str(e)}"}, status=500)
     return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
 
 def portal_reset_password(request):
     import json
+    from django.utils import timezone
     from django.http import JsonResponse
     from users.models import User
     
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            code = data.get('code')
+            code = str(data.get('code') or '').strip()
             new_password = data.get('newPassword')
             
-            # Mock validation. In a real app, verify the code from DB/Cache
-            if len(code) < 6:
-                return JsonResponse({'success': False, 'error': 'Invalid code'}, status=400)
+            if not code or len(code) != 6:
+                return JsonResponse({'success': False, 'error': 'Please enter a valid 6-digit code.'}, status=400)
+            if not new_password or len(new_password) < 6:
+                return JsonResponse({'success': False, 'error': 'New password must be at least 6 characters long.'}, status=400)
                 
-            # For demo, just find any user (or we could pass email) and reset. 
-            # We don't have email in the second step according to the web-portal UI.
-            # Real app: get email from session/cache using the code
-            # Let's just return success for demo purposes if code is '123456'
-            if code == '123456':
-                return JsonResponse({'success': True})
-            else:
-                return JsonResponse({'success': False, 'error': 'Invalid code. Use 123456 for demo.'}, status=400)
+            user = User.all_objects.filter(reset_token=code).first()
+            if not user:
+                return JsonResponse({'success': False, 'error': 'Invalid or incorrect reset code.'}, status=400)
+                
+            if user.reset_token_expiry and user.reset_token_expiry < timezone.now():
+                return JsonResponse({'success': False, 'error': 'Reset code has expired (15 minutes). Please request a new one.'}, status=400)
+                
+            user.set_password(new_password)
+            user.reset_token = None
+            user.reset_token_expiry = None
+            user.save(update_fields=['password', 'reset_token', 'reset_token_expiry'])
+            
+            return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
     return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
@@ -1508,9 +1578,23 @@ def portal_audit_logs(request):
     })
 
 @login_required(login_url='portal_login')
-@permission_required('audit_logs:read')
 def portal_reports(request):
-    return render(request, 'reports.html')
+    from assets.models import AssetCategory, Location
+    from django.utils import timezone
+    tenant = getattr(request.user, 'tenant', None)
+    categories = AssetCategory.objects.filter(tenant=tenant, is_active=True) if tenant else []
+    locations = Location.objects.filter(tenant=tenant, is_active=True) if tenant else []
+    
+    today = timezone.now().date()
+    first_day_of_month = today.replace(day=1)
+    
+    context = {
+        'categories': categories,
+        'locations': locations,
+        'default_date_from': first_day_of_month.strftime('%Y-%m-%d'),
+        'default_date_to': today.strftime('%Y-%m-%d'),
+    }
+    return render(request, 'reports.html', context)
 
 def custom_403_view(request, exception=None):
     import re

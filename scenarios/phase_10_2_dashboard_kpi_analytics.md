@@ -343,71 +343,71 @@ Dưới đây là bảng ma trận kiểm thử chi tiết hóa toàn bộ 17 k�
 
 ### 10.1. Ma Trận Kịch Bản Nghiệp Vụ & Dữ Liệu Biên
 
-- [ ] **TC-DASH-01: Tenant rỗng chưa có dữ liệu (Empty State)**
+- [x] **TC-DASH-01: Tenant rỗng chưa có dữ liệu (Empty State)**
   - *Mô tả*: Một tổ chức mới tạo chưa có tài sản hoặc công việc nào.
   - *Kỳ vọng*: Dashboard tải bình thường; các thẻ KPI hiển thị `0`; tỷ lệ hiển thị `0%`; MTBF/MTTR hiển thị `"N/A"`; biểu đồ trả về 30 ngày đều có giá trị `0`.
 
-- [ ] **TC-DASH-02: Bảo toàn giá trị khi 100% không có sự cố (Zero-Division Safe)**
+- [x] **TC-DASH-02: Bảo toàn giá trị khi 100% không có sự cố (Zero-Division Safe)**
   - *Mô tả*: Nhà máy hoạt động bình thường, không có bất kỳ Work Order sự cố đột xuất nào trong 30 ngày qua ($N_{\text{failures}} = 0$).
   - *Kỳ vọng*: Không xảy ra lỗi chia cho 0; MTBF/MTTR trả về `null`; nhãn hiển thị `"100% Khả dụng (0 Sự cố)"`; độ sẵn sàng vận hành đạt $100.0\%$.
 
-- [ ] **TC-DASH-03: Biến động vòng đời tài sản (Asset Lifecycle Filtering)**
+- [x] **TC-DASH-03: Biến động vòng đời tài sản (Asset Lifecycle Filtering)**
   - *Mô tả*: Tổ chức có 10 máy đang chạy (`OPERATING`), 2 máy dừng (`DOWN`), và công ty thanh lý 50 thiết bị cũ (`SCRAPPED` / `DISPOSED`).
   - *Kỳ vọng*: Tự động loại bỏ 50 thiết bị thanh lý khỏi biến `totalAssets`. Mẫu số tính toán chỉ là $10 + 2 = 12$ máy; 50 máy thanh lý bị loại bỏ hoàn toàn khỏi phân bổ tỷ lệ.
 
-- [ ] **TC-DASH-04: Bù lấp dữ liệu những ngày nghỉ (Zero-filling Time-series)**
+- [x] **TC-DASH-04: Bù lấp dữ liệu những ngày nghỉ (Zero-filling Time-series)**
   - *Mô tả*: Nhà máy nghỉ cuối tuần (Thứ 7, Chủ Nhật) không phát sinh Work Order nào. Trong 30 ngày qua chỉ có 3 ngày có phát sinh công việc.
   - *Kỳ vọng*: Dữ liệu trả về đủ 30 điểm ngày liên tục; các ngày không có việc đều có giá trị `{ created: 0, completed: 0 }`; trục X của biểu đồ không bị gãy hoặc thu hẹp.
 
-- [ ] **TC-DASH-05: Khả năng hoạt động khi dịch vụ bộ đệm gián đoạn (Graceful Cache Fallback)**
+- [x] **TC-DASH-05: Khả năng hoạt động khi dịch vụ bộ đệm gián đoạn (Graceful Cache Fallback)**
   - *Mô tả*: Dịch vụ Redis bị ngắt kết nối hoặc tràn bộ nhớ.
   - *Kỳ vọng*: Hệ thống tự động chuyển tiếp (Fallback) truy vấn trực tiếp cơ sở dữ liệu; trang tải thành công bình thường và không trả về lỗi HTTP 500.
 
-- [ ] **TC-DASH-06: Làm mới bộ đệm theo sự kiện (Event Invalidation Signals)**
+- [x] **TC-DASH-06: Làm mới bộ đệm theo sự kiện (Event Invalidation Signals)**
   - *Mô tả*: Một máy móc chuyển sang trạng thái dừng khẩn cấp (`DOWN`).
   - *Kỳ vọng*: Gọi lại Dashboard ngay lập tức số máy `Down` tăng lên tương ứng mà không phải chờ hết thời gian sống 5 phút của bộ đệm.
 
-- [ ] **TC-DASH-07: Cách ly dữ liệu giữa hai tổ chức độc lập (Multi-Tenant Isolation)**
+- [x] **TC-DASH-07: Cách ly dữ liệu giữa hai tổ chức độc lập (Multi-Tenant Isolation)**
   - *Mô tả*: Người dùng thuộc Tenant A và Tenant B cùng truy cập Dashboard.
   - *Kỳ vọng*: Toàn bộ số liệu KPI, biểu đồ và dòng hoạt động hoàn toàn tách biệt theo từng `tenant_id`.
 
-- [ ] **TC-DASH-08: MTBF & MTTR bị biến dạng do phiếu bảo trì phòng ngừa (PM Exclusion)**
+- [x] **TC-DASH-08: MTBF & MTTR bị biến dạng do phiếu bảo trì phòng ngừa (PM Exclusion)**
   - *Mô tả*: Tháng này nhà máy thực hiện 50 phiếu bảo trì định kỳ (`type == 'PREVENTIVE'`) và chỉ có 1 phiếu sửa chữa khẩn cấp (`type == 'EMERGENCY'`).
   - *Kỳ vọng*: Khi tính MTBF và MTTR, hệ thống bắt buộc loại trừ 50 phiếu PM khỏi mẫu số số lần hỏng hóc. Mẫu số $N_{\text{failures}}$ phải bằng đúng 1, không được đưa 50 phiếu PM vào làm giảm thê thảm MTBF.
 
-- [ ] **TC-DASH-09: Chồng lấn thời gian hoàn thành công việc (Cross-period Completion)**
+- [x] **TC-DASH-09: Chồng lấn thời gian hoàn thành công việc (Cross-period Completion)**
   - *Mô tả*: Kỹ thuật viên nhận 1 Work Order từ tháng trước (ngày 28/07) nhưng đến tháng này (ngày 05/08) mới hoàn thành.
   - *Kỳ vọng*: Trên biểu đồ xu hướng 30 ngày, điểm của đường Created ghi nhận tại ngày 28/07, còn điểm của đường Completed ghi nhận vào đúng ngày 05/08. Không bị bỏ quên phiếu khỏi năng suất của tháng hoàn thành.
 
-- [ ] **TC-DASH-10: Làm tròn tỷ lệ phần trăm phân bổ tài sản (Rounding Percentage Gap)**
+- [x] **TC-DASH-10: Làm tròn tỷ lệ phần trăm phân bổ tài sản (Rounding Percentage Gap)**
   - *Mô tả*: Tổ chức có 3 máy: 1 máy Operating, 1 máy Maintenance, 1 máy Down. Tỷ lệ thô tính ra là $33.333\%$, $33.333\%$, $33.333\%$.
   - *Kỳ vọng*: Dashboard áp dụng thuật toán phần dư lớn nhất (Largest Remainder) để làm tròn thành $33.4\%$, $33.3\%$, $33.3\%$. Tổng 3 trạng thái trên biểu đồ luôn tuyệt đối bằng $100.0\%$, không xảy ra lỗi UI $99.9\%$ hay $100.1\%$.
 
-- [ ] **TC-DASH-11: Chống tràn nhật ký hoạt động (Audit Log Noise Filter)**
+- [x] **TC-DASH-11: Chống tràn nhật ký hoạt động (Audit Log Noise Filter)**
   - *Mô tả*: Cơ sở dữ liệu ghi nhận 10 sự kiện: nhân viên đổi mật khẩu, xem báo cáo, sửa profile, tạo Work Order mới, máy CNC bị sự cố dừng khẩn cấp.
   - *Kỳ vọng*: Activity Feed trên Dashboard chỉ hiển thị 2 sự kiện mang tính tác động vận hành (Tạo Work Order, Máy dừng khẩn cấp). Toàn bộ các log thao tác hệ thống rác (đổi mật khẩu, xem trang, profile) bị loại bỏ hoàn toàn.
 
-- [ ] **TC-DASH-12: Lệch ngày biểu đồ do ranh giới Múi giờ UTC (Timezone Midnight Boundary)**
+- [x] **TC-DASH-12: Lệch ngày biểu đồ do ranh giới Múi giờ UTC (Timezone Midnight Boundary)**
   - *Mô tả*: Kỹ thuật viên bấm hoàn thành phiếu lúc 01:30 AM ngày 01/08 tại Việt Nam (UTC+7), tương ứng 18:30 ngày 31/07 (UTC).
   - *Kỳ vọng*: Điểm hoàn thành trên biểu đồ 30 ngày phải được ghi nhận vào ngày 01/08 theo múi giờ `Asia/Ho_Chi_Minh`, không bị thụt lùi về ngày 31/07.
 
-- [ ] **TC-DASH-13: Cách ly sự cố dở dang chưa hoàn tất (Ongoing Unresolved Downtime)**
+- [x] **TC-DASH-13: Cách ly sự cố dở dang chưa hoàn tất (Ongoing Unresolved Downtime)**
   - *Mô tả*: Một thiết bị bị sự cố từ hôm qua và hiện vẫn đang được sửa chữa (`status = IN_PROGRESS`, chưa có `completed_at`).
   - *Kỳ vọng*: Phiếu này không được đưa vào mẫu số của MTTR; trường `ongoingDownCount` trả về giá trị `1`; thiết bị vẫn được phân bổ vào nhóm `Down`.
 
-- [ ] **TC-DASH-14: Lọc dữ liệu thời gian sửa chữa ngoại lai (Anomalous Duration Filter)**
+- [x] **TC-DASH-14: Lọc dữ liệu thời gian sửa chữa ngoại lai (Anomalous Duration Filter)**
   - *Mô tả*: Có 1 phiếu sửa chữa bị kỹ thuật viên quên đóng trong 3 tháng dẫn đến `actual_duration_hours = 2160`, và 1 phiếu lỗi đồng hồ client dẫn đến thời gian âm (`actual_duration_hours = -2`).
   - *Kỳ vọng*: Cả 2 phiếu bất thường này bị loại trừ khỏi phép tính MTTR tiêu chuẩn, tránh phá vỡ số liệu MTTR của toàn nhà máy.
 
-- [ ] **TC-DASH-15: Phòng chống thảm họa bộ đệm (Cache Stampede Mutex Guardrail)**
+- [x] **TC-DASH-15: Phòng chống thảm họa bộ đệm (Cache Stampede Mutex Guardrail)**
   - *Mô tả*: Khi khóa Redis vừa hết hạn, gửi đồng thời 30 requests `GET /api/v1/dashboard/summary/` vào hệ thống.
   - *Kỳ vọng*: Cơ chế Mutex Lock chỉ cho phép 1 luồng duy nhất thực thi truy vấn tính toán cơ sở dữ liệu; 29 luồng còn lại chờ nhận kết quả đệm; cơ sở dữ liệu không bị nghẽn đột ngột.
 
-- [ ] **TC-DASH-16: An toàn tính biến động $\Delta$ khi kỳ trước rỗng (Safe Delta Zero-Division)**
+- [x] **TC-DASH-16: An toàn tính biến động $\Delta$ khi kỳ trước rỗng (Safe Delta Zero-Division)**
   - *Mô tả*: Tháng trước nhà máy có 0 sự cố (`Previous = 0`), tháng này phát sinh 2 sự cố (`Current = 2`).
   - *Kỳ vọng*: Hệ thống không phát sinh lỗi chia cho 0; hiển thị biến động `delta = "+2"` kèm nhãn `"Kỳ đầu / Mới"`.
 
-- [ ] **TC-DASH-17: Đồng nhất điều kiện lọc khi Drill-Down (Click-through Consistency)**
+- [x] **TC-DASH-17: Đồng nhất điều kiện lọc khi Drill-Down (Click-through Consistency)**
   - *Mô tả*: Thẻ KPI hiển thị "7 Phiếu đang xử lý". Người dùng nhấp vào link `drillDownUrl` chuyển sang màn hình Work Order.
   - *Kỳ vọng*: Trang đích áp dụng chính xác bộ lọc `status=CREATED,ASSIGNED,IN_PROGRESS` và trả về đúng 7 bản ghi khớp hoàn toàn với số hiển thị trên Dashboard.
 
@@ -478,28 +478,28 @@ created_qs = (
 
 ## 12. Kế Hoạch Triển Khai & Nghiệm Thu (Implementation Checklist)
 
-- [ ] **Task 10.2.1 — Calculate Asset Health Distribution**
-  - [ ] Xây dựng dịch vụ tính toán phân bổ 3 trạng thái (`OPERATING`, `MAINTENANCE`, `DOWN`).
-  - [ ] Loại trừ toàn bộ tài sản thanh lý (`SCRAPPED`, `DISPOSED`, `DECOMMISSIONED`).
-  - [ ] Áp dụng thuật toán Hamilton-Hare đảm bảo tổng 3 trạng thái luôn đạt tuyệt đối 100.0%.
-  - [ ] Gán nhãn trạng thái vận hành tổng thể của nhà máy.
-- [ ] **Task 10.2.2 — Calculate MTBF & MTTR Metrics**
-  - [ ] Xây dựng logic tính MTBF loại trừ hoàn toàn 100% phiếu PM (`PREVENTIVE`).
-  - [ ] Bọc an toàn chống lỗi chia cho 0 khi không có sự cố (trả về null và nhãn 100% khả dụng).
-  - [ ] Tính toán MTTR từ thời gian sửa chữa thực tế, cách ly các phiếu sự cố đang dở dang (`ongoingDownCount`).
-  - [ ] Lọc bỏ dữ liệu ngoại lai bất thường (âm hoặc $> 168$ giờ).
-- [ ] **Task 10.2.3 — Dynamic 30-Day Work Order Trends**
-  - [ ] Xây dựng truy vấn gom nhóm số lượng độc lập theo ngày tạo (`created_at`) và ngày hoàn thành (`completed_at`).
-  - [ ] Áp dụng chuyển đổi múi giờ địa phương của Tenant (`AT TIME ZONE`).
-  - [ ] Khởi tạo mảng bù khuyết (Zero-filling) đủ 30 ngày liên tục.
-- [ ] **Task 10.2.4 — Executive Activity Feed**
-  - [ ] Áp dụng bộ lọc danh sách trắng (Whitelist) các sự kiện nghiệp vụ quan trọng từ AuditLog.
-  - [ ] Chuyển đổi định dạng thời gian tương đối thân thiện.
-- [ ] **Task 10.2.5 — Caching, Stampede Protection & Resilience Engine**
-  - [ ] Cài đặt khóa lưu đệm theo Tenant với thời gian sống 5 phút.
-  - [ ] Thiết lập cơ chế khóa Mutex chống nghẽn đồng thời (Cache Stampede).
-  - [ ] Thiết lập cơ chế xóa bộ đệm tức thì khi có biến động sự cố khẩn cấp.
-  - [ ] Thiết lập cơ chế Fallback truy vấn trực tiếp cơ sở dữ liệu khi bộ đệm gặp sự cố.
-- [ ] **Task 10.2.6 — Drill-Down Deep Link & Safe Delta**
-  - [ ] Cung cấp các liên kết Drill-Down chuẩn hóa cho các thẻ KPI.
-  - [ ] Xử lý an toàn khi tính biến động $\Delta$ so với kỳ trước.
+- [x] **Task 10.2.1 — Calculate Asset Health Distribution**
+  - [x] Xây dựng dịch vụ tính toán phân bổ 3 trạng thái (`OPERATING`, `MAINTENANCE`, `DOWN`).
+  - [x] Loại trừ toàn bộ tài sản thanh lý (`SCRAPPED`, `DISPOSED`, `DECOMMISSIONED`).
+  - [x] Áp dụng thuật toán Hamilton-Hare đảm bảo tổng 3 trạng thái luôn đạt tuyệt đối 100.0%.
+  - [x] Gán nhãn trạng thái vận hành tổng thể của nhà máy.
+- [x] **Task 10.2.2 — Calculate MTBF & MTTR Metrics**
+  - [x] Xây dựng logic tính MTBF loại trừ hoàn toàn 100% phiếu PM (`PREVENTIVE`).
+  - [x] Bọc an toàn chống lỗi chia cho 0 khi không có sự cố (trả về null và nhãn 100% khả dụng).
+  - [x] Tính toán MTTR từ thời gian sửa chữa thực tế, cách ly các phiếu sự cố đang dở dang (`ongoingDownCount`).
+  - [x] Lọc bỏ dữ liệu ngoại lai bất thường (âm hoặc $> 168$ giờ).
+- [x] **Task 10.2.3 — Dynamic 30-Day Work Order Trends**
+  - [x] Xây dựng truy vấn gom nhóm số lượng độc lập theo ngày tạo (`created_at`) và ngày hoàn thành (`completed_at`).
+  - [x] Áp dụng chuyển đổi múi giờ địa phương của Tenant (`AT TIME ZONE`).
+  - [x] Khởi tạo mảng bù khuyết (Zero-filling) đủ 30 ngày liên tục.
+- [x] **Task 10.2.4 — Executive Activity Feed**
+  - [x] Áp dụng bộ lọc danh sách trắng (Whitelist) các sự kiện nghiệp vụ quan trọng từ AuditLog.
+  - [x] Chuyển đổi định dạng thời gian tương đối thân thiện.
+- [x] **Task 10.2.5 — Caching, Stampede Protection & Resilience Engine**
+  - [x] Cài đặt khóa lưu đệm theo Tenant với thời gian sống 5 phút.
+  - [x] Thiết lập cơ chế khóa Mutex chống nghẽn đồng thời (Cache Stampede).
+  - [x] Thiết lập cơ chế xóa bộ đệm tức thì khi có biến động sự cố khẩn cấp.
+  - [x] Thiết lập cơ chế Fallback truy vấn trực tiếp cơ sở dữ liệu khi bộ đệm gặp sự cố.
+- [x] **Task 10.2.6 — Drill-Down Deep Link & Safe Delta**
+  - [x] Cung cấp các liên kết Drill-Down chuẩn hóa cho các thẻ KPI.
+  - [x] Xử lý an toàn khi tính biến động $\Delta$ so với kỳ trước.

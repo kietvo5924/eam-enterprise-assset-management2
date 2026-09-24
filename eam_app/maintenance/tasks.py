@@ -87,6 +87,7 @@ def evaluate_triggers():
                     asset_id=assignment.asset_id,
                     title=f"PM: {pm_plan.name} for {assignment.asset.name}",
                     description=pm_plan.description,
+                    type="PREVENTIVE",
                     priority="MEDIUM",
                     status="CREATED",
                     deadline=next_due_date,

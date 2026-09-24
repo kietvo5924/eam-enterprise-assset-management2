@@ -99,7 +99,7 @@ class AuditLog(BaseTenantModel):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user_id = models.CharField(max_length=255, null=True, blank=True)
-    action_type = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    action_type = models.CharField(max_length=50)
     entity_type = models.CharField(max_length=255)
     entity_id = models.CharField(max_length=255)
     timestamp = models.DateTimeField(auto_now_add=True)

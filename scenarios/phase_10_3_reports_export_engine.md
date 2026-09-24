@@ -287,69 +287,69 @@ Dưới đây là bảng ma trận kiểm thử chi tiết hóa toàn bộ 16 k�
 
 ### 9.1. Ma Trận Kịch Bản Nghiệp Vụ Tài Chính & Bảo Trì
 
-- [ ] **TC-REP-01: Ràng buộc chặn sàn khấu hao tài sản (Không âm Net Book Value)**
+- [x] **TC-REP-01: Ràng buộc chặn sàn khấu hao tài sản (Không âm Net Book Value)**
   - *Mô tả*: Thiết bị nguyên giá 100,000,000 VNĐ, khấu hao trong 5 năm, giá trị thanh lý ước tính 5,000,000 VNĐ. Thiết bị đã vận hành sang năm thứ 7.
   - *Kỳ vọng*: Giá trị sổ sách còn lại dừng chính xác ở mức 5,000,000 VNĐ; không bao giờ bị âm; hiển thị trạng thái `"Đã khấu hao hết - Đang vận hành"`.
 
-- [ ] **TC-REP-02: Nhận diện kiến nghị thanh lý thiết bị (RRR $\ge 70\%$)**
+- [x] **TC-REP-02: Nhận diện kiến nghị thanh lý thiết bị (RRR $\ge 70\%$)**
   - *Mô tả*: Máy nén khí có giá trị thay thế 200,000,000 VNĐ, tổng chi phí sửa chữa OPEX tích lũy đạt 145,000,000 VNĐ ($72.5\%$).
   - *Kỳ vọng*: Báo cáo định giá tài sản đánh dấu thiết bị kèm cảnh báo đề xuất lập hội đồng thanh lý và đầu tư mới.
 
-- [ ] **TC-REP-03: Đại tu, nâng cấp tài sản làm thay đổi nguyên giá (CAPEX vs OPEX)**
+- [x] **TC-REP-03: Đại tu, nâng cấp tài sản làm thay đổi nguyên giá (CAPEX vs OPEX)**
   - *Mô tả*: Thiết bị được đại tu thay động cơ chính trị giá 80,000,000 VNĐ, đánh dấu `is_capitalized = True (CAPEX)`. Tổng chi phí sửa chữa thường (OPEX) trước đó là 30,000,000 VNĐ. Giá thay thế là 150,000,000 VNĐ.
   - *Kỳ vọng*: Khoản 80,000,000 VNĐ **không được tính vào tử số của RRR** ($\text{RRR} = \frac{30}{150} = 20\%$, không bị báo động thanh lý sai). Khoản này được cộng vào Nguyên giá để tính lại lịch khấu hao đường thẳng mới.
 
-- [ ] **TC-REP-04: Ghi nhận chi phí cho công việc kéo dài qua nhiều kỳ kế toán (Cross-period Accrual)**
+- [x] **TC-REP-04: Ghi nhận chi phí cho công việc kéo dài qua nhiều kỳ kế toán (Cross-period Accrual)**
   - *Mô tả*: Một Work Order sửa chữa lớn phát sinh từ 25/11 đến 10/12 mới hoàn thành (`completed_at`). Xuất vật tư 20,000,000 VNĐ vào ngày 26/11 và 15,000,000 VNĐ vào ngày 05/12.
   - *Kỳ vọng*: Báo cáo chi phí tháng 11 ghi nhận chính xác 20,000,000 VNĐ; báo cáo tháng 12 ghi nhận 15,000,000 VNĐ. Tuyệt đối không dồn toàn bộ 35,000,000 VNĐ vào tháng 12.
 
-- [ ] **TC-REP-05: Ghi đè và bỏ qua bảo trì định kỳ do trùng lặp (PM Suppression / Overlap)**
+- [x] **TC-REP-05: Ghi đè và bỏ qua bảo trì định kỳ do trùng lặp (PM Suppression / Overlap)**
   - *Mô tả*: Máy có lịch PM vào ngày 15. Ngày 10 máy bị sự cố, đội bảo trì đã xử lý xong sự cố và làm luôn checklist bảo dưỡng định kỳ. Quản lý hủy phiếu PM ngày 15 với lý do `SKIPPED_DUE_TO_OVERLAP`.
   - *Kỳ vọng*: Phiếu bị hủy này bị **loại trừ hoàn toàn khỏi mẫu số** tính tỷ lệ tuân thủ PM Compliance (quy tắc 10%), không bị đánh dấu là "Trễ hạn" hay "Thất bại".
 
-- [ ] **TC-REP-06: Tính toán giá vốn di động khi kho xuất âm (Negative Inventory Valuation)**
+- [x] **TC-REP-06: Tính toán giá vốn di động khi kho xuất âm (Negative Inventory Valuation)**
   - *Mô tả*: Kỹ thuật viên xuất gấp 2 vòng bi khi tồn kho trên hệ thống đang bằng 0 (xuất âm thành -2). Đơn giá bình quân gần nhất là 500,000 VNĐ. 3 ngày sau có phiếu Nhập kho mới với đơn giá thực tế 550,000 VNĐ.
   - *Kỳ vọng*: Work Order tạm tính chi phí ban đầu là $2 \times 500,000 = 1,000,000$ VNĐ. Khi có phiếu Nhập kho, hệ thống tự động sinh bút toán chênh lệch giá (Price Variance) bổ sung $+100,000$ VNĐ vào chi phí thực tế của Work Order.
 
-- [ ] **TC-REP-07: Tài sản luân chuyển giữa các trung tâm chi phí (Temporal Cost Center Slicing)**
+- [x] **TC-REP-07: Tài sản luân chuyển giữa các trung tâm chi phí (Temporal Cost Center Slicing)**
   - *Mô tả*: Xe nâng hoạt động tại Phân xưởng A trong Quý 1, sang Quý 2 được điều chuyển sang Phân xưởng B. Chi phí bảo trì phát sinh trong Quý 1 là 10,000,000 VNĐ, Quý 2 là 15,000,000 VNĐ.
   - *Kỳ vọng*: Báo cáo phân bổ chi phí theo Phân xưởng ghi nhận đúng 10,000,000 VNĐ cho Phân xưởng A và 15,000,000 VNĐ cho Phân xưởng B. Vị trí hiện tại ở Phân xưởng B không được áp đặt lên chi phí lịch sử của Quý 1.
 
-- [ ] **TC-REP-08: Đo lường tuân thủ PM theo quy tắc 10% (10% Compliance Rule)**
+- [x] **TC-REP-08: Đo lường tuân thủ PM theo quy tắc 10% (10% Compliance Rule)**
   - *Mô tả*: Phiếu bảo trì định kỳ chu kỳ 30 ngày, ngày đến hạn là 20/08. Kỹ thuật viên hoàn thành vào ngày 25/08 (trễ 5 ngày $> 3$ ngày $= 10\%$).
   - *Kỳ vọng*: Phiếu được phân loại vào nhóm hoàn thành trễ hạn và làm giảm tỷ lệ `pm_compliance_rate`.
 
-- [ ] **TC-REP-09: Hoàn trả vật tư xuất dư nhập lại kho**
+- [x] **TC-REP-09: Hoàn trả vật tư xuất dư nhập lại kho**
   - *Mô tả*: Kỹ thuật viên xuất 5 lít dầu bảo dưỡng (đơn giá 100,000 VNĐ/lít) nhưng chỉ dùng 3 lít, làm phiếu hoàn trả 2 lít vào kho.
   - *Kỳ vọng*: Kho nhập lại 2 lít theo đúng đơn giá 100,000 VNĐ; chi phí Work Order tự động giảm trừ $200,000$ VNĐ.
 
 ### 9.2. Ma Trận Kịch Bản Kỹ Thuật, Hiệu Năng & An Toàn
 
-- [ ] **TC-PERF-01: Xuất tập dữ liệu lớn không bị tràn bộ nhớ (Chunking & Streaming)**
+- [x] **TC-PERF-01: Xuất tập dữ liệu lớn không bị tràn bộ nhớ (Chunking & Streaming)**
   - *Mô tả*: Xuất báo cáo lịch sử chi phí chứa 50,000 bản ghi ra tệp Excel.
   - *Kỳ vọng*: Worker xử lý theo từng khối `chunk_size=2000`, ghi trực tiếp vào đĩa tạm bằng `openpyxl(write_only=True)`; RAM duy trì ổn định dưới 200MB.
 
-- [ ] **TC-PERF-02: Giới hạn tác vụ xuất đồng thời cho mỗi Tenant (Concurrency Limit)**
+- [x] **TC-PERF-02: Giới hạn tác vụ xuất đồng thời cho mỗi Tenant (Concurrency Limit)**
   - *Mô tả*: Một người dùng gửi liên tiếp 4 yêu cầu xuất báo cáo lớn trong vòng 10 giây.
   - *Kỳ vọng*: 3 yêu cầu đầu tiên được tiếp nhận (HTTP 202); yêu cầu thứ 4 bị từ chối với mã HTTP 429 kèm thông báo giới hạn.
 
-- [ ] **TC-SEC-01: Chống tấn công tiêm mã công thức bảng tính (CSV / Formula Injection)**
+- [x] **TC-SEC-01: Chống tấn công tiêm mã công thức bảng tính (CSV / Formula Injection)**
   - *Mô tả*: Tên phụ tùng hoặc ghi chú bảo trì chứa chuỗi `=SUM(1+1)` hoặc `@cmd|' /C calc'!A0`.
   - *Kỳ vọng*: Tệp Excel/CSV xuất ra tự động thêm dấu nháy đơn `'` ở đầu chuỗi (`'=SUM(1+1)`); khi mở tệp trên Excel hiển thị dạng văn bản thuần túy, không kích hoạt công thức.
 
-- [ ] **TC-SEC-02: Phục hồi tác vụ ma khi Worker bị khởi động lại (Zombie Job Auto-Recovery)**
+- [x] **TC-SEC-02: Phục hồi tác vụ ma khi Worker bị khởi động lại (Zombie Job Auto-Recovery)**
   - *Mô tả*: Worker đang xuất báo cáo thì server bị restart đột ngột, bản ghi `ExportJob` bị kẹt ở trạng thái `PROCESSING`.
   - *Kỳ vọng*: Tác vụ Celery Beat sau 15 phút quét thấy job không cập nhật tiến độ, tự động chuyển thành `FAILED` với thông báo lỗi rõ ràng.
 
-- [ ] **TC-SEC-03: Tự động xóa tệp MinIO sau 7 ngày (Retention Auto-Purge)**
+- [x] **TC-SEC-03: Tự động xóa tệp MinIO sau 7 ngày (Retention Auto-Purge)**
   - *Mô tả*: Kiểm tra các tệp báo cáo đã hoàn tất xuất quá 7 ngày trước đó.
   - *Kỳ vọng*: Tác vụ Celery Beat hàng đêm xóa thành công tệp vật lý trên MinIO và cập nhật trạng thái `ExportJob` thành `EXPIRED`.
 
-- [ ] **TC-SEC-04: Cách ly tệp xuất giữa các tổ chức (Multi-Tenant Isolation)**
+- [x] **TC-SEC-04: Cách ly tệp xuất giữa các tổ chức (Multi-Tenant Isolation)**
   - *Mô tả*: Người dùng thuộc Tenant A gọi API lấy liên kết tải tệp mang `job_id` của Tenant B.
   - *Kỳ vọng*: Hệ thống trả về `404 Not Found` hoặc `403 Forbidden`, tuyệt đối không sinh Presigned URL của Tenant khác.
 
-- [ ] **TC-SEC-05: Độ chính xác số học tài chính VNĐ (Decimal Precision)**
+- [x] **TC-SEC-05: Độ chính xác số học tài chính VNĐ (Decimal Precision)**
   - *Mô tả*: Tính tổng chi phí của 1,000 dòng vật tư lẻ và khấu hao hàng tháng.
   - *Kỳ vọng*: Sử dụng kiểu `Decimal` trong Python, tổng tiền khớp tuyệt đối từng đồng VNĐ so với phép cộng thủ công, không bị sai số dấu phẩy động của kiểu `float`.
 
@@ -415,25 +415,25 @@ def cleanup_zombie_export_jobs():
 
 ## 11. Kế Hoạch Triển Khai & Nghiệm Thu (Implementation Checklist)
 
-- [ ] **Task 10.3.1 — Interactive Analytics Interface**
-  - [ ] Xây dựng giao diện phân hệ 4 tab báo cáo chuyên sâu.
-  - [ ] Chế độ xem kép Biểu đồ tổng quan và Bảng dữ liệu chi tiết.
-- [ ] **Task 10.3.2 — Multi-Filter Engine & Accrual Query**
-  - [ ] Xây dựng bộ lọc đa tiêu chí (ngày phát sinh, danh mục, phân xưởng, tùy chọn loại trừ CAPEX).
-  - [ ] Xây dựng truy vấn kế toán dồn tích (Accrual query) theo ngày xuất kho và ngày chấm công thực tế.
-- [ ] **Task 10.3.3 — Asset Valuation & Capitalization Report**
-  - [ ] Xây dựng logic tính khấu hao đường thẳng có chặn sàn giá trị thanh lý ước tính.
-  - [ ] Xây dựng thuật toán tính chỉ số RRR loại trừ chi phí CAPEX.
-  - [ ] Xây dựng cơ chế vốn hóa chi phí đại tu CAPEX vào nguyên giá và tính lại khấu hao mới.
-- [ ] **Task 10.3.4 — Maintenance Performance & Resolution Report**
-  - [ ] Xây dựng logic đo lường tỷ lệ hoàn thành đúng hạn và tỷ lệ tuân thủ PM theo quy tắc 10%.
-  - [ ] Xử lý trạng thái `SKIPPED_DUE_TO_OVERLAP` loại trừ khỏi mẫu số tính tuân thủ PM.
-- [ ] **Task 10.3.5 — Spare Parts Valuation & Variance Engine**
-  - [ ] Xây dựng thuật toán định giá xuất kho theo chuẩn bình quân gia quyền di động.
-  - [ ] Xử lý tạm tính chi phí khi kho xuất âm và tự động sinh bút toán chênh lệch giá (Price Variance) khi có phiếu Nhập kho.
-  - [ ] Xử lý hoàn trừ chi phí khi vật tư xuất dư được nhập lại kho.
-- [ ] **Task 10.3.6 — Asynchronous Export Engine with MinIO & Resilience**
-  - [ ] Xây dựng model `ExportJob` và cơ chế khống chế tối đa 3 jobs đồng thời cho mỗi Tenant.
-  - [ ] Tác vụ Celery xuất Excel/PDF tối ưu bộ nhớ qua chunking và streaming.
-  - [ ] Tích hợp hàm khử độc chuỗi chống tiêm mã công thức (Formula Injection).
-  - [ ] Tác vụ ngầm dọn dẹp tệp MinIO sau 7 ngày và tự động phục hồi tác vụ ma (Zombie Job).
+- [x] **Task 10.3.1 — Interactive Analytics Interface**
+  - [x] Xây dựng giao diện phân hệ 4 tab báo cáo chuyên sâu.
+  - [x] Chế độ xem kép Biểu đồ tổng quan và Bảng dữ liệu chi tiết.
+- [x] **Task 10.3.2 — Multi-Filter Engine & Accrual Query**
+  - [x] Xây dựng bộ lọc đa tiêu chí (ngày phát sinh, danh mục, phân xưởng, tùy chọn loại trừ CAPEX).
+  - [x] Xây dựng truy vấn kế toán dồn tích (Accrual query) theo ngày xuất kho và ngày chấm công thực tế.
+- [x] **Task 10.3.3 — Asset Valuation & Capitalization Report**
+  - [x] Xây dựng logic tính khấu hao đường thẳng có chặn sàn giá trị thanh lý ước tính.
+  - [x] Xây dựng thuật toán tính chỉ số RRR loại trừ chi phí CAPEX.
+  - [x] Xây dựng cơ chế vốn hóa chi phí đại tu CAPEX vào nguyên giá và tính lại khấu hao mới.
+- [x] **Task 10.3.4 — Maintenance Performance & Resolution Report**
+  - [x] Xây dựng logic đo lường tỷ lệ hoàn thành đúng hạn và tỷ lệ tuân thủ PM theo quy tắc 10%.
+  - [x] Xử lý trạng thái `SKIPPED_DUE_TO_OVERLAP` loại trừ khỏi mẫu số tính tuân thủ PM.
+- [x] **Task 10.3.5 — Spare Parts Valuation & Variance Engine**
+  - [x] Xây dựng thuật toán định giá xuất kho theo chuẩn bình quân gia quyền di động.
+  - [x] Xử lý tạm tính chi phí khi kho xuất âm và tự động sinh bút toán chênh lệch giá (Price Variance) khi có phiếu Nhập kho.
+  - [x] Xử lý hoàn trừ chi phí khi vật tư xuất dư được nhập lại kho.
+- [x] **Task 10.3.6 — Asynchronous Export Engine with MinIO & Resilience**
+  - [x] Xây dựng model `ExportJob` và cơ chế khống chế tối đa 3 jobs đồng thời cho mỗi Tenant.
+  - [x] Tác vụ Celery xuất Excel/PDF tối ưu bộ nhớ qua chunking và streaming.
+  - [x] Tích hợp hàm khử độc chuỗi chống tiêm mã công thức (Formula Injection).
+  - [x] Tác vụ ngầm dọn dẹp tệp MinIO sau 7 ngày và tự động phục hồi tác vụ ma (Zombie Job).

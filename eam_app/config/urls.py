@@ -33,16 +33,21 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('portal.urls')),
+    path('portal/', include('portal.urls')),
+    path('favicon.ico', lambda r: HttpResponse(status=204)),
     path('api/v1/', include('users.urls')),
     path('api/v1/', include('core.urls')),
     path('api/v1/', include('assets.urls')),
     path('api/v1/', include('workorders.urls')),
     path('api/v1/', include('maintenance.urls')),
     path('api/v1/', include('notifications.urls')),
+    path('api/v1/dashboard/', include('analytics.urls')),
+    path('api/v1/reports/', include('analytics.report_urls')),
 ]
 
 handler403 = 'portal.views.custom_403_view'

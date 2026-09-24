@@ -1,6 +1,14 @@
+# Environment & Secrets
 .env
 .env.*
+*.env
+**/.env
+**/.env.*
 !.env.example
+*.pem
+*.key
+*.secret
+
 node_modules/
 dist/
 build/

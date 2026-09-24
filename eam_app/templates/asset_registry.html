@@ -6,9 +6,9 @@
 
 {% block content %}
 <!-- Main Content -->
-<div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-full">
+<div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
   <!-- Left Pane: Asset List -->
-  <div id="left-pane" class="w-full md:w-1/3 md:min-w-[320px] md:max-w-sm flex bg-white border border-neutral-200 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex-col overflow-hidden transition-all duration-300 relative">
+  <div id="left-pane" class="w-full md:w-1/3 md:min-w-[320px] md:max-w-sm flex bg-white border border-neutral-200 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex-col overflow-hidden transition-all duration-300 relative h-full max-h-full">
 
     <!-- Full Header -->
     <div id="left-pane-header" class="p-3 border-b border-neutral-200 bg-white flex items-center justify-between z-10 shadow-sm shrink-0">
@@ -61,14 +61,14 @@
     </div>
 
     <!-- Content -->
-    <div id="left-pane-content" class="flex-1 flex flex-col overflow-hidden">
+    <div id="left-pane-content" class="flex-1 flex flex-col overflow-hidden min-h-0 h-full">
       <div class="p-2 border-b border-neutral-100 bg-neutral-50/50 shrink-0">
         <div class="relative">
           <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm"></i>
           <input type="text" id="search-input" onkeyup="applyFilters()" placeholder="Tìm tên, mã Serial..." class="w-full pl-9 pr-3 py-1.5 h-9 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto p-2 text-sm select-none custom-scrollbar">
+      <div class="flex-1 overflow-y-auto min-h-0 p-2 text-sm select-none custom-scrollbar">
         {% for node in tree_locations %}
           {% with depth=0 %}
             {% include "partials/tree_node.html" %}
@@ -106,7 +106,7 @@
   </div>
 
   <!-- Right Pane: Asset Details -->
-  <div id="right-pane" class="flex-1 bg-white border border-neutral-200 rounded-xl flex-col overflow-hidden min-w-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hidden md:flex relative">
+  <div id="right-pane" class="flex-1 bg-white border border-neutral-200 rounded-xl flex-col overflow-hidden min-w-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hidden md:flex relative h-full max-h-full">
     
     <!-- Empty State -->
     <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-neutral-400 p-6">
@@ -116,7 +116,7 @@
     </div>
 
     <!-- Details View -->
-    <div id="details-view" class="hidden flex-col h-full">
+    <div id="details-view" class="hidden flex flex-col h-full max-h-full overflow-hidden">
       <div class="p-4 sm:p-6 border-b border-neutral-200 bg-white shrink-0 relative overflow-hidden">
         <div class="absolute top-0 right-0 -mr-16 -mt-16 w-[300px] h-[300px] rounded-full bg-gradient-to-bl from-info/10 via-primary-100/20 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
         <div class="flex flex-wrap justify-between items-start gap-4 sm:gap-6 relative z-10">
@@ -172,7 +172,7 @@
       </div>
 
       <!-- Scrollable Content -->
-      <div class="flex-1 overflow-y-auto bg-neutral-50/60 p-4 sm:p-6 custom-scrollbar">
+      <div class="flex-1 overflow-y-auto min-h-0 bg-neutral-50/60 p-4 sm:p-6 custom-scrollbar">
         <div class="space-y-4 sm:space-y-6">
 
           <!-- TOP CARDS -->

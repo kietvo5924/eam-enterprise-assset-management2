@@ -1,225 +1,1124 @@
 {% extends "base.html" %}
 
-{% block title %}System Reports - Enterprise Asset Management{% endblock %}
+{% block title %}Báo Cáo & Thống Kê Doanh Nghiệp — Enterprise Asset Management{% endblock %}
 
 {% block content %}
-<div class="flex-1 flex flex-col h-full overflow-hidden">
-  
-  <!-- Feature Under Development Banner -->
-  <div class="mb-6 bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center gap-4 shadow-sm relative overflow-hidden">
-    <div class="absolute top-0 right-0 w-32 h-32 bg-warning/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-    <div class="w-10 h-10 bg-warning/20 rounded-full flex items-center justify-center shrink-0">
-      <i class="ph-fill ph-warning-circle text-warning text-xl animate-pulse"></i>
-    </div>
-    <div>
-      <h3 class="font-bold text-neutral-900 text-sm">Tính Năng Đang Phát Triển</h3>
-      <p class="text-neutral-600 text-xs mt-0.5">Phân hệ Báo cáo (System Reports) đang trong quá trình hoàn thiện. Các chức năng và nút bấm hiện tại chỉ mang tính chất minh họa giao diện.</p>
-    </div>
-  </div>
+{% csrf_token %}
+<div class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
 
-  <!-- Page Header -->
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-    <div>
-      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1">ANALYTICS</p>
-      <h2 class="text-[26px] leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-3">
-        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-2xl shrink-0">
-          <i class="ph-fill ph-chart-line-up"></i>
+  <!-- Top Action Bar -->
+  <div class="px-6 pt-6 pb-4 shrink-0">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-[10px] font-bold text-primary bg-primary-50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Enterprise Analytics</span>
+          <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">VAS 03 Compliant</span>
         </div>
-        System Reports
-        <span class="text-[10px] bg-warning text-white px-2 py-1 rounded-md ml-2 align-middle font-bold">Đang phát triển</span>
-      </h2>
-    </div>
-    <div class="flex items-center gap-2 opacity-70">
-      <button class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 font-bold text-sm rounded-lg flex items-center gap-1.5 shadow-sm cursor-not-allowed">
-        <i class="ph-bold ph-calendar"></i> Date Range (Đang phát triển)
-      </button>
-      <button class="px-4 py-2 bg-primary text-white font-bold text-sm rounded-lg flex items-center gap-1.5 shadow-sm shadow-primary/30 cursor-not-allowed">
-        <i class="ph-bold ph-download-simple"></i> Export PDF (Đang phát triển)
-      </button>
-    </div>
-  </div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-primary/20 shrink-0">
+            <i class="ph-fill ph-chart-line-up text-xl"></i>
+          </div>
+          Phân Hệ Báo Cáo & Xuất Tệp Doanh Nghiệp
+        </h1>
+        <p class="text-xs text-slate-500 mt-1">Động cơ tính toán khấu hao tài sản chặn sàn VAS 03, tuân thủ PM 10%, tiêu hao phụ tùng và kế toán dồn tích đa kỳ.</p>
+      </div>
 
-  <!-- KPI Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary">
-          <i class="ph-fill ph-file-text"></i>
-        </div>
-        <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-green-50 text-green-700">
-          +12
-        </span>
-      </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total Reports</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">124</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-    </div>
-    
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-green-50 text-success">
-          <i class="ph-fill ph-activity"></i>
-        </div>
-        <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-green-50 text-green-700">
-          +0.5%
-        </span>
-      </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Avg Uptime</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">98.2%</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-    </div>
-    
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-orange-50 text-warning">
-          <i class="ph-fill ph-currency-dollar"></i>
-        </div>
-        <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-red-50 text-red-700">
-          -2.4%
-        </span>
-      </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total Cost</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">$45K</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-    </div>
-    
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-red-50 text-danger">
-          <i class="ph-fill ph-warning-circle"></i>
-        </div>
-        <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-red-50 text-red-700">
-          -1
-        </span>
-      </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Critical Assets</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">18</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-red-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-    </div>
-  </div>
-
-  <div class="bg-white border border-neutral-200 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col h-full overflow-hidden">
-    
-    <div class="p-4 border-b border-neutral-200 shrink-0 flex justify-between items-center bg-white">
-      <div class="flex items-center gap-4">
-        <h3 class="font-bold text-lg">Monthly Analytics</h3>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="flex bg-neutral-100 rounded-lg p-1">
-          <button class="px-3 py-1.5 bg-white shadow-sm rounded-md text-sm font-bold text-neutral-800">Charts</button>
-          <button class="px-3 py-1.5 rounded-md text-sm font-medium text-neutral-500 hover:text-neutral-700">Data Grid</button>
-        </div>
-        <button class="px-3 py-1.5 border border-neutral-200 text-neutral-600 font-bold text-sm hover:bg-neutral-50 rounded-lg flex items-center gap-1.5 transition-colors">
-          <i class="ph-bold ph-funnel"></i> Filters
+      <div class="flex items-center gap-3 self-stretch md:self-auto">
+        <button id="btnOpenHistory" onclick="openHistoryModal()" class="px-4 py-2.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95">
+          <i class="ph-bold ph-clock-counter-clockwise text-base text-slate-500"></i>
+          Lịch Sử Tệp Xuất
+        </button>
+        <button id="btnOpenExportModal" onclick="openExportModal()" class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md shadow-primary/25 transition-all active:scale-95">
+          <i class="ph-bold ph-download-simple text-base"></i>
+          Xuất Báo Cáo
         </button>
       </div>
     </div>
-    <div class="flex-1 overflow-auto bg-neutral-50 p-6">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        <div class="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm">
-          <h3 class="font-bold text-neutral-800 mb-6">Asset Downtime by Category</h3>
-          <div class="flex justify-center items-center h-64 relative">
-            <!-- Fake Donut Chart -->
-            <svg viewBox="0 0 100 100" class="w-48 h-48 transform -rotate-90">
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#e2e8f0" stroke-width="20" />
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#00a0e2" stroke-width="20" stroke-dasharray="251.2" stroke-dashoffset="60" />
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#faad14" stroke-width="20" stroke-dasharray="251.2" stroke-dashoffset="190" />
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span class="text-2xl font-black text-neutral-900">45</span>
-              <span class="text-[10px] font-bold text-neutral-400">HOURS</span>
-            </div>
+
+    <!-- 4 Subsystem Navigation Tabs -->
+    <div class="flex border-b border-slate-200 mt-6 gap-2 overflow-x-auto no-scrollbar">
+      <button onclick="switchTab('ASSET_VALUATION')" id="tab-ASSET_VALUATION" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        <i class="ph-bold ph-money text-base"></i>
+        <span>1. Khấu Hao & Định Giá Tài Sản (VAS 03)</span>
+      </button>
+      <button onclick="switchTab('MAINTENANCE_PERFORMANCE')" id="tab-MAINTENANCE_PERFORMANCE" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        <i class="ph-bold ph-gauge text-base"></i>
+        <span>2. Hiệu Suất Bảo Trì & Tuân Thủ PM</span>
+      </button>
+      <button onclick="switchTab('SPARE_PARTS')" id="tab-SPARE_PARTS" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        <i class="ph-bold ph-package text-base"></i>
+        <span>3. Tiêu Hao Phụ Tùng & Kho</span>
+      </button>
+      <button onclick="switchTab('COST_SUMMARY')" id="tab-COST_SUMMARY" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+        <i class="ph-bold ph-chart-pie-slice text-base"></i>
+        <span>4. Tổng Hợp Chi Phí Đa Kỳ (Accrual)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Smart Filter Bar -->
+  <div class="px-6 py-3 bg-white border-y border-slate-200 shadow-sm shrink-0">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Date Presets & Inputs -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Bộ Lọc:</span>
+        <div class="inline-flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+          <button id="preset-THIS_MONTH" onclick="setDatePreset('THIS_MONTH', event)" class="date-preset px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm transition-all">Tháng Này</button>
+          <button id="preset-LAST_MONTH" onclick="setDatePreset('LAST_MONTH', event)" class="date-preset px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">Tháng Trước</button>
+          <button id="preset-THIS_QUARTER" onclick="setDatePreset('THIS_QUARTER', event)" class="date-preset px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">Quý Này</button>
+          <button id="preset-THIS_YEAR" onclick="setDatePreset('THIS_YEAR', event)" class="date-preset px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition-all">Năm Nay</button>
+        </div>
+
+        <div class="flex items-center gap-1.5 text-xs text-slate-500 ml-2">
+          <input type="date" id="filterDateFrom" value="{{ default_date_from }}" class="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none">
+          <span>đến</span>
+          <input type="date" id="filterDateTo" value="{{ default_date_to }}" class="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Specific Filters (Dropdowns) -->
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="filterLocation" class="px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none">
+          <option value="">-- Tất cả Phân Xưởng / Vị Trí --</option>
+          {% for loc in locations %}
+          <option value="{{ loc.id }}">{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+
+        <select id="filterCategory" class="px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none">
+          <option value="">-- Tất cả Danh Mục --</option>
+          {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+          <input type="checkbox" id="filterIncludeCapex" class="rounded border-slate-300 text-primary focus:ring-primary/50">
+          <span>Bao gồm CAPEX</span>
+        </label>
+
+        <button onclick="applyFilters()" class="px-4 py-1.5 bg-primary text-white font-bold text-xs rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-1.5 shadow-sm shadow-primary/20">
+          <i class="ph-bold ph-funnel"></i> Lọc
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Main Scrollable Content -->
+  <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+    <!-- Dynamic KPI Summary Cards -->
+    <div id="kpiContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Injected via JavaScript based on active tab -->
+    </div>
+
+    <!-- Analytics Workspace (Dual View: Charts & Data Grid) -->
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+      
+      <!-- Toolbar -->
+      <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
+        <div class="flex items-center gap-3">
+          <h2 id="reportViewTitle" class="font-black text-slate-800 text-base flex items-center gap-2">
+            Bảng Dữ Liệu Chi Tiết
+          </h2>
+          <span id="recordCountBadge" class="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md">
+            Đang tải...
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- View Toggle -->
+          <div class="inline-flex bg-slate-200/70 p-0.5 rounded-lg text-xs font-bold">
+            <button id="btnViewCharts" onclick="setViewMode('CHARTS')" class="px-3 py-1 rounded-md text-slate-600 transition-all">
+              <i class="ph-bold ph-chart-pie align-middle mr-1"></i>Biểu Đồ
+            </button>
+            <button id="btnViewGrid" onclick="setViewMode('GRID')" class="px-3 py-1 rounded-md bg-white text-slate-900 shadow-sm transition-all">
+              <i class="ph-bold ph-table align-middle mr-1"></i>Bảng Dữ Liệu
+            </button>
           </div>
-          <div class="flex justify-center gap-4 mt-4">
-            <div class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600"><span class="w-3 h-3 rounded-full bg-primary"></span> Mechanical</div>
-            <div class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600"><span class="w-3 h-3 rounded-full bg-warning"></span> Electrical</div>
+
+          <!-- Fast Search -->
+          <div class="relative">
+            <input type="text" id="reportSearchInput" placeholder="Tìm kiếm nhanh..." onkeyup="handleSearch(event)" class="pl-8 pr-3 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:outline-none w-44">
+            <i class="ph-bold ph-magnifying-glass absolute left-2.5 top-1.5 text-slate-400 text-xs"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content Views -->
+      <div class="p-6">
+        
+        <!-- Charts View Panel -->
+        <div id="panelCharts" class="hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+              <h3 id="chart1Title" class="font-bold text-slate-800 text-sm mb-4">Phân Bổ Theo Phân Xưởng / Danh Mục</h3>
+              <div id="chart1Container" class="h-64 flex flex-col justify-center items-center">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-5">
+              <h3 id="chart2Title" class="font-bold text-slate-800 text-sm mb-4">Cơ Cấu Tài Chính & Tỷ Lệ</h3>
+              <div id="chart2Container" class="h-64 flex flex-col justify-center items-center">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <div class="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm">
-          <h3 class="font-bold text-neutral-800 mb-6">Maintenance Cost Trend</h3>
-          <div class="flex justify-center items-center h-64">
-            <!-- Fake Bar Chart -->
-            <div class="flex items-end gap-2 w-full h-full px-4">
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 40%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $4800
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M1</span>
-              </div>
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 60%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $7200
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M2</span>
-              </div>
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 30%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $3600
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M3</span>
-              </div>
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 80%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $9600
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M4</span>
-              </div>
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 50%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $6000
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M5</span>
-              </div>
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 90%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $10800
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M6</span>
-              </div>
-              
-              <div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                <div class="w-full bg-primary-100 rounded-t-sm group-hover:bg-primary transition-colors relative" style="height: 70%">
-                   <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                      $8400
-                   </div>
-                </div>
-                <span class="text-[10px] font-bold text-neutral-400">M7</span>
-              </div>
-              
-            </div>
+        <!-- Data Grid View Panel -->
+        <div id="panelGrid" class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead id="reportTableHead" class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+              <!-- Injected via JS -->
+            </thead>
+            <tbody id="reportTableBody" class="divide-y divide-slate-100 text-slate-600">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+          <div id="tableEmptyState" class="hidden py-16 text-center text-slate-400">
+            <i class="ph-fill ph-tray text-4xl mb-2 text-slate-300"></i>
+            <p class="font-semibold text-sm text-slate-600">Không có bản ghi nào phù hợp với bộ lọc</p>
+            <p class="text-xs text-slate-400 mt-1">Vui lòng điều chỉnh khoảng thời gian hoặc bỏ bớt tiêu chí lọc.</p>
           </div>
         </div>
 
       </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Modal Xuất Báo Cáo (Async Export Modal) -->
+<div id="exportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center text-xl shrink-0">
+          <i class="ph-bold ph-cloud-arrow-down"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900 text-base">Khởi Tạo Xuất Báo Cáo</h3>
+          <p class="text-xs text-slate-500">Tác vụ chạy ngầm Celery & Lưu kho MinIO</p>
+        </div>
+      </div>
+      <button onclick="closeExportModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-2">Phân Hệ Báo Cáo:</label>
+        <div id="exportModalReportLabel" class="p-3 bg-slate-100 rounded-xl font-bold text-slate-800 text-xs flex items-center gap-2">
+          <i class="ph-fill ph-file-text text-primary text-base"></i>
+          <span id="exportModalReportText">Báo cáo Khấu hao & Định giá tài sản</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-2">Định Dạng Tệp Cần Xuất:</label>
+        <div class="grid grid-cols-3 gap-3">
+          <label class="format-choice border-2 border-primary bg-primary-50/50 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-all">
+            <input type="radio" name="exportFormat" value="XLSX" checked class="hidden">
+            <i class="ph-fill ph-file-xls text-emerald-600 text-2xl mb-1"></i>
+            <span class="font-bold text-xs text-slate-800">Excel (.xlsx)</span>
+            <span class="text-[9px] text-slate-500">Streaming</span>
+          </label>
+          <label class="format-choice border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-all">
+            <input type="radio" name="exportFormat" value="PDF" class="hidden">
+            <i class="ph-fill ph-file-pdf text-rose-600 text-2xl mb-1"></i>
+            <span class="font-bold text-xs text-slate-800">PDF (.pdf)</span>
+            <span class="text-[9px] text-slate-500">In ấn</span>
+          </label>
+          <label class="format-choice border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-all">
+            <input type="radio" name="exportFormat" value="CSV" class="hidden">
+            <i class="ph-fill ph-file-csv text-blue-600 text-2xl mb-1"></i>
+            <span class="font-bold text-xs text-slate-800">CSV (.csv)</span>
+            <span class="text-[9px] text-slate-500">Dữ liệu thô</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="p-3 bg-amber-50 rounded-xl border border-amber-200/60 text-xs text-amber-800 flex items-start gap-2.5">
+        <i class="ph-fill ph-shield-check text-amber-600 text-base shrink-0 mt-0.5"></i>
+        <div>
+          <p class="font-bold text-[11px]">Bảo Mật & Tuân Thủ Vòng Đời Tệp:</p>
+          <p class="text-[10px] text-amber-700 mt-0.5">Tệp xuất ra được mã hóa và tự động khử độc chuỗi chống Formula Injection. Tệp trên MinIO sẽ tự động xóa sau 7 ngày.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+      <button onclick="closeExportModal()" class="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-100 transition-colors">
+        Hủy Bỏ
+      </button>
+      <button id="btnSubmitExport" onclick="submitExportJob()" class="px-5 py-2 bg-primary text-white font-bold text-xs rounded-xl hover:bg-primary-600 transition-all shadow-md shadow-primary/25 flex items-center gap-2">
+        <i class="ph-bold ph-paper-plane-tilt"></i>
+        Bắt Đầu Xuất
+      </button>
     </div>
   </div>
 </div>
+
+<!-- Modal Lịch Sử Xuất Tệp (History Modal) -->
+<div id="historyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[80vh]">
+    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-xl shrink-0">
+          <i class="ph-bold ph-clock-counter-clockwise"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900 text-base">Lịch Sử Các Tác Vụ Xuất Tệp</h3>
+          <p class="text-xs text-slate-500">Danh sách các tệp báo cáo đã tạo trong 7 ngày qua</p>
+        </div>
+      </div>
+      <button onclick="closeHistoryModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+
+    <div class="p-6 overflow-y-auto flex-1 divide-y divide-slate-100" id="historyListContainer">
+      <!-- Injected via JS -->
+    </div>
+
+    <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0 text-xs text-slate-500">
+      <span>* Liên kết tải tệp có hiệu lực trong 24 giờ.</span>
+      <button onclick="closeHistoryModal()" class="px-4 py-1.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-colors">
+        Đóng
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Background Job Progress Drawer (Góc Phải Dưới) -->
+<div id="floatingJobDrawer" class="fixed bottom-6 right-6 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-80 transform translate-y-32 opacity-0 pointer-events-none transition-all duration-300">
+  <div class="flex justify-between items-start mb-2">
+    <div class="flex items-center gap-2">
+      <div id="jobDrawerIcon" class="w-7 h-7 rounded-lg bg-primary-50 text-primary flex items-center justify-center text-sm animate-spin">
+        <i class="ph-bold ph-spinner"></i>
+      </div>
+      <div>
+        <h4 id="jobDrawerTitle" class="font-bold text-slate-800 text-xs">Đang xuất báo cáo...</h4>
+        <p id="jobDrawerSubtitle" class="text-[10px] text-slate-400">Vui lòng chờ tác vụ Celery xử lý</p>
+      </div>
+    </div>
+    <button onclick="dismissJobDrawer()" class="text-slate-400 hover:text-slate-700 text-sm">
+      <i class="ph-bold ph-x"></i>
+    </button>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="w-full bg-slate-100 rounded-full h-2 mb-3 overflow-hidden">
+    <div id="jobDrawerProgressBar" class="bg-primary h-2 rounded-full transition-all duration-300" style="width: 15%"></div>
+  </div>
+
+  <div class="flex justify-between items-center">
+    <span id="jobDrawerPercent" class="text-[10px] font-bold text-slate-500">15% Hoàn tất</span>
+    <div id="jobDrawerActions">
+      <!-- Download button appears when COMPLETED -->
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript Logic Phân Hệ Báo Cáo -->
+<script>
+  let currentTab = 'ASSET_VALUATION';
+  let currentViewMode = 'GRID';
+  let activePollingJobId = null;
+  let pollInterval = null;
+  let lastPreviewData = null;
+
+  // Format choice selector in modal
+  document.querySelectorAll('.format-choice').forEach(label => {
+    label.addEventListener('click', () => {
+      document.querySelectorAll('.format-choice').forEach(l => {
+        l.classList.remove('border-2', 'border-primary', 'bg-primary-50/50');
+        l.classList.add('border-slate-200');
+      });
+      label.classList.add('border-2', 'border-primary', 'bg-primary-50/50');
+      label.classList.remove('border-slate-200');
+    });
+  });
+
+  function formatVnd(val) {
+    if (val === null || val === undefined) return '0 đ';
+    return new Intl.NumberFormat('vi-VN').format(Math.round(val)) + ' đ';
+  }
+
+  function switchTab(tabKey) {
+    currentTab = tabKey;
+    document.querySelectorAll('.report-tab').forEach(tab => {
+      tab.classList.remove('border-primary', 'text-primary', 'bg-white', 'shadow-sm');
+      tab.classList.add('border-transparent', 'text-slate-500');
+    });
+
+    const activeTab = document.getElementById(`tab-${tabKey}`);
+    if (activeTab) {
+      activeTab.classList.add('border-primary', 'text-primary', 'bg-white', 'shadow-sm');
+      activeTab.classList.remove('border-transparent', 'text-slate-500');
+    }
+
+    const tabTitles = {
+      'ASSET_VALUATION': 'Bảng Chi Tiết Khấu Hao & Định Giá Tài Sản (VAS 03)',
+      'MAINTENANCE_PERFORMANCE': 'Bảng Theo Dõi Lệnh Bảo Trì & Tuân Thủ PM',
+      'SPARE_PARTS': 'Bảng Danh Mục Phụ Tùng & Tồn Kho',
+      'COST_SUMMARY': 'Bảng Tổng Hợp Chi Phí Đa Kỳ Theo Phân Xưởng'
+    };
+    const titleEl = document.getElementById('reportViewTitle');
+    if (titleEl) {
+      titleEl.innerText = tabTitles[tabKey] || 'Bảng Dữ Liệu Chi Tiết';
+    }
+
+    // Toggle specific filter visibility
+    const capexCheckbox = document.getElementById('filterIncludeCapex').parentElement;
+    if (tabKey === 'COST_SUMMARY') {
+      capexCheckbox.classList.remove('hidden');
+    } else {
+      capexCheckbox.classList.add('hidden');
+    }
+
+    loadReportPreview();
+  }
+
+  function setViewMode(mode) {
+    currentViewMode = mode;
+    const btnCharts = document.getElementById('btnViewCharts');
+    const btnGrid = document.getElementById('btnViewGrid');
+    const panelCharts = document.getElementById('panelCharts');
+    const panelGrid = document.getElementById('panelGrid');
+
+    if (mode === 'CHARTS') {
+      btnCharts.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+      btnCharts.classList.remove('text-slate-600');
+      btnGrid.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+      btnGrid.classList.add('text-slate-600');
+      panelCharts.classList.remove('hidden');
+      panelGrid.classList.add('hidden');
+      renderCharts();
+    } else {
+      btnGrid.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+      btnGrid.classList.remove('text-slate-600');
+      btnCharts.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+      btnCharts.classList.add('text-slate-600');
+      panelGrid.classList.remove('hidden');
+      panelCharts.classList.add('hidden');
+    }
+  }
+
+  function setDatePreset(preset, evt) {
+    const now = new Date();
+    let dateFrom, dateTo;
+
+    document.querySelectorAll('.date-preset').forEach(btn => {
+      btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+      btn.classList.add('text-slate-600');
+    });
+
+    const activeBtn = evt ? evt.currentTarget : document.getElementById(`preset-${preset}`);
+    if (activeBtn) {
+      activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+      activeBtn.classList.remove('text-slate-600');
+    }
+
+    if (preset === 'THIS_MONTH') {
+      dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateTo = now;
+    } else if (preset === 'LAST_MONTH') {
+      dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      dateTo = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else if (preset === 'THIS_QUARTER') {
+      const qStartMonth = Math.floor(now.getMonth() / 3) * 3;
+      dateFrom = new Date(now.getFullYear(), qStartMonth, 1);
+      dateTo = now;
+    } else if (preset === 'THIS_YEAR') {
+      dateFrom = new Date(now.getFullYear(), 0, 1);
+      dateTo = now;
+    }
+
+    document.getElementById('filterDateFrom').value = dateFrom.toISOString().split('T')[0];
+    document.getElementById('filterDateTo').value = dateTo.toISOString().split('T')[0];
+    applyFilters();
+  }
+
+  function applyFilters() {
+    loadReportPreview();
+  }
+
+  async function loadReportPreview() {
+    const dateFrom = document.getElementById('filterDateFrom').value;
+    const dateTo = document.getElementById('filterDateTo').value;
+    const locationId = document.getElementById('filterLocation').value;
+    const categoryId = document.getElementById('filterCategory').value;
+    const includeCapex = document.getElementById('filterIncludeCapex').checked;
+    const search = document.getElementById('reportSearchInput').value;
+
+    document.getElementById('recordCountBadge').innerText = 'Đang tải dữ liệu...';
+    const tbody = document.getElementById('reportTableBody');
+    const emptyState = document.getElementById('tableEmptyState');
+    if (emptyState) emptyState.classList.add('hidden');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="py-12 text-center text-slate-400">
+            <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary-50 text-primary mb-2 animate-spin">
+              <i class="ph-bold ph-spinner text-lg"></i>
+            </div>
+            <p class="font-bold text-xs text-slate-700">Đang tổng hợp dữ liệu báo cáo...</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">Truy vấn chỉ số khấu hao, bảo trì và tồn kho theo thời gian thực</p>
+          </td>
+        </tr>
+      `;
+    }
+
+    const payload = {
+      reportType: currentTab,
+      filters: {
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        locationId: locationId || undefined,
+        categoryId: categoryId || undefined,
+        includeCapex: includeCapex,
+        search: search || undefined
+      }
+    };
+
+    try {
+      const res = await fetch('/api/v1/reports/preview/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        lastPreviewData = json.data;
+        renderKpis(json.data);
+        renderTable(json.data);
+        if (currentViewMode === 'CHARTS') {
+          renderCharts();
+        }
+      } else {
+        alert(json.error ? json.error.message : 'Không thể tải bản xem trước báo cáo.');
+      }
+    } catch (err) {
+      console.error(err);
+      document.getElementById('recordCountBadge').innerText = 'Lỗi kết nối';
+    }
+  }
+
+  function renderKpis(data) {
+    const kpiBox = document.getElementById('kpiContainer');
+    const summary = data.summary || {};
+
+    if (currentTab === 'ASSET_VALUATION') {
+      kpiBox.innerHTML = `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Nguyên Giá</p>
+          <h3 class="text-2xl font-black text-slate-900">${formatVnd(summary.totalOriginalCost)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Tổng ${summary.totalAssets || 0} tài sản theo dõi</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Vốn Hóa Đại Tu (CAPEX)</p>
+          <h3 class="text-2xl font-black text-indigo-600">+${formatVnd(summary.totalCapex)}</h3>
+          <p class="text-[10px] text-indigo-500 mt-1">Cộng dồn vào nguyên giá mới</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Giá Trị Sổ Sách Còn Lại</p>
+          <h3 class="text-2xl font-black text-emerald-600">${formatVnd(summary.totalNetBookValue)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Chặn sàn VAS 03 không bị âm</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm ${summary.badActorCount > 0 ? 'ring-2 ring-rose-500/20 bg-rose-50/20' : ''}">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Đề Xuất Thanh Lý (RRR >= 70%)</p>
+          <h3 class="text-2xl font-black ${summary.badActorCount > 0 ? 'text-rose-600' : 'text-slate-900'}">${summary.badActorCount || 0}</h3>
+          <p class="text-[10px] ${summary.badActorCount > 0 ? 'text-rose-600 font-bold' : 'text-slate-500'} mt-1">Thiết bị hỏng vặt chi phí cao</p>
+        </div>
+      `;
+    } else if (currentTab === 'MAINTENANCE_PERFORMANCE') {
+      kpiBox.innerHTML = `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Lệnh Hoàn Tất</p>
+          <h3 class="text-2xl font-black text-slate-900">${summary.completedOrders || 0} / ${summary.totalOrders || 0}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Tỷ lệ: ${summary.totalOrders ? Math.round((summary.completedOrders/summary.totalOrders)*100) : 100}%</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tuân Thủ PM (Quy Tắc 10%)</p>
+          <h3 class="text-2xl font-black text-emerald-600">${summary.pmComplianceRate || 100}%</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Đã loại trừ ${summary.skippedDueToOverlap || 0} phiếu trùng lặp</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">MTTR Sửa Chữa Trung Bình</p>
+          <h3 class="text-2xl font-black text-slate-900">${summary.avgMttrHours || 0}h</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Lệnh sửa chữa đột xuất</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Giờ Công Kỹ Thuật</p>
+          <h3 class="text-2xl font-black text-slate-900">${summary.totalLaborHours || 0}h</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Ngoài giờ: ${summary.overtimeLaborHours || 0}h | Chi phí: ${formatVnd(summary.totalLaborCost)}</p>
+        </div>
+      `;
+    } else if (currentTab === 'SPARE_PARTS') {
+      kpiBox.innerHTML = `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Giá Trị Tồn Kho</p>
+          <h3 class="text-2xl font-black text-slate-900">${formatVnd(summary.totalInventoryValue)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">${summary.totalParts || 0} mã phụ tùng</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Cảnh Báo Tồn Âm Kho</p>
+          <h3 class="text-2xl font-black ${summary.negativeStockItems > 0 ? 'text-rose-600' : 'text-slate-900'}">${summary.negativeStockItems || 0}</h3>
+          <p class="text-[10px] ${summary.negativeStockItems > 0 ? 'text-rose-600 font-bold' : 'text-slate-500'} mt-1">Xuất khẩn cấp trước GRN</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Bút Toán Chênh Lệch Giá</p>
+          <h3 class="text-2xl font-black text-indigo-600">${formatVnd(summary.priceVarianceTotal)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Điều chỉnh tự động sau nhập kho</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Vật Tư Hoàn Trả Kho</p>
+          <h3 class="text-2xl font-black text-emerald-600">${formatVnd(summary.surplusReturnedTotal)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Đã khấu trừ vào Work Order</p>
+        </div>
+      `;
+    } else { // COST_SUMMARY
+      kpiBox.innerHTML = `
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Chi Phí Thực Tế</p>
+          <h3 class="text-2xl font-black text-slate-900">${formatVnd(summary.totalCost)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Theo kế toán dồn tích (Accrual)</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Chi Phí Vật Tư</p>
+          <h3 class="text-2xl font-black text-blue-600">${formatVnd(summary.totalMaterialCost)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Tính theo ngày xuất kho thực tế</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Chi Phí Nhân Công</p>
+          <h3 class="text-2xl font-black text-indigo-600">${formatVnd(summary.totalLaborCost)}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Tính theo ngày chấm công kỹ thuật</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Trung Tâm Chi Phí</p>
+          <h3 class="text-2xl font-black text-slate-900">${summary.costCenterCount || 0}</h3>
+          <p class="text-[10px] text-slate-500 mt-1">Cắt lớp lịch sử luân chuyển</p>
+        </div>
+      `;
+    }
+  }
+
+  function renderTable(data) {
+    const thead = document.getElementById('reportTableHead');
+    const tbody = document.getElementById('reportTableBody');
+    const emptyState = document.getElementById('tableEmptyState');
+    const badge = document.getElementById('recordCountBadge');
+
+    tbody.innerHTML = '';
+
+    if (currentTab === 'ASSET_VALUATION') {
+      const items = data.items || [];
+      badge.innerText = `Hiển thị ${items.length} tài sản (Xem trước)`;
+
+      thead.innerHTML = `
+        <tr>
+          <th class="px-4 py-3">Mã & Tên Tài Sản</th>
+          <th class="px-4 py-3">Vị Trí / Danh Mục</th>
+          <th class="px-4 py-3 text-right">Nguyên Giá Gốc</th>
+          <th class="px-4 py-3 text-right">CAPEX Vốn Hóa</th>
+          <th class="px-4 py-3 text-right">Khấu Hao Lũy Kế</th>
+          <th class="px-4 py-3 text-right">Giá Trị Sổ Sách</th>
+          <th class="px-4 py-3 text-center">Tỷ Lệ RRR</th>
+          <th class="px-4 py-3">Trạng Thái & Đề Xuất</th>
+        </tr>
+      `;
+
+      if (items.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      items.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50 transition-colors ${row.isBadActor ? 'bg-rose-50/30' : ''}`;
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-bold text-slate-900">
+            <div>${row.name}</div>
+            <div class="text-[10px] font-medium text-slate-400">${row.serialNumber}</div>
+          </td>
+          <td class="px-4 py-3 text-slate-600">
+            <div>${row.locationName}</div>
+            <div class="text-[10px] text-slate-400">${row.categoryName}</div>
+          </td>
+          <td class="px-4 py-3 text-right font-medium">${formatVnd(row.originalCost)}</td>
+          <td class="px-4 py-3 text-right font-medium text-indigo-600">+${formatVnd(row.capexCost)}</td>
+          <td class="px-4 py-3 text-right font-medium text-slate-500">${formatVnd(row.accumulatedDepreciation)}</td>
+          <td class="px-4 py-3 text-right font-bold text-emerald-700">${formatVnd(row.netBookValue)}</td>
+          <td class="px-4 py-3 text-center">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${row.isBadActor ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">
+              ${row.rrrPercent}%
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${row.monthsInService >= row.usefulLifeYears * 12 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">
+              ${row.financialStatus}
+            </span>
+            ${row.isBadActor ? `<div class="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1"><i class="ph-fill ph-warning-circle"></i> Đề xuất thanh lý</div>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } else if (currentTab === 'MAINTENANCE_PERFORMANCE') {
+      const items = data.items || [];
+      badge.innerText = `Hiển thị ${items.length} lệnh làm việc (Xem trước)`;
+
+      thead.innerHTML = `
+        <tr>
+          <th class="px-4 py-3">Mã & Tiêu Đề Lệnh</th>
+          <th class="px-4 py-3">Tài Sản</th>
+          <th class="px-4 py-3">Loại / Độ Ưu Tiên</th>
+          <th class="px-4 py-3">Người Xử Lý</th>
+          <th class="px-4 py-3">Hạn Đến / Hoàn Tất</th>
+          <th class="px-4 py-3 text-center">Thời Lượng</th>
+          <th class="px-4 py-3">Trạng Thái</th>
+        </tr>
+      `;
+
+      if (items.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      items.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-bold text-slate-900">
+            <div>${row.title}</div>
+            <div class="text-[10px] font-mono text-slate-400">#${row.id.substring(0,8)}</div>
+          </td>
+          <td class="px-4 py-3 font-medium text-slate-700">${row.assetName}</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">${row.type}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ml-1 ${row.priority === 'URGENT' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">${row.priority}</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600">${row.assignedTo}</td>
+          <td class="px-4 py-3 text-[10px] text-slate-500">
+            <div>Hạn: ${row.dueDate}</div>
+            <div>Xong: ${row.completedAt}</div>
+          </td>
+          <td class="px-4 py-3 text-center font-bold text-slate-700">${row.durationHours}h</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${row.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}">
+              ${row.status}
+            </span>
+            ${row.skippedReason !== 'N/A' ? `<div class="text-[9px] text-amber-600 font-semibold mt-0.5">${row.skippedReason}</div>` : ''}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } else if (currentTab === 'SPARE_PARTS') {
+      const parts = data.parts || [];
+      badge.innerText = `Hiển thị ${parts.length} mã phụ tùng (Xem trước)`;
+
+      thead.innerHTML = `
+        <tr>
+          <th class="px-4 py-3">Mã & Tên Phụ Tùng</th>
+          <th class="px-4 py-3 text-right">Số Lượng Tồn</th>
+          <th class="px-4 py-3 text-right">Đơn Giá Bình Quân</th>
+          <th class="px-4 py-3 text-right">Tổng Giá Trị</th>
+          <th class="px-4 py-3 text-center">Trạng Thái</th>
+        </tr>
+      `;
+
+      if (parts.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      parts.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50 transition-colors ${row.isNegative ? 'bg-rose-50/40' : ''}`;
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-bold text-slate-900">
+            <div>${row.name}</div>
+            <div class="text-[10px] font-mono text-slate-400">${row.partNumber}</div>
+          </td>
+          <td class="px-4 py-3 text-right font-black ${row.isNegative ? 'text-rose-600' : 'text-slate-800'}">${row.quantityInStock}</td>
+          <td class="px-4 py-3 text-right font-medium">${formatVnd(row.unitCost)}</td>
+          <td class="px-4 py-3 text-right font-bold text-emerald-700">${formatVnd(row.totalValue)}</td>
+          <td class="px-4 py-3 text-center">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${row.isNegative ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}">
+              ${row.isNegative ? 'CẢNH BÁO TỒN ÂM' : 'Bình thường'}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } else { // COST_SUMMARY
+      const costCenters = data.costCenters || [];
+      badge.innerText = `Hiển thị ${costCenters.length} phân xưởng / trung tâm chi phí`;
+
+      thead.innerHTML = `
+        <tr>
+          <th class="px-4 py-3">Trung Tâm Chi Phí / Phân Xưởng</th>
+          <th class="px-4 py-3 text-right">Chi Phí Vật Tư (Accrual)</th>
+          <th class="px-4 py-3 text-right">Chi Phí Nhân Công (Chấm công)</th>
+          <th class="px-4 py-3 text-right">Tổng Chi Phí Hạch Toán</th>
+        </tr>
+      `;
+
+      if (costCenters.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      costCenters.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+        tr.innerHTML = `
+          <td class="px-4 py-3 font-black text-slate-800">${row.costCenter}</td>
+          <td class="px-4 py-3 text-right font-medium text-blue-600">${formatVnd(row.materialCost)}</td>
+          <td class="px-4 py-3 text-right font-medium text-indigo-600">${formatVnd(row.laborCost)}</td>
+          <td class="px-4 py-3 text-right font-black text-slate-900">${formatVnd(row.totalCost)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  function renderCharts() {
+    if (!lastPreviewData) return;
+    const chartSeries = lastPreviewData.chartSeries || [];
+    const container1 = document.getElementById('chart1Container');
+    const container2 = document.getElementById('chart2Container');
+    const chart1TitleEl = document.getElementById('chart1Title');
+    const chart2TitleEl = document.getElementById('chart2Title');
+
+    const titlesMap = {
+      'ASSET_VALUATION': {
+        c1: 'Top Phân Xưởng / Danh Mục Theo Giá Trị Còn Lại',
+        c2: 'Cơ Cấu Khấu Hao vs Giá Trị Sổ Sách'
+      },
+      'MAINTENANCE_PERFORMANCE': {
+        c1: 'Thống Kê Tuân Thủ Kế Hoạch PM',
+        c2: 'Hiệu Quả Nhân Công & Giờ Sửa Chữa MTTR'
+      },
+      'SPARE_PARTS': {
+        c1: 'Top Phụ Tùng Tồn Kho Giá Trị Cao Nhất',
+        c2: 'Chỉ Số Kho & Biến Động Chênh Lệch Giá'
+      },
+      'COST_SUMMARY': {
+        c1: 'Chi Phí Theo Phân Xưởng / Trung Tâm Chi Phí',
+        c2: 'Cơ Cấu Chi Phí Vật Tư & Nhân Công (Accrual)'
+      }
+    };
+
+    if (chart1TitleEl && titlesMap[currentTab]) chart1TitleEl.innerText = titlesMap[currentTab].c1;
+    if (chart2TitleEl && titlesMap[currentTab]) chart2TitleEl.innerText = titlesMap[currentTab].c2;
+
+    if (chartSeries.length === 0) {
+      container1.innerHTML = '<span class="text-xs text-slate-400">Chưa có đủ dữ liệu để vẽ biểu đồ</span>';
+      container2.innerHTML = '<span class="text-xs text-slate-400">Chưa có đủ dữ liệu để vẽ biểu đồ</span>';
+      return;
+    }
+
+    const maxVal = Math.max(...chartSeries.map(s => s.value), 1);
+
+    let barsHtml = '<div class="w-full flex flex-col gap-2.5 px-4">';
+    chartSeries.forEach(item => {
+      const pct = Math.round((item.value / maxVal) * 100);
+      const isCount = currentTab === 'MAINTENANCE_PERFORMANCE';
+      const displayVal = isCount ? `${item.value} lệnh` : formatVnd(item.value);
+      barsHtml += `
+        <div>
+          <div class="flex justify-between text-xs font-bold mb-1">
+            <span class="text-slate-700 truncate">${item.name}</span>
+            <span class="text-slate-900">${displayVal}</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+            <div class="bg-gradient-to-r from-primary to-indigo-600 h-3 rounded-full" style="width: ${pct}%"></div>
+          </div>
+        </div>
+      `;
+    });
+    barsHtml += '</div>';
+    container1.innerHTML = barsHtml;
+
+    // Summary Distribution
+    const summary = lastPreviewData.summary || {};
+    let distHtml = '<div class="grid grid-cols-2 gap-4 w-full px-4 text-center">';
+    if (currentTab === 'ASSET_VALUATION') {
+      distHtml += `
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Khấu hao tích lũy</p>
+          <p class="text-base font-black text-slate-800 mt-1">${formatVnd(summary.totalAccumulatedDepreciation)}</p>
+        </div>
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Giá trị sổ sách còn lại</p>
+          <p class="text-base font-black text-emerald-600 mt-1">${formatVnd(summary.totalNetBookValue)}</p>
+        </div>
+      `;
+    } else if (currentTab === 'MAINTENANCE_PERFORMANCE') {
+      distHtml += `
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tuân thủ PM (10%)</p>
+          <p class="text-base font-black text-emerald-600 mt-1">${summary.pmComplianceRate || 100}%</p>
+        </div>
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">MTTR trung bình</p>
+          <p class="text-base font-black text-slate-800 mt-1">${summary.avgMttrHours || 0} giờ</p>
+        </div>
+      `;
+    } else if (currentTab === 'SPARE_PARTS') {
+      distHtml += `
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Giá trị tồn kho</p>
+          <p class="text-base font-black text-slate-800 mt-1">${formatVnd(summary.totalInventoryValue)}</p>
+        </div>
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Chênh lệch giá tự động</p>
+          <p class="text-base font-black text-indigo-600 mt-1">${formatVnd(summary.priceVarianceTotal)}</p>
+        </div>
+      `;
+    } else { // COST_SUMMARY
+      distHtml += `
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Chi phí vật tư</p>
+          <p class="text-base font-black text-blue-600 mt-1">${formatVnd(summary.totalMaterialCost)}</p>
+        </div>
+        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <p class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Chi phí nhân công</p>
+          <p class="text-base font-black text-indigo-600 mt-1">${formatVnd(summary.totalLaborCost)}</p>
+        </div>
+      `;
+    }
+    distHtml += '</div>';
+    container2.innerHTML = distHtml;
+  }
+
+  function handleSearch(e) {
+    if (e.key === 'Enter') {
+      applyFilters();
+    }
+  }
+
+  // Export Modal Management
+  function openExportModal() {
+    const titles = {
+      'ASSET_VALUATION': 'Báo Cáo Khấu Hao & Định Giá Tài Sản (VAS 03)',
+      'MAINTENANCE_PERFORMANCE': 'Báo Cáo Hiệu Suất Bảo Trì & SLA',
+      'SPARE_PARTS': 'Báo Cáo Tiêu Hao Phụ Tùng & Kho',
+      'COST_SUMMARY': 'Báo Cáo Tổng Hợp Chi Phí Đa Kỳ (Accrual)'
+    };
+    document.getElementById('exportModalReportText').innerText = titles[currentTab] || currentTab;
+    document.getElementById('exportModal').classList.remove('hidden');
+  }
+
+  function closeExportModal() {
+    document.getElementById('exportModal').classList.add('hidden');
+  }
+
+  async function submitExportJob() {
+    const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'XLSX';
+    const dateFrom = document.getElementById('filterDateFrom').value;
+    const dateTo = document.getElementById('filterDateTo').value;
+    const locationId = document.getElementById('filterLocation').value;
+    const categoryId = document.getElementById('filterCategory').value;
+    const includeCapex = document.getElementById('filterIncludeCapex').checked;
+
+    closeExportModal();
+
+    const payload = {
+      reportType: currentTab,
+      fileFormat: format,
+      filters: {
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        locationId: locationId || undefined,
+        categoryId: categoryId || undefined,
+        includeCapex: includeCapex
+      }
+    };
+
+    try {
+      const res = await fetch('/api/v1/reports/export/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+      if (res.status === 202 && json.data?.jobId) {
+        startPollingJob(json.data.jobId);
+      } else if (res.status === 429) {
+        alert(json.error?.message || 'Bạn đang có 3 tác vụ xuất đang xử lý. Vui lòng chờ tác vụ trước hoàn tất.');
+      } else {
+        alert(json.error?.message || 'Không thể tạo tác vụ xuất.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối khi gửi yêu cầu xuất báo cáo.');
+    }
+  }
+
+  function startPollingJob(jobId) {
+    activePollingJobId = jobId;
+    const drawer = document.getElementById('floatingJobDrawer');
+    drawer.classList.remove('translate-y-32', 'opacity-0', 'pointer-events-none');
+
+    document.getElementById('jobDrawerTitle').innerText = 'Đang xuất báo cáo...';
+    document.getElementById('jobDrawerSubtitle').innerText = 'Khởi chạy Celery Worker';
+    document.getElementById('jobDrawerProgressBar').style.width = '10%';
+    document.getElementById('jobDrawerPercent').innerText = '10% Đang xử lý';
+    document.getElementById('jobDrawerActions').innerHTML = '';
+
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(() => checkJobStatus(jobId), 1500);
+  }
+
+  async function checkJobStatus(jobId) {
+    try {
+      const res = await fetch(`/api/v1/reports/export-jobs/${jobId}/`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const job = json.data;
+        document.getElementById('jobDrawerProgressBar').style.width = `${job.progressPercent}%`;
+        document.getElementById('jobDrawerPercent').innerText = `${job.progressPercent}% Hoàn tất`;
+
+        if (job.status === 'COMPLETED') {
+          clearInterval(pollInterval);
+          document.getElementById('jobDrawerTitle').innerText = 'Báo Cáo Sẵn Sàng!';
+          document.getElementById('jobDrawerSubtitle').innerText = 'Tự hủy sau 7 ngày';
+          document.getElementById('jobDrawerIcon').innerHTML = '<i class="ph-bold ph-check text-emerald-600"></i>';
+          document.getElementById('jobDrawerIcon').classList.remove('animate-spin', 'bg-primary-50', 'text-primary');
+          document.getElementById('jobDrawerIcon').classList.add('bg-emerald-50');
+
+          const dlFilename = job.fileName || `${job.reportType || 'Bao_Cao'}.${(job.fileFormat || 'xlsx').toLowerCase()}`;
+          document.getElementById('jobDrawerActions').innerHTML = `
+            <a href="/api/v1/reports/export-jobs/${job.jobId}/download/" download="${dlFilename}" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+              <i class="ph-bold ph-download-simple"></i> Tải Về
+            </a>
+          `;
+        } else if (job.status === 'FAILED') {
+          clearInterval(pollInterval);
+          document.getElementById('jobDrawerTitle').innerText = 'Xuất Thất Bại';
+          document.getElementById('jobDrawerSubtitle').innerText = job.errorMessage || 'Lỗi hệ thống';
+          document.getElementById('jobDrawerIcon').innerHTML = '<i class="ph-bold ph-warning text-rose-600"></i>';
+          document.getElementById('jobDrawerIcon').classList.remove('animate-spin');
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function dismissJobDrawer() {
+    const drawer = document.getElementById('floatingJobDrawer');
+    drawer.classList.add('translate-y-32', 'opacity-0', 'pointer-events-none');
+    if (pollInterval) clearInterval(pollInterval);
+  }
+
+  // History Modal
+  async function openHistoryModal() {
+    document.getElementById('historyModal').classList.remove('hidden');
+    const container = document.getElementById('historyListContainer');
+    container.innerHTML = '<div class="py-8 text-center text-slate-400">Đang tải lịch sử...</div>';
+
+    try {
+      const res = await fetch('/api/v1/reports/export-jobs/');
+      const json = await res.json();
+      if (json.success && json.data) {
+        const jobs = json.data;
+        if (jobs.length === 0) {
+          container.innerHTML = '<div class="py-8 text-center text-slate-400">Chưa có tệp báo cáo nào được xuất gần đây.</div>';
+          return;
+        }
+
+        container.innerHTML = '';
+        jobs.forEach(j => {
+          const item = document.createElement('div');
+          item.className = 'py-3.5 flex justify-between items-center';
+          item.innerHTML = `
+            <div>
+              <div class="font-bold text-xs text-slate-800 flex items-center gap-2">
+                <span>${j.reportTypeName || j.reportType}</span>
+                <span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono rounded font-bold">${j.fileFormat}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${j.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : j.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">${j.status}</span>
+              </div>
+              <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
+                <span>Khởi tạo: ${j.createdAt}</span>
+                ${j.expiresAt ? `<span>Hết hạn: ${j.expiresAt}</span>` : ''}
+              </div>
+            </div>
+            <div>
+              ${j.status === 'COMPLETED' ? `
+                <a href="/api/v1/reports/export-jobs/${j.jobId}/download/" download="${j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase())}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5">
+                  <i class="ph-bold ph-download-simple"></i> Tải Lại
+                </a>
+              ` : ''}
+            </div>
+          `;
+          container.appendChild(item);
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      container.innerHTML = '<div class="py-8 text-center text-rose-500">Lỗi khi tải lịch sử.</div>';
+    }
+  }
+
+  function downloadExistingJob(jobId) {
+    window.location.href = `/api/v1/reports/export-jobs/${jobId}/download/`;
+  }
+
+  function closeHistoryModal() {
+    document.getElementById('historyModal').classList.add('hidden');
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  function getCsrfToken() {
+    const input = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (input && input.value) return input.value;
+    return getCookie('csrftoken') || '';
+  }
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', () => {
+    switchTab('ASSET_VALUATION');
+  });
+</script>
 {% endblock %}

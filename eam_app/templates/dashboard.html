@@ -1,242 +1,472 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - EAM System{% endblock %}
-{% block breadcrumb %}Dashboard{% endblock %}
+{% block title %}Executive Dashboard - EAM System{% endblock %}
+{% block breadcrumb %}Executive Dashboard{% endblock %}
 
 {% block content %}
 <div class="bg-transparent h-full flex flex-col space-y-6 overflow-hidden">
   
-  <!-- 1. HERO HEADER: Greeting & Context (LIGHT MODE) -->
+  <!-- 1. HERO HEADER: Greeting & Context -->
   <div class="p-6 md:p-8 bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shrink-0 relative overflow-hidden group">
     <!-- Decorative Blobs -->
     <div class="absolute -top-24 -right-24 w-64 h-64 bg-primary-50 rounded-full blur-3xl pointer-events-none"></div>
-    <div class="absolute top-10 right-40 w-32 h-32 bg-green-50 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute top-10 right-40 w-32 h-32 bg-emerald-50 rounded-full blur-2xl pointer-events-none"></div>
     
     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 relative z-10">
       <div>
-        <div class="inline-flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 border border-green-100">
-          <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-          Live System Status: Optimal
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 border
+          {% if asset_health.plantStatus == 'OPTIMAL' %}
+            bg-emerald-50 text-emerald-700 border-emerald-100
+          {% elif asset_health.plantStatus == 'NORMAL' %}
+            bg-blue-50 text-blue-700 border-blue-100
+          {% elif asset_health.plantStatus == 'WARNING' %}
+            bg-amber-50 text-amber-700 border-amber-100
+          {% else %}
+            bg-rose-50 text-rose-700 border-rose-100
+          {% endif %}
+        ">
+          <span class="w-2 h-2 rounded-full animate-pulse
+            {% if asset_health.plantStatus == 'OPTIMAL' %}bg-emerald-500
+            {% elif asset_health.plantStatus == 'NORMAL' %}bg-blue-500
+            {% elif asset_health.plantStatus == 'WARNING' %}bg-amber-500
+            {% else %}bg-rose-500{% endif %}
+          "></span>
+          Nhịp Tim Vận Hành: {{ asset_health.plantStatusLabel|default:"Bình thường" }}
         </div>
-        <h1 class="text-3xl lg:text-4xl font-black text-neutral-900 tracking-tight mb-2 flex flex-wrap items-center gap-3">
+        <h1 class="text-3xl lg:text-4xl font-black text-neutral-900 tracking-tight mb-1 flex flex-wrap items-center gap-3">
           Chào buổi sáng, {{ user.username|default:"Nguyễn Minh" }} 👋
-          <span class="text-xs bg-warning text-white px-2 py-1 rounded-md align-middle font-bold tracking-normal uppercase">Đang phát triển</span>
+          <span class="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-lg font-bold tracking-normal uppercase">Executive KPIs</span>
         </h1>
         <p class="text-neutral-500 font-medium text-sm flex items-center gap-2 mt-2">
-          <i class="ph-fill ph-calendar-blank"></i> <span id="current-date"></span>
+          <i class="ph-fill ph-calendar-blank text-primary"></i> <span id="current-date"></span>
+          <span class="text-neutral-300">|</span>
+          <i class="ph-fill ph-clock text-neutral-400"></i> Múi giờ: <span class="font-semibold text-neutral-700">{{ trends.timezone|default:"Asia/Ho_Chi_Minh" }}</span>
         </p>
       </div>
-      <div class="flex flex-wrap gap-3 w-full lg:w-auto opacity-70">
-        <button class="flex-1 lg:flex-none px-5 py-2.5 bg-white text-neutral-700 font-bold text-sm rounded-xl flex items-center justify-center gap-2 border border-neutral-200 shadow-sm cursor-not-allowed">
-          <i class="ph-bold ph-bell"></i> Alerts (Đang phát triển) <span class="bg-danger text-white text-[10px] px-1.5 py-0.5 rounded-md ml-1">3</span>
+      <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+        <button id="btn-refresh-dashboard" class="flex-1 lg:flex-none px-4 py-2.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-700 font-bold text-sm rounded-xl flex items-center justify-center gap-2 border border-neutral-200 shadow-sm transition">
+          <i class="ph-bold ph-arrows-clockwise text-primary" id="refresh-icon"></i> Làm mới số liệu
         </button>
-        <button class="flex-1 lg:flex-none px-6 py-2.5 bg-primary text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/30 cursor-not-allowed">
-          <i class="ph-bold ph-plus"></i> Quick Action (Đang phát triển)
-        </button>
+        {% if 'work_order:create' in user_permissions %}
+        <a href="/portal/work-orders/" class="flex-1 lg:flex-none px-5 py-2.5 bg-primary hover:bg-primary-600 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/30 transition">
+          <i class="ph-bold ph-plus"></i> Tạo Phiếu Mới
+        </a>
+        {% endif %}
       </div>
-    </div>
-  </div>
-
-  <!-- Feature Under Development Banner -->
-  <div class="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center gap-4 shadow-sm relative overflow-hidden">
-    <div class="absolute top-0 right-0 w-32 h-32 bg-warning/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-    <div class="w-10 h-10 bg-warning/20 rounded-full flex items-center justify-center shrink-0">
-      <i class="ph-fill ph-warning-circle text-warning text-xl animate-pulse"></i>
-    </div>
-    <div>
-      <h3 class="font-bold text-neutral-900 text-sm">Tính Năng Đang Phát Triển</h3>
-      <p class="text-neutral-600 text-xs mt-0.5">Bảng điều khiển tổng hợp (Dashboard) đang trong quá trình hoàn thiện. Số liệu và biểu đồ hiện tại mang tính chất thống kê cơ bản.</p>
     </div>
   </div>
 
   <div class="flex-1 overflow-y-auto space-y-6 pb-6">
     
-    <!-- 2. KPI GRID -->
+    <!-- 2. KPI GRID (4 Thẻ Chỉ Số Trọng Yếu kèm Drill-Down) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
       
-      <!-- Total Assets -->
-      <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <!-- KPI 1: Total Assets -->
+      {% if 'asset:read' in user_permissions %}
+      <a href="{{ kpis.totalAssets.drillDownUrl|default:'/portal/assets/?status=OPERATING,MAINTENANCE,DOWN&is_trackable=true' }}" class="block bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-lg hover:border-primary/40 transition-all duration-300 relative overflow-hidden group cursor-pointer">
+        <div class="flex justify-between items-start mb-4 relative z-10">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary group-hover:scale-110 transition-transform">
+            <i class="ph-fill ph-cube"></i>
+          </div>
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1
+            {% if kpis.totalAssets.deltaType == 'positive' %}bg-emerald-50 text-emerald-700 border border-emerald-100
+            {% elif kpis.totalAssets.deltaType == 'negative' %}bg-rose-50 text-rose-700 border border-rose-100
+            {% else %}bg-neutral-100 text-neutral-600{% endif %}">
+            {{ kpis.totalAssets.delta|default:"0" }}
+          </span>
+        </div>
+        <div class="relative z-10">
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.totalAssets.label|default:"Thiết bị đang quản lý" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.totalAssets.value|default:0 }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">{{ kpis.totalAssets.deltaLabel|default:"so với tháng trước" }}</span>
+          </div>
+        </div>
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-primary font-semibold group-hover:translate-x-1 transition-transform">
+          <span>Xem danh sách thiết bị</span>
+          <i class="ph-bold ph-arrow-right"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-primary group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      </a>
+      {% else %}
+      <div class="block bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] relative overflow-hidden group">
         <div class="flex justify-between items-start mb-4 relative z-10">
           <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary">
             <i class="ph-fill ph-cube"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-green-50 text-green-700">
-            +12
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1 bg-neutral-100 text-neutral-600">
+            {{ kpis.totalAssets.delta|default:"0" }}
           </span>
         </div>
         <div class="relative z-10">
-          <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total Assets</p>
-          <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ total_assets|default:0 }}</h3>
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.totalAssets.label|default:"Thiết bị đang quản lý" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.totalAssets.value|default:0 }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">{{ kpis.totalAssets.deltaLabel|default:"so với tháng trước" }}</span>
+          </div>
         </div>
-        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400 font-medium">
+          <span>Chỉ số tổng hợp</span>
+          <i class="ph-bold ph-lock-key text-neutral-300" title="Yêu cầu quyền: asset:read"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-primary pointer-events-none"></div>
       </div>
+      {% endif %}
 
-      <!-- Active Work Orders -->
-      <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+      <!-- KPI 2: Active Work Orders -->
+      {% if 'work_order:read' in user_permissions %}
+      <a href="{{ kpis.activeWorkOrders.drillDownUrl|default:'/portal/work-orders/?status=CREATED,ASSIGNED,IN_PROGRESS' }}" class="block bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-lg hover:border-amber-400/40 transition-all duration-300 relative overflow-hidden group cursor-pointer">
         <div class="flex justify-between items-start mb-4 relative z-10">
-          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-orange-50 text-warning">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform">
             <i class="ph-fill ph-clipboard-text"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-red-50 text-red-700">
-            -5
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1
+            {% if kpis.activeWorkOrders.deltaType == 'positive' %}bg-emerald-50 text-emerald-700 border border-emerald-100
+            {% elif kpis.activeWorkOrders.deltaType == 'negative' %}bg-rose-50 text-rose-700 border border-rose-100
+            {% else %}bg-neutral-100 text-neutral-600{% endif %}">
+            {{ kpis.activeWorkOrders.delta|default:"0" }}
           </span>
         </div>
         <div class="relative z-10">
-          <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Active Work Orders</p>
-          <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ active_work_orders|default:0 }}</h3>
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.activeWorkOrders.label|default:"Phiếu đang xử lý" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.activeWorkOrders.value|default:0 }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">{{ kpis.activeWorkOrders.deltaLabel|default:"so với hôm qua" }}</span>
+          </div>
         </div>
-        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-      </div>
-
-      <!-- Completed Work Orders -->
-      <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-amber-600 font-semibold group-hover:translate-x-1 transition-transform">
+          <span>Xem các phiếu đang mở</span>
+          <i class="ph-bold ph-arrow-right"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-amber-500 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      </a>
+      {% else %}
+      <div class="block bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] relative overflow-hidden group">
         <div class="flex justify-between items-start mb-4 relative z-10">
-          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-green-50 text-success">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-amber-50 text-amber-600">
+            <i class="ph-fill ph-clipboard-text"></i>
+          </div>
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1 bg-neutral-100 text-neutral-600">
+            {{ kpis.activeWorkOrders.delta|default:"0" }}
+          </span>
+        </div>
+        <div class="relative z-10">
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.activeWorkOrders.label|default:"Phiếu đang xử lý" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.activeWorkOrders.value|default:0 }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">{{ kpis.activeWorkOrders.deltaLabel|default:"so với hôm qua" }}</span>
+          </div>
+        </div>
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400 font-medium">
+          <span>Chỉ số tổng hợp</span>
+          <i class="ph-bold ph-lock-key text-neutral-300" title="Yêu cầu quyền: work_order:read"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-amber-500 pointer-events-none"></div>
+      </div>
+      {% endif %}
+
+      <!-- KPI 3: Completed Work Orders -->
+      {% if 'work_order:read' in user_permissions %}
+      <a href="{{ kpis.completedWorkOrders.drillDownUrl|default:'/portal/work-orders/?status=COMPLETED&period=30d' }}" class="block bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-lg hover:border-emerald-400/40 transition-all duration-300 relative overflow-hidden group cursor-pointer">
+        <div class="flex justify-between items-start mb-4 relative z-10">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
             <i class="ph-fill ph-check-square"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-green-50 text-green-700">
-            +3
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1
+            {% if kpis.completedWorkOrders.deltaType == 'positive' %}bg-emerald-50 text-emerald-700 border border-emerald-100
+            {% elif kpis.completedWorkOrders.deltaType == 'negative' %}bg-rose-50 text-rose-700 border border-rose-100
+            {% else %}bg-neutral-100 text-neutral-600{% endif %}">
+            {{ kpis.completedWorkOrders.delta|default:"0" }}
           </span>
         </div>
         <div class="relative z-10">
-          <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Completed WOs</p>
-          <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ completed_work_orders|default:0 }}</h3>
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.completedWorkOrders.label|default:"Phiếu hoàn tất (30 ngày)" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.completedWorkOrders.value|default:0 }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">{{ kpis.completedWorkOrders.deltaLabel|default:"so với 30 ngày trước" }}</span>
+          </div>
         </div>
-        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
-      </div>
-
-      <!-- System Uptime -->
-      <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-emerald-600 font-semibold group-hover:translate-x-1 transition-transform">
+          <span>Xem lịch sử hoàn thành</span>
+          <i class="ph-bold ph-arrow-right"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-emerald-500 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      </a>
+      {% else %}
+      <div class="block bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] relative overflow-hidden group">
         <div class="flex justify-between items-start mb-4 relative z-10">
-          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-blue-50 text-info">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-emerald-50 text-emerald-600">
+            <i class="ph-fill ph-check-square"></i>
+          </div>
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1 bg-neutral-100 text-neutral-600">
+            {{ kpis.completedWorkOrders.delta|default:"0" }}
+          </span>
+        </div>
+        <div class="relative z-10">
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.completedWorkOrders.label|default:"Phiếu hoàn tất (30 ngày)" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.completedWorkOrders.value|default:0 }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">{{ kpis.completedWorkOrders.deltaLabel|default:"so với 30 ngày trước" }}</span>
+          </div>
+        </div>
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400 font-medium">
+          <span>Chỉ số tổng hợp</span>
+          <i class="ph-bold ph-lock-key text-neutral-300" title="Yêu cầu quyền: work_order:read"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-emerald-500 pointer-events-none"></div>
+      </div>
+      {% endif %}
+
+      <!-- KPI 4: Plant Availability & PM Compliance -->
+      <div class="bg-white p-5 rounded-2xl border border-neutral-200/80 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-lg hover:border-blue-400/40 transition-all duration-300 relative overflow-hidden group">
+        <div class="flex justify-between items-start mb-4 relative z-10">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform">
             <i class="ph-fill ph-activity"></i>
           </div>
-          <span class="text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider bg-green-50 text-green-700">
-            +0.1%
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-md tracking-wider flex items-center gap-1
+            {% if kpis.plantAvailability.deltaType == 'positive' %}bg-emerald-50 text-emerald-700 border border-emerald-100
+            {% elif kpis.plantAvailability.deltaType == 'negative' %}bg-rose-50 text-rose-700 border border-rose-100
+            {% else %}bg-neutral-100 text-neutral-600{% endif %}">
+            {{ kpis.plantAvailability.delta|default:"+0.0%" }}
           </span>
         </div>
         <div class="relative z-10">
-          <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">System Uptime</p>
-          <h3 class="text-3xl font-black text-neutral-900 tracking-tight">99.9%</h3>
+          <p class="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1">{{ kpis.plantAvailability.label|default:"Độ sẵn sàng vận hành" }}</p>
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.plantAvailability.value|default:"100.0%" }}</h3>
+            <span class="text-[11px] text-neutral-400 font-medium">Khả dụng</span>
+          </div>
         </div>
-        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-blue-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+        <div class="mt-3 pt-2 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-600">
+          {% if 'work_order:read' in user_permissions %}
+          <a href="{{ kpis.pmComplianceRate.drillDownUrl|default:'/portal/work-orders/?type=PREVENTIVE' }}" class="hover:text-primary transition flex items-center gap-1 font-semibold">
+            <span>Tuân thủ PM:</span>
+            <span class="text-neutral-900 font-bold">{{ kpis.pmComplianceRate.value|default:"100.0%" }}</span>
+          </a>
+          {% else %}
+          <span class="flex items-center gap-1 font-semibold text-neutral-600">
+            <span>Tuân thủ PM:</span>
+            <span class="text-neutral-900 font-bold">{{ kpis.pmComplianceRate.value|default:"100.0%" }}</span>
+          </span>
+          {% endif %}
+          <i class="ph-fill ph-seal-check text-emerald-500"></i>
+        </div>
+        <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-10 border-blue-500 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
       </div>
 
     </div>
 
+    <!-- 3. MAIN SECTION: Charts & Analytics Widgets -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
       
-      <!-- 3. CLEAN CHART: Work Order Trends -->
-      <div class="lg:col-span-2 bg-white rounded-3xl border border-neutral-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
-        <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-white/50">
-          <h3 class="text-base font-bold text-neutral-900">Work Order Trends</h3>
-          <div class="flex gap-2">
-            <span class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span> Created</span>
-            <span class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600"><span class="w-2.5 h-2.5 rounded-full bg-success"></span> Completed</span>
+      <!-- 3.1. Dynamic 30-Day Work Order Trends Chart -->
+      <div class="lg:col-span-2 bg-white rounded-3xl border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-neutral-100 flex flex-wrap justify-between items-center bg-white/50 gap-4">
+          <div>
+            <h3 class="text-base font-bold text-neutral-900">Xu Hướng Khối Lượng & Giải Quyết Công Việc (30 Ngày)</h3>
+            <p class="text-xs text-neutral-400 mt-0.5">Dữ liệu chuỗi thời gian liên tục được bù khuyết số 0 theo múi giờ Tenant</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600">
+              <span class="w-3 h-3 rounded-md bg-primary"></span> Tạo mới
+            </span>
+            <span class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600">
+              <span class="w-3 h-3 rounded-md bg-emerald-500"></span> Hoàn tất
+            </span>
           </div>
         </div>
-        <div class="p-6 flex-1 flex flex-col items-center justify-center min-h-[300px]">
-          <!-- Clean Fake Area Chart -->
-          <svg viewBox="0 0 800 200" class="w-full h-full preserve-3d" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="chart-blue" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="#00a0e2" stop-opacity="0.4"/>
-                <stop offset="100%" stop-color="#00a0e2" stop-opacity="0.05"/>
-              </linearGradient>
-              <linearGradient id="chart-green" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="#52c41a" stop-opacity="0.4"/>
-                <stop offset="100%" stop-color="#52c41a" stop-opacity="0.05"/>
-              </linearGradient>
-            </defs>
-            <!-- Grid Lines -->
-            <path d="M0,50 L800,50 M0,100 L800,100 M0,150 L800,150" fill="none" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="5,5" />
-            <path d="M0,150 L100,120 L200,160 L300,90 L400,130 L500,70 L600,110 L700,50 L800,80" fill="none" stroke="#00a0e2" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M0,150 L100,120 L200,160 L300,90 L400,130 L500,70 L600,110 L700,50 L800,80 L800,200 L0,200 Z" fill="url(#chart-blue)" />
-            <path d="M0,180 L100,160 L200,180 L300,120 L400,160 L500,100 L600,150 L700,90 L800,120" fill="none" stroke="#52c41a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M0,180 L100,160 L200,180 L300,120 L400,160 L500,100 L600,150 L700,90 L800,120 L800,200 L0,200 Z" fill="url(#chart-green)" />
-          </svg>
-          <div class="w-full flex justify-between text-[10px] font-bold text-neutral-400 uppercase tracking-widest mt-4 px-2">
-            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+
+        <div class="p-6 flex-1 flex flex-col justify-between">
+          <!-- Interactive Trend Chart Canvas / SVG Container -->
+          <div class="relative w-full h-72" id="trend-chart-container">
+            <!-- Dynamic SVG Chart injected via JS -->
+            <svg id="trend-svg-chart" viewBox="0 0 840 240" class="w-full h-full overflow-visible">
+              <!-- Will be rendered dynamically via JS based on trends_json -->
+            </svg>
+            <!-- Hover Tooltip -->
+            <div id="chart-tooltip" class="absolute hidden pointer-events-none bg-neutral-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl text-xs shadow-2xl z-20 border border-neutral-700/50 transition-opacity duration-100">
+              <div class="font-bold text-[11px] text-neutral-300 mb-1.5 flex items-center gap-1.5" id="tooltip-date">
+                <i class="ph-bold ph-calendar text-primary"></i> <span>--/--</span>
+              </div>
+              <div class="space-y-1">
+                <div class="flex items-center justify-between gap-4">
+                  <span class="flex items-center gap-1.5 text-neutral-300">
+                    <span class="w-2 h-2 rounded-full bg-primary"></span> Tạo mới:
+                  </span>
+                  <span class="font-black text-white" id="tooltip-created">0</span>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                  <span class="flex items-center gap-1.5 text-neutral-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Hoàn tất:
+                  </span>
+                  <span class="font-black text-white" id="tooltip-completed">0</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 4. ACTIVITY & QUICK STATS COLUMN -->
+      <!-- 3.2. Right Column: Asset Health & Executive Widgets -->
       <div class="space-y-6 lg:space-y-8">
         
-        <!-- Quick Stats: Asset Health -->
-        <div class="bg-white rounded-3xl border border-neutral-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6">
-          <h3 class="text-base font-bold text-neutral-900 mb-4">Asset Health Distribution</h3>
-          <div class="space-y-4">
-            <!-- We can use Django context to make this dynamic later, hardcoding for visual parity first -->
+        <!-- Asset Health Distribution (Hamilton-Hare 100.0%) -->
+        <div class="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h3 class="text-base font-bold text-neutral-900">Sức Khỏe Thiết Bị</h3>
+              <p class="text-[11px] text-neutral-400">Chuẩn hóa 100.0% tỷ lệ vận hành</p>
+            </div>
+            <span class="text-xs font-bold px-2.5 py-1 rounded-lg uppercase
+              {% if asset_health.plantStatus == 'OPTIMAL' %}bg-emerald-50 text-emerald-700
+              {% elif asset_health.plantStatus == 'NORMAL' %}bg-blue-50 text-blue-700
+              {% elif asset_health.plantStatus == 'WARNING' %}bg-amber-50 text-amber-700
+              {% else %}bg-rose-50 text-rose-700{% endif %}">
+              {{ asset_health.plantStatusLabel|default:"Bình thường" }}
+            </span>
+          </div>
 
-            <div>
-              <div class="flex justify-between items-center mb-1.5">
-                <span class="text-xs font-bold text-neutral-700">Healthy (Operating)</span>
-                <span class="text-xs font-black text-neutral-900">85%</span>
-              </div>
-              <div class="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
-                <div class="h-full bg-success rounded-full" style="width: 85%"></div>
-              </div>
+          <!-- Multi-Segment Visual Bar -->
+          <div class="h-3 w-full bg-neutral-100 rounded-full overflow-hidden flex mb-4 shadow-inner">
+            <div class="h-full bg-emerald-500 transition-all duration-500" style="width: {{ asset_health.operating.percentage|default:0 }}%" title="Operating: {{ asset_health.operating.percentage }}%"></div>
+            <div class="h-full bg-amber-500 transition-all duration-500" style="width: {{ asset_health.maintenance.percentage|default:0 }}%" title="Maintenance: {{ asset_health.maintenance.percentage }}%"></div>
+            <div class="h-full bg-rose-500 transition-all duration-500" style="width: {{ asset_health.down.percentage|default:0 }}%" title="Down: {{ asset_health.down.percentage }}%"></div>
+          </div>
+
+          <!-- Distribution Details -->
+          <div class="space-y-3">
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-semibold text-neutral-700 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Đang hoạt động (Operating)
+              </span>
+              <span class="font-bold text-neutral-900">{{ asset_health.operating.count|default:0 }} máy ({{ asset_health.operating.percentage|default:0 }}%)</span>
             </div>
-            <div>
-              <div class="flex justify-between items-center mb-1.5">
-                <span class="text-xs font-bold text-neutral-700">Warning (Maintenance Needed)</span>
-                <span class="text-xs font-black text-neutral-900">12%</span>
-              </div>
-              <div class="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
-                <div class="h-full bg-warning rounded-full" style="width: 12%"></div>
-              </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-semibold text-neutral-700 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Đang bảo trì (Maintenance)
+              </span>
+              <span class="font-bold text-neutral-900">{{ asset_health.maintenance.count|default:0 }} máy ({{ asset_health.maintenance.percentage|default:0 }}%)</span>
             </div>
-            <div>
-              <div class="flex justify-between items-center mb-1.5">
-                <span class="text-xs font-bold text-neutral-700">Critical (Down)</span>
-                <span class="text-xs font-black text-neutral-900">3%</span>
-              </div>
-              <div class="h-2 w-full bg-neutral-100 rounded-full overflow-hidden">
-                <div class="h-full bg-danger rounded-full" style="width: 3%"></div>
-              </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-semibold text-neutral-700 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Dừng sự cố (Down)
+              </span>
+              <span class="font-bold text-neutral-900">{{ asset_health.down.count|default:0 }} máy ({{ asset_health.down.percentage|default:0 }}%)</span>
             </div>
+          </div>
+
+          <!-- Total Active Footer -->
+          <div class="mt-4 pt-3 border-t border-neutral-100 flex justify-between items-center text-xs text-neutral-500 font-medium">
+            <span>Tổng thiết bị độc lập quản lý:</span>
+            <span class="font-black text-neutral-800">{{ asset_health.totalActive|default:0 }}</span>
           </div>
         </div>
 
-        <!-- Recent Activities -->
-        <div class="bg-white rounded-3xl border border-neutral-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col flex-1">
-          <div class="px-6 py-5 border-b border-neutral-100 flex justify-between items-center bg-white/50 shrink-0">
-            <h3 class="text-base font-bold text-neutral-900">Activity Feed</h3>
-            <button class="text-primary text-xs font-bold hover:underline bg-primary/10 px-2 py-1 rounded-md">View All</button>
+        <!-- Reliability & Maintenance Metrics Card (MTBF / MTTR) -->
+        <div class="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6">
+          <h3 class="text-base font-bold text-neutral-900 mb-4 flex items-center justify-between">
+            <span>Độ Tin Cậy & Sửa Chữa</span>
+            <i class="ph-fill ph-wrench text-primary"></i>
+          </h3>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- MTBF -->
+            <div class="bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
+              <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">MTBF (Trung bình giữa sự cố)</p>
+              <h4 class="text-lg font-black text-neutral-900 tracking-tight">{{ reliability.mtbfDisplay|default:"100% Khả dụng (0 Sự cố)" }}</h4>
+              <p class="text-[10px] text-neutral-500 mt-1">Loại trừ 100% phiếu PM</p>
+            </div>
+
+            <!-- MTTR -->
+            <div class="bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
+              <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">MTTR (Thời gian sửa trung bình)</p>
+              <h4 class="text-lg font-black text-neutral-900 tracking-tight">{{ reliability.mttrDisplay|default:"N/A" }}</h4>
+              <p class="text-[10px] text-neutral-500 mt-1">Lọc ngoại lai > 168 giờ</p>
+            </div>
           </div>
-          <div class="p-6 space-y-6 flex-1 overflow-y-auto">
-            <div class="flex gap-4 group cursor-pointer">
-              <div class="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-success shrink-0 mt-0.5 border border-green-100 shadow-sm group-hover:scale-110 transition-transform">
-                <i class="ph-fill ph-check-circle text-lg"></i>
-              </div>
-              <div>
-                <p class="text-sm font-black text-neutral-900 leading-tight group-hover:text-primary transition-colors">WO-0087 Completed</p>
-                <p class="text-xs text-neutral-500 mt-1.5 font-medium leading-relaxed">Preventive maintenance on CNC Machine #1 finished by Nguyen Minh.</p>
-                <p class="text-[10px] font-bold text-neutral-400 mt-2 tracking-wider">2 HOURS AGO</p>
-              </div>
+
+          <!-- Ongoing Down Isolation Alert -->
+          <div class="mt-4 p-3 bg-neutral-50 rounded-xl flex items-center justify-between text-xs border border-neutral-100">
+            <span class="text-neutral-600 font-medium flex items-center gap-1.5">
+              <i class="ph-bold ph-warning-circle text-amber-500"></i> Sự cố đang xử lý dở dang:
+            </span>
+            <span class="font-black px-2 py-0.5 rounded-md {% if reliability.ongoingDownCount > 0 %}bg-rose-50 text-rose-700{% else %}bg-emerald-50 text-emerald-700{% endif %}">
+              {{ reliability.ongoingDownCount|default:0 }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Recent Activities (Activity Feed Whitelist) -->
+        <div class="bg-white rounded-3xl border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
+          <div class="px-6 py-5 border-b border-neutral-100 flex justify-between items-center bg-white/50 shrink-0">
+            <div>
+              <h3 class="text-base font-bold text-neutral-900">Dòng Hoạt Động Vận Hành</h3>
+              <p class="text-[11px] text-neutral-400">Nhật ký tác động đã qua lọc Whitelist</p>
             </div>
-            <div class="flex gap-4 group cursor-pointer">
-              <div class="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-danger shrink-0 mt-0.5 border border-red-100 shadow-sm group-hover:scale-110 transition-transform">
-                <i class="ph-fill ph-warning-circle text-lg"></i>
+            {% if 'audit_logs:read' in user_permissions %}
+            <a href="/portal/audit-logs/" class="text-primary text-xs font-bold hover:underline bg-primary/10 px-2.5 py-1 rounded-lg transition">Xem tất cả</a>
+            {% endif %}
+          </div>
+
+          <div class="p-6 space-y-5 flex-1 overflow-y-auto max-h-[380px]" id="activity-feed-list">
+            {% if activities %}
+              {% for act in activities %}
+                {% if act.link and 'work_order:read' in user_permissions and 'WO' in act.eventType or act.link and 'asset:read' in user_permissions and 'ASSET' in act.eventType %}
+                <a href="{{ act.link }}" class="flex gap-4 group cursor-pointer p-2 -mx-2 rounded-xl hover:bg-neutral-50 transition-colors">
+                  <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 mt-0.5 border shadow-sm group-hover:scale-110 transition-transform
+                    {% if 'COMPLETED' in act.eventType or 'RESTORED' in act.eventType %}
+                      bg-emerald-50 text-emerald-600 border-emerald-100
+                    {% elif 'DOWN' in act.eventType or 'LOW_STOCK' in act.eventType %}
+                      bg-rose-50 text-rose-600 border-rose-100
+                    {% else %}
+                      bg-primary-50 text-primary border-primary-100
+                    {% endif %}">
+                    {% if 'COMPLETED' in act.eventType or 'RESTORED' in act.eventType %}
+                      <i class="ph-fill ph-check-circle"></i>
+                    {% elif 'DOWN' in act.eventType or 'LOW_STOCK' in act.eventType %}
+                      <i class="ph-fill ph-warning-circle"></i>
+                    {% else %}
+                      <i class="ph-fill ph-clipboard-text"></i>
+                    {% endif %}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-neutral-900 leading-tight group-hover:text-primary transition-colors truncate">{{ act.title }}</p>
+                    <p class="text-xs text-neutral-500 mt-1 font-medium leading-relaxed line-clamp-2">{{ act.description }}</p>
+                    <p class="text-[10px] font-bold text-neutral-400 mt-1.5 tracking-wider uppercase">{{ act.timeAgo }}</p>
+                  </div>
+                </a>
+                {% else %}
+                <div class="flex gap-4 p-2 -mx-2 rounded-xl">
+                  <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg shrink-0 mt-0.5 border shadow-sm
+                    {% if 'COMPLETED' in act.eventType or 'RESTORED' in act.eventType %}
+                      bg-emerald-50 text-emerald-600 border-emerald-100
+                    {% elif 'DOWN' in act.eventType or 'LOW_STOCK' in act.eventType %}
+                      bg-rose-50 text-rose-600 border-rose-100
+                    {% else %}
+                      bg-primary-50 text-primary border-primary-100
+                    {% endif %}">
+                    {% if 'COMPLETED' in act.eventType or 'RESTORED' in act.eventType %}
+                      <i class="ph-fill ph-check-circle"></i>
+                    {% elif 'DOWN' in act.eventType or 'LOW_STOCK' in act.eventType %}
+                      <i class="ph-fill ph-warning-circle"></i>
+                    {% else %}
+                      <i class="ph-fill ph-clipboard-text"></i>
+                    {% endif %}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-black text-neutral-900 leading-tight truncate">{{ act.title }}</p>
+                    <p class="text-xs text-neutral-500 mt-1 font-medium leading-relaxed line-clamp-2">{{ act.description }}</p>
+                    <p class="text-[10px] font-bold text-neutral-400 mt-1.5 tracking-wider uppercase">{{ act.timeAgo }}</p>
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <div class="py-8 text-center text-neutral-400 text-xs">
+                <i class="ph-fill ph-tray text-2xl mb-1 block"></i>
+                Chưa có sự kiện vận hành nào được ghi nhận.
               </div>
-              <div>
-                <p class="text-sm font-black text-neutral-900 leading-tight group-hover:text-primary transition-colors">Alert: Temperature High</p>
-                <p class="text-xs text-neutral-500 mt-1.5 font-medium leading-relaxed">Transformer T-01 exceeded operating temperature limit (85°C).</p>
-                <p class="text-[10px] font-bold text-neutral-400 mt-2 tracking-wider">4 HOURS AGO</p>
-              </div>
-            </div>
-            <div class="flex gap-4 group cursor-pointer">
-              <div class="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center text-primary shrink-0 mt-0.5 border border-primary-100 shadow-sm group-hover:scale-110 transition-transform">
-                <i class="ph-fill ph-plus-circle text-lg"></i>
-              </div>
-              <div>
-                <p class="text-sm font-black text-neutral-900 leading-tight group-hover:text-primary transition-colors">New Asset Registered</p>
-                <p class="text-xs text-neutral-500 mt-1.5 font-medium leading-relaxed">Conveyor Belt System v3 added to Assembly Line B.</p>
-                <p class="text-[10px] font-bold text-neutral-400 mt-2 tracking-wider">YESTERDAY</p>
-              </div>
-            </div>
+            {% endif %}
           </div>
         </div>
 
@@ -248,17 +478,236 @@
 
 {% block extra_js %}
 <script>
+  // Trend Series Data passed from Django Server-Side
+  const trendSeriesData = {{ trends_json|safe|default:"[]" }};
+
   document.addEventListener('DOMContentLoaded', () => {
+    // 1. Date header formatter
     const dateElement = document.getElementById('current-date');
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    
-    const updateTime = () => {
-      const now = new Date();
-      if(dateElement) dateElement.innerText = now.toLocaleDateString('vi-VN', options);
-    };
-    
-    updateTime();
-    setInterval(updateTime, 60000);
+    if(dateElement) dateElement.innerText = new Date().toLocaleDateString('vi-VN', options);
+
+    // 2. Render Trend Chart
+    renderTrendChart(trendSeriesData);
+
+    // 3. Setup Refresh button
+    const refreshBtn = document.getElementById('btn-refresh-dashboard');
+    const refreshIcon = document.getElementById('refresh-icon');
+    if(refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        if(refreshIcon) refreshIcon.classList.add('animate-spin');
+        // Fetch live summary & trends asynchronously
+        Promise.all([
+          fetch('/api/v1/dashboard/summary/').then(r => r.json()),
+          fetch('/api/v1/dashboard/trends/').then(r => r.json()),
+          fetch('/api/v1/dashboard/activity-feed/').then(r => r.json())
+        ])
+        .then(([summaryRes, trendsRes, actRes]) => {
+          if(summaryRes.success && trendsRes.success) {
+            window.location.reload();
+          }
+        })
+        .catch(err => console.error("Refresh error:", err))
+        .finally(() => {
+          setTimeout(() => {
+            if(refreshIcon) refreshIcon.classList.remove('animate-spin');
+          }, 600);
+        });
+      });
+    }
   });
+
+  function renderTrendChart(data) {
+    const svg = document.getElementById('trend-svg-chart');
+    const tooltip = document.getElementById('chart-tooltip');
+    const tooltipDate = document.getElementById('tooltip-date');
+    const tooltipCreated = document.getElementById('tooltip-created');
+    const tooltipCompleted = document.getElementById('tooltip-completed');
+
+    if(!svg) return;
+
+    if(!data || data.length === 0) {
+      svg.innerHTML = `
+        <text x="420" y="120" text-anchor="middle" font-size="13" font-weight="600" fill="#94a3b8">
+          Chưa có dữ liệu biến động công việc trong 30 ngày qua
+        </text>
+      `;
+      return;
+    }
+
+    const width = 840;
+    const height = 240;
+    const paddingLeft = 45;
+    const paddingRight = 25;
+    const paddingTop = 25;
+    const paddingBottom = 35;
+    const plotWidth = width - paddingLeft - paddingRight;
+    const plotHeight = height - paddingTop - paddingBottom;
+    const n = data.length;
+
+    // 1. Calculate dynamic, clean Y-axis scale
+    let maxVal = 4;
+    data.forEach(d => {
+      if(d.created > maxVal) maxVal = d.created;
+      if(d.completed > maxVal) maxVal = d.completed;
+    });
+
+    const stepCount = 4;
+    const step = Math.max(1, Math.ceil(maxVal / stepCount));
+    const yMax = step * stepCount;
+
+    const getX = (index) => paddingLeft + (index / (n - 1)) * plotWidth;
+    const getY = (val) => paddingTop + plotHeight - (val / yMax) * plotHeight;
+
+    // 2. Build points
+    const createdPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.created), val: d.created, item: d }));
+    const completedPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.completed), val: d.completed, item: d }));
+
+    // 3. Catmull-Rom to Cubic Bézier Spline path generator
+    function buildCurvedPath(pts) {
+      if (!pts || pts.length === 0) return '';
+      if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+      let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i === 0 ? i : i - 1];
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+      }
+      return d;
+    }
+
+    const createdPathD = buildCurvedPath(createdPoints);
+    const completedPathD = buildCurvedPath(completedPoints);
+
+    const baselineY = (height - paddingBottom).toFixed(1);
+    const firstX = createdPoints[0].x.toFixed(1);
+    const lastX = createdPoints[n - 1].x.toFixed(1);
+
+    const createdAreaD = `${createdPathD} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+    const completedAreaD = `${completedPathD} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
+
+    // 4. Gridlines & Y-Axis Labels
+    let gridHtml = '';
+    for (let i = 0; i <= stepCount; i++) {
+      const val = i * step;
+      const y = getY(val);
+      const isBaseline = (i === 0);
+      gridHtml += `
+        <line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" 
+              stroke="${isBaseline ? '#cbd5e1' : '#f1f5f9'}" 
+              stroke-width="${isBaseline ? '1.5' : '1'}" 
+              ${isBaseline ? '' : 'stroke-dasharray="4,4"'} />
+        <text x="${paddingLeft - 10}" y="${y + 3.5}" text-anchor="end" font-size="10" font-weight="600" fill="#94a3b8">${val}</text>
+      `;
+    }
+
+    // 5. X-Axis Date Labels (Sample every 5 days + last day)
+    let xLabelsHtml = '';
+    const stepX = Math.max(1, Math.floor(n / 6));
+    for (let i = 0; i < n; i += stepX) {
+      xLabelsHtml += `<text x="${getX(i)}" y="${height - 12}" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">${data[i].date}</text>`;
+    }
+    if ((n - 1) % stepX !== 0) {
+      xLabelsHtml += `<text x="${getX(n - 1)}" y="${height - 12}" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">${data[n - 1].date}</text>`;
+    }
+
+    svg.innerHTML = `
+      <defs>
+        <linearGradient id="grad-created" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#00a0e2" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#00a0e2" stop-opacity="0.01"/>
+        </linearGradient>
+        <linearGradient id="grad-completed" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#10b981" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#10b981" stop-opacity="0.01"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Background Grid & Scales -->
+      ${gridHtml}
+      ${xLabelsHtml}
+
+      <!-- Smooth Area Fills -->
+      <path d="${createdAreaD}" fill="url(#grad-created)" />
+      <path d="${completedAreaD}" fill="url(#grad-completed)" />
+
+      <!-- Smooth Cubic Spline Lines -->
+      <path d="${createdPathD}" fill="none" stroke="#00a0e2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="${completedPathD}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+      <!-- Interactive Crosshair & Focus Markers -->
+      <line id="chart-crosshair" x1="0" y1="${paddingTop}" x2="0" y2="${height - paddingBottom}" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3,3" class="hidden pointer-events-none" />
+      <circle id="focus-dot-created" cx="0" cy="0" r="5" fill="#00a0e2" stroke="#ffffff" stroke-width="2" class="hidden pointer-events-none shadow" />
+      <circle id="focus-dot-completed" cx="0" cy="0" r="5" fill="#10b981" stroke="#ffffff" stroke-width="2" class="hidden pointer-events-none shadow" />
+    `;
+
+    // 6. Interactive Hover Handling
+    const chartContainer = document.getElementById('trend-chart-container');
+    const crosshair = document.getElementById('chart-crosshair');
+    const focusCreated = document.getElementById('focus-dot-created');
+    const focusCompleted = document.getElementById('focus-dot-completed');
+
+    if (chartContainer && tooltip && crosshair) {
+      svg.addEventListener('mousemove', (e) => {
+        const rect = svg.getBoundingClientRect();
+        const clientX = e.clientX - rect.left;
+        const svgX = (clientX / rect.width) * width;
+        
+        // Find closest point index
+        let closestIdx = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < n; i++) {
+          const dist = Math.abs(getX(i) - svgX);
+          if (dist < minDist) {
+            minDist = dist;
+            closestIdx = i;
+          }
+        }
+
+        const d = data[closestIdx];
+        const ptX = getX(closestIdx);
+        const ptYCreated = getY(d.created);
+        const ptYCompleted = getY(d.completed);
+
+        // Update crosshair & dots
+        crosshair.setAttribute('x1', ptX);
+        crosshair.setAttribute('x2', ptX);
+        crosshair.classList.remove('hidden');
+
+        focusCreated.setAttribute('cx', ptX);
+        focusCreated.setAttribute('cy', ptYCreated);
+        focusCreated.classList.remove('hidden');
+
+        focusCompleted.setAttribute('cx', ptX);
+        focusCompleted.setAttribute('cy', ptYCompleted);
+        focusCompleted.classList.remove('hidden');
+
+        // Update Tooltip
+        if (tooltipDate) tooltipDate.innerHTML = `<i class="ph-bold ph-calendar text-primary"></i> Ngày ${d.date}/2026`;
+        if (tooltipCreated) tooltipCreated.innerText = d.created;
+        if (tooltipCompleted) tooltipCompleted.innerText = d.completed;
+
+        tooltip.classList.remove('hidden');
+        const tooltipX = (ptX / width) * rect.width;
+        tooltip.style.left = `${Math.min(rect.width - 150, Math.max(10, tooltipX - 60))}px`;
+        tooltip.style.top = `15px`;
+      });
+
+      chartContainer.addEventListener('mouseleave', () => {
+        tooltip.classList.add('hidden');
+        if (crosshair) crosshair.classList.add('hidden');
+        if (focusCreated) focusCreated.classList.add('hidden');
+        if (focusCompleted) focusCompleted.classList.add('hidden');
+      });
+    }
+  }
 </script>
 {% endblock %}

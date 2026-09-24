@@ -27,8 +27,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-o-vpz0i87++$s)sl9y4&0n80ux*241i^ht#y356h+frf4v9e0='
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-o-vpz0i87++$s)sl9y4&0n80ux*241i^ht#y356h+frf4v9e0=')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -56,6 +55,7 @@ INSTALLED_APPS = [
     'maintenance',
     'portal',
     'notifications',
+    'analytics',
 ]
 
 MIDDLEWARE = [
@@ -147,9 +147,9 @@ EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.Ema
 EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = env('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = env('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='kenlin7080@gmail.com')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='kstg dwqf rxtz vlud')
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='kenlin7080@gmail.com')
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=env('EMAIL_HOST_USER', default='webmaster@localhost'))
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -211,12 +211,27 @@ CELERY_TASK_QUEUES = {
     'default': {},
     'notifications': {},
     'periodic': {},
+    'reports_export': {},
 }
 CELERY_TASK_ROUTES = {
     'notifications.async_send_notification': {'queue': 'notifications'},
     'notifications.async_dispatch_notification_channels': {'queue': 'notifications'},
     'notifications.periodic_escalation_scan': {'queue': 'periodic'},
     'maintenance.tasks.evaluate_triggers': {'queue': 'periodic'},
+    'analytics.tasks.generate_export_report': {'queue': 'reports_export'},
+    'analytics.tasks.cleanup_zombie_export_jobs': {'queue': 'periodic'},
+    'analytics.tasks.purge_expired_export_files': {'queue': 'periodic'},
+}
+
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-zombie-export-jobs': {
+        'task': 'analytics.tasks.cleanup_zombie_export_jobs',
+        'schedule': timedelta(minutes=5),
+    },
+    'purge-expired-export-files': {
+        'task': 'analytics.tasks.purge_expired_export_files',
+        'schedule': timedelta(days=1),
+    },
 }
 
 # Cache Configuration with Redis
