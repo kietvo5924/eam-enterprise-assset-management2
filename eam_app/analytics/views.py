@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from django.utils import timezone
 from urllib.parse import quote
 from django.http import HttpResponseRedirect, FileResponse, HttpResponse
 from rest_framework.views import APIView
@@ -15,7 +16,8 @@ from analytics.report_services import (
     AssetValuationEngine,
     MaintenancePerformanceEngine,
     SparePartsValuationEngine,
-    CostSummaryEngine
+    CostSummaryEngine,
+    parse_date_safe
 )
 from analytics.export_engine import MinIOStorageService, REPORT_BUCKET_NAME
 from analytics.tasks import generate_export_report
@@ -62,7 +64,7 @@ def check_report_permission(user, report_type: str) -> bool:
         for role in user.roles.prefetch_related('permissions').all():
             for perm in role.permissions.all():
                 perms.add(perm.id)
-    if 'system:admin' in perms or 'reports:read' in perms or 'audit_logs:read' in perms:
+    if 'system:admin' in perms or 'reports:read' in perms:
         return True
 
     # Role specific boundaries
@@ -157,8 +159,8 @@ class ReportPreviewView(APIView):
             elif report_type == 'MAINTENANCE_PERFORMANCE':
                 result = MaintenancePerformanceEngine.get_performance_data(
                     tenant=tenant,
-                    date_from=datetime.strptime(filters['dateFrom'], '%Y-%m-%d').date() if filters.get('dateFrom') else None,
-                    date_to=datetime.strptime(filters['dateTo'], '%Y-%m-%d').date() if filters.get('dateTo') else None,
+                    date_from=parse_date_safe(filters.get('dateFrom')),
+                    date_to=parse_date_safe(filters.get('dateTo')),
                     location_id=filters.get('locationId')
                 )
                 preview_items = result.get('items', [])[:50]
@@ -167,8 +169,8 @@ class ReportPreviewView(APIView):
             elif report_type == 'SPARE_PARTS':
                 result = SparePartsValuationEngine.get_spare_parts_data(
                     tenant=tenant,
-                    date_from=datetime.strptime(filters['dateFrom'], '%Y-%m-%d').date() if filters.get('dateFrom') else None,
-                    date_to=datetime.strptime(filters['dateTo'], '%Y-%m-%d').date() if filters.get('dateTo') else None,
+                    date_from=parse_date_safe(filters.get('dateFrom')),
+                    date_to=parse_date_safe(filters.get('dateTo')),
                     search=filters.get('search')
                 )
                 result['parts'] = result.get('parts', [])[:50]
@@ -177,8 +179,8 @@ class ReportPreviewView(APIView):
             elif report_type == 'COST_SUMMARY':
                 result = CostSummaryEngine.get_cost_summary_data(
                     tenant=tenant,
-                    date_from=datetime.strptime(filters['dateFrom'], '%Y-%m-%d').date() if filters.get('dateFrom') else None,
-                    date_to=datetime.strptime(filters['dateTo'], '%Y-%m-%d').date() if filters.get('dateTo') else None,
+                    date_from=parse_date_safe(filters.get('dateFrom')),
+                    date_to=parse_date_safe(filters.get('dateTo')),
                     cost_center=filters.get('costCenter'),
                     include_capex=filters.get('includeCapex', False)
                 )
@@ -220,6 +222,14 @@ class ReportExportView(APIView):
             )
 
         # Rule 7: Concurrency Limit (Max 3 concurrent jobs per tenant)
+        # Auto-recover jobs that were stuck for > 3 minutes so user is never blocked
+        stale_cutoff = timezone.now() - timedelta(minutes=3)
+        ExportJob.all_objects.filter(
+            tenant=tenant,
+            status__in=['PENDING', 'PROCESSING'],
+            created_at__lt=stale_cutoff
+        ).update(status='FAILED', error_message='Tác vụ quá thời gian chờ (Timeout)')
+
         active_jobs_count = ExportJob.all_objects.filter(
             tenant=tenant,
             status__in=['PENDING', 'PROCESSING']
@@ -246,12 +256,29 @@ class ReportExportView(APIView):
             file_name=f"{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_format.lower()}"
         )
 
-        # Enqueue Celery task
+        # Dispatch execution: Celery worker if active, or background thread fallback
+        import threading
+
+        def run_thread_export():
+            try:
+                generate_export_report(str(job.id))
+            except Exception as ex:
+                logger.exception(f"Background thread export failed: {ex}")
+
+        dispatched = False
         try:
-            generate_export_report.delay(str(job.id))
+            from config.celery import app
+            active_workers = app.control.ping(timeout=0.3)
+            if active_workers:
+                generate_export_report.delay(str(job.id))
+                dispatched = True
         except Exception as e:
-            logger.warning(f"Celery dispatch failed, running synchronous fallback: {e}")
-            generate_export_report(str(job.id))
+            logger.warning(f"Celery check/dispatch error: {e}")
+
+        if not dispatched:
+            logger.info(f"No active Celery worker listening. Running export job {job.id} in background thread.")
+            thread = threading.Thread(target=run_thread_export, daemon=True)
+            thread.start()
 
         return Response({
             "success": True,
@@ -321,7 +348,7 @@ class ReportExportJobDownloadView(APIView):
     authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, id):
+    def get(self, request, id, filename=None):
         tenant = getattr(request.user, 'tenant', None)
         if not tenant:
             return error_response("NO_TENANT", "Tenant not associated with user")
@@ -363,19 +390,17 @@ class ReportExportJobDownloadView(APIView):
         }
         content_type = content_types.get(job.file_format.upper(), 'application/octet-stream')
 
-        friendly_filename = job.file_name or f"{job.report_type}_{str(job.id)[:8]}.{job.file_format.lower()}"
+        friendly_filename = filename or job.file_name or f"{job.report_type}_{str(job.id)[:8]}.{job.file_format.lower()}"
         if not friendly_filename.lower().endswith(f".{job.file_format.lower()}"):
             friendly_filename = f"{friendly_filename}.{job.file_format.lower()}"
 
-        # Clean ASCII filename fallback for Content-Disposition
-        safe_ascii_filename = friendly_filename.encode('ascii', 'ignore').decode('ascii') or f"report.{job.file_format.lower()}"
-
-        response = HttpResponse(
-            file_data,
+        import io
+        response = FileResponse(
+            io.BytesIO(file_data),
+            as_attachment=True,
+            filename=friendly_filename,
             content_type=content_type
         )
-        response['Content-Disposition'] = f'attachment; filename="{safe_ascii_filename}"; filename*=UTF-8\'\'{quote(friendly_filename)}'
-        response['Content-Length'] = len(file_data)
         return response
 
 

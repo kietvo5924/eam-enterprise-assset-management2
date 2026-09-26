@@ -11,9 +11,14 @@ def check_perm(request, perm):
         return True
     if not hasattr(request, '_user_permissions_cache'):
         perms = set()
-        for role in request.user.roles.prefetch_related('permissions').all():
+        roles = list(request.user.roles.prefetch_related('permissions').all())
+        for role in roles:
             for p in role.permissions.all():
                 perms.add(p.id)
+        if any(r.name == 'TENANT_ADMIN' for r in roles) and len(perms) <= 2:
+            from users.models import Permission
+            tenant_perms = set(Permission.objects.exclude(id='system:admin').values_list('id', flat=True))
+            perms.update(tenant_perms)
         request._user_permissions_cache = perms
     if 'system:admin' in request._user_permissions_cache:
         return True
@@ -1578,6 +1583,7 @@ def portal_audit_logs(request):
     })
 
 @login_required(login_url='portal_login')
+@permission_required('reports:read')
 def portal_reports(request):
     from assets.models import AssetCategory, Location
     from django.utils import timezone
@@ -1614,6 +1620,8 @@ def custom_403_view(request, exception=None):
         'pm_plan:read': 'Xem kế hoạch bảo trì PM (Read PM Plans)',
         'inventory:read': 'Xem kho & phụ tùng (Read Inventory)',
         'audit_logs:read': 'Xem nhật ký kiểm toán (Read Audit Logs)',
+        'reports:read': 'Xem báo cáo doanh nghiệp (Read Enterprise Reports)',
+        'reports:export': 'Xuất báo cáo doanh nghiệp (Export Enterprise Reports)',
         'system:admin': 'Quản trị viên toàn hệ thống (Super Admin)',
         'asset_category:read': 'Cấu hình phân loại tài sản (Asset Config)',
     }

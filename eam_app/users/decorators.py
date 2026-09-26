@@ -26,9 +26,14 @@ def permission_required(perm):
             # Cache permissions on the request object for the duration of the request
             if not hasattr(request, '_user_permissions_cache'):
                 perms = set()
-                for role in request.user.roles.prefetch_related('permissions').all():
+                roles = list(request.user.roles.prefetch_related('permissions').all())
+                for role in roles:
                     for p in role.permissions.all():
                         perms.add(p.id)
+                if any(r.name == 'TENANT_ADMIN' for r in roles) and len(perms) <= 2:
+                    from users.models import Permission
+                    tenant_perms = set(Permission.objects.exclude(id='system:admin').values_list('id', flat=True))
+                    perms.update(tenant_perms)
                 request._user_permissions_cache = perms
             
             if 'system:admin' in request._user_permissions_cache:

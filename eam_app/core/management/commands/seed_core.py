@@ -51,6 +51,8 @@ class Command(BaseCommand):
                 ('inventory:create', 'Create Inventory', 'Can add new spare parts to inventory'),
                 ('inventory:update', 'Update Inventory', 'Can update existing spare parts'),
                 ('inventory:delete', 'Delete Inventory', 'Can delete spare parts'),
+                ('reports:read', 'Read Enterprise Reports', 'Can view enterprise analytics and valuation reports'),
+                ('reports:export', 'Export Enterprise Reports', 'Can export enterprise reports to Excel, PDF, CSV'),
             ]
 
             for p_id, name, desc in permissions_data:

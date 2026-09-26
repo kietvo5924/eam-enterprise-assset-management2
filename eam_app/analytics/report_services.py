@@ -23,6 +23,46 @@ def round_vnd(val: Decimal | float | int) -> Decimal:
     return val.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
+def parse_date_safe(val: Any) -> Optional[date]:
+    """
+    Safely parses input to a datetime.date object.
+    Supports datetime.date, datetime.datetime, ISO strings (with or without time/Z),
+    and common date formats (YYYY-MM-DD, DD/MM/YYYY).
+    """
+    if val is None or val == "":
+        return None
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+
+    val_str = str(val).strip()
+    if len(val_str) >= 10 and val_str[4] == '-' and val_str[7] == '-':
+        try:
+            return datetime.strptime(val_str[:10], '%Y-%m-%d').date()
+        except ValueError:
+            pass
+
+    if len(val_str) >= 10 and val_str[2] == '/' and val_str[5] == '/':
+        try:
+            return datetime.strptime(val_str[:10], '%d/%m/%Y').date()
+        except ValueError:
+            pass
+
+    try:
+        from django.utils.dateparse import parse_date, parse_datetime
+        parsed = parse_date(val_str)
+        if parsed:
+            return parsed
+        parsed_dt = parse_datetime(val_str)
+        if parsed_dt:
+            return parsed_dt.date()
+    except Exception:
+        pass
+
+    return None
+
+
 class AssetValuationEngine:
     """
     Engine for Asset Valuation, Straight-Line Depreciation (VAS 03 Floor Guardrail),
@@ -75,11 +115,11 @@ class AssetValuationEngine:
             total_cost_basis = base_cost + capex_cost
             depreciable_amount = max(Decimal('0'), total_cost_basis - salvage_val)
 
-            useful_years = asset.useful_life_years or 5
+            useful_years = max(1, asset.useful_life_years or 5)
             useful_months = useful_years * 12
 
             # Determine start date for depreciation
-            start_date = asset.capitalized_date if (asset.capitalized_date and asset.capitalized_cost > 0) else asset.purchase_date
+            start_date = asset.capitalized_date if (asset.capitalized_date and capex_cost > 0) else asset.purchase_date
             if not start_date:
                 start_date = asset.created_at.date() if asset.created_at else as_of_date
 
@@ -121,16 +161,19 @@ class AssetValuationEngine:
 
             total_opex = round_vnd(total_opex)
 
-            # Replacement value comparison: use base_cost if available, else 1
-            replacement_val = base_cost if base_cost > 0 else Decimal('1')
-            rrr_percent = round(float((total_opex / replacement_val) * Decimal('100')), 2)
-
-            is_bad_actor = (rrr_percent >= 70.0)
-            if is_bad_actor:
-                bad_actor_count += 1
-                recommendation = "CẢNH BÁO: Đề xuất thanh lý / Thay thế mới (RRR >= 70%)"
+            # Replacement value comparison: use base_cost if available
+            if base_cost > 0:
+                rrr_percent = round(float((total_opex / base_cost) * Decimal('100')), 2)
+                is_bad_actor = (rrr_percent >= 70.0)
+                if is_bad_actor:
+                    bad_actor_count += 1
+                    recommendation = "CẢNH BÁO: Đề xuất thanh lý / Thay thế mới (RRR >= 70%)"
+                else:
+                    recommendation = "Bình thường"
             else:
-                recommendation = "Bình thường"
+                rrr_percent = 0.0
+                is_bad_actor = False
+                recommendation = "Chưa có thông tin nguyên giá để tính RRR" if total_opex > 0 else "Bình thường"
 
             total_original_cost += base_cost
             total_capex += capex_cost
@@ -204,7 +247,8 @@ class MaintenancePerformanceEngine:
         if date_from and date_to:
             wo_qs = wo_qs.filter(
                 Q(created_at__date__gte=date_from, created_at__date__lte=date_to) |
-                Q(deadline__date__gte=date_from, deadline__date__lte=date_to)
+                Q(deadline__date__gte=date_from, deadline__date__lte=date_to) |
+                Q(completed_at__date__gte=date_from, completed_at__date__lte=date_to)
             )
 
         if location_id:
@@ -231,33 +275,35 @@ class MaintenancePerformanceEngine:
             if pm.skipped_reason == 'SKIPPED_DUE_TO_OVERLAP' or (pm.status == 'CANCELLED' and pm.resolution_notes and 'OVERLAP' in pm.resolution_notes.upper()):
                 continue
 
-            if pm.status == 'COMPLETED' and pm.completed_at and pm.due_date:
-                # 10% Rule: 30 days cycle has 3 days tolerance
-                tolerance_days = 3
-                deadline = pm.due_date + timedelta(days=tolerance_days)
-                if pm.completed_at <= deadline:
-                    on_time_pm_count += 1
+            target_deadline = pm.due_date or pm.deadline
+            if pm.status == 'COMPLETED' and pm.completed_at:
+                if target_deadline:
+                    # 10% Rule: 30 days cycle has 3 days tolerance
+                    tolerance_days = 3
+                    deadline = target_deadline + timedelta(days=tolerance_days)
+                    if pm.completed_at <= deadline:
+                        on_time_pm_count += 1
+                    else:
+                        late_pm_count += 1
                 else:
-                    late_pm_count += 1
-            elif pm.due_date and timezone.now() > (pm.due_date + timedelta(days=3)):
+                    on_time_pm_count += 1
+            elif target_deadline and timezone.now() > (target_deadline + timedelta(days=3)):
                 late_pm_count += 1
 
         pm_compliance_rate = 100.0
         if effective_pm_denominator > 0:
-            pm_compliance_rate = round((on_time_pm_count / effective_pm_denominator) * 100.0, 2)
+            pm_compliance_rate = min(100.0, round((on_time_pm_count / effective_pm_denominator) * 100.0, 2))
 
         # MTTR Calculation for corrective / breakdown orders
         repair_orders = wo_qs.filter(
             type__in=['CORRECTIVE', 'BREAKDOWN', 'EMERGENCY'],
-            status='COMPLETED',
-            actual_start_time__isnull=False,
-            completed_at__isnull=False
+            status='COMPLETED'
         )
         durations = []
         for ro in repair_orders:
-            delta_hours = (ro.completed_at - ro.actual_start_time).total_seconds() / 3600.0
-            if delta_hours >= 0:
-                durations.append(delta_hours)
+            dur = ro.actual_duration_hours
+            if dur is not None and 0 < dur <= 168.0:
+                durations.append(dur)
 
         avg_mttr_hours = round(sum(durations) / len(durations), 2) if durations else 0.0
 
@@ -506,7 +552,7 @@ class SparePartsValuationEngine:
                 variances_created.append(var_tx)
 
                 if target_wo:
-                    target_wo.actual_cost = (target_wo.actual_cost or Decimal('0')) + variance_amount
+                    target_wo.actual_cost = max(Decimal('0'), (target_wo.actual_cost or Decimal('0')) + variance_amount)
                     target_wo.save(update_fields=['actual_cost'])
 
         # Update spare part quantity and moving average
@@ -617,7 +663,8 @@ class CostSummaryEngine:
         total_material_cost = Decimal('0')
         for m in material_qs:
             cc = m.cost_center_snapshot or "Phân xưởng mặc định"
-            amt = m.total_amount if m.transaction_type != 'RETURN' else -m.total_amount
+            m_amount = m.total_amount or Decimal('0')
+            amt = m_amount if m.transaction_type != 'RETURN' else -m_amount
             total_material_cost += amt
 
             if cc not in cost_center_aggregates:
@@ -627,11 +674,12 @@ class CostSummaryEngine:
         total_labor_cost = Decimal('0')
         for l in labor_qs:
             cc = l.cost_center_snapshot or "Phân xưởng mặc định"
-            total_labor_cost += l.total_cost
+            l_cost = l.total_cost or Decimal('0')
+            total_labor_cost += l_cost
 
             if cc not in cost_center_aggregates:
                 cost_center_aggregates[cc] = {"material": Decimal('0'), "labor": Decimal('0')}
-            cost_center_aggregates[cc]["labor"] += l.total_cost
+            cost_center_aggregates[cc]["labor"] += l_cost
 
         cost_center_rows = []
         for cc, vals in cost_center_aggregates.items():

@@ -28,6 +28,12 @@ def user_permissions(request):
                 perms = all_perms
             except Exception:
                 perms.add('system:admin')
+        elif any(r.name == 'TENANT_ADMIN' for r in roles) and len(perms) <= 2:
+            try:
+                tenant_perms = set(Permission.objects.exclude(id='system:admin').values_list('id', flat=True))
+                perms.update(tenant_perms)
+            except Exception:
+                pass
 
         request._user_permissions_cache = perms
         request._user_roles_cache = [r.name for r in roles]

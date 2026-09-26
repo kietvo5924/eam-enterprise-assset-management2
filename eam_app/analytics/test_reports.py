@@ -20,7 +20,8 @@ from analytics.report_services import (
     MaintenancePerformanceEngine,
     SparePartsValuationEngine,
     CostSummaryEngine,
-    round_vnd
+    round_vnd,
+    parse_date_safe
 )
 from analytics.export_engine import (
     sanitize_cell_value,
@@ -725,3 +726,407 @@ def test_tc_sec_05_decimal_precision_and_rounding():
     # 12345.67 * 1000 = 12,345,670.00
     assert total == Decimal('12345670.00')
     assert rounded_total == Decimal('12345670')
+
+
+def test_tc_rep_10_zero_or_missing_base_cost_no_false_alarm(test_setup):
+    """
+    TC-REP-10: Thiết bị chưa có hoặc nguyên giá bằng 0 không bị báo động thanh lý ảo.
+    Thiết bị mới tiếp nhận chưa nhập nguyên giá (base_cost = 0), phát sinh sửa chữa 15,000,000 VNĐ.
+    Kỳ vọng: Không chia cho 1 dẫn đến RRR = 1,500,000,000%, không bị đánh dấu Bad Actor,
+    hiển thị hướng dẫn cập nhật nguyên giá thay vì đề xuất thanh lý máy mới.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(
+        tenant=tenant,
+        name="Máy Tiện Mới Tiếp Nhận Chưa Vào Sổ",
+        qr_code="ASSET-10-NOCOST",
+        purchase_cost=Decimal("0.00"),
+        value=Decimal("0.00"),
+        location=test_setup["location_a"]
+    )
+
+    WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="Lắp đặt phụ kiện ban đầu",
+        type="CORRECTIVE",
+        status="COMPLETED",
+        actual_cost=Decimal("15000000.00")
+    )
+
+    data = AssetValuationEngine.get_asset_valuation_data(tenant=tenant)
+    item = next(i for i in data["items"] if i["id"] == str(asset.id))
+
+    assert item["rrrPercent"] == 0.0
+    assert item["isBadActor"] is False
+    assert "Chưa có thông tin nguyên giá" in item["recommendation"]
+    assert data["summary"]["badActorCount"] == 0
+
+
+def test_tc_rep_11_cross_month_work_order_completion_in_performance_report(test_setup):
+    """
+    TC-REP-11: Phiếu công việc tạo tháng trước nhưng hoàn thành trong kỳ báo cáo (Cross-Month Completion).
+    Phiếu sửa chữa được tạo ngày 25/07, đến ngày 05/08 mới hoàn tất.
+    Kỳ vọng: Báo cáo hiệu suất tháng 8 (01/08 - 31/08) phải ghi nhận phiếu này vào completedOrders và MTTR.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(tenant=tenant, name="Máy Cắt Plasma", qr_code="ASSET-11")
+
+    wo = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="Đại tu hệ thống làm mát nguồn plasma",
+        type="CORRECTIVE",
+        status="COMPLETED",
+        actual_duration_minutes=240,  # 4 hours
+        completed_at=datetime(2026, 8, 5, 14, 0, tzinfo=dt_timezone.utc)
+    )
+    # Set created_at to July 25
+    WorkOrder.all_objects.filter(id=wo.id).update(created_at=datetime(2026, 7, 25, 9, 0, tzinfo=dt_timezone.utc))
+
+    data = MaintenancePerformanceEngine.get_performance_data(
+        tenant=tenant,
+        date_from=date(2026, 8, 1),
+        date_to=date(2026, 8, 31)
+    )
+
+    summary = data["summary"]
+    assert summary["totalOrders"] >= 1
+    assert summary["completedOrders"] >= 1
+    assert summary["avgMttrHours"] == 4.0
+
+
+def test_tc_rep_12_mttr_ignores_anomalous_durations_and_accepts_minutes(test_setup):
+    """
+    TC-REP-12: MTTR lọc các thời lượng dị biệt và nhận diện thời lượng theo phút.
+    Phiếu 1: 180 phút (3.0h) - không có actual_start_time.
+    Phiếu 2: 3000 giờ (quên đóng phiếu 4 tháng).
+    Phiếu 3: -60 phút (lỗi đồng hồ).
+    Kỳ vọng: MTTR chỉ tính trung bình phiếu 1 là 3.0h, loại bỏ hoàn toàn phiếu 2 và phiếu 3.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(tenant=tenant, name="Máy Ép Thủy Lực P2", qr_code="ASSET-12")
+
+    # Ticket 1: 180 minutes = 3.0h (valid)
+    wo1 = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="Sửa chữa van đảo chiều",
+        type="BREAKDOWN",
+        status="COMPLETED",
+        actual_duration_minutes=180,
+        completed_at=datetime(2026, 8, 10, 10, 0, tzinfo=dt_timezone.utc)
+    )
+    WorkOrder.all_objects.filter(id=wo1.id).update(created_at=datetime(2026, 8, 10, 7, 0, tzinfo=dt_timezone.utc))
+
+    # Ticket 2: 3000h outlier
+    wo2 = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="Phiếu quên đóng 4 tháng",
+        type="BREAKDOWN",
+        status="COMPLETED",
+        actual_duration_minutes=3000 * 60,
+        completed_at=datetime(2026, 8, 12, 10, 0, tzinfo=dt_timezone.utc)
+    )
+    WorkOrder.all_objects.filter(id=wo2.id).update(created_at=datetime(2026, 8, 12, 7, 0, tzinfo=dt_timezone.utc))
+
+    # Ticket 3: -60 minutes (negative)
+    wo3 = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="Lỗi đồng hồ hệ thống",
+        type="BREAKDOWN",
+        status="COMPLETED",
+        actual_duration_minutes=-60,
+        completed_at=datetime(2026, 8, 15, 10, 0, tzinfo=dt_timezone.utc)
+    )
+    WorkOrder.all_objects.filter(id=wo3.id).update(created_at=datetime(2026, 8, 15, 7, 0, tzinfo=dt_timezone.utc))
+
+    data = MaintenancePerformanceEngine.get_performance_data(
+        tenant=tenant,
+        date_from=date(2026, 8, 1),
+        date_to=date(2026, 8, 31)
+    )
+
+    assert data["summary"]["avgMttrHours"] == 3.0
+
+
+def test_tc_rep_13_pm_compliance_tolerance_and_no_deadline(test_setup):
+    """
+    TC-REP-13: Quy tắc dung sai 3 ngày PM và xử lý phiếu PM không gán hạn.
+    Phiếu 1: Hoàn thành hạn + 2 ngày (trong dung sai 3 ngày) -> ĐÚNG HẠN.
+    Phiếu 2: Hoàn thành hạn + 6 ngày (quá dung sai) -> TRỄ HẠN.
+    Phiếu 3: Hoàn tất không có deadline -> ĐÚNG HẠN.
+    Kỳ vọng: 2 đúng hạn, 1 trễ hạn, tổng mẫu số 3 -> Tỷ lệ tuân thủ = 66.67%.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(tenant=tenant, name="Cầu Trục 10 Tấn", qr_code="ASSET-13")
+
+    # PM 1: Due 2026-08-10, completed 2026-08-12 (2 days <= 3 days tolerance) -> ON TIME
+    w1 = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="PM Cáp cầu trục",
+        type="PREVENTIVE",
+        status="COMPLETED",
+        deadline=datetime(2026, 8, 10, 17, 0, tzinfo=dt_timezone.utc),
+        completed_at=datetime(2026, 8, 12, 10, 0, tzinfo=dt_timezone.utc)
+    )
+    WorkOrder.all_objects.filter(id=w1.id).update(created_at=datetime(2026, 8, 1, 8, 0, tzinfo=dt_timezone.utc))
+
+    # PM 2: Due 2026-08-10, completed 2026-08-16 (6 days > 3 days tolerance) -> LATE
+    w2 = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="PM Phanh cầu trục",
+        type="PREVENTIVE",
+        status="COMPLETED",
+        deadline=datetime(2026, 8, 10, 17, 0, tzinfo=dt_timezone.utc),
+        completed_at=datetime(2026, 8, 16, 10, 0, tzinfo=dt_timezone.utc)
+    )
+    WorkOrder.all_objects.filter(id=w2.id).update(created_at=datetime(2026, 8, 1, 8, 0, tzinfo=dt_timezone.utc))
+
+    # PM 3: No explicit deadline, completed -> ON TIME
+    w3 = WorkOrder.all_objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="PM Bôi trơn ray",
+        type="PREVENTIVE",
+        status="COMPLETED",
+        deadline=None,
+        completed_at=datetime(2026, 8, 15, 10, 0, tzinfo=dt_timezone.utc)
+    )
+    WorkOrder.all_objects.filter(id=w3.id).update(created_at=datetime(2026, 8, 1, 8, 0, tzinfo=dt_timezone.utc))
+
+    data = MaintenancePerformanceEngine.get_performance_data(
+        tenant=tenant,
+        date_from=date(2026, 8, 1),
+        date_to=date(2026, 8, 31)
+    )
+
+    summary = data["summary"]
+    assert summary["totalPmDue"] == 3
+    assert summary["onTimePmCount"] == 2
+    assert summary["latePmCount"] == 1
+    assert summary["pmComplianceRate"] == 66.67
+
+
+def test_tc_rep_14_partial_negative_inventory_reconciliation(test_setup):
+    """
+    TC-REP-14: Nhập kho bổ sung một phần cho kho đang xuất âm (Partial Reconciliation).
+    Tồn kho ban đầu = 0. Xuất gấp 5 bộ cảm biến @ 200,000 VNĐ -> Tồn = -5. WO = 1,000,000 VNĐ.
+    Phiếu Nhập kho mới chỉ về 3 bộ @ 250,000 VNĐ (chênh lệch +50,000/bộ).
+    Kỳ vọng: Tồn kho chuyển thành -2. Bút toán chênh lệch giá chỉ tính trên 3 bộ (3 * 50,000 = +150,000 VNĐ).
+    Chi phí WO tăng thành 1,150,000 VNĐ.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(tenant=tenant, name="Cảm Biến Quang", qr_code="ASSET-14")
+    part = SparePart.all_objects.create(
+        tenant=tenant,
+        name="Cảm Biến Quang Omron",
+        quantity_in_stock=Decimal("0.00"),
+        unit_cost=Decimal("200000.00")
+    )
+    wo = WorkOrder.all_objects.create(tenant=tenant, asset=asset, title="Thay cảm biến quang", status="IN_PROGRESS")
+
+    # Issue 5 units
+    SparePartsValuationEngine.record_negative_issue_and_variance(
+        tenant=tenant,
+        spare_part=part,
+        work_order=wo,
+        issue_qty=Decimal("5.00"),
+        issue_date=timezone.now() - timedelta(days=2),
+        cost_center="Phân Xưởng Lắp Ráp"
+    )
+
+    part.refresh_from_db()
+    wo.refresh_from_db()
+    assert part.quantity_in_stock == Decimal("-5.00")
+    assert wo.actual_cost == Decimal("1000000.00")
+
+    # GRN only 3 units @ 250,000 VNĐ
+    SparePartsValuationEngine.apply_grn_receipt_and_reconcile_variance(
+        tenant=tenant,
+        spare_part=part,
+        receipt_qty=Decimal("3.00"),
+        new_unit_cost=Decimal("250000.00"),
+        receipt_date=timezone.now()
+    )
+
+    part.refresh_from_db()
+    wo.refresh_from_db()
+
+    # Stock is -5 + 3 = -2
+    assert part.quantity_in_stock == Decimal("-2.00")
+    # Variance for 3 units = 3 * 50,000 = 150,000 VNĐ -> WO cost = 1,150,000 VNĐ
+    assert wo.actual_cost == Decimal("1150000.00")
+
+
+def test_tc_rep_15_negative_price_variance_grn_cheaper(test_setup):
+    """
+    TC-REP-15: Chênh lệch giá âm khi đơn giá nhập kho thực tế rẻ hơn giá tạm tính.
+    Xuất âm 2 bóng đèn sấy @ 500,000 VNĐ -> WO = 1,000,000 VNĐ.
+    Nhập kho thực tế 5 bóng với giá đàm phán rẻ hơn: 450,000 VNĐ (-50,000 VNĐ/bóng).
+    Kỳ vọng: Bút toán điều chỉnh giá âm: -100,000 VNĐ. Chi phí WO giảm xuống 900,000 VNĐ.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(tenant=tenant, name="Buồng Sấy Sơn", qr_code="ASSET-15")
+    part = SparePart.all_objects.create(
+        tenant=tenant,
+        name="Bóng Đèn Sấy Hồng Ngoại",
+        quantity_in_stock=Decimal("0.00"),
+        unit_cost=Decimal("500000.00")
+    )
+    wo = WorkOrder.all_objects.create(tenant=tenant, asset=asset, title="Thay bóng sấy sơn", status="IN_PROGRESS")
+
+    # Issue 2 units
+    SparePartsValuationEngine.record_negative_issue_and_variance(
+        tenant=tenant,
+        spare_part=part,
+        work_order=wo,
+        issue_qty=Decimal("2.00"),
+        issue_date=timezone.now() - timedelta(days=2),
+        cost_center="Phân Xưởng Sơn"
+    )
+
+    assert wo.actual_cost == Decimal("1000000.00")
+
+    # GRN 5 units @ 450,000 VNĐ (cheaper)
+    SparePartsValuationEngine.apply_grn_receipt_and_reconcile_variance(
+        tenant=tenant,
+        spare_part=part,
+        receipt_qty=Decimal("5.00"),
+        new_unit_cost=Decimal("450000.00"),
+        receipt_date=timezone.now()
+    )
+
+    wo.refresh_from_db()
+    # WO cost reduced by 100,000 -> 900,000 VNĐ
+    assert wo.actual_cost == Decimal("900000.00")
+
+
+def test_tc_rep_16_temporal_cost_center_with_null_costs_and_returns(test_setup):
+    """
+    TC-REP-16: An toàn dữ liệu khi có bản ghi công hoặc vật tư có giá trị None / Null.
+    Xử lý đúng trừ vật tư hoàn trả và bỏ qua an toàn các trường Null không sinh lỗi TypeError.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(tenant=tenant, name="Trạm Xử Lý Nước", qr_code="ASSET-16")
+    part = SparePart.all_objects.create(tenant=tenant, name="Hóa Chất Xử Lý", unit_cost=Decimal("1000000.00"))
+
+    wo = WorkOrder.all_objects.create(tenant=tenant, asset=asset, title="Bảo trì trạm nước")
+
+    # Material issue: 10,000,000 VNĐ
+    StockTransaction.all_objects.create(
+        tenant=tenant,
+        spare_part=part,
+        work_order=wo,
+        transaction_type='ISSUE',
+        quantity=Decimal("10.00"),
+        unit_price=Decimal("1000000.00"),
+        total_amount=Decimal("10000000.00"),
+        issue_date=datetime(2026, 8, 10, 10, 0, tzinfo=dt_timezone.utc),
+        cost_center_snapshot="Trạm Nước Thải"
+    )
+
+    # Material return: 2,000,000 VNĐ
+    StockTransaction.all_objects.create(
+        tenant=tenant,
+        spare_part=part,
+        work_order=wo,
+        transaction_type='RETURN',
+        quantity=Decimal("2.00"),
+        unit_price=Decimal("1000000.00"),
+        total_amount=Decimal("2000000.00"),
+        issue_date=datetime(2026, 8, 15, 10, 0, tzinfo=dt_timezone.utc),
+        cost_center_snapshot="Trạm Nước Thải"
+    )
+
+    # Transaction with 0.00 total_amount (edge case)
+    StockTransaction.all_objects.create(
+        tenant=tenant,
+        spare_part=part,
+        work_order=wo,
+        transaction_type='ISSUE',
+        quantity=Decimal("0.00"),
+        unit_price=Decimal("0.00"),
+        total_amount=Decimal("0.00"),
+        issue_date=datetime(2026, 8, 16, 10, 0, tzinfo=dt_timezone.utc),
+        cost_center_snapshot="Trạm Nước Thải"
+    )
+
+    # Labor log: 3,000,000 VNĐ
+    LaborLog.all_objects.create(
+        tenant=tenant,
+        work_order=wo,
+        technician=test_setup["tech_user"],
+        hours_worked=Decimal("10.00"),
+        hourly_rate=Decimal("300000.00"),
+        total_cost=Decimal("3000000.00"),
+        work_date=date(2026, 8, 10),
+        cost_center_snapshot="Trạm Nước Thải"
+    )
+
+    data = CostSummaryEngine.get_cost_summary_data(
+        tenant=tenant,
+        date_from=date(2026, 8, 1),
+        date_to=date(2026, 8, 31)
+    )
+
+    summary = data["summary"]
+    # Net material: 10m - 2m = 8,000,000 VNĐ
+    assert summary["totalMaterialCost"] == 8000000.0
+    # Labor: 3,000,000 VNĐ
+    assert summary["totalLaborCost"] == 3000000.0
+    # Total: 11,000,000 VNĐ
+    assert summary["totalCost"] == 11000000.0
+
+
+def test_tc_rep_17_safe_date_parsing_various_formats():
+    """
+    TC-REP-17: Khả năng phân tích linh hoạt các định dạng ngày tháng đầu vào.
+    Hỗ trợ ISO-8601 có thời gian, chuỗi YYYY-MM-DD, DD/MM/YYYY, date, datetime và chuỗi rỗng.
+    """
+    assert parse_date_safe("2026-08-01T15:30:00Z") == date(2026, 8, 1)
+    assert parse_date_safe("2026-08-01 10:00:00") == date(2026, 8, 1)
+    assert parse_date_safe("2026-08-01") == date(2026, 8, 1)
+    assert parse_date_safe("01/08/2026") == date(2026, 8, 1)
+    assert parse_date_safe(datetime(2026, 8, 1, 10, 0)) == date(2026, 8, 1)
+    assert parse_date_safe(date(2026, 8, 1)) == date(2026, 8, 1)
+    assert parse_date_safe("") is None
+    assert parse_date_safe(None) is None
+
+
+def test_tc_rep_18_depreciation_with_none_capitalized_cost(test_setup):
+    """
+    TC-REP-18: Khấu hao tài sản khi capitalized_cost = 0 nhưng có capitalized_date.
+    Không chuyển nhầm ngày tính khấu hao sang capitalized_date khi chưa có chi phí vốn hóa.
+    Đồng thời kiểm tra engine an toàn nếu capitalized_cost trên đối tượng là None.
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(
+        tenant=tenant,
+        name="Máy Hàn Laser Tự Động",
+        qr_code="ASSET-18-LASER",
+        purchase_date=date(2025, 1, 1),
+        purchase_cost=Decimal("60000000.00"),
+        salvage_value=Decimal("0.00"),
+        useful_life_years=5,
+        capitalized_date=date(2025, 6, 1),
+        capitalized_cost=Decimal("0.00"),  # 0 CAPEX
+        location=test_setup["location_a"]
+    )
+
+    data = AssetValuationEngine.get_asset_valuation_data(
+        tenant=tenant,
+        as_of_date=date(2026, 1, 1)
+    )
+
+    item = next(i for i in data["items"] if i["id"] == str(asset.id))
+    assert item["capexCost"] == 0.0
+    assert item["totalCostBasis"] == 60000000.0
+    assert item["monthsInService"] == 12  # Starts from purchase_date (2025-01-01), not capitalized_date (2025-06-01)
+    # Monthly = 60m / 60 months = 1,000,000 VNĐ. 12 months = 12,000,000 VNĐ.
+    assert item["accumulatedDepreciation"] == 12000000.0
+    assert item["netBookValue"] == 48000000.0

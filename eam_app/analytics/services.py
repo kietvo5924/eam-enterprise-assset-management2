@@ -49,18 +49,32 @@ def calculate_largest_remainder_percentages(counts: dict[str, int]) -> dict[str,
     return floored
 
 
+def _format_diff_val(val) -> str:
+    if val is None:
+        return "0"
+    try:
+        fval = float(val)
+        if fval.is_integer():
+            return str(int(fval))
+        return str(round(fval, 1))
+    except Exception:
+        return str(val)
+
+
 def calculate_safe_delta(current_val: float, previous_val: float, is_percentage: bool = False, higher_is_better: bool = True, default_label: str = "so với tháng trước") -> dict:
     """
     Safe Delta Calculation Guardrail (Rule 9 & TC-DASH-16).
     Avoids ZeroDivisionError / Infinity when previous period value is 0.
+    Handles int, float, and Decimal inputs safely.
     """
     if previous_val == 0 or previous_val is None:
         diff = current_val - (previous_val or 0)
+        formatted_diff = _format_diff_val(diff)
         if diff > 0:
-            diff_str = f"+{int(diff) if isinstance(diff, int) or diff.is_integer() else round(diff, 1)}"
+            diff_str = f"+{formatted_diff}"
             delta_type = "positive" if higher_is_better else "negative"
         elif diff < 0:
-            diff_str = f"{int(diff) if isinstance(diff, int) or diff.is_integer() else round(diff, 1)}"
+            diff_str = f"{formatted_diff}"
             delta_type = "negative" if higher_is_better else "positive"
         else:
             diff_str = "0"
@@ -77,11 +91,12 @@ def calculate_safe_delta(current_val: float, previous_val: float, is_percentage:
 
     diff = current_val - previous_val
     sign = "+" if diff > 0 else ""
+    formatted_diff = _format_diff_val(diff)
 
     if is_percentage:
-        delta_str = f"{sign}{round(diff, 1)}%"
+        delta_str = f"{sign}{round(float(diff), 1)}%"
     else:
-        delta_str = f"{sign}{int(diff) if isinstance(diff, int) or diff.is_integer() else round(diff, 1)}"
+        delta_str = f"{sign}{formatted_diff}"
 
     if diff > 0:
         delta_type = "positive" if higher_is_better else "negative"
@@ -109,7 +124,7 @@ class AssetHealthService:
 
     @classmethod
     def calculate_health(cls, tenant) -> dict:
-        qs = Asset.objects.filter(tenant=tenant, is_trackable=True)
+        qs = Asset.all_objects.filter(tenant=tenant, is_trackable=True)
         # Exclude decommissioned/scrapped/disposed/retired
         qs = qs.exclude(status__in=cls.EXCLUDED_STATUSES)
 
@@ -171,7 +186,7 @@ class ReliabilityMetricsService:
 
         # Rule 2: Strictly EXCLUDE Preventive Maintenance ('PREVENTIVE')
         # Only technical failure work orders in period
-        failure_wos = WorkOrder.objects.filter(
+        failure_wos = WorkOrder.all_objects.filter(
             tenant=tenant,
             type__in=cls.FAILURE_TYPES,
             created_at__gte=start_date
@@ -179,12 +194,12 @@ class ReliabilityMetricsService:
         n_failures = failure_wos.count()
 
         # Rule 7: Ongoing unresolved downtime isolation (uncompleted failure work orders or down assets)
-        ongoing_wos_count = WorkOrder.objects.filter(
+        ongoing_wos_count = WorkOrder.all_objects.filter(
             tenant=tenant,
             type__in=cls.FAILURE_TYPES,
             status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS']
         ).count()
-        down_assets_count = Asset.objects.filter(
+        down_assets_count = Asset.all_objects.filter(
             tenant=tenant,
             is_trackable=True,
             status='DOWN'
@@ -192,7 +207,7 @@ class ReliabilityMetricsService:
         ongoing_down_count = max(ongoing_wos_count, down_assets_count)
 
         # MTTR: Only COMPLETED failures in period with valid duration
-        completed_failures = WorkOrder.objects.filter(
+        completed_failures = WorkOrder.all_objects.filter(
             tenant=tenant,
             type__in=cls.FAILURE_TYPES,
             status='COMPLETED',
@@ -230,6 +245,10 @@ class ReliabilityMetricsService:
             if mttr_hours is not None and (mtbf_hours + mttr_hours) > 0:
                 avail_num = round((mtbf_hours / (mtbf_hours + mttr_hours)) * 100.0, 1)
                 plant_availability = f"{avail_num}%"
+            elif total_active_assets > 0 and ongoing_down_count > 0:
+                active_up = max(0, total_active_assets - ongoing_down_count)
+                avail_num = round((active_up / total_active_assets) * 100.0, 1)
+                plant_availability = f"{avail_num}%"
             else:
                 plant_availability = "100.0%"
 
@@ -256,7 +275,7 @@ class PMComplianceService:
         now = timezone.now()
         start_date = now - timedelta(days=period_days)
 
-        pm_due_qs = WorkOrder.objects.filter(
+        pm_due_qs = WorkOrder.all_objects.filter(
             tenant=tenant,
             type='PREVENTIVE'
         ).filter(
@@ -323,7 +342,7 @@ class TrendAnalyticsService:
 
         # Rule 4: Query Created series
         created_qs = (
-            WorkOrder.objects.filter(
+            WorkOrder.all_objects.filter(
                 tenant=tenant,
                 created_at__gte=start_utc,
                 created_at__lte=end_utc
@@ -340,7 +359,7 @@ class TrendAnalyticsService:
 
         # Rule 4: Query Completed series
         completed_qs = (
-            WorkOrder.objects.filter(
+            WorkOrder.all_objects.filter(
                 tenant=tenant,
                 status='COMPLETED',
                 completed_at__gte=start_utc,
@@ -389,7 +408,7 @@ class ActivityFeedService:
         now = timezone.now()
 
         # Query recent audit logs for this tenant
-        logs = AuditLog.objects.filter(tenant=tenant).order_by('-timestamp')[:100]
+        logs = AuditLog.all_objects.filter(tenant=tenant).order_by('-timestamp')[:100]
 
         activities = []
         for log in logs:
@@ -492,7 +511,7 @@ class ActivityFeedService:
     @classmethod
     def _synthesize_recent_activities(cls, tenant, now, limit: int) -> list[dict]:
         """Fallback: synthesize from actual work orders and asset changes if audit log is empty."""
-        recent_wos = WorkOrder.objects.filter(tenant=tenant).order_by('-updated_at')[:limit]
+        recent_wos = WorkOrder.all_objects.filter(tenant=tenant).order_by('-updated_at')[:limit]
         acts = []
         for wo in recent_wos:
             if wo.status == 'COMPLETED':
@@ -611,7 +630,7 @@ class DashboardCacheService:
         total_active_assets = asset_health["totalActive"]
 
         # Previous 30-day assets (or delta)
-        prev_assets_count = Asset.objects.filter(
+        prev_assets_count = Asset.all_objects.filter(
             tenant=tenant,
             is_trackable=True,
             created_at__lt=start_30d
@@ -622,12 +641,12 @@ class DashboardCacheService:
         )
 
         # 2. Active Work Orders
-        active_wo_count = WorkOrder.objects.filter(
+        active_wo_count = WorkOrder.all_objects.filter(
             tenant=tenant,
             status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS']
         ).count()
         # Yesterday's active count estimation
-        yesterday_created = WorkOrder.objects.filter(
+        yesterday_created = WorkOrder.all_objects.filter(
             tenant=tenant,
             created_at__gte=now - timedelta(days=1),
             status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS']
@@ -638,12 +657,12 @@ class DashboardCacheService:
         )
 
         # 3. Completed Work Orders in 30 days
-        completed_wo_count = WorkOrder.objects.filter(
+        completed_wo_count = WorkOrder.all_objects.filter(
             tenant=tenant,
             status='COMPLETED',
             completed_at__gte=start_30d
         ).count()
-        prev_completed_wo_count = WorkOrder.objects.filter(
+        prev_completed_wo_count = WorkOrder.all_objects.filter(
             tenant=tenant,
             status='COMPLETED',
             completed_at__gte=start_60d,

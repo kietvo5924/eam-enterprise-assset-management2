@@ -1015,7 +1015,7 @@
 
           const dlFilename = job.fileName || `${job.reportType || 'Bao_Cao'}.${(job.fileFormat || 'xlsx').toLowerCase()}`;
           document.getElementById('jobDrawerActions').innerHTML = `
-            <a href="/api/v1/reports/export-jobs/${job.jobId}/download/" download="${dlFilename}" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+            <a href="/api/v1/reports/export-jobs/${job.jobId}/download/${encodeURIComponent(dlFilename)}" download="${dlFilename}" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shadow-sm">
               <i class="ph-bold ph-download-simple"></i> Tải Về
             </a>
           `;
@@ -1072,7 +1072,7 @@
             </div>
             <div>
               ${j.status === 'COMPLETED' ? `
-                <a href="/api/v1/reports/export-jobs/${j.jobId}/download/" download="${j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase())}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5">
+                <a href="/api/v1/reports/export-jobs/${j.jobId}/download/${encodeURIComponent(j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase()))}" download="${j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase())}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5">
                   <i class="ph-bold ph-download-simple"></i> Tải Lại
                 </a>
               ` : ''}
@@ -1087,8 +1087,9 @@
     }
   }
 
-  function downloadExistingJob(jobId) {
-    window.location.href = `/api/v1/reports/export-jobs/${jobId}/download/`;
+  function downloadExistingJob(jobId, filename) {
+    const fn = filename ? `/${encodeURIComponent(filename)}` : '';
+    window.location.href = `/api/v1/reports/export-jobs/${jobId}/download${fn}`;
   }
 
   function closeHistoryModal() {

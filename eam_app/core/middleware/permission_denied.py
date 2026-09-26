@@ -48,6 +48,8 @@ class PermissionDeniedMiddleware(MiddlewareMixin):
             'pm_plan:read': 'Xem kế hoạch bảo trì PM (Read PM Plans)',
             'inventory:read': 'Xem kho & phụ tùng (Read Inventory)',
             'audit_logs:read': 'Xem nhật ký kiểm toán (Read Audit Logs)',
+            'reports:read': 'Xem báo cáo doanh nghiệp (Read Enterprise Reports)',
+            'reports:export': 'Xuất báo cáo doanh nghiệp (Export Enterprise Reports)',
             'system:admin': 'Quản trị viên toàn hệ thống (Super Admin)',
             'asset_category:read': 'Cấu hình phân loại tài sản (Asset Config)',
         }

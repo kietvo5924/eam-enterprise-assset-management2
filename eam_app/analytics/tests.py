@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -716,3 +717,244 @@ class DashboardAnalyticsTestCase(TestCase):
             kpis["activeWorkOrders"]["drillDownUrl"],
             "/portal/work-orders/?status=CREATED,ASSIGNED,IN_PROGRESS"
         )
+
+    def test_tc_dash_18_decimal_inputs_safe_delta(self):
+        """
+        TC-DASH-18: Decimal Inputs in Safe Delta.
+        Verifies calculate_safe_delta handles Decimal types without AttributeError.
+        """
+        # Decimal positive change
+        res1 = calculate_safe_delta(current_val=Decimal("15.00"), previous_val=Decimal("10.00"), higher_is_better=True)
+        self.assertEqual(res1["delta"], "+5")
+        self.assertEqual(res1["deltaType"], "positive")
+
+        # Decimal fractional change
+        res2 = calculate_safe_delta(current_val=Decimal("12.50"), previous_val=Decimal("10.00"), is_percentage=True)
+        self.assertEqual(res2["delta"], "+2.5%")
+        self.assertEqual(res2["deltaType"], "positive")
+
+        # Decimal negative change
+        res3 = calculate_safe_delta(current_val=Decimal("5.00"), previous_val=Decimal("8.00"), higher_is_better=True)
+        self.assertEqual(res3["delta"], "-3")
+        self.assertEqual(res3["deltaType"], "negative")
+
+        # Decimal from zero
+        res4 = calculate_safe_delta(current_val=Decimal("10.00"), previous_val=Decimal("0.00"))
+        self.assertEqual(res4["delta"], "+10")
+        self.assertEqual(res4["deltaLabel"], "Kỳ đầu / Mới")
+
+    def test_tc_dash_19_hamilton_hare_stress_and_edge_cases(self):
+        """
+        TC-DASH-19: Hamilton-Hare Rounding Stress & Multi-Bucket Edge Cases.
+        Guarantees exact 100.0% sum across diverse bucket distributions.
+        """
+        # All zeros
+        res_zeros = calculate_largest_remainder_percentages({'operating': 0, 'maintenance': 0, 'down': 0})
+        self.assertEqual(sum(res_zeros.values()), 0.0)
+
+        # Single active bucket
+        res_single = calculate_largest_remainder_percentages({'operating': 10, 'maintenance': 0, 'down': 0})
+        self.assertEqual(res_single['operating'], 100.0)
+        self.assertEqual(res_single['maintenance'], 0.0)
+        self.assertEqual(res_single['down'], 0.0)
+        self.assertEqual(sum(res_single.values()), 100.0)
+
+        # 7 equal buckets
+        seven_buckets = {f"b_{i}": 1 for i in range(7)}
+        res_seven = calculate_largest_remainder_percentages(seven_buckets)
+        self.assertEqual(round(sum(res_seven.values()), 1), 100.0)
+
+        # Large numbers
+        large_counts = {'operating': 789123, 'maintenance': 123456, 'down': 87421}
+        res_large = calculate_largest_remainder_percentages(large_counts)
+        self.assertEqual(round(sum(res_large.values()), 1), 100.0)
+
+    def test_tc_dash_20_ongoing_failures_availability_accuracy(self):
+        """
+        TC-DASH-20: Plant Availability When Failures Exist But None Completed Yet.
+        10 trackable assets, 2 are in DOWN status with ongoing emergency work orders.
+        Availability should accurately reflect 80.0%, NOT misleading 100.0%.
+        """
+        set_current_tenant(self.tenant_a.id)
+        assets = []
+        for i in range(10):
+            st = "DOWN" if i < 2 else "OPERATIONAL"
+            a = Asset.objects.create(
+                tenant=self.tenant_a,
+                name=f"Plant Line Asset {i+1}",
+                qr_code=f"QR-PL-{i+1}",
+                status=st,
+                is_trackable=True
+            )
+            assets.append(a)
+
+        # 2 ongoing emergency work orders
+        now = timezone.now()
+        for i in range(2):
+            WorkOrder.objects.create(
+                tenant=self.tenant_a,
+                asset=assets[i],
+                title=f"Ongoing Emergency Break {i+1}",
+                type="EMERGENCY",
+                status="IN_PROGRESS"
+            )
+
+        response = self.client_a.get('/api/v1/dashboard/summary/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+
+        rel = data["reliability"]
+        self.assertFalse(rel["isZeroFailure"])
+        self.assertIsNone(rel["mttrHours"])
+        self.assertEqual(rel["mttrDisplay"], "N/A")
+        self.assertEqual(rel["ongoingDownCount"], 2)
+
+        # Availability must reflect ongoing downtime (8/10 = 80.0%)
+        self.assertEqual(data["kpis"]["plantAvailability"]["value"], "80.0%")
+
+    def test_tc_dash_21_pm_compliance_tolerance_and_deadlines(self):
+        """
+        TC-DASH-21: PM Compliance Tolerance & Deadlines.
+        Verifies on-time vs late classification in PMComplianceService.
+        """
+        set_current_tenant(self.tenant_a.id)
+        asset = Asset.objects.create(
+            tenant=self.tenant_a,
+            name="Packaging Line",
+            qr_code="QR-PKG-01",
+            status="OPERATIONAL",
+            is_trackable=True
+        )
+
+        now = timezone.now()
+
+        # PM 1: Completed on time (before deadline)
+        WorkOrder.objects.create(
+            tenant=self.tenant_a,
+            asset=asset,
+            title="On time PM",
+            type="PREVENTIVE",
+            status="COMPLETED",
+            deadline=now - timedelta(days=5),
+            completed_at=now - timedelta(days=6)
+        )
+
+        # PM 2: Completed late (after deadline)
+        WorkOrder.objects.create(
+            tenant=self.tenant_a,
+            asset=asset,
+            title="Late PM",
+            type="PREVENTIVE",
+            status="COMPLETED",
+            deadline=now - timedelta(days=10),
+            completed_at=now - timedelta(days=2)
+        )
+
+        # PM 3: Completed without explicit deadline -> counted as on-time
+        WorkOrder.objects.create(
+            tenant=self.tenant_a,
+            asset=asset,
+            title="No deadline PM",
+            type="PREVENTIVE",
+            status="COMPLETED",
+            deadline=None,
+            completed_at=now - timedelta(days=3)
+        )
+
+        res = PMComplianceService.calculate_compliance(self.tenant_a, period_days=30)
+        # 3 total due, 2 on time, 1 late -> 66.7%
+        self.assertEqual(res["totalDue"], 3)
+        self.assertEqual(res["completedOnTime"], 2)
+        self.assertEqual(res["rate"], 66.7)
+
+    def test_tc_dash_22_duration_minutes_without_actual_start_time(self):
+        """
+        TC-DASH-22: Duration Minutes Without Actual Start Time.
+        Technician entered actual_duration_minutes = 90 without clock-in actual_start_time.
+        actual_duration_hours property should correctly evaluate to 1.5h and feed into MTTR.
+        """
+        set_current_tenant(self.tenant_a.id)
+        asset = Asset.objects.create(
+            tenant=self.tenant_a,
+            name="CNC Miller #2",
+            qr_code="QR-CNC-02",
+            status="OPERATIONAL",
+            is_trackable=True
+        )
+
+        now = timezone.now()
+        WorkOrder.objects.create(
+            tenant=self.tenant_a,
+            asset=asset,
+            title="Quick Spindle Fix",
+            type="CORRECTIVE",
+            status="COMPLETED",
+            completed_at=now - timedelta(days=1),
+            actual_duration_minutes=90  # 1.5h
+        )
+
+        rel = ReliabilityMetricsService.calculate_reliability(self.tenant_a, total_active_assets=1, period_days=30)
+        self.assertEqual(rel["mttrHours"], 1.5)
+        self.assertEqual(rel["mttrDisplay"], "1.5 giờ")
+
+    def test_tc_dash_23_activity_feed_fallback_synthesis(self):
+        """
+        TC-DASH-23: Activity Feed Fallback Synthesis From Actual WorkOrders.
+        When AuditLog table has no operational entries, fallback gracefully synthesizes
+        operational activity from recent WorkOrders.
+        """
+        set_current_tenant(self.tenant_a.id)
+        asset = Asset.objects.create(
+            tenant=self.tenant_a,
+            name="Main Generator",
+            qr_code="QR-GEN-M1",
+            status="OPERATIONAL",
+            is_trackable=True
+        )
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant_a,
+            asset=asset,
+            title="Sửa chữa khẩn cấp hệ thống điện",
+            status="COMPLETED"
+        )
+
+        # Clear audit logs
+        AuditLog.objects.filter(tenant=self.tenant_a).delete()
+
+        acts = ActivityFeedService.get_recent_activities(self.tenant_a, limit=5)
+        self.assertTrue(len(acts) >= 1)
+        self.assertEqual(acts[0]["eventType"], "WO_COMPLETED")
+        self.assertIn("Hoàn tất", acts[0]["title"])
+        self.assertIn(str(wo.id), acts[0]["link"])
+
+    def test_tc_dash_24_multi_tenant_cache_and_metric_isolation(self):
+        """
+        TC-DASH-24: Multi-Tenant Complete Cache and Metric Isolation.
+        Tenant A operations do not contaminate Tenant B's cached summary.
+        """
+        set_current_tenant(self.tenant_a.id)
+        for i in range(3):
+            Asset.objects.create(
+                tenant=self.tenant_a,
+                name=f"Tenant A Asset {i}",
+                qr_code=f"QR-TNA-{i}",
+                status="OPERATIONAL",
+                is_trackable=True
+            )
+
+        set_current_tenant(self.tenant_b.id)
+        for i in range(8):
+            Asset.objects.create(
+                tenant=self.tenant_b,
+                name=f"Tenant B Asset {i}",
+                qr_code=f"QR-TNB-{i}",
+                status="OPERATIONAL",
+                is_trackable=True
+            )
+
+        sum_a = DashboardCacheService.get_summary(self.tenant_a)
+        sum_b = DashboardCacheService.get_summary(self.tenant_b)
+
+        self.assertEqual(sum_a["kpis"]["totalAssets"]["value"], 3)
+        self.assertEqual(sum_b["kpis"]["totalAssets"]["value"], 8)

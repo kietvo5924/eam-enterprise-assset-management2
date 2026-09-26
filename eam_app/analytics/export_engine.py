@@ -16,7 +16,8 @@ from analytics.report_services import (
     MaintenancePerformanceEngine,
     SparePartsValuationEngine,
     CostSummaryEngine,
-    round_vnd
+    round_vnd,
+    parse_date_safe
 )
 
 logger = logging.getLogger(__name__)
@@ -255,8 +256,8 @@ class ExportEngineService:
 
         data = MaintenancePerformanceEngine.get_performance_data(
             tenant=tenant,
-            date_from=datetime.strptime(filters['dateFrom'], '%Y-%m-%d').date() if filters.get('dateFrom') else None,
-            date_to=datetime.strptime(filters['dateTo'], '%Y-%m-%d').date() if filters.get('dateTo') else None,
+            date_from=parse_date_safe(filters.get('dateFrom')),
+            date_to=parse_date_safe(filters.get('dateTo')),
             location_id=filters.get('locationId')
         )
 
@@ -291,6 +292,8 @@ class ExportEngineService:
 
         data = SparePartsValuationEngine.get_spare_parts_data(
             tenant=tenant,
+            date_from=parse_date_safe(filters.get('dateFrom')),
+            date_to=parse_date_safe(filters.get('dateTo')),
             search=filters.get('search')
         )
 
@@ -319,8 +322,8 @@ class ExportEngineService:
 
         data = CostSummaryEngine.get_cost_summary_data(
             tenant=tenant,
-            date_from=datetime.strptime(filters['dateFrom'], '%Y-%m-%d').date() if filters.get('dateFrom') else None,
-            date_to=datetime.strptime(filters['dateTo'], '%Y-%m-%d').date() if filters.get('dateTo') else None,
+            date_from=parse_date_safe(filters.get('dateFrom')),
+            date_to=parse_date_safe(filters.get('dateTo')),
             cost_center=filters.get('costCenter'),
             include_capex=filters.get('includeCapex', False)
         )
