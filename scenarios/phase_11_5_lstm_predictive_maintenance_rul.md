@@ -30,6 +30,7 @@ Hệ thống được thiết kế theo kiến trúc phòng vệ 2 tầng liên 
   - `SparePart`: Kiểm tra tự động số lượng tồn kho khả dụng và thời gian đặt hàng (`lead_time_days`) khi RUL chạm ngưỡng cảnh báo đón đầu.
   - `WorkOrder`: Tự động tạo bản thảo phiếu bảo trì phòng ngừa đón đầu (`type = 'PREDICTIVE_PM'`) khi RUL chạm mức nguy cấp.
 - **Tiền Tệ Chuẩn Hóa**: Mọi chi phí ước tính linh kiện thay thế tuân thủ chuẩn `Decimal` / `DECIMAL(18, 2)` Việt Nam Đồng (VNĐ).
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn mạng nơ-ron học sâu và giải thuật dự đoán RUL (kiến trúc LSTM, Monte Carlo Dropout ước lượng độ bất định, bộ lọc khởi động nguội Cold-start, kẹp chống ảo giác Phantom Recovery, và chuyển đổi chuỗi thời gian) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/predictive_rul/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng mô hình học sâu suy diễn RUL khỏi các tầng controller/CRUD thông thường.
 
 ---
 

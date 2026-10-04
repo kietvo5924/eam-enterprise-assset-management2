@@ -683,6 +683,74 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       'Thiết bị',
                       '${_workOrder!.assetName ?? 'Không có thiết bị'} - ${_workOrder!.assetLocation ?? 'Không rõ vị trí'}',
                     ),
+                    if (_workOrder!.coordsX != null || _workOrder!.zoneId != null || _workOrder!.assetLocation != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0f172a),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on, color: Color(0xFF38bdf8), size: 18),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Vị trí: ${_workOrder!.zoneId ?? _workOrder!.assetLocation ?? 'Phân xưởng'} (Tầng ${_workOrder!.floorLevel ?? 1})',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                if (_workOrder!.coordsX != null && _workOrder!.coordsY != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0284c7).withValues(alpha: 0.3),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'X=${_workOrder!.coordsX}m, Y=${_workOrder!.coordsY}m',
+                                      style: const TextStyle(color: Color(0xFF38bdf8), fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  context.push('/floorplan-viewer', extra: {
+                                    'locationId': _workOrder!.zoneId ?? '',
+                                    'locationName': _workOrder!.assetLocation ?? _workOrder!.zoneId ?? 'Phân xưởng',
+                                    'focusAssetId': _workOrder!.assetId,
+                                    'targetCoordsX': _workOrder!.coordsX,
+                                    'targetCoordsY': _workOrder!.coordsY,
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0284c7),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  elevation: 0,
+                                ),
+                                icon: const Icon(Icons.map, size: 16),
+                                label: const Text('🗺 Xem Ghim Máy Trên Sơ Đồ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     _buildInfoRow(
                       PhosphorIcons.calendar(PhosphorIconsStyle.fill),

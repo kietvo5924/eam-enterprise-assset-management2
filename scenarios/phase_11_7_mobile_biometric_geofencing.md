@@ -29,6 +29,7 @@ Hệ thống phân định rõ hai mốc kiểm soát trong vòng đời lệnh 
   - `Asset`: Tọa độ vĩ độ/kinh độ (`latitude`, `longitude`), mã định danh QR thân máy (`qr_code`).
   - `User`: Hồ sơ nhân viên kỹ thuật thực hiện điểm danh.
 - **Tối Ưu Hóa Thiết Bị Di Động (Edge Inference)**: Mô hình MobileFaceNet được đóng gói dạng TFLite (`mobilefacenet.tflite` $\approx 4.1\text{ MB}$) chạy trực tiếp trên chip di động của kỹ thuật viên, không yêu cầu máy chủ phải gắn GPU.
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật định vị không gian và kiểm định sinh trắc học trên backend (công thức tính khoảng cách trắc địa Haversine, cổng kiểm soát tuân thủ 15 phút, và các helper đối soát vector đặc trưng khuôn mặt) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/biometric/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật không gian & sinh trắc học khỏi các tầng controller/CRUD thông thường.
 
 ---
 

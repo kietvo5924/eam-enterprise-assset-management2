@@ -249,13 +249,13 @@
     - `[x]` Task 10.3.4 — Implement Maintenance Performance & Work Order Resolution Report.
     - `[x]` Task 10.3.5 — Implement Spare Parts Consumption & Cost Report.
     - `[x]` Task 10.3.6 — Build Celery asynchronous export tasks generating Excel (`openpyxl`) and PDF formats with upload to MinIO.
-- `[ ]` **Phase 11 — Research Algorithms & Deep Learning Core (Academic Thesis Focus)**
-  - `[ ]` **11.1 — Hungarian Assignment Optimization (Kuhn-Munkres Algorithm)**
-    - `[ ]` Task 11.1.1 — Formalize multi-factor cost matrix: Priority Multiplier, multi-floor distance, zone & shift handover penalties, Big-M safety.
-    - `[ ]` Task 11.1.2 — Implement core Hungarian solver using `scipy.optimize.linear_sum_assignment` with dummy padding and dependency filter.
-    - `[ ]` Task 11.1.3 — Implement auto-assignment API endpoints (`preview` with shared tool conflict detector, `apply` with concurrency database lock).
-    - `[ ]` Task 11.1.4 — Build Web Portal UI integration: "Tự động phân công tối ưu (Hungary)" modal with explainable matrix, tool warning banner & manual override.
-    - `[ ]` Task 11.1.5 — Write unit tests for edge cases: Priority Multiplier, Zone & Shift handover clashes, Shared tool bottlenecks, and Task dependencies.
+- `[ ]` **Phase 11 — Research Algorithms & Deep Learning Core (Academic Thesis Focus)** *(Quy ước Kiến trúc: Toàn bộ mã nguồn giải thuật đóng gói trong thư mục riêng biệt `eam_app/algorithms/`)*
+  - `[x]` **11.1 — Hungarian Assignment Optimization (Kuhn-Munkres Algorithm)**
+    - `[x]` Task 11.1.1 — Formalize multi-factor cost matrix: Priority Multiplier, multi-floor distance, zone & shift handover penalties, Big-M safety.
+    - `[x]` Task 11.1.2 — Implement core Hungarian solver using `scipy.optimize.linear_sum_assignment` with dummy padding and dependency filter.
+    - `[x]` Task 11.1.3 — Implement auto-assignment API endpoints (`preview` with shared tool conflict detector, `apply` with concurrency database lock).
+    - `[x]` Task 11.1.4 — Build Web Portal UI integration: "Tự động phân công tối ưu (Hungary)" modal with explainable matrix, tool warning banner & manual override.
+    - `[x]` Task 11.1.5 — Write unit tests for edge cases: Priority Multiplier, Zone & Shift handover clashes, Shared tool bottlenecks, and Task dependencies.
   - `[ ]` **11.2 — Genetic Algorithm (GA) Multi-Objective Task Assignment Optimization** *(Đề Cương Mục 3.1.3 & 108)*
     - `[ ]` Task 11.2.1 — Formalize GA chromosome encoding with Sub-decoding heuristic and Virtual/Backlog Technician.
     - `[ ]` Task 11.2.2 — Design multi-objective fitness function: Skill score, Workload balance (with travel time), Travel distance, and Due date penalties.

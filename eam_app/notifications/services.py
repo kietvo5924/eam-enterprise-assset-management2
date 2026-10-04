@@ -311,16 +311,78 @@ def dispatch_event_notification(
 # -------------------------------------------------------------------------
 
 def notify_work_order_assigned(work_order, assignee=None, is_reassigned=False, sender=None):
-    """Event 1: WO_ASSIGNED"""
+    """Event 1: WO_ASSIGNED (Enriched with Spatial Location, Equipment & Floorplan Context)"""
     recipient = assignee or getattr(work_order, 'assigned_to', None)
     if not recipient:
         return None
 
     action_text = "tái phân công" if is_reassigned else "phân công"
     priority = getattr(work_order, 'priority', 'MEDIUM')
-    title = f"Phân công công việc: {work_order.title}"
-    message = f"Bạn đã được {action_text} thực hiện phiếu WO '{work_order.title}' (Độ ưu tiên: {priority})."
+    is_urgent = priority in ('URGENT', 'CRITICAL')
+    severity = 'URGENT' if is_urgent else 'INFO'
+
+    # Spatial & Equipment Context
+    asset = getattr(work_order, 'asset', None)
+    asset_name = asset.name if asset else 'Chung'
+    asset_qr = asset.qr_code if asset else ''
+    
+    # Zone & Location metadata
+    zone_name = work_order.zone_id or (asset.zone_id if asset else '') or 'Khu vực Chung'
+    floor_level = work_order.floor_level or (asset.floor_level if asset else 1)
+    coords_x = work_order.coords_x or (asset.coords_x if asset else 0.0)
+    coords_y = work_order.coords_y or (asset.coords_y if asset else 0.0)
+
+    # Floorplan image lookup from Location model
+    floorplan_image = ''
+    has_floorplan = False
+    loc_obj = getattr(asset, 'location', None)
+    if not loc_obj and work_order.zone_id:
+        from assets.models import Location
+        loc_obj = Location.objects.filter(tenant=work_order.tenant, code=work_order.zone_id).first()
+    if loc_obj:
+        floorplan_image = loc_obj.floorplan_image or ''
+        has_floorplan = bool(loc_obj.floorplan_image)
+        if loc_obj.name:
+            zone_name = f"{loc_obj.name} [{loc_obj.code or work_order.zone_id}]"
+
+    # Deadline formatted
+    deadline_str = work_order.deadline.strftime('%H:%M %d/%m/%Y') if getattr(work_order, 'deadline', None) else 'Trong ngày'
+
+    # Title & Message with rich location details
+    if is_urgent:
+        title = f"🚨 [KHẨN CẤP] Phân công sự cố: {work_order.title}"
+    else:
+        title = f"Phân công công việc: {work_order.title}"
+
+    msg_lines = [
+        f"Bạn đã được {action_text} thực hiện phiếu #{work_order.code}: {work_order.title} (Ưu tiên: {priority}).",
+        f"📍 Vị trí: {zone_name} (Tầng {floor_level}) - Thiết bị: {asset_name} ({asset_qr or 'N/A'}).",
+        f"⏱ Hạn hoàn thành: {deadline_str}."
+    ]
+    if coords_x or coords_y:
+        msg_lines.append(f"🗺 Tọa độ mặt bằng: X={coords_x}m, Y={coords_y}m.")
+    if getattr(work_order, 'is_crew_task', False):
+        msg_lines.append("👥 Nhiệm vụ tổ đội (Crew Task): Vui lòng phối hợp cùng đồng đội phân công.")
+
+    message = "\n".join(msg_lines)
     link = f"/portal/work-orders/{work_order.id}/"
+
+    metadata = {
+        'work_order_id': str(work_order.id),
+        'work_order_code': work_order.code,
+        'priority': priority,
+        'asset_id': str(asset.id) if asset else None,
+        'asset_name': asset_name,
+        'asset_qr': asset_qr,
+        'zone_id': work_order.zone_id or '',
+        'zone_name': zone_name,
+        'floor_level': floor_level,
+        'coords_x': float(coords_x or 0.0),
+        'coords_y': float(coords_y or 0.0),
+        'has_floorplan': has_floorplan,
+        'floorplan_image': floorplan_image,
+        'is_crew_task': bool(getattr(work_order, 'is_crew_task', False)),
+    }
 
     notifs = dispatch_event_notification(
         event_type='WO_ASSIGNED',
@@ -333,8 +395,9 @@ def notify_work_order_assigned(work_order, assignee=None, is_reassigned=False, s
         link=link,
         sender=sender or getattr(work_order, 'created_by', None),
         category='WORK_ORDER',
-        severity='INFO',
-        is_actionable=True
+        severity=severity,
+        is_actionable=True,
+        metadata=metadata
     )
     return notifs[0] if notifs else None
 
@@ -715,3 +778,203 @@ def notify_system_maintenance(title, message, scheduled_time=None):
             dispatched.extend(res)
 
     return dispatched
+
+
+def notify_technician_shift_assigned(schedule, actor=None, is_update=False):
+    """Event 16: SCHEDULE_ASSIGNED / SCHEDULE_UPDATED (Workforce Shift & Duty Zone Assignment)"""
+    recipient = getattr(schedule, 'user', None)
+    if not recipient:
+        return None
+
+    tenant = schedule.tenant
+    work_date = schedule.work_date
+    date_str = work_date.strftime('%d/%m/%Y')
+    status = schedule.status
+    shift_tmpl = getattr(schedule, 'shift_template', None)
+
+    # Resolve Duty Zone & Floorplan Metadata
+    duty_zone_code = schedule.duty_zone_id or ''
+    duty_zone_name = 'Chốt trực chưa phân định'
+    floorplan_image = ''
+    has_floorplan = False
+    center_x = 0.0
+    center_y = 0.0
+    floor_level = 1
+    zone_type = 'STANDARD'
+
+    if duty_zone_code:
+        from assets.models import Location
+        loc_obj = Location.objects.filter(tenant=tenant, code=duty_zone_code, is_active=True).first()
+        if not loc_obj:
+            try:
+                import uuid
+                loc_obj = Location.objects.filter(tenant=tenant, id=uuid.UUID(duty_zone_code)).first()
+            except Exception:
+                loc_obj = None
+        if loc_obj:
+            duty_zone_name = loc_obj.name
+            duty_zone_code = loc_obj.code or duty_zone_code
+            floorplan_image = loc_obj.floorplan_image or ''
+            has_floorplan = bool(loc_obj.floorplan_image)
+            center_x = float(loc_obj.center_x or 0.0)
+            center_y = float(loc_obj.center_y or 0.0)
+            floor_level = loc_obj.floor_level or 1
+            zone_type = loc_obj.zone_type
+
+    if status == 'ON_DUTY':
+        shift_name = shift_tmpl.name if shift_tmpl else 'Ca làm việc'
+        time_start = shift_tmpl.start_time.strftime('%H:%M') if shift_tmpl and shift_tmpl.start_time else ''
+        time_end = shift_tmpl.end_time.strftime('%H:%M') if shift_tmpl and shift_tmpl.end_time else ''
+        time_range = f"{time_start} - {time_end}" if time_start and time_end else "Cả ca"
+
+        action_str = "Cập nhật ca trực" if is_update else "Phân công ca trực mới"
+        title = f"{action_str}: {shift_name} ({date_str})"
+        msg_lines = [
+            f"Bạn đã được phân công {shift_name} ({time_range}) ngày {date_str}.",
+            f"📍 Chốt trực phân xưởng: {duty_zone_name} [{duty_zone_code}] (Tầng {floor_level})."
+        ]
+        if has_floorplan:
+            msg_lines.append("🗺 Đã có sơ đồ mặt bằng chi tiết của phân xưởng trên ứng dụng di động.")
+        msg_lines.append("Vui lòng kiểm tra nhiệm vụ và có mặt đúng giờ nhận ca.")
+        message = "\n".join(msg_lines)
+        event_type = 'SCHEDULE_UPDATED' if is_update else 'SCHEDULE_ASSIGNED'
+    elif status == 'OFF':
+        title = f"Cập nhật ca trực: Nghỉ ca ngày {date_str}"
+        message = f"Lịch trực ngày {date_str} của bạn đã được cập nhật thành: Nghỉ ca (OFF)."
+        event_type = 'SCHEDULE_UPDATED'
+    elif status == 'LEAVE':
+        title = f"Cập nhật ca trực: Nghỉ phép ngày {date_str}"
+        message = f"Lịch trực ngày {date_str} của bạn đã được ghi nhận: Nghỉ phép (LEAVE)."
+        event_type = 'SCHEDULE_UPDATED'
+    else:
+        title = f"Cập nhật lịch trực: Ngày {date_str}"
+        message = f"Lịch trực ngày {date_str} của bạn có thay đổi trạng thái: {status}."
+        event_type = 'SCHEDULE_UPDATED'
+
+    link = f"/portal/workforce-tools/?tab=roster"
+
+    metadata = {
+        'schedule_id': str(schedule.id),
+        'work_date': work_date.isoformat(),
+        'status': status,
+        'shift_name': shift_tmpl.name if shift_tmpl else '',
+        'shift_code': shift_tmpl.code if shift_tmpl else '',
+        'duty_zone_id': duty_zone_code,
+        'duty_zone_name': duty_zone_name,
+        'floor_level': floor_level,
+        'center_x': center_x,
+        'center_y': center_y,
+        'zone_type': zone_type,
+        'has_floorplan': has_floorplan,
+        'floorplan_image': floorplan_image,
+    }
+
+    notifs = dispatch_event_notification(
+        event_type=event_type,
+        tenant=tenant,
+        entity_type='TechnicianSchedule',
+        entity_id=schedule.id,
+        recipients=[recipient],
+        title=title,
+        message=message,
+        link=link,
+        sender=actor,
+        category='WORKFORCE',
+        severity='INFO',
+        is_actionable=False,
+        metadata=metadata
+    )
+    return notifs[0] if notifs else None
+
+
+def notify_work_order_started(work_order, technician=None, sender=None):
+    """Event 17: WO_STARTED (Informs Supervisor & Creator when Tech begins execution and snaps coords)"""
+    tenant = work_order.tenant
+    asset = work_order.asset
+    tech_user = technician or work_order.assigned_to
+    tech_name = getattr(tech_user, 'full_name', '') or getattr(tech_user, 'username', 'KTV') if tech_user else 'KTV'
+    asset_name = asset.name if asset else 'Thiết bị'
+    zone_name = work_order.zone_id or (asset.zone_id if asset else 'Chung')
+
+    recipients = []
+    if work_order.created_by and work_order.created_by != tech_user:
+        recipients.append(work_order.created_by)
+    managers = NotificationRouter.get_maintenance_managers(tenant.id)
+    for m in managers:
+        if m not in recipients and m != tech_user:
+            recipients.append(m)
+
+    if not recipients:
+        return []
+
+    title = f"KTV bắt đầu xử lý phiếu: #{work_order.code}"
+    coords_text = f" (X={work_order.coords_x}m, Y={work_order.coords_y}m)" if work_order.coords_x or work_order.coords_y else ""
+    message = (
+        f"Kỹ thuật viên {tech_name} đã bắt đầu xử lý phiếu #{work_order.code} ({work_order.title}) "
+        f"tại {asset_name} - Phân xưởng {zone_name}{coords_text}. "
+        f"Tọa độ KTV đã được snap vào vị trí máy móc."
+    )
+    link = f"/portal/work-orders/{work_order.id}/"
+
+    return dispatch_event_notification(
+        event_type='WO_STARTED',
+        tenant=tenant,
+        entity_type='WorkOrder',
+        entity_id=work_order.id,
+        recipients=recipients,
+        title=title,
+        message=message,
+        link=link,
+        sender=tech_user,
+        category='WORK_ORDER',
+        severity='INFO',
+        is_actionable=False
+    )
+
+
+def notify_work_order_completed(work_order, technician=None, sender=None):
+    """Event 18: WO_COMPLETED (Informs Supervisor & Creator when WO is completed and Tech returns to Duty Zone)"""
+    tenant = work_order.tenant
+    asset = work_order.asset
+    tech_user = technician or work_order.assigned_to
+    tech_name = getattr(tech_user, 'full_name', '') or getattr(tech_user, 'username', 'KTV') if tech_user else 'KTV'
+
+    duty_zone_info = ""
+    if tech_user and hasattr(tech_user, 'technician_profile'):
+        tp = tech_user.technician_profile
+        if tp.zone_id:
+            duty_zone_info = f" KTV đã trở về chốt trực ca [{tp.zone_id}] và sẵn sàng nhận việc."
+
+    recipients = []
+    if work_order.created_by and work_order.created_by != tech_user:
+        recipients.append(work_order.created_by)
+    managers = NotificationRouter.get_maintenance_managers(tenant.id)
+    for m in managers:
+        if m not in recipients and m != tech_user:
+            recipients.append(m)
+
+    if not recipients:
+        return []
+
+    title = f"Hoàn thành phiếu công việc: #{work_order.code}"
+    message = (
+        f"Kỹ thuật viên {tech_name} đã hoàn thành phiếu #{work_order.code} ({work_order.title})."
+        f"{duty_zone_info}"
+    )
+    link = f"/portal/work-orders/{work_order.id}/"
+
+    return dispatch_event_notification(
+        event_type='WO_COMPLETED',
+        tenant=tenant,
+        entity_type='WorkOrder',
+        entity_id=work_order.id,
+        recipients=recipients,
+        title=title,
+        message=message,
+        link=link,
+        sender=tech_user,
+        category='WORK_ORDER',
+        severity='INFO',
+        is_actionable=False
+    )
+

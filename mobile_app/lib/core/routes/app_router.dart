@@ -9,6 +9,7 @@ import '../../features/work_orders/screens/create_work_order_screen.dart';
 import '../../features/work_orders/screens/work_order_detail_screen.dart';
 import '../../features/scanner/screens/qr_scanner_screen.dart';
 import '../../features/dashboard/screens/equipment_detail_screen.dart';
+import '../../features/dashboard/screens/floorplan_viewer_screen.dart';
 
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -55,6 +56,21 @@ class AppRouter {
               final id = state.pathParameters['id']!;
               final code = state.extra as String? ?? 'WO-${id.substring(0, 4)}';
               return WorkOrderDetailScreen(workOrderId: id, workOrderCode: code);
+            },
+          ),
+          GoRoute(
+            path: 'floorplan-viewer',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>? ?? {};
+              return FloorplanViewerScreen(
+                locationId: extra['locationId'] ?? '',
+                locationName: extra['locationName'],
+                focusAssetId: extra['focusAssetId'],
+                targetCoordsX: (extra['targetCoordsX'] as num?)?.toDouble(),
+                targetCoordsY: (extra['targetCoordsY'] as num?)?.toDouble(),
+                dutyZoneCoordsX: (extra['dutyZoneCoordsX'] as num?)?.toDouble(),
+                dutyZoneCoordsY: (extra['dutyZoneCoordsY'] as num?)?.toDouble(),
+              );
             },
           ),
           GoRoute(

@@ -8,8 +8,11 @@ from django.db import transaction, models
 from workorders.models import WorkOrder
 from workorders.serializers import (
     WorkOrderSerializer, WorkOrderCreateSerializer,
-    WorkOrderAssignSerializer, WorkOrderStatusUpdateSerializer
+    WorkOrderAssignSerializer, WorkOrderStatusUpdateSerializer,
+    WorkOrderAutoAssignPreviewRequestSerializer,
+    WorkOrderAutoAssignApplyRequestSerializer
 )
+from algorithms.hungarian.service import HungarianAssignmentService, ConcurrencyConflictError
 from users.models import User
 from users.permissions import HasPermission
 from rest_framework.permissions import IsAuthenticated
@@ -303,6 +306,28 @@ class WorkOrderStatusView(APIView):
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can start the Work Order')
             wo.actual_start_time = timezone.now()
+
+            # Event-based technician positioning: snap tech coords & zone to machine
+            assigned_user = wo.assigned_to or request.user
+            if hasattr(assigned_user, 'technician_profile'):
+                tp = assigned_user.technician_profile
+                snap_x = wo.coords_x or (wo.asset.coords_x if wo.asset else None)
+                snap_y = wo.coords_y or (wo.asset.coords_y if wo.asset else None)
+                snap_zone = wo.zone_id or (wo.asset.zone_id if wo.asset else None)
+                snap_floor = wo.floor_level or (wo.asset.floor_level if wo.asset else None)
+                if snap_x is not None: tp.coords_x = snap_x
+                if snap_y is not None: tp.coords_y = snap_y
+                if snap_zone: tp.zone_id = snap_zone
+                if snap_floor: tp.floor_level = snap_floor
+                tp.availability_status = 'BUSY'
+                tp.save()
+
+            # Dispatch real-time notification to supervisor / creator
+            try:
+                from notifications.services import notify_work_order_started
+                notify_work_order_started(wo, technician=assigned_user)
+            except Exception:
+                pass
             
         if new_status == 'COMPLETED':
             if wo.status != 'IN_PROGRESS':
@@ -326,6 +351,35 @@ class WorkOrderStatusView(APIView):
                 wo.resolution_notes = resolution_notes
             wo.actual_duration_minutes = data.get('actualDurationMinutes')
             wo.completed_at = timezone.now()
+
+            # Event-based technician positioning: return tech to duty zone station
+            assigned_user = wo.assigned_to or request.user
+            if hasattr(assigned_user, 'technician_profile'):
+                tp = assigned_user.technician_profile
+                tp.availability_status = 'AVAILABLE'
+                from users.models import TechnicianSchedule
+                from assets.models import Location
+                today_sched = TechnicianSchedule.objects.filter(
+                    tenant=wo.tenant,
+                    user=assigned_user,
+                    work_date=timezone.now().date(),
+                    status='ON_DUTY'
+                ).first()
+                if today_sched and today_sched.duty_zone_id:
+                    loc = Location.objects.filter(tenant=wo.tenant, code=today_sched.duty_zone_id).first()
+                    if loc:
+                        tp.zone_id = loc.code
+                        tp.coords_x = loc.center_x or 25.0
+                        tp.coords_y = loc.center_y or 20.0
+                        tp.floor_level = loc.floor_level or 1
+                tp.save()
+
+            # Dispatch real-time notification to supervisor / creator
+            try:
+                from notifications.services import notify_work_order_completed
+                notify_work_order_completed(wo, technician=assigned_user)
+            except Exception:
+                pass
             
         if new_status == 'CANCELLED':
             if wo.status == 'COMPLETED':
@@ -724,3 +778,74 @@ class MaintenanceCalendarView(APIView):
                     })
 
         return success_response(events)
+
+
+class WorkOrderAutoAssignPreviewView(APIView):
+    """
+    POST /api/v1/work-orders/auto-assign/preview/
+    Evaluates optimal Kuhn-Munkres assignment plan with 10 guardrails.
+    Returns explainable cost matrix, assignment proposals, and conflict warnings.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not HasPermission('work_order:read')().has_permission(request, self):
+            self.permission_denied(request)
+
+        serializer = WorkOrderAutoAssignPreviewRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        work_order_ids = serializer.validated_data.get('workOrderIds')
+        tenant = getattr(request.user, 'tenant', None)
+
+        preview_result = HungarianAssignmentService.preview(
+            tenant=tenant,
+            work_order_ids=work_order_ids
+        )
+        return success_response(preview_result)
+
+
+class WorkOrderAutoAssignApplyView(APIView):
+    """
+    POST /api/v1/work-orders/auto-assign/apply/
+    Atomically locks candidate records and applies approved assignment plan.
+    Dispatches Kafka/WebSocket/DB assignment notifications.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not HasPermission('work_order:update')().has_permission(request, self):
+            self.permission_denied(request)
+
+        serializer = WorkOrderAutoAssignApplyRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        assignments_data = serializer.validated_data.get('assignments')
+        tenant = getattr(request.user, 'tenant', None)
+
+        try:
+            apply_result = HungarianAssignmentService.apply(
+                tenant=tenant,
+                assignments_data=assignments_data,
+                current_user=request.user
+            )
+            return success_response(apply_result, message="Phân công công việc tối ưu thành công.")
+        except ConcurrencyConflictError as e:
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "CONCURRENT_DISPATCH_CONFLICT",
+                    "message": str(e)
+                }
+            }, status=status.HTTP_409_CONFLICT)
+        except ValidationError as e:
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": str(e)
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+

@@ -13,6 +13,12 @@ class WorkOrder {
   final String? assigneeUsername;
   final String? resolutionNotes;
 
+  final String? code;
+  final double? coordsX;
+  final double? coordsY;
+  final int? floorLevel;
+  final String? zoneId;
+
   final List<WorkOrderChecklist> checklists;
   final List<WorkOrderAttachment> attachments;
 
@@ -21,6 +27,7 @@ class WorkOrder {
     required this.title,
     required this.description,
     required this.status,
+    this.code,
     this.priority,
     this.assetId,
     this.assetName,
@@ -28,6 +35,10 @@ class WorkOrder {
     this.deadline,
     this.assigneeUsername,
     this.resolutionNotes,
+    this.coordsX,
+    this.coordsY,
+    this.floorLevel,
+    this.zoneId,
     this.checklists = const [],
     this.attachments = const [],
   });
@@ -90,17 +101,24 @@ class WorkOrder {
   }
 
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
+    final String rawId = (json['id'] ?? '').toString();
+    final String defaultCode = rawId.length >= 8 ? 'WO-${rawId.substring(0, 8).toUpperCase()}' : 'WO';
     return WorkOrder(
-      id: json['id'] ?? '',
+      id: rawId,
+      code: json['code'] ?? defaultCode,
       title: json['title'] ?? 'Công việc không tên',
       description: json['description'] ?? '',
       status: json['status'] ?? 'UNKNOWN',
       priority: json['priority'],
-      assetId: json['asset']?['id'],
+      assetId: json['asset']?['id'] ?? json['assetId'],
       assetName: json['asset']?['name'] ?? 'Chưa gán thiết bị',
       assetLocation: json['asset']?['locationName'] ?? 'Không rõ vị trí',
+      coordsX: (json['coordsX'] as num?)?.toDouble() ?? (json['asset']?['coordsX'] as num?)?.toDouble(),
+      coordsY: (json['coordsY'] as num?)?.toDouble() ?? (json['asset']?['coordsY'] as num?)?.toDouble(),
+      floorLevel: json['floorLevel'] as int? ?? json['asset']?['floorLevel'] as int?,
+      zoneId: json['zoneId'] as String? ?? json['asset']?['zoneId'] as String?,
       deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline']) : null,
-      assigneeUsername: json['assignee']?['username'],
+      assigneeUsername: json['assignee']?['username'] ?? json['assigneeName'],
       resolutionNotes: json['resolutionNotes'],
       checklists: (json['checklists'] as List<dynamic>?)?.map((c) => WorkOrderChecklist.fromJson(c)).toList() ?? [],
       attachments: (json['attachments'] as List<dynamic>?)?.map((a) => WorkOrderAttachment.fromJson(a)).toList() ?? [],

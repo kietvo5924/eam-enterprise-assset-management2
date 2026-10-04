@@ -35,6 +35,7 @@ Tìm phương án phân bổ toàn bộ danh mục công việc trong ca cho đ�
   - `TechnicianProfile`: Chuyên môn (`skills`), bậc thợ (`skill_level`), thời lượng ca trực (`max_shift_minutes`), vị trí xuất phát.
   - `WorkOrder`: Kỹ năng yêu cầu (`required_skill`), thời gian ước tính (`estimated_duration_minutes`), hạn chót hoàn thành (`due_date`), vị trí thiết bị (`coords_x, coords_y, zone_id`), phụ tùng yêu cầu (`required_spare_parts`).
 - **Xử Lý Bất Đồng Bộ Qua Hàng Đợi Celery**: Do thuật toán GA cần tính toán qua 100–150 thế hệ, việc kích hoạt GA phải được giao cho Worker Celery ngầm xử lý (`celery_queue: optimization`) để không chặn luồng HTTP của máy chủ Web.
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật di truyền (cấu trúc nhiễm sắc thể, hàm đánh giá đa mục tiêu Pareto, toán tử lai ghép Crossover, đột biến thích ứng Mutation, và heuristic sub-decoding) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/genetic/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật tối ưu hóa đa mục tiêu khỏi các tầng controller/CRUD thông thường.
 
 ---
 

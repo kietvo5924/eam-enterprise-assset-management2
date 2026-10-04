@@ -67,7 +67,7 @@
         </div>
       </div>
       <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Completed (YTD)</p>
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Completed YTD</p>
         <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.completed|default:"0" }}</h3>
       </div>
       <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
@@ -96,6 +96,15 @@
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+            <button 
+              type="button"
+              id="btn-hungarian-optimize"
+              onclick="openHungarianModal()"
+              class="bg-gradient-to-r from-indigo-600 to-primary-600 hover:from-indigo-700 hover:to-primary-700 text-white rounded-xl h-10 px-4 font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
+              title="Phân công công việc tự động bằng giải thuật Hungary Kuhn-Munkres"
+            >
+              <i class="ph-bold ph-cpu"></i> Phân công tối ưu Hungary
+            </button>
             {% if 'work_order:create' in user_permissions %}
             <button 
               onclick="openWoModal()"
@@ -128,6 +137,9 @@
         <table class="w-full text-sm text-left min-w-max custom-beautiful-table" id="woTable">
           <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
             <tr>
+              <th class="px-3 py-3 w-10 text-center">
+                <input type="checkbox" id="selectAllWo" onchange="toggleSelectAllWo(this)" class="rounded text-primary focus:ring-primary cursor-pointer" title="Chọn tất cả phiếu CREATED">
+              </th>
               <th class="px-4 py-3 font-semibold">Title</th>
               <th class="px-4 py-3 font-semibold">Asset</th>
               <th class="px-4 py-3 font-semibold relative group">
@@ -163,7 +175,10 @@
           <tbody class="divide-y divide-neutral-100" id="wo-tbody">
             {% for item in work_orders_data %}
             {% with wo=item.wo checklists_json=item.checklists_json follow_ups_count=item.follow_ups_count %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
+            <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-id="{{ wo.id }}" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
+              <td class="px-3 py-3 text-center">
+                <input type="checkbox" class="wo-select-cb rounded text-primary focus:ring-primary cursor-pointer" value="{{ wo.id }}" data-status="{{ wo.status }}" data-title="{{ wo.title|escapejs }}" {% if wo.status != 'CREATED' %}disabled title="Chỉ phiếu CREATED mới có thể phân công tự động"{% endif %}>
+              </td>
               <td class="px-4 py-3 w-[250px] max-w-[250px]">
                 <div class="flex flex-col items-start">
                   <strong onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}')" class="text-neutral-800 hover:text-primary cursor-pointer transition-colors truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
@@ -266,7 +281,7 @@
             {% endwith %}
             {% empty %}
             <tr>
-              <td colspan="9" class="px-4 py-12 text-center text-neutral-500">
+              <td colspan="10" class="px-4 py-12 text-center text-neutral-500">
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-clipboard-text text-4xl text-neutral-300 mb-3"></i>
                   <p class="text-base font-semibold text-neutral-700 m-0">No work orders found</p>
@@ -276,7 +291,7 @@
             </tr>
             {% endfor %}
             <tr id="empty-state" class="hidden">
-              <td colspan="9" class="px-4 py-12 text-center text-neutral-500">
+              <td colspan="10" class="px-4 py-12 text-center text-neutral-500">
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-clipboard-text text-4xl text-neutral-300 mb-3"></i>
                   <p class="text-base font-semibold text-neutral-700 m-0">No work orders found</p>
@@ -327,12 +342,16 @@
         </div>
         <div>
           <label class="block text-sm font-bold text-neutral-700 mb-1.5">Asset</label>
-          <select id="wo-asset" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+          <select id="wo-asset" onchange="onAssetSelected(this.value)" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
             <option value="">-- Không liên kết tài sản --</option>
             {% for a in assets %}
             <option value="{{ a.id }}">{{ a.name }}</option>
             {% endfor %}
           </select>
+          <div id="wo-asset-loc-badge" class="hidden mt-2 p-2.5 bg-sky-50 border border-sky-200 rounded-xl flex items-center gap-2 text-xs text-sky-800 font-medium">
+            <i class="ph-bold ph-map-pin text-sm shrink-0 text-sky-600"></i>
+            <span id="wo-asset-loc-text">📍 Vị trí kế thừa từ thiết bị</span>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -357,11 +376,11 @@
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Assignee</label>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Kỹ thuật viên phụ trách</label>
             <select id="wo-assignee" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-              <option value="">Unassigned</option>
+              <option value="">-- Chưa phân công --</option>
               {% for u in users %}
-              <option value="{{ u.id }}">{{ u.username }}</option>
+              <option value="{{ u.id }}">{{ u.username }} - Thợ Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
               {% endfor %}
             </select>
           </div>
@@ -372,7 +391,143 @@
         </div>
         <div>
           <label class="block text-sm font-bold text-neutral-700 mb-1.5">Description</label>
-          <textarea id="wo-desc" rows="4" placeholder="Mô tả công việc cần làm..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+          <textarea id="wo-desc" rows="3" placeholder="Mô tả chi tiết sự cố hoặc nội dung bảo trì..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+        </div>
+
+        <!-- Tiêu chuẩn Kỹ thuật & Tối ưu Hungarian -->
+        <div class="border border-neutral-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+          <button type="button" onclick="toggleTechAccordion()" class="w-full px-4 py-3 bg-neutral-50 hover:bg-neutral-100/80 flex items-center justify-between transition-colors border-b border-neutral-200 text-left">
+            <div class="flex items-center gap-2.5 text-xs font-bold text-neutral-800 uppercase tracking-wider">
+              <i class="ph-fill ph-cpu text-primary text-base"></i>
+              <span>Yêu cầu Kỹ thuật & Tối ưu Hungarian</span>
+            </div>
+            <i id="tech-accordion-icon" class="ph-bold ph-caret-down text-neutral-500 transition-transform"></i>
+          </button>
+          
+          <div id="tech-accordion-body" class="hidden p-4 space-y-4 text-xs">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-neutral-700 mb-1">Bậc thợ tối thiểu</label>
+                <select id="wo-min-skill-level" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                  <option value="1">Bậc 1 - Sơ cấp</option>
+                  <option value="2">Bậc 2 - Trung cấp</option>
+                  <option value="3">Bậc 3 - Chuyên gia</option>
+                  <option value="4">Bậc 4 - Bậc thầy</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-bold text-neutral-700 mb-1">Chuyên môn yêu cầu</label>
+                <select id="wo-required-skill" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                  {% if skills %}
+                    {% for sk in skills %}
+                    <option value="{{ sk.code }}">{{ sk.name }} - {{ sk.code }}</option>
+                    {% endfor %}
+                  {% else %}
+                    <option value="GENERAL">Bảo dưỡng chung</option>
+                    <option value="ELECTRICAL">Điện / Tự động hóa</option>
+                    <option value="MECHANICAL">Cơ khí chế tạo</option>
+                    <option value="HVAC">Điện lạnh & HVAC</option>
+                    <option value="HYDRAULIC">Thủy lực / Khí nén</option>
+                  {% endif %}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-neutral-700 mb-1">Chứng chỉ an toàn bắt buộc</label>
+              <select id="wo-required-cert" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                <option value="">-- Không yêu cầu chứng chỉ đặc thù --</option>
+                {% if cert_types %}
+                  {% for ct in cert_types %}
+                  <option value="{{ ct.code }}">{{ ct.name }} - {{ ct.code }}</option>
+                  {% endfor %}
+                {% else %}
+                  <option value="CERT_HIGH_VOLTAGE">Điện cao thế</option>
+                  <option value="CERT_BOILER">Nồi hơi & Bình áp lực</option>
+                  <option value="CERT_CLEANROOM">Phòng sạch ISO-5</option>
+                  <option value="CERT_SAFETY">An toàn hóa chất & Khí gas</option>
+                {% endif %}
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-bold text-neutral-700 mb-1">Công cụ chuyên dụng cần thiết</label>
+              <div class="flex flex-wrap gap-2 pt-1">
+                {% if tools %}
+                  {% for t in tools %}
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
+                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="{{ t.code }}">
+                    <span class="font-medium text-neutral-700">{{ t.name }}</span>
+                    <span class="text-[10px] text-neutral-400">SL: {{ t.available_quantity }}</span>
+                  </label>
+                  {% endfor %}
+                {% else %}
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
+                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="TOOL_VIB_METER"> Máy đo độ rung
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
+                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="TOOL_LASER_ALIGN"> Cân đồng tâm laser
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
+                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="TOOL_THERMAL_CAM"> Camera nhiệt hồng ngoại
+                  </label>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-neutral-100 space-y-3">
+              <label class="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" id="wo-is-crew-task" class="rounded text-primary focus:ring-primary">
+                <span class="font-bold text-neutral-700">Công việc theo tổ đội - Cần 2 người trở lên</span>
+              </label>
+
+              <div>
+                <label class="block font-bold text-neutral-700 mb-1">Phụ thuộc Work Order tiền đề</label>
+                <select id="wo-depends-on" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                  <option value="">-- Không có sự phụ thuộc --</option>
+                  {% for item in work_orders_data %}
+                  <option value="{{ item.wo.id }}">{{ item.wo.code }} - {{ item.wo.title|truncatechars:35 }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Location Coordinates (Auto-Inherited from Asset) -->
+              <div class="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-neutral-700 flex items-center gap-1.5">
+                    <i class="ph-bold ph-map-pin text-primary"></i> Vị trí & Tọa độ thực hiện
+                  </span>
+                  <span class="text-[11px] text-neutral-400">Tự động điền từ Thiết bị</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Khu vực</label>
+                    <select id="wo-zone" onchange="onWoZoneChanged(this.value)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+                      <option value="">-- Chọn khu vực --</option>
+                      {% for loc in locations_list %}
+                      <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}]</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Tầng</label>
+                    <input type="number" id="wo-floor" value="1" min="1" max="10" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Tọa độ X - Y</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" step="0.1" id="wo-coords-x" placeholder="X" value="0.0" class="w-1/2 px-1.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+                      <input type="number" step="0.1" id="wo-coords-y" placeholder="Y" value="0.0" class="w-1/2 px-1.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+                    </div>
+                  </div>
+                </div>
+                <button type="button" onclick="openFloorplanPickerForWo()" class="w-full mt-2 py-1.5 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 border border-indigo-200 transition">
+                  <i class="ph-bold ph-map-pin"></i>
+                  <span>Chọn trên sơ đồ mặt bằng</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </form>
     </div>
@@ -399,7 +554,7 @@
       <select id="assign-user" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
         <option value="">-- Bỏ phân công --</option>
         {% for u in users %}
-        <option value="{{ u.id }}">{{ u.username }}</option>
+        <option value="{{ u.id }}">{{ u.username }} - Thợ Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
         {% endfor %}
       </select>
       <div class="mt-6 flex justify-end gap-3">
@@ -481,7 +636,10 @@
         {% endif %}
       </div>
     </div>
-  <!-- Completion Modal -->
+  </div>
+</div>
+
+<!-- Completion Modal -->
 <div id="completion-modal" class="fixed inset-0 z-[110] hidden flex items-center justify-center">
   <div class="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm" onclick="closeCompletionModal()"></div>
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative z-10">
@@ -509,11 +667,500 @@
   </div>
 </div>
 
+<!-- Hungarian Assignment Modal -->
+<div id="hungarian-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+    <!-- Modal Header -->
+    <div class="p-6 bg-gradient-to-r from-neutral-900 via-neutral-800 to-indigo-950 text-white flex justify-between items-center relative overflow-hidden shrink-0">
+      <div class="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
+      <div class="flex items-center gap-4 relative z-10">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 text-2xl">
+          <i class="ph-bold ph-cpu"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-xl font-black text-white m-0">Tối Ưu Hóa Phân Công Lực Lượng Kuhn-Munkres</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">Phase 11.1 Algorithm</span>
+          </div>
+          <p class="text-xs text-neutral-300 mt-1 mb-0">Giải thuật Hungary đa mục tiêu: Tối thiểu hóa khoảng cách Manhattan, độ lệch kỹ năng, cân bằng tải trọng và tôn trọng 10 ràng buộc an toàn.</p>
+        </div>
+      </div>
+      <button onclick="closeHungarianModal()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors relative z-10 cursor-pointer">
+        <i class="ph-bold ph-x text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-6 overflow-y-auto flex-1 space-y-6" id="hungarian-modal-body">
+      <!-- Loading State -->
+      <div id="hungarian-loading" class="py-16 flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <p class="text-base font-bold text-neutral-700">Đang khởi tạo ma trận chi phí và tính toán nghiệm tối ưu...</p>
+        <p class="text-xs text-neutral-400 mt-1">Đang đánh giá Manhattan multi-floor, ma trận kỹ năng, ràng buộc ca trực và công cụ...</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="hungarian-error" class="hidden p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 flex items-start gap-3">
+        <i class="ph-fill ph-warning-circle text-2xl text-red-500 shrink-0 mt-0.5"></i>
+        <div class="flex-1">
+          <h4 class="font-bold text-sm text-red-900" id="hungarian-error-title">Lỗi xử lý phân công</h4>
+          <p class="text-xs text-red-700 mt-1" id="hungarian-error-message"></p>
+        </div>
+      </div>
+
+      <!-- Content Container -->
+      <div id="hungarian-content" class="hidden space-y-6">
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-indigo-50/60 border border-indigo-100 p-4 rounded-2xl">
+            <span class="text-[11px] font-bold text-indigo-700 uppercase tracking-wider block mb-1">Tổng Chi Phí Tối Ưu Z*</span>
+            <div class="text-2xl font-black text-indigo-900" id="kpi-total-cost">0.00</div>
+            <span class="text-[10px] text-indigo-600">Đã chuẩn hóa đa mục tiêu</span>
+          </div>
+          <div class="bg-emerald-50/60 border border-emerald-100 p-4 rounded-2xl">
+            <span class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">Phiếu Đã Phân Công</span>
+            <div class="text-2xl font-black text-emerald-900" id="kpi-assigned-count">0</div>
+            <span class="text-[10px] text-emerald-600">Kỹ thuật viên khả dụng</span>
+          </div>
+          <div class="bg-amber-50/60 border border-amber-100 p-4 rounded-2xl">
+            <span class="text-[11px] font-bold text-amber-700 uppercase tracking-wider block mb-1">Phiếu Chưa Gán / Tồn Đọng</span>
+            <div class="text-2xl font-black text-amber-900" id="kpi-unassigned-count">0</div>
+            <span class="text-[10px] text-amber-600">Thiếu nhân sự trực</span>
+          </div>
+          <div class="bg-rose-50/60 border border-rose-100 p-4 rounded-2xl">
+            <span class="text-[11px] font-bold text-rose-700 uppercase tracking-wider block mb-1">Bị Khóa Phụ Thuộc</span>
+            <div class="text-2xl font-black text-rose-900" id="kpi-blocked-count">0</div>
+            <span class="text-[10px] text-rose-600">Chờ tiền đề hoàn thành</span>
+          </div>
+        </div>
+
+        <!-- Shared Tool Conflicts Warning (Rule 5) -->
+        <div id="hungarian-tool-conflicts" class="hidden p-4 rounded-2xl bg-amber-50 border border-amber-200">
+          <div class="flex items-center gap-2 mb-2 text-amber-900 font-bold text-sm">
+            <i class="ph-fill ph-wrench text-lg text-amber-600"></i>
+            <span>CẢNH BÁO TẮC NGHẼN CÔNG CỤ CHUYÊN DỤNG - Ràng buộc chia sẻ công cụ</span>
+          </div>
+          <div class="text-xs text-amber-800 space-y-1" id="hungarian-tool-conflicts-list"></div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-neutral-200 gap-4">
+          <button type="button" id="tab-btn-pairs" onclick="switchHungarianTab('pairs')" class="pb-3 px-1 border-b-2 border-indigo-600 font-bold text-sm text-indigo-600 flex items-center gap-2 cursor-pointer">
+            <i class="ph-bold ph-list-checks"></i> Đề Xuất Phân Công & Điều Chỉnh Thủ Công
+          </button>
+          <button type="button" id="tab-btn-matrix" onclick="switchHungarianTab('matrix')" class="pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-neutral-500 hover:text-neutral-700 flex items-center gap-2 cursor-pointer">
+            <i class="ph-bold ph-grid-four"></i> Ma Trận Chi Phí 2D Minh Bạch
+          </button>
+        </div>
+
+        <!-- Tab 1: Proposed Assignments -->
+        <div id="tab-content-pairs" class="space-y-4">
+          <div class="border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
+                <tr>
+                  <th class="p-3">Phiếu Công Việc</th>
+                  <th class="p-3">Ưu Tiên</th>
+                  <th class="p-3">Vai Trò</th>
+                  <th class="p-3">Kỹ Thuật Viên Chỉ Định</th>
+                  <th class="p-3 text-right">Chi Phí Z</th>
+                  <th class="p-3">Giải Trình Quyết Định</th>
+                </tr>
+              </thead>
+              <tbody id="hungarian-assignments-tbody" class="divide-y divide-neutral-100"></tbody>
+            </table>
+          </div>
+
+          <!-- Unassigned & Blocked Section -->
+          <div id="hungarian-unassigned-section" class="hidden space-y-2">
+            <h5 class="text-xs font-bold text-neutral-500 uppercase tracking-wider">Phiếu Chưa Thể Phân Công Đợt Này</h5>
+            <div id="hungarian-unassigned-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Full 2D Cost Matrix Table -->
+        <div id="tab-content-matrix" class="hidden space-y-4">
+          <p class="text-xs text-neutral-500">Bảng thể hiện tổng chi phí giữa từng Kỹ thuật viên theo hàng và từng Phiếu công việc theo cột. Ô được tô <strong class="text-indigo-600 font-semibold">xanh lam viền đậm</strong> là nghiệm tối ưu Kuhn-Munkres được chọn. Ô đỏ hiển thị vi phạm an toàn Big-M.</p>
+          <div class="border border-neutral-200 rounded-2xl overflow-x-auto shadow-sm max-h-[380px]">
+            <table class="w-full text-center text-xs border-collapse" id="hungarian-matrix-table">
+              <thead id="hungarian-matrix-thead" class="sticky top-0 bg-neutral-100 z-10 border-b border-neutral-200"></thead>
+              <tbody id="hungarian-matrix-tbody" class="divide-y divide-neutral-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="p-4 bg-neutral-50 border-t border-neutral-200 flex justify-between items-center shrink-0">
+      <span class="text-xs text-neutral-500" id="hungarian-status-text">Chọn các phiếu công việc ở bảng ngoài hoặc phân công tự động toàn bộ phiếu mới.</span>
+      <div class="flex gap-3">
+        <button onclick="closeHungarianModal()" class="px-5 py-2.5 rounded-xl border border-neutral-300 text-neutral-700 font-bold text-sm hover:bg-neutral-100 transition-colors cursor-pointer">Đóng</button>
+        <button id="btn-apply-hungarian" onclick="applyHungarianAssignment()" disabled class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer">
+          <i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng
+        </button>
+      </div>
+    </div>
+</div>
+
+<!-- Modal Trình Ghim Vị Trí Mặt Bằng Trực Quan Cho Work Order -->
+<div id="modal-floorplan-picker" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-md hidden z-[120] flex items-center justify-center p-2 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+    <!-- Modal Header -->
+    <div class="px-6 py-4 bg-gradient-to-r from-neutral-900 via-slate-900 to-sky-950 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0 border-b border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 text-xl font-bold">
+          <i class="ph ph-map-pin"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 id="floorplan-picker-title" class="text-base font-black text-white m-0">Sơ đồ Mặt bằng & Ghim Vị trí Phiếu việc</h3>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/30 text-sky-200 border border-sky-400/30">Google Maps Style</span>
+          </div>
+          <p id="floorplan-picker-subtitle" class="text-xs text-slate-300 m-0 mt-0.5">Nhấp chuột vào mặt bằng để cắm ghim vị trí máy cần sửa chữa</p>
+        </div>
+      </div>
+
+      <!-- Controls & Blueprint Preset -->
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <select id="floorplan-preset-select" onchange="changeFloorplanPreset(this.value)" class="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-sky-400">
+          <option value="PRESS">Sơ đồ Mẫu: Xưởng Cơ khí & Dập</option>
+          <option value="CLEANROOM">Sơ đồ Mẫu: Phòng Sạch Điện tử ISO-5</option>
+          <option value="WAREHOUSE">Sơ đồ Mẫu: Kho Vận Logistics</option>
+          <option value="STANDARD">Sơ đồ Mẫu: Mặt Bằng Tầng Tổng Thể</option>
+        </select>
+        <button onclick="closeFloorplanModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+          <i class="ph ph-x text-base"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Interactive Canvas / Viewport Area -->
+    <div class="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center select-none" id="floorplan-viewport" style="min-height: 480px; max-height: 65vh;">
+      <!-- Coordinate Ruler / HUD Header -->
+      <div class="absolute top-3 left-3 z-20 flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl text-xs backdrop-blur-sm text-slate-200 font-mono shadow-lg">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Tọa độ ghim:</span>
+        <span class="text-sky-400 font-bold" id="hud-coord-x">X: 25.0m</span>
+        <span class="text-slate-500">|</span>
+        <span class="text-sky-400 font-bold" id="hud-coord-y">Y: 20.0m</span>
+        <span class="text-slate-500">|</span>
+        <span class="text-amber-400 font-bold" id="hud-coord-floor">Tầng 1</span>
+      </div>
+
+      <!-- Zoom Controls Overlay -->
+      <div class="absolute top-3 right-3 z-20 flex flex-col gap-1.5 bg-slate-900/90 border border-slate-700/80 p-1.5 rounded-xl backdrop-blur-sm shadow-lg">
+        <button onclick="adjustFloorplanZoom(0.15)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-sm font-bold" title="Phóng to">
+          <i class="ph ph-plus"></i>
+        </button>
+        <button onclick="adjustFloorplanZoom(-0.15)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-sm font-bold" title="Thu nhỏ">
+          <i class="ph ph-minus"></i>
+        </button>
+        <button onclick="resetFloorplanZoom()" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold" title="Vừa màn hình">
+          <i class="ph ph-arrows-out-simple"></i>
+        </button>
+      </div>
+
+      <!-- Zoomable Container -->
+      <div id="floorplan-container" class="relative w-full h-full max-w-[880px] max-h-[520px] transition-transform duration-100 cursor-crosshair"
+           onclick="handleFloorplanContainerClick(event)">
+        <!-- Background SVG Blueprint Canvas -->
+        <svg id="floorplan-svg" class="w-full h-full rounded-2xl border border-slate-800 shadow-2xl" viewBox="0 0 1000 700" preserveAspectRatio="none">
+          <defs>
+            <pattern id="wo-fp-grid-major" width="200" height="175" patternUnits="userSpaceOnUse">
+              <path d="M 200 0 L 0 0 0 175" fill="none" stroke="#1e293b" stroke-width="1.2"/>
+            </pattern>
+            <pattern id="wo-fp-grid-minor" width="50" height="43.75" patternUnits="userSpaceOnUse">
+              <path d="M 50 0 L 0 0 0 43.75" fill="none" stroke="#0f172a" stroke-width="0.6"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="#070b13" />
+          <rect width="100%" height="100%" fill="url(#wo-fp-grid-minor)" />
+          <rect width="100%" height="100%" fill="url(#wo-fp-grid-major)" />
+          <g fill="#475569" font-size="11" font-family="monospace">
+            <text x="30" y="25">0m</text>
+            <text x="230" y="25">20m</text>
+            <text x="430" y="25">40m</text>
+            <text x="630" y="25">60m</text>
+            <text x="830" y="25">80m</text>
+            <text x="960" y="25">100m</text>
+            <text x="15" y="195">20m</text>
+            <text x="15" y="370">40m</text>
+            <text x="15" y="545">60m</text>
+            <text x="15" y="685">80m</text>
+          </g>
+          <rect x="50" y="40" width="910" height="620" rx="8" stroke="#0284c7" stroke-width="2.5" fill="#0369a1" fill-opacity="0.04"/>
+          <g id="floorplan-preset-content"></g>
+        </svg>
+
+        <!-- Interactive Pin Marker -->
+        <div id="floorplan-pin" class="absolute z-30 transform -translate-x-1/2 -translate-y-full transition-all duration-150 pointer-events-none" style="left: 25%; top: 25%;">
+          <div class="relative flex flex-col items-center">
+            <div class="absolute -bottom-1 w-6 h-6 rounded-full bg-rose-500/40 animate-ping"></div>
+            <div class="absolute -bottom-1 w-3 h-3 rounded-full bg-rose-500 border-2 border-white shadow-md"></div>
+            <div class="px-2.5 py-1 rounded-xl bg-rose-600 text-white text-[11px] font-bold shadow-xl border border-rose-400 flex items-center gap-1 mb-1 whitespace-nowrap">
+              <i class="ph ph-map-pin-fill text-xs"></i>
+              <span id="pin-label-text">Vị trí máy hỏng</span>
+            </div>
+            <svg class="w-8 h-8 text-rose-500 filter drop-shadow-lg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer / Action Bar -->
+    <div class="px-6 py-4 bg-white border-t border-neutral-100 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-neutral-600">Tầng:</label>
+          <input type="number" id="picker-input-floor" value="1" min="1" max="20" class="w-14 h-9 px-2 text-center rounded-xl border border-neutral-300 text-xs font-bold" onchange="onFloorplanManualInputChange()">
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-neutral-600">X (m):</label>
+          <input type="number" step="0.1" id="picker-input-x" value="25.0" class="w-20 h-9 px-2 text-center rounded-xl border border-neutral-300 text-xs font-mono font-bold" onchange="onFloorplanManualInputChange()">
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-neutral-600">Y (m):</label>
+          <input type="number" step="0.1" id="picker-input-y" value="20.0" class="w-20 h-9 px-2 text-center rounded-xl border border-neutral-300 text-xs font-mono font-bold" onchange="onFloorplanManualInputChange()">
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <button type="button" onclick="closeFloorplanModal()" class="px-5 py-2.5 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50 transition">
+          Hủy bỏ
+        </button>
+        <button type="button" onclick="confirmFloorplanForWo()" class="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-600 text-white text-sm font-bold shadow-md shadow-primary/25 transition flex items-center gap-2">
+          <i class="ph ph-check-circle text-base"></i>
+          <span>Xác nhận Tọa độ này</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
   let currentWo = null;
+  const ASSETS_MAP = {{ assets_json|default:'{}'|safe }};
+  const WO_METADATA = {{ wo_metadata_json|default:'{}'|safe }};
+
+  function toggleTechAccordion() {
+      const body = document.getElementById('tech-accordion-body');
+      const icon = document.getElementById('tech-accordion-icon');
+      if (!body) return;
+      if (body.classList.contains('hidden')) {
+          body.classList.remove('hidden');
+          if (icon) icon.classList.remove('rotate-180');
+      } else {
+          body.classList.add('hidden');
+          if (icon) icon.classList.add('rotate-180');
+      }
+  }
+
+  function onAssetSelected(assetId) {
+      const badge = document.getElementById('wo-asset-loc-badge');
+      const text = document.getElementById('wo-asset-loc-text');
+      if (!assetId || !ASSETS_MAP[assetId]) {
+          if (badge) badge.classList.add('hidden');
+          return;
+      }
+      const a = ASSETS_MAP[assetId];
+      if (document.getElementById('wo-zone') && a.zone_id) document.getElementById('wo-zone').value = a.zone_id;
+      if (document.getElementById('wo-floor') && a.floor_level) document.getElementById('wo-floor').value = a.floor_level;
+      if (document.getElementById('wo-coords-x') && a.coords_x !== undefined) document.getElementById('wo-coords-x').value = a.coords_x;
+      if (document.getElementById('wo-coords-y') && a.coords_y !== undefined) document.getElementById('wo-coords-y').value = a.coords_y;
+
+      if (badge && text) {
+          text.innerHTML = `📍 Đã gán vị trí từ thiết bị: <b>${a.zone_id || 'Chung'}</b>, Tầng <b>${a.floor_level || 1}</b> - Tọa độ: ${a.coords_x || 0}, ${a.coords_y || 0}`;
+          badge.classList.remove('hidden');
+      }
+  }
+
+  const LOCATIONS_LIST = {{ locations_json|default:'[]'|safe }};
+  const LOCATIONS_MAP = {};
+  if (Array.isArray(LOCATIONS_LIST)) {
+    LOCATIONS_LIST.forEach(l => {
+      if (l.code) LOCATIONS_MAP[l.code] = l;
+    });
+  }
+
+  function onWoZoneChanged(zoneCode) {
+    if (!zoneCode || !LOCATIONS_MAP[zoneCode]) return;
+    const loc = LOCATIONS_MAP[zoneCode];
+    if (document.getElementById('wo-floor') && loc.floor_level) {
+      document.getElementById('wo-floor').value = loc.floor_level;
+    }
+    if (document.getElementById('wo-coords-x') && loc.center_x !== undefined) {
+      document.getElementById('wo-coords-x').value = loc.center_x;
+    }
+    if (document.getElementById('wo-coords-y') && loc.center_y !== undefined) {
+      document.getElementById('wo-coords-y').value = loc.center_y;
+    }
+    const badge = document.getElementById('wo-asset-loc-badge');
+    const text = document.getElementById('wo-asset-loc-text');
+    if (badge && text) {
+      text.innerHTML = `📍 Đã gán tọa độ tâm từ khu vực: <b>${loc.name}</b>, Tầng <b>${loc.floor_level}</b> - Tọa độ: ${loc.center_x}, ${loc.center_y}`;
+      badge.classList.remove('hidden');
+    }
+  }
+
+  window.woFloorplanCurrentZoom = 1.0;
+  function openFloorplanPickerForWo() {
+    const zoneCode = (document.getElementById('wo-zone') ? document.getElementById('wo-zone').value : '') || 'ZONE';
+    const floor = parseInt(document.getElementById('wo-floor') ? document.getElementById('wo-floor').value : 1) || 1;
+    const x = parseFloat(document.getElementById('wo-coords-x') ? document.getElementById('wo-coords-x').value : 25.0) || 25.0;
+    const y = parseFloat(document.getElementById('wo-coords-y') ? document.getElementById('wo-coords-y').value : 20.0) || 20.0;
+
+    let defaultPreset = 'STANDARD';
+    const upper = zoneCode.toUpperCase();
+    if (upper.includes('PRESS') || upper.includes('DAP') || upper.includes('CO_KHI')) defaultPreset = 'PRESS';
+    else if (upper.includes('CLEAN') || upper.includes('SACH')) defaultPreset = 'CLEANROOM';
+    else if (upper.includes('KHO') || upper.includes('WAREHOUSE')) defaultPreset = 'WAREHOUSE';
+
+    const sel = document.getElementById('floorplan-preset-select');
+    if (sel) {
+      sel.value = defaultPreset;
+      changeFloorplanPreset(defaultPreset);
+    }
+    updateFloorplanPin(x, y, floor);
+    resetFloorplanZoom();
+    const modal = document.getElementById('modal-floorplan-picker');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeFloorplanModal() {
+    const modal = document.getElementById('modal-floorplan-picker');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function confirmFloorplanForWo() {
+    const x = parseFloat(document.getElementById('picker-input-x').value || 0);
+    const y = parseFloat(document.getElementById('picker-input-y').value || 0);
+    const floor = parseInt(document.getElementById('picker-input-floor').value || 1);
+
+    if (document.getElementById('wo-coords-x')) document.getElementById('wo-coords-x').value = x;
+    if (document.getElementById('wo-coords-y')) document.getElementById('wo-coords-y').value = y;
+    if (document.getElementById('wo-floor')) document.getElementById('wo-floor').value = floor;
+
+    const badge = document.getElementById('wo-asset-loc-badge');
+    const text = document.getElementById('wo-asset-loc-text');
+    if (badge && text) {
+      text.innerHTML = `📍 Đã ghim trên mặt bằng: Tầng <b>${floor}</b> - Tọa độ: <b>${x}, ${y}</b>`;
+      badge.classList.remove('hidden');
+    }
+
+    closeFloorplanModal();
+  }
+
+  function changeFloorplanPreset(presetKey) {
+    renderPresetSVG(presetKey);
+  }
+
+  function renderPresetSVG(preset) {
+    const g = document.getElementById('floorplan-preset-content');
+    if (!g) return;
+    if (preset === 'PRESS') {
+      g.innerHTML = `
+        <rect x="70" y="320" width="870" height="60" fill="#0284c7" fill-opacity="0.08" stroke="#38bdf8" stroke-dasharray="6 4" stroke-width="1"/>
+        <text x="500" y="355" fill="#38bdf8" font-size="12" font-family="monospace" text-anchor="middle" font-weight="bold">HÀNH LANG VẬN CHUYỂN PHÔI THÉP (MAIN AISLE 4.0M)</text>
+        <g stroke="#38bdf8" stroke-width="1.5" fill="#1e293b">
+          <rect x="100" y="90" width="160" height="190" rx="6"/><text x="180" y="180" fill="#f8fafc" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MÁY DẬP 500T</text><text x="180" y="200" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle">[PRESS-01]</text>
+          <rect x="310" y="90" width="160" height="190" rx="6"/><text x="390" y="180" fill="#f8fafc" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MÁY DẬP 300T</text><text x="390" y="200" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle">[PRESS-02]</text>
+          <rect x="520" y="90" width="160" height="190" rx="6"/><text x="600" y="180" fill="#f8fafc" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MÁY DẬP 200T</text><text x="600" y="200" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="middle">[PRESS-03]</text>
+          <rect x="100" y="420" width="220" height="200" rx="6" fill="#0f172a" stroke="#64748b"/><text x="210" y="515" fill="#f8fafc" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">TRUNG TÂM PHAY CNC</text>
+          <rect x="360" y="420" width="220" height="200" rx="6" fill="#0f172a" stroke="#64748b"/><text x="470" y="515" fill="#f8fafc" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">KHO KHUÔN MẪU DẬP</text>
+        </g>
+        <rect x="800" y="60" width="140" height="110" rx="4" fill="#334155" stroke="#f59e0b" stroke-width="2"/>
+        <text x="870" y="110" fill="#fef08a" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">CẦU THANG BỘ</text><text x="870" y="130" fill="#cbd5e1" font-size="10" font-family="monospace" text-anchor="middle">[STAIR-01]</text>
+      `;
+    } else if (preset === 'CLEANROOM') {
+      g.innerHTML = `
+        <rect x="80" y="70" width="850" height="560" rx="8" stroke="#06b6d4" stroke-width="2" fill="#083344" fill-opacity="0.3"/>
+        <rect x="100" y="90" width="180" height="150" rx="6" fill="#164e63" stroke="#22d3ee" stroke-width="1.5"/><text x="190" y="160" fill="#cffafe" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">BUỒNG THỔI KHÍ</text>
+        <rect x="320" y="90" width="280" height="240" rx="6" fill="#713f12" fill-opacity="0.4" stroke="#eab308" stroke-width="2"/><text x="460" y="200" fill="#fef08a" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">PHÒNG QUANG KHẮC (YELLOW)</text>
+        <rect x="100" y="380" width="340" height="220" rx="6" fill="#0e7490" fill-opacity="0.2" stroke="#06b6d4" stroke-width="1.5"/><text x="270" y="485" fill="#e0f2fe" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">BÀN THAO TÁC KHÍ DÒNG DỌC</text>
+        <rect x="480" y="380" width="300" height="220" rx="6" fill="#4c0519" fill-opacity="0.3" stroke="#f43f5e" stroke-width="1.5"/><text x="630" y="485" fill="#ffe4e6" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">TỦ HÚT HÓA CHẤT ĂN MÒN</text>
+      `;
+    } else if (preset === 'WAREHOUSE') {
+      g.innerHTML = `
+        <g stroke="#94a3b8" stroke-width="1" fill="#1e293b">
+          <rect x="100" y="80" width="750" height="60" rx="4"/><text x="475" y="115" fill="#f8fafc" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">DÃY KỆ PALLET A</text>
+          <rect x="100" y="200" width="750" height="60" rx="4"/><text x="475" y="235" fill="#f8fafc" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">DÃY KỆ PALLET B</text>
+          <rect x="100" y="320" width="750" height="60" rx="4"/><text x="475" y="355" fill="#f8fafc" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">DÃY KỆ PALLET C</text>
+          <rect x="100" y="450" width="400" height="170" rx="6" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/><text x="300" y="530" fill="#bbf7d0" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">CỬA XUẤT HÀNG DOCK 1 - 3</text>
+          <rect x="540" y="450" width="310" height="170" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/><text x="695" y="530" fill="#bfdbfe" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">KHU TIẾP NHẬN INBOUND</text>
+        </g>
+      `;
+    } else {
+      g.innerHTML = `
+        <g stroke="#38bdf8" stroke-dasharray="4 4" stroke-width="1" fill="#0f172a" fill-opacity="0.4">
+          <rect x="80" y="70" width="390" height="260" rx="6"/><text x="275" y="195" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">PHÂN XƯỞNG CƠ KHÍ & GIA CÔNG</text>
+          <rect x="520" y="70" width="410" height="260" rx="6"/><text x="725" y="195" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">PHÂN XƯỞNG LẮP RÁP & ĐIỆN TỬ</text>
+          <rect x="80" y="360" width="390" height="260" rx="6"/><text x="275" y="485" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">TRẠM ĐIỆN & KHÍ NÉN TRUNG TÂM</text>
+          <rect x="520" y="360" width="410" height="260" rx="6"/><text x="725" y="485" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">KHO PHỤ TÙNG & VẬT TƯ TIÊU HAO</text>
+        </g>
+      `;
+    }
+  }
+
+  function handleFloorplanContainerClick(e) {
+    const container = document.getElementById('floorplan-container');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const pctX = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+    const pctY = Math.max(0, Math.min(100, (clickY / rect.height) * 100));
+
+    const metersX = Math.round((pctX / 100 * 100) * 10) / 10;
+    const metersY = Math.round((pctY / 100 * 80) * 10) / 10;
+    const currentFloor = parseInt(document.getElementById('picker-input-floor').value || 1);
+
+    updateFloorplanPin(metersX, metersY, currentFloor);
+  }
+
+  function updateFloorplanPin(metersX, metersY, floor) {
+    const pin = document.getElementById('floorplan-pin');
+    if (!pin) return;
+
+    const pctX = Math.max(0, Math.min(100, (metersX / 100) * 100));
+    const pctY = Math.max(0, Math.min(100, (metersY / 80) * 100));
+
+    pin.style.left = pctX + '%';
+    pin.style.top = pctY + '%';
+
+    document.getElementById('picker-input-x').value = metersX.toFixed(1);
+    document.getElementById('picker-input-y').value = metersY.toFixed(1);
+    document.getElementById('picker-input-floor').value = floor || 1;
+
+    document.getElementById('hud-coord-x').innerText = 'X: ' + metersX.toFixed(1) + 'm';
+    document.getElementById('hud-coord-y').innerText = 'Y: ' + metersY.toFixed(1) + 'm';
+    document.getElementById('hud-coord-floor').innerText = 'Tầng ' + (floor || 1);
+  }
+
+  function onFloorplanManualInputChange() {
+    const x = parseFloat(document.getElementById('picker-input-x').value || 0);
+    const y = parseFloat(document.getElementById('picker-input-y').value || 0);
+    const floor = parseInt(document.getElementById('picker-input-floor').value || 1);
+    updateFloorplanPin(x, y, floor);
+  }
+
+  function adjustFloorplanZoom(delta) {
+    window.woFloorplanCurrentZoom = Math.max(0.7, Math.min(2.5, (window.woFloorplanCurrentZoom || 1.0) + delta));
+    const c = document.getElementById('floorplan-container');
+    if (c) c.style.transform = `scale(${window.woFloorplanCurrentZoom})`;
+  }
+
+  function resetFloorplanZoom() {
+    window.woFloorplanCurrentZoom = 1.0;
+    const c = document.getElementById('floorplan-container');
+    if (c) c.style.transform = 'scale(1)';
+  }
 
   let currentPage = 1;
   const rowsPerPage = 15;
@@ -642,11 +1289,77 @@
       
       document.getElementById('wo-modal-title').innerText = id ? 'Sửa Work Order' : 'Tạo Work Order';
       document.getElementById('wo-msg').classList.add('hidden');
+
+      // Populate optimization fields from WO_METADATA if editing
+      const meta = (id && window.WO_METADATA && window.WO_METADATA[id]) ? window.WO_METADATA[id] : {
+          required_skill: 'GENERAL',
+          min_skill_level: 1,
+          required_certification: '',
+          required_tools: [],
+          is_crew_task: false,
+          depends_on_wo_id: '',
+          zone_id: '',
+          floor_level: 1,
+          coords_x: 0.0,
+          coords_y: 0.0
+      };
+
+      if (document.getElementById('wo-min-skill-level')) {
+          document.getElementById('wo-min-skill-level').value = meta.min_skill_level || 1;
+          
+          const skillVal = (meta.required_skill || 'GENERAL').trim();
+          const skillSelect = document.getElementById('wo-required-skill');
+          if (skillSelect) {
+              skillSelect.value = skillVal;
+              if (!skillSelect.value) {
+                  for (let opt of skillSelect.options) {
+                      if (opt.value.toUpperCase() === skillVal.toUpperCase() || opt.text.toUpperCase().includes(skillVal.toUpperCase())) {
+                          skillSelect.value = opt.value;
+                          break;
+                      }
+                  }
+              }
+          }
+
+          const certVal = (meta.required_certification || '').trim();
+          const certSelect = document.getElementById('wo-required-cert');
+          if (certSelect) {
+              certSelect.value = certVal;
+              if (!certSelect.value && certVal) {
+                  for (let opt of certSelect.options) {
+                      if (opt.value.toUpperCase() === certVal.toUpperCase() || opt.text.toUpperCase().includes(certVal.toUpperCase())) {
+                          certSelect.value = opt.value;
+                          break;
+                      }
+                  }
+              }
+          }
+          document.getElementById('wo-is-crew-task').checked = !!meta.is_crew_task;
+          document.getElementById('wo-depends-on').value = meta.depends_on_wo_id || '';
+          document.getElementById('wo-zone').value = meta.zone_id || '';
+          document.getElementById('wo-floor').value = meta.floor_level || 1;
+          document.getElementById('wo-coords-x').value = meta.coords_x !== undefined ? meta.coords_x : 0.0;
+          document.getElementById('wo-coords-y').value = meta.coords_y !== undefined ? meta.coords_y : 0.0;
+
+          const reqTools = meta.required_tools || [];
+          document.querySelectorAll('.wo-tool-cb').forEach(cb => {
+              cb.checked = reqTools.includes(cb.value);
+          });
+      }
+
+      if (asset_id) {
+          onAssetSelected(asset_id);
+      } else {
+          const badge = document.getElementById('wo-asset-loc-badge');
+          if (badge) badge.classList.add('hidden');
+      }
   }
 
   function closeWoModal() {
       document.getElementById('wo-modal').classList.add('hidden');
       document.getElementById('wo-form').reset();
+      const badge = document.getElementById('wo-asset-loc-badge');
+      if (badge) badge.classList.add('hidden');
   }
 
   function saveWo() {
@@ -659,7 +1372,18 @@
           status: document.getElementById('wo-status').value,
           asset_id: document.getElementById('wo-asset').value,
           assigned_to_id: document.getElementById('wo-assignee').value,
-          deadline: document.getElementById('wo-deadline').value
+          deadline: document.getElementById('wo-deadline').value,
+          // Optimization & Hungarian fields
+          min_skill_level: parseInt(document.getElementById('wo-min-skill-level')?.value || '1'),
+          required_skill: document.getElementById('wo-required-skill')?.value || 'GENERAL',
+          required_certification: document.getElementById('wo-required-cert')?.value || '',
+          required_tools: Array.from(document.querySelectorAll('.wo-tool-cb:checked')).map(cb => cb.value),
+          is_crew_task: document.getElementById('wo-is-crew-task')?.checked || false,
+          depends_on_wo_id: document.getElementById('wo-depends-on')?.value || '',
+          zone_id: document.getElementById('wo-zone')?.value || '',
+          floor_level: parseInt(document.getElementById('wo-floor')?.value || '1'),
+          coords_x: parseFloat(document.getElementById('wo-coords-x')?.value || '0'),
+          coords_y: parseFloat(document.getElementById('wo-coords-y')?.value || '0'),
       };
       
       const method = id ? 'PUT' : 'POST';
@@ -894,7 +1618,7 @@
           
           let tagsHtml = '';
           if (item.expected_value) {
-              tagsHtml += `<span class="text-neutral-500 font-normal text-xs ml-1">(Yêu cầu: ${item.expected_value})</span>`;
+              tagsHtml += `<span class="text-neutral-500 font-normal text-xs ml-1">- Yêu cầu: ${item.expected_value}</span>`;
           }
           if (item.is_mandatory) {
               tagsHtml += `<span class="ml-2 text-[10px] px-1.5 py-0.5 bg-red-50 text-red-600 rounded font-bold uppercase tracking-wider">Bắt buộc</span>`;
@@ -978,6 +1702,356 @@
           if(data.success) {
               window.location.reload(); 
           }
+      });
+  }
+
+  // ==========================================
+  // TASK 11.1: HUNGARIAN ASSIGNMENT OPTIMIZATION
+  // ==========================================
+  let hungarianPreviewData = null;
+  let hungarianSelectedAssignments = [];
+
+  function toggleSelectAllWo(master) {
+      document.querySelectorAll('.wo-select-cb:not(:disabled)').forEach(cb => {
+          cb.checked = master.checked;
+      });
+  }
+
+  function openHungarianModal() {
+      const modal = document.getElementById('hungarian-modal');
+      const loading = document.getElementById('hungarian-loading');
+      const errBox = document.getElementById('hungarian-error');
+      const content = document.getElementById('hungarian-content');
+      const btnApply = document.getElementById('btn-apply-hungarian');
+
+      modal.classList.remove('hidden');
+      loading.classList.remove('hidden');
+      errBox.classList.add('hidden');
+      content.classList.add('hidden');
+      btnApply.disabled = true;
+
+      // Collect selected WO IDs if any
+      const selectedIds = Array.from(document.querySelectorAll('.wo-select-cb:checked'))
+                               .map(cb => cb.value);
+
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+      fetch('/api/v1/work-orders/auto-assign/preview/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({ workOrderIds: selectedIds })
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(({ status, body }) => {
+          loading.classList.add('hidden');
+          if (status >= 400 || !body.success) {
+              errBox.classList.remove('hidden');
+              document.getElementById('hungarian-error-title').innerText = 'Không thể tính toán phân công';
+              document.getElementById('hungarian-error-message').innerText = (body.error && body.error.message) || body.message || 'Lỗi kết nối máy chủ.';
+              return;
+          }
+
+          hungarianPreviewData = body.data;
+          hungarianSelectedAssignments = (hungarianPreviewData.assignments || []).map(a => ({
+              workOrderId: a.workOrderId,
+              technicianId: a.technicianId,
+              slotRole: a.slotRole || 'SOLO'
+          }));
+
+          renderHungarianPreview(hungarianPreviewData);
+          content.classList.remove('hidden');
+          btnApply.disabled = (hungarianSelectedAssignments.length === 0);
+      })
+      .catch(err => {
+          loading.classList.add('hidden');
+          errBox.classList.remove('hidden');
+          document.getElementById('hungarian-error-title').innerText = 'Lỗi kết nối';
+          document.getElementById('hungarian-error-message').innerText = err.message;
+      });
+  }
+
+  function closeHungarianModal() {
+      document.getElementById('hungarian-modal').classList.add('hidden');
+  }
+
+  function switchHungarianTab(tab) {
+      const btnPairs = document.getElementById('tab-btn-pairs');
+      const btnMatrix = document.getElementById('tab-btn-matrix');
+      const contentPairs = document.getElementById('tab-content-pairs');
+      const contentMatrix = document.getElementById('tab-content-matrix');
+
+      if (tab === 'pairs') {
+          btnPairs.className = 'pb-3 px-1 border-b-2 border-indigo-600 font-bold text-sm text-indigo-600 flex items-center gap-2 cursor-pointer';
+          btnMatrix.className = 'pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-neutral-500 hover:text-neutral-700 flex items-center gap-2 cursor-pointer';
+          contentPairs.classList.remove('hidden');
+          contentMatrix.classList.add('hidden');
+      } else {
+          btnMatrix.className = 'pb-3 px-1 border-b-2 border-indigo-600 font-bold text-sm text-indigo-600 flex items-center gap-2 cursor-pointer';
+          btnPairs.className = 'pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-neutral-500 hover:text-neutral-700 flex items-center gap-2 cursor-pointer';
+          contentMatrix.classList.remove('hidden');
+          contentPairs.classList.add('hidden');
+      }
+  }
+
+  function renderHungarianPreview(data) {
+      // 1. KPIs
+      document.getElementById('kpi-total-cost').innerText = Number(data.totalOptimalCost || 0).toFixed(2);
+      document.getElementById('kpi-assigned-count').innerText = data.assignmentsCount || 0;
+      document.getElementById('kpi-unassigned-count').innerText = data.unassignedCount || 0;
+      document.getElementById('kpi-blocked-count').innerText = (data.blockedWorkOrders || []).length;
+
+      // 2. Shared Tool Bottleneck Warnings
+      const toolBox = document.getElementById('hungarian-tool-conflicts');
+      const toolList = document.getElementById('hungarian-tool-conflicts-list');
+      if (data.sharedToolConflicts && data.sharedToolConflicts.length > 0) {
+          toolBox.classList.remove('hidden');
+          toolList.innerHTML = data.sharedToolConflicts.map(c => `
+              <div class="flex items-center gap-2 py-1">
+                  <span class="font-bold text-amber-900">• ${c.tool_name || c.toolName}:</span>
+                  <span>Hiện có ${c.total_available || c.totalAvailable} chiếc nhưng đang có ${c.required_count || c.requiredCount} kỹ thuật viên đồng thời cần dùng: ${(c.assigned_technicians || c.assignedTechnicians || c.conflictingWorkOrders || []).join(', ')}.</span>
+              </div>
+          `).join('');
+      } else {
+          toolBox.classList.add('hidden');
+          toolList.innerHTML = '';
+      }
+
+      // 3. Proposed Assignments Table
+      const tbody = document.getElementById('hungarian-assignments-tbody');
+      tbody.innerHTML = '';
+
+      if (!data.assignments || data.assignments.length === 0) {
+          tbody.innerHTML = `
+              <tr>
+                  <td colspan="6" class="p-8 text-center text-neutral-400">
+                      Không có phiếu công việc nào đủ điều kiện hoặc không có kỹ thuật viên sẵn sàng trực.
+                  </td>
+              </tr>
+          `;
+      } else {
+          data.assignments.forEach((item, idx) => {
+              const priorityClass = {
+                  'CRITICAL': 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+                  'HIGH': 'bg-rose-50 text-rose-700 border-rose-200',
+                  'MEDIUM': 'bg-amber-50 text-amber-700 border-amber-200',
+                  'LOW': 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }[item.priority] || 'bg-neutral-100 text-neutral-700';
+
+              const roleBadge = item.slotRole === 'LEAD' 
+                  ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">LEAD</span>'
+                  : (item.slotRole === 'ASSIST' 
+                      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">ASSIST</span>' 
+                      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">SOLO</span>');
+
+              const costDisplay = item.isSafetyViolation 
+                  ? '<span class="px-2 py-0.5 rounded bg-red-100 text-red-700 font-black text-[11px] animate-pulse">BIG-M Vi phạm</span>'
+                  : `<span class="font-black text-indigo-700 text-sm">${Number(item.cost).toFixed(2)}</span>`;
+
+              const breakdown = item.breakdown || {};
+              const breakdownTooltip = `
+                  <div class="space-y-1 text-[11px]">
+                      <div class="font-semibold text-neutral-800">${item.explanation || 'Chi phí phân công tối ưu'}</div>
+                      <div class="grid grid-cols-2 gap-x-2 text-neutral-500 pt-1 border-t border-neutral-100">
+                          <span>Khoảng cách: <b>${breakdown.distance_cost ? breakdown.distance_cost.toFixed(2) : '0'}</b></span>
+                          <span>Độ lệch kỹ năng: <b>${breakdown.skill_cost ? breakdown.skill_cost.toFixed(2) : '0'}</b></span>
+                          <span>Tải trọng tích lũy: <b>${breakdown.workload_cost ? breakdown.workload_cost.toFixed(2) : '0'}</b></span>
+                          <span>Hệ số ưu tiên: <b>${breakdown.priority_multiplier || '1.0'}x</b></span>
+                          <span>Phạt khu vực: <b>+${breakdown.zone_penalty || 0}</b></span>
+                          <span>Phạt giao ca: <b>+${breakdown.shift_penalty || 0}</b></span>
+                      </div>
+                  </div>
+              `;
+
+              tbody.innerHTML += `
+                  <tr class="hover:bg-neutral-50/80 transition-colors">
+                      <td class="p-3">
+                          <div class="font-bold text-neutral-900">${item.workOrderCode || ''}</div>
+                          <div class="text-neutral-500 truncate max-w-xs" title="${item.workOrderTitle}">${item.workOrderTitle}</div>
+                      </td>
+                      <td class="p-3">
+                          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${priorityClass}">${item.priority}</span>
+                      </td>
+                      <td class="p-3">${roleBadge}</td>
+                      <td class="p-3">
+                          <div class="flex items-center gap-2">
+                              <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                  ${item.technicianName.charAt(0)}
+                              </div>
+                              <span class="font-bold text-neutral-800">${item.technicianName}</span>
+                          </div>
+                      </td>
+                      <td class="p-3 text-right">${costDisplay}</td>
+                      <td class="p-3">
+                          <div class="bg-neutral-50 border border-neutral-200/80 p-2 rounded-xl text-neutral-700">
+                              ${breakdownTooltip}
+                          </div>
+                      </td>
+                  </tr>
+              `;
+          });
+      }
+
+      // 4. Unassigned & Blocked Section
+      const unassignedSec = document.getElementById('hungarian-unassigned-section');
+      const unassignedList = document.getElementById('hungarian-unassigned-list');
+      const unassignedItems = [...(data.unassignedSlots || []), ...(data.blockedWorkOrders || [])];
+
+      if (unassignedItems.length > 0) {
+          unassignedSec.classList.remove('hidden');
+          unassignedList.innerHTML = '';
+          (data.unassignedSlots || []).forEach(slot => {
+              unassignedList.innerHTML += `
+                  <div class="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
+                      <div class="truncate mr-2">
+                          <span class="font-bold text-amber-900">${slot.title}</span>
+                          <span class="text-amber-600 text-[10px] block">Tồn đọng: Chưa đủ kỹ thuật viên trực khả dụng</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 shrink-0">Hàng đợi</span>
+                  </div>
+              `;
+          });
+          (data.blockedWorkOrders || []).forEach(b => {
+              unassignedList.innerHTML += `
+                  <div class="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/80 flex items-center justify-between">
+                      <div class="truncate mr-2">
+                          <span class="font-bold text-rose-900">${b.workOrderTitle}</span>
+                          <span class="text-rose-600 text-[10px] block">Khóa tiền đề: Phụ thuộc vào [${b.blockingWorkOrderCode || 'Phiếu'}] ${b.blockingWorkOrderTitle}</span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 shrink-0">Bị khóa</span>
+                  </div>
+              `;
+          });
+      } else {
+          unassignedSec.classList.add('hidden');
+      }
+
+      // 5. 2D Cost Matrix Table
+      renderCostMatrixTable(data);
+  }
+
+  function renderCostMatrixTable(data) {
+      const thead = document.getElementById('hungarian-matrix-thead');
+      const tbody = document.getElementById('hungarian-matrix-tbody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      const techNames = (data.matrixHeader && data.matrixHeader.technicians) || [];
+      const woNames = (data.matrixHeader && data.matrixHeader.workOrders) || [];
+      const matrix = data.costMatrix || [];
+
+      if (techNames.length === 0 || woNames.length === 0) {
+          tbody.innerHTML = `<tr><td class="p-6 text-neutral-400">Không có dữ liệu ma trận.</td></tr>`;
+          return;
+      }
+
+      // Build Thead
+      let headHtml = '<tr><th class="p-2.5 bg-neutral-200 text-neutral-700 font-bold text-xs sticky left-0 z-20">Kỹ Thuật Viên</th>';
+      woNames.forEach(name => {
+          headHtml += `<th class="p-2.5 text-neutral-700 font-bold text-xs whitespace-nowrap px-4 border-l border-neutral-200">${name}</th>`;
+      });
+      headHtml += '</tr>';
+      thead.innerHTML = headHtml;
+
+      // Identify optimal pairs for highlighting
+      const assignedTechNames = new Set((data.assignments || []).map(a => a.technicianName));
+
+      // Build Tbody
+      matrix.forEach((row, rIdx) => {
+          const tName = techNames[rIdx] || `Tech ${rIdx + 1}`;
+          let rowHtml = `<tr class="hover:bg-neutral-50"><td class="p-2.5 text-left font-bold text-neutral-800 bg-neutral-100 sticky left-0 z-10 whitespace-nowrap border-r border-neutral-200">${tName}</td>`;
+
+          row.forEach((cost, cIdx) => {
+              const isAssigned = (data.assignments || []).some(a => 
+                  a.technicianName === tName && 
+                  woNames[cIdx] && 
+                  (woNames[cIdx].includes(a.workOrderCode) || woNames[cIdx].includes(a.workOrderTitle))
+              );
+
+              let cellClass = 'p-2.5 text-center border-b border-l border-neutral-100 font-medium ';
+              let cellContent = '';
+
+              if (cost >= 5000000) {
+                  cellClass += 'bg-red-50 text-red-600 font-bold';
+                  cellContent = 'BIG-M';
+              } else if (isAssigned) {
+                  cellClass += 'bg-indigo-100 text-indigo-900 font-black border-2 border-indigo-500 shadow-sm';
+                  cellContent = `★ ${Number(cost).toFixed(2)}`;
+              } else {
+                  cellClass += 'text-neutral-600';
+                  cellContent = Number(cost).toFixed(2);
+              }
+
+              rowHtml += `<td class="${cellClass}" title="Chi phí C[${rIdx}][${cIdx}] = ${cost}">${cellContent}</td>`;
+          });
+
+          rowHtml += '</tr>';
+          tbody.innerHTML += rowHtml;
+      });
+  }
+
+  function applyHungarianAssignment() {
+      if (!hungarianSelectedAssignments || hungarianSelectedAssignments.length === 0) {
+          alert('Không có phiếu phân công nào để áp dụng.');
+          return;
+      }
+
+      const btnApply = document.getElementById('btn-apply-hungarian');
+      const errBox = document.getElementById('hungarian-error');
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+      btnApply.disabled = true;
+      btnApply.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Đang áp dụng...';
+      errBox.classList.add('hidden');
+
+      fetch('/api/v1/work-orders/auto-assign/apply/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({ assignments: hungarianSelectedAssignments })
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(({ status, body }) => {
+          btnApply.disabled = false;
+          btnApply.innerHTML = '<i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng';
+
+          if (status === 409) {
+              // Concurrency conflict (Rule 10)
+              errBox.classList.remove('hidden');
+              document.getElementById('hungarian-error-title').innerText = 'Xung đột điều phối đồng thời (409 Conflict)';
+              document.getElementById('hungarian-error-message').innerHTML = `
+                  ${(body.error && body.error.message) || 'Kỹ thuật viên hoặc phiếu đã bị thay đổi trạng thái bởi một người khác.'}
+                  <div class="mt-2">
+                      <button onclick="openHungarianModal()" class="px-3 py-1 rounded bg-red-600 text-white font-bold text-xs hover:bg-red-700">
+                          Tải lại và tính toán lại nghiệm tối ưu
+                      </button>
+                  </div>
+              `;
+              return;
+          }
+
+          if (status >= 400 || !body.success) {
+              errBox.classList.remove('hidden');
+              document.getElementById('hungarian-error-title').innerText = 'Lỗi áp dụng phân công';
+              document.getElementById('hungarian-error-message').innerText = (body.error && body.error.message) || body.message || 'Lỗi không xác định.';
+              return;
+          }
+
+          // Success
+          alert(`Đã áp dụng thành công ${body.data.appliedCount} phân công công việc tối ưu!`);
+          closeHungarianModal();
+          window.location.reload();
+      })
+      .catch(err => {
+          btnApply.disabled = false;
+          btnApply.innerHTML = '<i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng';
+          errBox.classList.remove('hidden');
+          document.getElementById('hungarian-error-title').innerText = 'Lỗi mạng hoặc hệ thống';
+          document.getElementById('hungarian-error-message').innerText = err.message;
       });
   }
 </script>

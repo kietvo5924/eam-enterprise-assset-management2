@@ -28,6 +28,7 @@ Trong bảo trì công nghiệp nặng, sửa chữa một sự cố nhỏ (thay
   - `Asset`: Khóa trạng thái an toàn `LOCKED_SAFETY_LOTO` hoặc chuyển tạm thời sang `TESTING_ENERGIZED` trong suốt các giai đoạn đại tu.
   - `AuditLog`: Lưu vết kiểm toán toàn bộ các thao tác ghi đè cấp độ nghiêm trọng, lùi bước giai đoạn, cấp điện tạm và biên bản nghiệm thu.
 - **Giao Dịch Nguyên Khối (Atomic Transactions)**: Mọi thao tác chuyển giai đoạn HSM, lùi bước linh hoạt và cập nhật khóa an toàn phải nằm trong khối `transaction.atomic()` của Django để tránh tình trạng dữ liệu dở dang khi xảy ra sự cố mạng.
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật phân cấp sự cố và điều phối máy trạng thái phân cấp (cây quyết định giải thích được `DecisionTreeClassifier`, logic vùng đệm giáp ranh Marginal Boundary Warning, động cơ HSM State Machine 8 giai đoạn, và chuỗi băm bất biến SHA-256 Tamper-evident Audit Hash Chain) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/decision_tree_hsm/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật workflow phức tạp khỏi các tầng controller/CRUD thông thường.
 
 ---
 

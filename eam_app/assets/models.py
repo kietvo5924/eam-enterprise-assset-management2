@@ -3,10 +3,22 @@ from core.models import BaseTenantModel
 import uuid
 
 class Location(BaseTenantModel):
+    ZONE_TYPE_CHOICES = (
+        ('STANDARD', 'Tiêu chuẩn'),
+        ('CONTROLLED', 'Kiểm soát đặc thù / Phòng sạch'),
+        ('GENERAL', 'Chung / Toàn nhà máy'),
+    )
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     parent_id = models.CharField(max_length=255, null=True, blank=True)
+    code = models.CharField(max_length=64, blank=True, default='')
     name = models.CharField(max_length=255)
+    zone_type = models.CharField(max_length=32, choices=ZONE_TYPE_CHOICES, default='STANDARD')
     description = models.TextField(null=True, blank=True)
+    floorplan_image = models.TextField(blank=True, default='', help_text='URL hoặc Data URI ảnh sơ đồ mặt bằng')
+    center_x = models.FloatField(default=0.0, null=True, blank=True)
+    center_y = models.FloatField(default=0.0, null=True, blank=True)
+    floor_level = models.SmallIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -15,9 +27,13 @@ class Location(BaseTenantModel):
     
     class Meta:
         db_table = 'locations'
+        indexes = [
+            models.Index(fields=['tenant', 'code']),
+            models.Index(fields=['tenant', 'zone_type']),
+        ]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.code})" if self.code else self.name
 
 class AssetCategory(BaseTenantModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -105,6 +121,10 @@ class Asset(BaseTenantModel):
     qr_code = models.CharField(max_length=100)
     is_trackable = models.BooleanField(default=True, db_index=True)
     is_active = models.BooleanField(default=True)
+    coords_x = models.FloatField(default=0.0, null=True, blank=True)
+    coords_y = models.FloatField(default=0.0, null=True, blank=True)
+    floor_level = models.SmallIntegerField(default=1)
+    zone_id = models.CharField(max_length=64, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
@@ -179,4 +199,102 @@ class StockTransaction(BaseTenantModel):
 
     def __str__(self):
         return f"{self.transaction_type} - {self.spare_part.name} - Qty: {self.quantity}"
+
+
+class Tool(BaseTenantModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=64)
+    name = models.CharField(max_length=255)
+    available_quantity = models.IntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tools'
+        unique_together = (('code', 'tenant'),)
+        indexes = [
+            models.Index(fields=['tenant', 'code']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.code}) - Avail: {self.available_quantity}"
+
+
+class ToolInstance(BaseTenantModel):
+    INSPECTION_CHOICES = (
+        ('PASSED', 'Đạt chuẩn'),
+        ('DUE_SOON', 'Sắp đến hạn'),
+        ('EXPIRED', 'Quá hạn kiểm định'),
+    )
+    STATUS_CHOICES = (
+        ('AVAILABLE', 'Khả dụng'),
+        ('IN_USE', 'Đang sử dụng'),
+        ('MAINTENANCE', 'Đang bảo dưỡng'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tool = models.ForeignKey(Tool, on_delete=models.CASCADE, related_name='instances')
+    serial_number = models.CharField(max_length=100)
+    asset_tag = models.CharField(max_length=100, blank=True, default='')
+    calibration_date = models.DateField(null=True, blank=True, help_text='Ngày kiểm định/hiệu chuẩn gần nhất')
+    calibration_due_date = models.DateField(null=True, blank=True, help_text='Ngày đến hạn hiệu chuẩn tiếp theo')
+    inspection_status = models.CharField(max_length=20, choices=INSPECTION_CHOICES, default='PASSED')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='AVAILABLE')
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tool_instances'
+        unique_together = (('tenant', 'tool', 'serial_number'),)
+        indexes = [
+            models.Index(fields=['tenant', 'inspection_status']),
+            models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['tenant', 'calibration_due_date']),
+        ]
+
+    def __str__(self):
+        return f"{self.tool.name} - SN: {self.serial_number} ({self.status})"
+
+    @property
+    def is_calibration_valid(self):
+        from django.utils import timezone
+        if self.inspection_status == 'EXPIRED':
+            return False
+        if self.calibration_due_date and self.calibration_due_date < timezone.now().date():
+            return False
+        return True
+
+
+class ToolReservation(BaseTenantModel):
+    STATUS_CHOICES = (
+        ('RESERVED', 'Reserved / Đã giữ chỗ'),
+        ('IN_USE', 'In Use / Đang xuất dùng'),
+        ('RETURNED', 'Returned / Đã hoàn trả'),
+        ('CANCELLED', 'Cancelled / Đã hủy'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tool = models.ForeignKey(Tool, on_delete=models.CASCADE, related_name='reservations')
+    tool_instance = models.ForeignKey(ToolInstance, on_delete=models.SET_NULL, null=True, blank=True, related_name='reservations')
+    work_order = models.ForeignKey('workorders.WorkOrder', on_delete=models.CASCADE, related_name='tool_reservations')
+    reserved_quantity = models.IntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='RESERVED')
+    reserved_at = models.DateTimeField(auto_now_add=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tool_reservations'
+        indexes = [
+            models.Index(fields=['tenant', 'work_order', 'status']),
+            models.Index(fields=['tenant', 'tool', 'status']),
+        ]
+
+    def __str__(self):
+        return f"Reservation of {self.tool.code} (x{self.reserved_quantity}) for WO-{str(self.work_order_id)[:8]} [{self.status}]"
+
 

@@ -27,6 +27,7 @@ Trong các nhà máy sản xuất chưa lắp đặt hệ thống cảm biến I
   - `Asset`: Phân loại danh mục tài sản, ngưỡng kỹ thuật an toàn của nhà sản xuất (OEM static limits).
   - `WorkOrder`: Loại công việc (`type`), trạng thái (`status`). Khi Work Order hoàn thành, kích hoạt tín hiệu tái lập cửa sổ trượt (Post-Repair Reset).
 - **Tích Hợp Hệ Thống Thông Báo Thời Gian Thực (Task 10.1)**: Tự động kích hoạt thông báo mức `CRITICAL` gửi cho Quản lý bảo trì khi phát hiện đột biến nghiêm trọng.
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật phát hiện bất thường cảm biến (Sliding-window dynamic Z-score, Isolation Forest đa biến, Theil-Sen robust drift estimator, và cơ chế post-repair window pruning) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/anomaly_detection/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật Condition Monitoring khỏi các tầng controller/CRUD thông thường.
 
 ---
 

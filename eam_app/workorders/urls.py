@@ -5,13 +5,16 @@ from workorders.views import (
     WorkOrderChecklistView, WorkOrderChecklistDeleteView,
     WorkOrderNoteUpdateView, WorkOrderAttachmentView,
     WorkOrderAttachmentDeleteView, WorkOrderKpiView,
-    MaintenanceCalendarView
+    MaintenanceCalendarView,
+    WorkOrderAutoAssignPreviewView, WorkOrderAutoAssignApplyView
 )
 
 urlpatterns = [
     re_path(r'^work-orders/?$', WorkOrderListView.as_view(), name='work_order_list'),
     re_path(r'^work-orders/kpis/?$', WorkOrderKpiView.as_view(), name='work_order_kpis'),
     re_path(r'^work-orders/calendar/?$', MaintenanceCalendarView.as_view(), name='work_order_calendar'),
+    re_path(r'^work-orders/auto-assign/preview/?$', WorkOrderAutoAssignPreviewView.as_view(), name='work_order_auto_assign_preview'),
+    re_path(r'^work-orders/auto-assign/apply/?$', WorkOrderAutoAssignApplyView.as_view(), name='work_order_auto_assign_apply'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/?$', WorkOrderDetailView.as_view(), name='work_order_detail'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/assign/?$', WorkOrderAssignView.as_view(), name='work_order_assign'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/status/?$', WorkOrderStatusView.as_view(), name='work_order_status'),

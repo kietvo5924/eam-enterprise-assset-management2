@@ -54,11 +54,33 @@ class WorkOrder(BaseTenantModel):
     skipped_reason = models.CharField(max_length=50, null=True, blank=True)
     skipped_reference_wo = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='suppressed_pm_orders')
     
+    # Phase 11.1: Hungarian Assignment Optimization Fields
+    required_skill = models.CharField(max_length=64, null=True, blank=True)
+    min_skill_level = models.SmallIntegerField(default=1)
+    required_certification = models.CharField(max_length=100, null=True, blank=True)
+    required_tools = models.JSONField(default=list, blank=True)
+    depends_on_wo = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='dependent_work_orders'
+    )
+    is_crew_task = models.BooleanField(default=False)
+    coords_x = models.FloatField(null=True, blank=True)
+    coords_y = models.FloatField(null=True, blank=True)
+    floor_level = models.SmallIntegerField(default=1, null=True, blank=True)
+    zone_id = models.CharField(max_length=64, blank=True, default='')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
     updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
+    @property
+    def code(self):
+        return f"WO-{str(self.id)[:8].upper()}"
+
     @property
     def due_date(self):
         return self.deadline
@@ -66,6 +88,19 @@ class WorkOrder(BaseTenantModel):
     @due_date.setter
     def due_date(self, value):
         self.deadline = value
+
+    @property
+    def estimated_duration_hours(self):
+        if self.estimated_duration_minutes is not None:
+            return round(float(self.estimated_duration_minutes) / 60.0, 2)
+        return 0.0
+
+    @estimated_duration_hours.setter
+    def estimated_duration_hours(self, value):
+        if value is not None:
+            self.estimated_duration_minutes = int(float(value) * 60)
+        else:
+            self.estimated_duration_minutes = None
 
     @property
     def actual_duration_hours(self):
@@ -81,6 +116,8 @@ class WorkOrder(BaseTenantModel):
         indexes = [
             models.Index(fields=['tenant', 'status', 'type', 'created_at']),
             models.Index(fields=['tenant', 'completed_at']),
+            models.Index(fields=['tenant', 'status', 'priority'], name='work_orders_tenant__cdbaca_idx'),
+            models.Index(fields=['tenant', 'depends_on_wo'], name='work_orders_tenant__a59ed9_idx'),
         ]
         
     def __str__(self):

@@ -154,6 +154,115 @@ class LocationDetailView(APIView):
         return success_response(None)
 
 
+class LocationFloorplanDetailView(APIView):
+    """
+    API Mobile & Web: Xem Sơ đồ Mặt bằng Chi tiết của Phân xưởng/Doanh nghiệp kèm danh sách máy móc đã lắp đặt
+    """
+    def get(self, request, location_id):
+        has_loc = HasPermission('location:read')().has_permission(request, self)
+        has_asset = HasPermission('asset:read')().has_permission(request, self)
+        has_wo = HasPermission('work_order:read')().has_permission(request, self)
+        if not (has_loc or has_asset or has_wo):
+            self.permission_denied(request)
+
+        import uuid
+        location = None
+        try:
+            loc_uuid = uuid.UUID(str(location_id))
+            location = Location.objects.filter(id=loc_uuid).first()
+        except (ValueError, TypeError):
+            location = None
+
+        if not location:
+            # Fallback search by location code within tenant
+            tenant = getattr(request.user, 'tenant', None)
+            location = Location.objects.filter(code=str(location_id), is_active=True)
+            if tenant:
+                location = location.filter(tenant=tenant)
+            location = location.first()
+
+        if not location:
+            raise ValidationError("Location not found")
+
+        # Determine Vector Preset based on code/name if enterprise hasn't uploaded CAD floorplan_image
+        code_upper = (location.code or '').upper()
+        name_upper = (location.name or '').upper()
+        vector_preset = 'STANDARD'
+        if any(k in code_upper or k in name_upper for k in ['DAP', 'PRESS', 'DẬP', 'STAMPING']):
+            vector_preset = 'PRESS'
+        elif any(k in code_upper or k in name_upper for k in ['SACH', 'CLEAN', 'SẠCH', 'CHIP', 'YELLOW']):
+            vector_preset = 'CLEANROOM'
+        elif any(k in code_upper or k in name_upper for k in ['KHO', 'WAREHOUSE', 'STORAGE', 'PALLET', 'DOCK']):
+            vector_preset = 'WAREHOUSE'
+
+        # Query all active assets situated in this location or zone
+        from workorders.models import WorkOrder
+        from django.db.models import Q
+
+        assets_qs = Asset.objects.filter(
+            Q(location=location) | Q(zone_id=location.code),
+            is_active=True
+        ).select_related('category')
+        if location.tenant:
+            assets_qs = assets_qs.filter(tenant=location.tenant)
+
+        # Preload active work orders targeting these assets
+        active_wo_qs = WorkOrder.objects.filter(
+            status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS']
+        )
+        if location.tenant:
+            active_wo_qs = active_wo_qs.filter(tenant=location.tenant)
+        active_wo_qs = active_wo_qs.values('id', 'asset_id')
+
+        active_wo_by_asset = {}
+        for w in active_wo_qs:
+            aid = str(w['asset_id'])
+            if aid not in active_wo_by_asset:
+                active_wo_by_asset[aid] = {
+                    'id': str(w['id']),
+                    'code': f"WO-{str(w['id'])[:8].upper()}"
+                }
+
+        equipment_list = []
+        for a in assets_qs:
+            wo_info = active_wo_by_asset.get(str(a.id))
+            equipment_list.append({
+                "id": str(a.id),
+                "name": a.name,
+                "serialNumber": a.serial_number or "",
+                "qrCode": a.qr_code,
+                "model": a.model or "",
+                "manufacturer": a.manufacturer or "",
+                "status": a.status,
+                "coordsX": float(a.coords_x or 0.0),
+                "coordsY": float(a.coords_y or 0.0),
+                "floorLevel": a.floor_level or location.floor_level or 1,
+                "categoryName": a.category.name if a.category else "",
+                "hasActiveWorkOrder": bool(wo_info),
+                "activeWorkOrderId": wo_info['id'] if wo_info else None,
+                "activeWorkOrderCode": wo_info['code'] if wo_info else None
+            })
+
+        data = {
+            "locationId": str(location.id),
+            "code": location.code or "",
+            "name": location.name,
+            "zoneType": location.zone_type,
+            "floorLevel": location.floor_level or 1,
+            "centerX": float(location.center_x or 0.0),
+            "centerY": float(location.center_y or 0.0),
+            "floorplanImage": location.floorplan_image or "",
+            "hasFloorplan": bool(location.floorplan_image),
+            "vectorPreset": vector_preset,
+            "dimensions": {
+                "widthMeters": 100.0,
+                "heightMeters": 70.0
+            },
+            "equipmentList": equipment_list
+        }
+        return success_response(data)
+
+
 class AssetCategoryListView(APIView):
     def get(self, request):
         has_cat = HasPermission('asset_category:read')().has_permission(request, self)

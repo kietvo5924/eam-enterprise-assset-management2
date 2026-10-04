@@ -476,3 +476,240 @@ class ResetPasswordView(APIView):
                 return Response({"success": False, "message": "Reset code has expired"}, status=400)
         
         return Response({"success": False, "message": "Invalid reset code"}, status=400)
+
+
+class UserMeProfileView(APIView):
+    """
+    API Mobile & Web: Lấy hồ sơ cá nhân của người dùng hiện tại, bao gồm quyền hạn,
+    năng lực thợ (kỹ năng, chứng chỉ, cấp bậc) và chốt trực phân xưởng.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        tenant = getattr(user, 'tenant', None)
+        from django.utils import timezone
+        today = timezone.now().date()
+
+        # Collect roles and permissions
+        roles = list(user.roles.values_list('name', flat=True))
+        permissions = set()
+        for role in user.roles.prefetch_related('permissions'):
+            for perm in role.permissions.all():
+                permissions.add(perm.id)
+
+        # Check today's schedule for duty zone
+        from users.models import TechnicianSchedule, TechnicianProfile, UserCertification
+        schedule_today = TechnicianSchedule.objects.filter(
+            tenant=tenant,
+            user=user,
+            work_date=today
+        ).select_related('shift_template').first()
+
+        tp = getattr(user, 'technician_profile', None)
+
+        duty_zone_code = ''
+        if schedule_today and schedule_today.duty_zone_id:
+            duty_zone_code = schedule_today.duty_zone_id
+        elif tp and tp.zone_id:
+            duty_zone_code = tp.zone_id
+
+        duty_zone_data = None
+        if duty_zone_code:
+            from assets.models import Location
+            loc_obj = Location.objects.filter(tenant=tenant, code=duty_zone_code, is_active=True).first()
+            if not loc_obj:
+                try:
+                    import uuid
+                    loc_obj = Location.objects.filter(tenant=tenant, id=uuid.UUID(duty_zone_code)).first()
+                except Exception:
+                    loc_obj = None
+            if loc_obj:
+                duty_zone_data = {
+                    "id": str(loc_obj.id),
+                    "code": loc_obj.code or duty_zone_code,
+                    "name": loc_obj.name,
+                    "zoneType": loc_obj.zone_type,
+                    "floorLevel": loc_obj.floor_level or 1,
+                    "centerX": float(loc_obj.center_x or 0.0),
+                    "centerY": float(loc_obj.center_y or 0.0),
+                    "floorplanImage": loc_obj.floorplan_image or "",
+                    "hasFloorplan": bool(loc_obj.floorplan_image),
+                    "description": loc_obj.description or ""
+                }
+            else:
+                duty_zone_data = {
+                    "id": None,
+                    "code": duty_zone_code,
+                    "name": duty_zone_code,
+                    "zoneType": "STANDARD",
+                    "floorLevel": 1,
+                    "centerX": 0.0,
+                    "centerY": 0.0,
+                    "floorplanImage": "",
+                    "hasFloorplan": False,
+                    "description": ""
+                }
+
+        # User certifications with valid status and countdown days
+        certs_data = []
+        user_certs = UserCertification.objects.filter(
+            tenant=tenant,
+            user=user
+        ).select_related('certification_type')
+        for uc in user_certs:
+            days_rem = (uc.expiry_date - today).days if uc.expiry_date else None
+            certs_data.append({
+                "id": str(uc.id),
+                "code": uc.certification_type.code,
+                "name": uc.certification_type.name,
+                "issuingBody": uc.certification_type.issuing_body,
+                "expiryDate": uc.expiry_date.isoformat() if uc.expiry_date else None,
+                "isValid": uc.is_valid,
+                "daysRemaining": days_rem,
+                "status": uc.status
+            })
+
+        tech_data = None
+        if tp:
+            tech_data = {
+                "skillLevel": tp.skill_level,
+                "skills": tp.skills or [],
+                "certifications": certs_data,
+                "dutyZone": duty_zone_data,
+                "availabilityStatus": tp.availability_status,
+                "isOnDuty": tp.is_on_duty and (schedule_today.status == 'ON_DUTY' if schedule_today else True),
+                "coordsX": float(tp.coords_x or 0.0),
+                "coordsY": float(tp.coords_y or 0.0),
+                "floorLevel": tp.floor_level or 1
+            }
+        elif 'TECHNICIAN' in roles or duty_zone_data or certs_data:
+            tech_data = {
+                "skillLevel": 1,
+                "skills": [],
+                "certifications": certs_data,
+                "dutyZone": duty_zone_data,
+                "availabilityStatus": "AVAILABLE",
+                "isOnDuty": True if schedule_today and schedule_today.status == 'ON_DUTY' else False,
+                "coordsX": 0.0,
+                "coordsY": 0.0,
+                "floorLevel": 1
+            }
+
+        res_data = {
+            "id": str(user.id),
+            "username": user.username,
+            "fullName": getattr(user, 'full_name', None) or user.username,
+            "email": user.email,
+            "tenantId": str(user.tenant_id) if user.tenant_id else None,
+            "roles": roles,
+            "permissions": sorted(list(permissions)),
+            "technicianProfile": tech_data
+        }
+        return success_response(res_data)
+
+
+class UserMeScheduleView(APIView):
+    """
+    API Mobile & Web: Lấy danh sách lịch trực ca cá nhân của Kỹ thuật viên
+    theo khoảng thời gian start_date - end_date (hoặc mặc định 21 ngày gần nhất).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        tenant = getattr(user, 'tenant', None)
+        from django.utils import timezone
+        import datetime
+        today = timezone.now().date()
+
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        if start_date_str:
+            try:
+                start_date = datetime.date.fromisoformat(start_date_str)
+            except ValueError:
+                start_date = today - datetime.timedelta(days=7)
+        else:
+            start_date = today - datetime.timedelta(days=7)
+
+        if end_date_str:
+            try:
+                end_date = datetime.date.fromisoformat(end_date_str)
+            except ValueError:
+                end_date = today + datetime.timedelta(days=14)
+        else:
+            end_date = today + datetime.timedelta(days=14)
+
+        from users.models import TechnicianSchedule
+        from assets.models import Location
+
+        schedules = TechnicianSchedule.objects.filter(
+            tenant=tenant,
+            user=user,
+            work_date__gte=start_date,
+            work_date__lte=end_date
+        ).select_related('shift_template').order_by('work_date')
+
+        # Cache location details for duty zones
+        locations_by_code = {}
+        for loc in Location.objects.filter(tenant=tenant, is_active=True):
+            if loc.code:
+                locations_by_code[loc.code] = loc
+            locations_by_code[str(loc.id)] = loc
+
+        items = []
+        for s in schedules:
+            duty_zone_code = s.duty_zone_id or ""
+            loc_obj = locations_by_code.get(duty_zone_code)
+            if loc_obj:
+                duty_zone_data = {
+                    "id": str(loc_obj.id),
+                    "code": loc_obj.code or duty_zone_code,
+                    "name": loc_obj.name,
+                    "zoneType": loc_obj.zone_type,
+                    "floorLevel": loc_obj.floor_level or 1,
+                    "centerX": float(loc_obj.center_x or 0.0),
+                    "centerY": float(loc_obj.center_y or 0.0),
+                    "floorplanImage": loc_obj.floorplan_image or "",
+                    "hasFloorplan": bool(loc_obj.floorplan_image),
+                    "description": loc_obj.description or ""
+                }
+            elif duty_zone_code:
+                duty_zone_data = {
+                    "id": None,
+                    "code": duty_zone_code,
+                    "name": duty_zone_code,
+                    "zoneType": "STANDARD",
+                    "floorLevel": 1,
+                    "centerX": 0.0,
+                    "centerY": 0.0,
+                    "floorplanImage": "",
+                    "hasFloorplan": False,
+                    "description": ""
+                }
+            else:
+                duty_zone_data = None
+
+            shift_tmpl = s.shift_template
+            shift_data = {
+                "id": str(shift_tmpl.id) if shift_tmpl else None,
+                "code": shift_tmpl.code if shift_tmpl else "",
+                "name": shift_tmpl.name if shift_tmpl else s.status,
+                "startTime": shift_tmpl.start_time.strftime('%H:%M') if shift_tmpl and shift_tmpl.start_time else "",
+                "endTime": shift_tmpl.end_time.strftime('%H:%M') if shift_tmpl and shift_tmpl.end_time else "",
+                "color": shift_tmpl.color_code if shift_tmpl else "#3b82f6"
+            } if shift_tmpl else None
+
+            items.append({
+                "id": str(s.id),
+                "date": s.work_date.isoformat(),
+                "isToday": s.work_date == today,
+                "status": s.status,
+                "shift": shift_data,
+                "dutyZone": duty_zone_data,
+                "notes": s.notes or ""
+            })
+
+        return success_response(items)

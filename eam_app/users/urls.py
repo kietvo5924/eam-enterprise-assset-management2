@@ -4,7 +4,8 @@ from users.views import (
     RoleListView, RoleDetailView, PermissionListView,
     UserListView, UserDetailView, UserDisableView, UserEnableView,
     UserInviteView, UserImportView,
-    ChangePasswordView, ForgotPasswordView, ResetPasswordView
+    ChangePasswordView, ForgotPasswordView, ResetPasswordView,
+    UserMeProfileView, UserMeScheduleView
 )
 
 urlpatterns = [
@@ -13,6 +14,9 @@ urlpatterns = [
     re_path(r'^auth/change-password/?$', ChangePasswordView.as_view(), name='auth_change_password'),
     re_path(r'^auth/forgot-password/?$', ForgotPasswordView.as_view(), name='auth_forgot_password'),
     re_path(r'^auth/reset-password/?$', ResetPasswordView.as_view(), name='auth_reset_password'),
+
+    re_path(r'^users/me/profile/?$', UserMeProfileView.as_view(), name='user_me_profile'),
+    re_path(r'^users/me/schedule/?$', UserMeScheduleView.as_view(), name='user_me_schedule'),
     
     path('roles', RoleListView.as_view(), name='role_list'),
     path('roles/<uuid:role_id>', RoleDetailView.as_view(), name='role_detail'),

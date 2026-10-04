@@ -3,13 +3,23 @@ from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart,
 
 class LocationSerializer(serializers.ModelSerializer):
     parentId = serializers.CharField(source='parent_id', read_only=True)
+    code = serializers.CharField(read_only=True)
+    zoneType = serializers.CharField(source='zone_type', read_only=True)
+    floorLevel = serializers.IntegerField(source='floor_level', read_only=True)
+    centerX = serializers.FloatField(source='center_x', read_only=True)
+    centerY = serializers.FloatField(source='center_y', read_only=True)
+    floorplanImage = serializers.CharField(source='floorplan_image', read_only=True)
+    hasFloorplan = serializers.SerializerMethodField()
     isActive = serializers.BooleanField(source='is_active', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
 
+    def get_hasFloorplan(self, obj):
+        return bool(obj.floorplan_image)
+
     class Meta:
         model = Location
-        fields = ['id', 'parentId', 'name', 'description', 'isActive', 'createdAt', 'updatedAt']
+        fields = ['id', 'parentId', 'code', 'name', 'zoneType', 'floorLevel', 'centerX', 'centerY', 'floorplanImage', 'hasFloorplan', 'description', 'isActive', 'createdAt', 'updatedAt']
 
 class LocationCreateUpdateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
@@ -76,6 +86,10 @@ class AssetSerializer(serializers.ModelSerializer):
     purchaseDate = serializers.DateField(source='purchase_date', read_only=True)
     qrCode = serializers.CharField(source='qr_code', read_only=True)
     isActive = serializers.BooleanField(source='is_active', read_only=True)
+    coordsX = serializers.FloatField(source='coords_x', read_only=True)
+    coordsY = serializers.FloatField(source='coords_y', read_only=True)
+    floorLevel = serializers.IntegerField(source='floor_level', read_only=True)
+    zoneId = serializers.CharField(source='zone_id', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     
@@ -83,7 +97,8 @@ class AssetSerializer(serializers.ModelSerializer):
         model = Asset
         fields = ['id', 'categoryId', 'categoryName', 'parentId', 'name', 'serialNumber', 'model', 'manufacturer', 
                   'purchaseDate', 'value', 'status', 'locationId', 'locationName', 'hierarchyTemplateId', 
-                  'hierarchyTemplateName', 'qrCode', 'isActive', 'createdAt', 'updatedAt']
+                  'hierarchyTemplateName', 'qrCode', 'isActive', 'coordsX', 'coordsY', 'floorLevel', 'zoneId',
+                  'createdAt', 'updatedAt']
 
 class AssetCreateUpdateSerializer(serializers.Serializer):
     categoryId = serializers.UUIDField(required=False, allow_null=True)

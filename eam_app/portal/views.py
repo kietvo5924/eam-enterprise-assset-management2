@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from users.decorators import permission_required
 from django.contrib import messages
+import json
 
 def check_perm(request, perm):
     if not request.user or not request.user.is_authenticated:
@@ -440,8 +441,9 @@ def portal_users(request):
                 u.save()
                 
             role_ids = data.get('roles', [])
+            roles = []
             if role_ids:
-                roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
+                roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
                 for r in roles:
                     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
                     if r.name == 'SUPER_ADMIN' and not is_super:
@@ -449,6 +451,48 @@ def portal_users(request):
                 u.roles.set(roles)
             else:
                 u.roles.clear()
+
+            # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
+            # If any assigned role has 'work_order:execute', ensure and update TechnicianProfile
+            has_exec_perm = any(r.permissions.filter(id='work_order:execute').exists() for r in roles)
+            tech_payload = data.get('technicianProfile')
+            if has_exec_perm or tech_payload:
+                from users.models import TechnicianProfile
+                from datetime import timedelta
+                from django.utils import timezone
+                
+                tech_data = tech_payload or {}
+                shift_code = tech_data.get('shift_code', 'SHIFT_1')
+                now = timezone.now()
+                if shift_code == 'SHIFT_1':
+                    shift_end = now.replace(hour=14, minute=0, second=0, microsecond=0)
+                    if shift_end < now:
+                        shift_end += timedelta(days=1)
+                elif shift_code == 'SHIFT_2':
+                    shift_end = now.replace(hour=22, minute=0, second=0, microsecond=0)
+                    if shift_end < now:
+                        shift_end += timedelta(days=1)
+                elif shift_code == 'SHIFT_3':
+                    shift_end = now.replace(hour=6, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                else:
+                    shift_end = now + timedelta(hours=8)
+
+                TechnicianProfile.objects.update_or_create(
+                    user=u,
+                    defaults={
+                        'tenant_id': tenant_id,
+                        'skill_level': int(tech_data.get('skill_level', 1)),
+                        'skills': tech_data.get('skills', ['GENERAL']),
+                        'certifications': tech_data.get('certifications', []),
+                        'zone_id': tech_data.get('zone_id', '') or '',
+                        'floor_level': int(tech_data.get('floor_level', 1)),
+                        'coords_x': float(tech_data.get('coords_x', 20.0)),
+                        'coords_y': float(tech_data.get('coords_y', 20.0)),
+                        'shift_end_time': shift_end,
+                        'is_on_duty': True,
+                        'availability_status': 'AVAILABLE'
+                    }
+                )
                 
             return JsonResponse({'success': True, 'id': str(u.id)})
         except Exception as e:
@@ -490,19 +534,64 @@ def portal_users(request):
             u.save()
             
             role_ids = data.get('roles', [])
-            roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id))
-            for r in roles:
-                is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
-                if r.name == 'SUPER_ADMIN' and not is_super:
-                    return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
-            u.roles.set(roles)
+            roles = []
+            if role_ids:
+                roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
+                for r in roles:
+                    is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+                    if r.name == 'SUPER_ADMIN' and not is_super:
+                        return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
+                u.roles.set(roles)
+            else:
+                u.roles.clear()
+
+            # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
+            has_exec_perm = any(r.permissions.filter(id='work_order:execute').exists() for r in roles)
+            tech_payload = data.get('technicianProfile')
+            if has_exec_perm or tech_payload:
+                from users.models import TechnicianProfile
+                from datetime import timedelta
+                from django.utils import timezone
+                
+                tech_data = tech_payload or {}
+                shift_code = tech_data.get('shift_code', 'SHIFT_1')
+                now = timezone.now()
+                if shift_code == 'SHIFT_1':
+                    shift_end = now.replace(hour=14, minute=0, second=0, microsecond=0)
+                    if shift_end < now:
+                        shift_end += timedelta(days=1)
+                elif shift_code == 'SHIFT_2':
+                    shift_end = now.replace(hour=22, minute=0, second=0, microsecond=0)
+                    if shift_end < now:
+                        shift_end += timedelta(days=1)
+                elif shift_code == 'SHIFT_3':
+                    shift_end = now.replace(hour=6, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                else:
+                    shift_end = now + timedelta(hours=8)
+
+                TechnicianProfile.objects.update_or_create(
+                    user=u,
+                    defaults={
+                        'tenant_id': tenant_id,
+                        'skill_level': int(tech_data.get('skill_level', 1)),
+                        'skills': tech_data.get('skills', ['GENERAL']),
+                        'certifications': tech_data.get('certifications', []),
+                        'zone_id': tech_data.get('zone_id', '') or '',
+                        'floor_level': int(tech_data.get('floor_level', 1)),
+                        'coords_x': float(tech_data.get('coords_x', 20.0)),
+                        'coords_y': float(tech_data.get('coords_y', 20.0)),
+                        'shift_end_time': shift_end,
+                        'is_on_duty': True,
+                        'availability_status': 'AVAILABLE'
+                    }
+                )
             
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     elif request.method == 'DELETE':
-        if not HasPermission('user:update')().has_permission(request, None): # delete is mapped to update block in legacy usually? No legacy has delete? Wait, legacy only has disable/enable.
+        if not HasPermission('user:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
@@ -511,18 +600,18 @@ def portal_users(request):
                 return JsonResponse({'success': False, 'error': 'Cannot block your own account'}, status=400)
             if u.is_superuser:
                 return JsonResponse({'success': False, 'error': 'Cannot block superuser'}, status=400)
-            # Soft delete by marking INACTIVE instead of deleting
             u.status = 'INACTIVE'
             u.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
+    from assets.models import Asset
 
     if str(tenant_id) == '00000000-0000-0000-0000-000000000000' or request.user.is_superuser:
-        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').select_related('tenant').order_by('-created_at')
+        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').select_related('tenant', 'technician_profile').prefetch_related('roles__permissions').order_by('-created_at')
     else:
-        users = User.objects.filter(tenant_id=tenant_id).select_related('tenant').order_by('-created_at')
+        users = User.objects.filter(tenant_id=tenant_id).select_related('tenant', 'technician_profile').prefetch_related('roles__permissions').order_by('-created_at')
     
     # Calculate metrics
     total_users = users.count()
@@ -532,13 +621,57 @@ def portal_users(request):
     
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
     if is_super:
-        roles = Role.all_objects.all()
+        roles = Role.all_objects.prefetch_related('permissions').all()
     else:
-        roles = Role.objects.filter(tenant_id=tenant_id).exclude(name='SUPER_ADMIN')
+        roles = Role.objects.filter(tenant_id=tenant_id).prefetch_related('permissions').exclude(name='SUPER_ADMIN')
     
+    # RBAC: Compute permission map and user profile data for frontend
+    roles_can_execute_map = {}
+    for r in roles:
+        has_exec = r.permissions.filter(id='work_order:execute').exists()
+        r.can_execute_wo = has_exec
+        roles_can_execute_map[str(r.id)] = has_exec
+
+    user_profiles_dict = {}
+    for u in users:
+        tp = getattr(u, 'technician_profile', None)
+        u.can_execute_wo = any(r.permissions.filter(id='work_order:execute').exists() for r in u.roles.all()) or (tp is not None)
+        if tp:
+            user_profiles_dict[str(u.id)] = {
+                'skill_level': tp.skill_level,
+                'skills': tp.skills or [],
+                'certifications': tp.certifications or [],
+                'zone_id': tp.zone_id or '',
+                'floor_level': tp.floor_level or 1,
+                'coords_x': tp.coords_x or 0.0,
+                'coords_y': tp.coords_y or 0.0,
+            }
+
+    # Available Zones & Locations Master Data
+    from assets.models import Location
+    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image'))
+    loc_codes = [l['code'] for l in locations_list if l['code']]
+    asset_zones = list(Asset.objects.filter(tenant_id=tenant_id).exclude(zone_id='').values_list('zone_id', flat=True).distinct())
+    available_zones = sorted(list(set(loc_codes + asset_zones)))
+    if not available_zones:
+        available_zones = ['ZONE_MAIN', 'ZONE_PRESS', 'ZONE_CLEANROOM', 'ZONE_WAREHOUSE']
+
+    from users.models import WorkforceSkill, CertificationType, ShiftTemplate
+    workforce_skills = list(WorkforceSkill.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name', 'category'))
+    certification_types = list(CertificationType.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name'))
+    shift_templates = list(ShiftTemplate.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'start_time', 'end_time', 'is_overnight'))
+
     return render(request, 'users.html', {
         'users': users, 
         'roles': roles,
+        'roles_can_execute_json': json.dumps(roles_can_execute_map),
+        'user_profiles_json': json.dumps(user_profiles_dict),
+        'available_zones': available_zones,
+        'locations_list': locations_list,
+        'locations_json': json.dumps(locations_list, default=str),
+        'workforce_skills': workforce_skills,
+        'certification_types': certification_types,
+        'shift_templates': shift_templates,
         'total_users': total_users,
         'active_users': active_users,
         'blocked_users': blocked_users,
@@ -714,25 +847,98 @@ def portal_asset_categories(request):
 
 
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
-    from assets.models import HierarchyTemplate, Location
+    from assets.models import HierarchyTemplate, Location, Asset
     templates = HierarchyTemplate.objects.filter(tenant_id=tenant_id)
-    locations = Location.objects.filter(tenant_id=tenant_id)
-    
-    # Process locations for template hierarchy
+    locations = Location.objects.filter(tenant_id=tenant_id).exclude(code__startswith='__').order_by('floor_level', 'name', 'id')
+    import re
+    # Process locations for template hierarchy & visual floorplan
     loc_list = []
     for loc in locations:
+        dim_match = re.search(r'\[DIM:([\d\.]+)x([\d\.]+)\]', loc.description or '')
+        w_m = float(dim_match.group(1)) if dim_match else 36.0
+        h_m = float(dim_match.group(2)) if dim_match else 26.0
         loc_list.append({
             'id': str(loc.id),
             'name': loc.name,
+            'code': loc.code or '',
+            'zone_type': loc.zone_type,
             'description': loc.description or '',
             'parent_id': loc.parent_id or '',
+            'center_x': loc.center_x,
+            'center_y': loc.center_y,
+            'width_m': w_m,
+            'height_m': h_m,
+            'floor_level': loc.floor_level or 1,
+            'floorplan_image': loc.floorplan_image or '',
             'is_active': loc.is_active
         })
+
+    # Query active assets for drag-and-drop floorplan studio
+    assets_qs = Asset.objects.filter(tenant_id=tenant_id, is_active=True).order_by('name', 'id').values(
+        'id', 'name', 'qr_code', 'model', 'serial_number', 'status', 'location_id',
+        'coords_x', 'coords_y', 'floor_level', 'zone_id'
+    )
+    assets_list = list(assets_qs)
+    for a in assets_list:
+        a['id'] = str(a['id'])
+        if a.get('location_id'):
+            a['location_id'] = str(a['location_id'])
+
+    # Active technicians & roster duty stations today (for Floorplan Worker Simulation)
+    from users.models import TechnicianSchedule
+    from workorders.models import WorkOrder
+    from django.utils import timezone
+    today = timezone.now().date()
+    
+    today_scheds = TechnicianSchedule.objects.filter(
+        tenant_id=tenant_id,
+        work_date=today,
+        status='ON_DUTY'
+    ).select_related('user', 'shift_template')
+    
+    techs_list = []
+    for s in today_scheds:
+        tp = getattr(s.user, 'technician_profile', None)
+        techs_list.append({
+            'user_id': str(s.user.id),
+            'name': s.user.get_full_name() or s.user.username,
+            'duty_zone': s.duty_zone_id or (tp.zone_id if tp else ''),
+            'shift_name': s.shift_template.name if s.shift_template else 'Ca trực',
+            'coords_x': tp.coords_x if tp else 0.0,
+            'coords_y': tp.coords_y if tp else 0.0,
+            'floor_level': tp.floor_level if tp else 1,
+            'availability': tp.availability_status if tp else 'AVAILABLE'
+        })
+
+    # In-progress work orders (for live machine status indicator)
+    active_wos = list(WorkOrder.objects.filter(
+        tenant_id=tenant_id,
+        status='IN_PROGRESS',
+        asset_id__isnull=False
+    ).values('id', 'title', 'asset_id', 'assigned_to__username'))
+    for w in active_wos:
+        w['id'] = str(w['id'])
+        w['asset_id'] = str(w['asset_id'])
+
+    spatials_loc = Location.objects.filter(tenant_id=tenant_id, code='__SPATIAL_ELEMENTS__').first()
+    spatials_json = spatials_loc.description if (spatials_loc and spatials_loc.description) else '[]'
+
+    factory_dim_loc = Location.objects.filter(tenant_id=tenant_id, code='__FACTORY_DIMENSIONS__').first()
+    factory_dim_json = factory_dim_loc.description if (factory_dim_loc and factory_dim_loc.description) else '{}'
 
     return render(request, 'asset_categories.html', {
         'categories': categories,
         'templates': templates,
         'locations': loc_list,
+        'locations_json': json.dumps(loc_list, default=str),
+        'assets_list': assets_list,
+        'assets_json': json.dumps(assets_list, default=str),
+        'technicians_list': techs_list,
+        'technicians_json': json.dumps(techs_list, default=str),
+        'active_wos_list': active_wos,
+        'active_wos_json': json.dumps(active_wos, default=str),
+        'spatials_json': spatials_json,
+        'factory_dim_json': factory_dim_json,
     })
 
 @login_required(login_url='portal_login')
@@ -818,13 +1024,59 @@ def portal_locations(request):
     tenant_id = request.user.tenant_id
     
 
+    action = request.GET.get('action')
+    if request.method == 'POST' and action == 'place_asset':
+        try:
+            data = json.loads(request.body)
+            asset_id = data.get('asset_id')
+            loc_id = data.get('location_id')
+            cx = float(data.get('coords_x') or 0.0)
+            cy = float(data.get('coords_y') or 0.0)
+            fl = int(data.get('floor_level') or 1)
+            
+            from assets.models import Asset
+            asset_obj = Asset.objects.filter(id=asset_id, tenant_id=tenant_id).first()
+            if not asset_obj:
+                return JsonResponse({'success': False, 'error': 'Asset not found'}, status=404)
+            
+            if loc_id:
+                loc = Location.objects.filter(id=loc_id, tenant_id=tenant_id).first()
+                if loc:
+                    asset_obj.location = loc
+                    asset_obj.zone_id = loc.code or loc.name
+            else:
+                asset_obj.location = None
+                asset_obj.zone_id = ''
+                
+            asset_obj.coords_x = cx
+            asset_obj.coords_y = cy
+            asset_obj.floor_level = fl
+            asset_obj.save()
+            return JsonResponse({
+                'success': True,
+                'asset_id': str(asset_obj.id),
+                'location_id': str(asset_obj.location_id) if asset_obj.location_id else None,
+                'coords_x': asset_obj.coords_x,
+                'coords_y': asset_obj.coords_y,
+                'zone_id': asset_obj.zone_id
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
     if request.method == 'POST':
         if not HasPermission('asset_category:create')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
+            import uuid
             data = json.loads(request.body)
             name = data.get('name')
             parent_id = data.get('parentId')
+            code = (data.get('code') or '').strip().upper()
+            zone_type = data.get('zone_type', 'STANDARD')
+            floor_level = int(data.get('floor_level') or 1)
+            center_x = float(data.get('center_x') or 25.0)
+            center_y = float(data.get('center_y') or 20.0)
+            floorplan_image = data.get('floorplan_image', '')
             
             if Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exists():
                 return JsonResponse({'success': False, 'error': 'Location name already exists under this parent'}, status=400)
@@ -832,6 +1084,12 @@ def portal_locations(request):
             l = Location.objects.create(
                 tenant_id=tenant_id,
                 name=name,
+                code=code or ('LOC-' + str(uuid.uuid4())[:6].upper()),
+                zone_type=zone_type,
+                floor_level=floor_level,
+                center_x=center_x,
+                center_y=center_y,
+                floorplan_image=floorplan_image or '',
                 description=data.get('description'),
                 parent_id=parent_id,
                 is_active=data.get('is_active', True)
@@ -859,6 +1117,18 @@ def portal_locations(request):
                 l.parent_id = parent_id
             if 'is_active' in data:
                 l.is_active = data.get('is_active')
+            if 'code' in data and data.get('code'):
+                l.code = data.get('code').strip().upper()
+            if 'zone_type' in data:
+                l.zone_type = data.get('zone_type')
+            if 'floor_level' in data:
+                l.floor_level = int(data.get('floor_level') or 1)
+            if 'center_x' in data and data.get('center_x') is not None:
+                l.center_x = float(data.get('center_x'))
+            if 'center_y' in data and data.get('center_y') is not None:
+                l.center_y = float(data.get('center_y'))
+            if 'floorplan_image' in data:
+                l.floorplan_image = data.get('floorplan_image') or ''
             l.save()
             return JsonResponse({'success': True})
         except Exception as e:
@@ -877,7 +1147,19 @@ def portal_locations(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
     locations = Location.objects.filter(tenant_id=tenant_id)
-    return JsonResponse({'success': True, 'data': [{'id': str(loc.id), 'name': loc.name, 'description': loc.description, 'parentId': loc.parent_id, 'isActive': loc.is_active} for loc in locations]})
+    return JsonResponse({'success': True, 'data': [{
+        'id': str(loc.id),
+        'name': loc.name,
+        'code': loc.code or '',
+        'zone_type': loc.zone_type,
+        'center_x': loc.center_x,
+        'center_y': loc.center_y,
+        'floor_level': loc.floor_level,
+        'floorplan_image': loc.floorplan_image or '',
+        'description': loc.description,
+        'parentId': loc.parent_id,
+        'isActive': loc.is_active
+    } for loc in locations]})
 
 @login_required(login_url='portal_login')
 @permission_required('asset:read')
@@ -949,10 +1231,16 @@ def portal_asset_registry(request):
                 a.manufacturer = data.get('manufacturer') or None
             if 'purchase_date' in data:
                 a.purchase_date = data.get('purchase_date') or None
-            if 'value' in data:
-                a.value = data.get('value') or None
             if 'is_active' in data:
                 a.is_active = data.get('is_active', True)
+            if 'coords_x' in data and data.get('coords_x') is not None:
+                a.coords_x = float(data.get('coords_x') or 0.0)
+            if 'coords_y' in data and data.get('coords_y') is not None:
+                a.coords_y = float(data.get('coords_y') or 0.0)
+            if 'floor_level' in data and data.get('floor_level') is not None:
+                a.floor_level = int(data.get('floor_level') or 1)
+            if 'zone_id' in data and data.get('zone_id') is not None:
+                a.zone_id = str(data.get('zone_id') or '')
                 
             a.save()
             return JsonResponse({'success': True})
@@ -1061,6 +1349,13 @@ def portal_work_orders(request):
                 asset_id = data.get('asset_id')
                 assigned_to_id = data.get('assigned_to_id')
                 
+                # Auto-inherit location from asset if not manually supplied
+                asset_obj = Asset.objects.filter(id=asset_id, tenant_id=tenant_id).first() if asset_id else None
+                zone_id = data.get('zone_id') if data.get('zone_id') else (asset_obj.zone_id if asset_obj else '')
+                floor_level = int(data.get('floor_level') if data.get('floor_level') is not None else (asset_obj.floor_level if asset_obj else 1))
+                coords_x = float(data.get('coords_x') if data.get('coords_x') is not None else (asset_obj.coords_x if asset_obj else 0.0))
+                coords_y = float(data.get('coords_y') if data.get('coords_y') is not None else (asset_obj.coords_y if asset_obj else 0.0))
+
                 wo = WorkOrder.objects.create(
                     tenant_id=tenant_id,
                     title=data.get('title'),
@@ -1070,7 +1365,18 @@ def portal_work_orders(request):
                     asset_id=asset_id if asset_id else None,
                     assigned_to_id=assigned_to_id if assigned_to_id else None,
                     deadline=parse_datetime(data.get('deadline')) if data.get('deadline') else None,
-                    created_by=request.user
+                    created_by=request.user,
+                    # Hungarian & Optimization fields
+                    required_skill=data.get('required_skill', 'GENERAL') or 'GENERAL',
+                    min_skill_level=int(data.get('min_skill_level', 1)),
+                    required_certification=data.get('required_certification', '') or '',
+                    required_tools=data.get('required_tools', []),
+                    is_crew_task=bool(data.get('is_crew_task', False)),
+                    depends_on_wo_id=data.get('depends_on_wo_id') if data.get('depends_on_wo_id') else None,
+                    zone_id=zone_id or '',
+                    floor_level=floor_level,
+                    coords_x=coords_x,
+                    coords_y=coords_y
                 )
                 return JsonResponse({'success': True, 'id': str(wo.id)})
         except Exception as e:
@@ -1100,6 +1406,28 @@ def portal_work_orders(request):
                         if str(wo.assigned_to_id) != str(request.user.id):
                             raise Exception("Only the assignee can start the Work Order")
                         wo.actual_start_time = timezone.now()
+
+                        # Event-based technician positioning: snap tech coords & zone to machine
+                        if hasattr(request.user, 'technician_profile'):
+                            tp = request.user.technician_profile
+                            snap_x = wo.coords_x or (wo.asset.coords_x if wo.asset else None)
+                            snap_y = wo.coords_y or (wo.asset.coords_y if wo.asset else None)
+                            snap_zone = wo.zone_id or (wo.asset.zone_id if wo.asset else None)
+                            snap_floor = wo.floor_level or (wo.asset.floor_level if wo.asset else None)
+                            if snap_x is not None: tp.coords_x = snap_x
+                            if snap_y is not None: tp.coords_y = snap_y
+                            if snap_zone: tp.zone_id = snap_zone
+                            if snap_floor: tp.floor_level = snap_floor
+                            tp.availability_status = 'BUSY'
+                            tp.save()
+
+                        # Dispatch real-time notification to supervisor / creator
+                        try:
+                            from notifications.services import notify_work_order_started
+                            notify_work_order_started(wo, technician=request.user)
+                        except Exception:
+                            pass
+
                     elif new_status == 'COMPLETED':
                         if current_status != 'IN_PROGRESS':
                             raise Exception("Work Order can only be completed from IN_PROGRESS state")
@@ -1116,6 +1444,35 @@ def portal_work_orders(request):
                                 raise Exception(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
                                 
                         wo.completed_at = timezone.now()
+
+                        # Event-based technician positioning: return tech to duty zone station
+                        if hasattr(request.user, 'technician_profile'):
+                            tp = request.user.technician_profile
+                            tp.availability_status = 'AVAILABLE'
+                            from users.models import TechnicianSchedule
+                            from assets.models import Location
+                            today_sched = TechnicianSchedule.objects.filter(
+                                tenant_id=tenant_id,
+                                user=request.user,
+                                work_date=timezone.now().date(),
+                                status='ON_DUTY'
+                            ).first()
+                            if today_sched and today_sched.duty_zone_id:
+                                loc = Location.objects.filter(tenant_id=tenant_id, code=today_sched.duty_zone_id).first()
+                                if loc:
+                                    tp.zone_id = loc.code
+                                    tp.coords_x = loc.center_x or 25.0
+                                    tp.coords_y = loc.center_y or 20.0
+                                    tp.floor_level = loc.floor_level or 1
+                            tp.save()
+
+                        # Dispatch real-time notification to supervisor / creator
+                        try:
+                            from notifications.services import notify_work_order_completed
+                            notify_work_order_completed(wo, technician=request.user)
+                        except Exception:
+                            pass
+
                     elif new_status in ['CANCELED', 'CANCELLED']:
                         if current_status == 'COMPLETED':
                             raise Exception("Cannot cancel a COMPLETED Work Order")
@@ -1163,6 +1520,28 @@ def portal_work_orders(request):
                 else:
                     wo.deadline = None
                     
+                # Hungarian & Optimization fields in PUT
+                if 'required_skill' in data:
+                    wo.required_skill = data.get('required_skill') or 'GENERAL'
+                if 'min_skill_level' in data:
+                    wo.min_skill_level = int(data.get('min_skill_level', 1))
+                if 'required_certification' in data:
+                    wo.required_certification = data.get('required_certification') or ''
+                if 'required_tools' in data:
+                    wo.required_tools = data.get('required_tools', [])
+                if 'is_crew_task' in data:
+                    wo.is_crew_task = bool(data.get('is_crew_task', False))
+                if 'depends_on_wo_id' in data:
+                    wo.depends_on_wo_id = data.get('depends_on_wo_id') if data.get('depends_on_wo_id') else None
+                if 'zone_id' in data:
+                    wo.zone_id = data.get('zone_id') or ''
+                if 'floor_level' in data:
+                    wo.floor_level = int(data.get('floor_level', 1))
+                if 'coords_x' in data and data.get('coords_x') is not None:
+                    wo.coords_x = float(data.get('coords_x'))
+                if 'coords_y' in data and data.get('coords_y') is not None:
+                    wo.coords_y = float(data.get('coords_y'))
+
                 wo.save()
                 return JsonResponse({'success': True})
         except Exception as e:
@@ -1187,6 +1566,7 @@ def portal_work_orders(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
     from django.utils import timezone
+    from assets.models import Tool
     now = timezone.now()
 
     work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by').prefetch_related('checklists', 'follow_up_work_orders')
@@ -1197,6 +1577,7 @@ def portal_work_orders(request):
     completed = sum(1 for wo in work_orders if wo.status == 'COMPLETED')
 
     wo_data = []
+    wo_metadata = {}
     for wo in work_orders:
         checklists = list(wo.checklists.all().values('id', 'item_name', 'is_completed', 'input_type', 'expected_value', 'actual_value', 'is_mandatory'))
         # Need to cast UUIDs to strings
@@ -1211,9 +1592,51 @@ def portal_work_orders(request):
             'follow_ups_count': len(follow_ups)
         })
 
+        wo_metadata[str(wo.id)] = {
+            'required_skill': wo.required_skill or 'GENERAL',
+            'min_skill_level': wo.min_skill_level or 1,
+            'required_certification': wo.required_certification or '',
+            'required_tools': wo.required_tools or [],
+            'is_crew_task': bool(wo.is_crew_task),
+            'depends_on_wo_id': str(wo.depends_on_wo_id) if wo.depends_on_wo_id else '',
+            'zone_id': wo.zone_id or '',
+            'floor_level': wo.floor_level or 1,
+            'coords_x': wo.coords_x if wo.coords_x is not None else 0.0,
+            'coords_y': wo.coords_y if wo.coords_y is not None else 0.0,
+        }
+
     assets = Asset.objects.filter(tenant_id=tenant_id)
-    users = User.objects.all() # Assuming cross-tenant or specific users
-    
+    assets_dict = {}
+    for a in assets:
+        assets_dict[str(a.id)] = {
+            'name': a.name,
+            'zone_id': a.zone_id or '',
+            'floor_level': a.floor_level or 1,
+            'coords_x': a.coords_x if a.coords_x is not None else 0.0,
+            'coords_y': a.coords_y if a.coords_y is not None else 0.0,
+        }
+
+    # Strict RBAC: Technicians assignable must have permission 'work_order:execute'
+    technicians = User.objects.filter(
+        tenant_id=tenant_id,
+        roles__permissions__id='work_order:execute'
+    ).distinct().select_related('technician_profile')
+
+    tools = list(Tool.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name', 'available_quantity'))
+
+    from users.models import WorkforceSkill, CertificationType
+    skills = list(WorkforceSkill.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name', 'category'))
+    cert_types = list(CertificationType.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name'))
+
+    # Available Zones & Locations Master Data
+    from assets.models import Location
+    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image'))
+    loc_codes = [l['code'] for l in locations_list if l['code']]
+    asset_zones = list(Asset.objects.filter(tenant_id=tenant_id).exclude(zone_id='').values_list('zone_id', flat=True).distinct())
+    available_zones = sorted(list(set(loc_codes + asset_zones)))
+    if not available_zones:
+        available_zones = ['ZONE_MAIN', 'ZONE_PRESS', 'ZONE_CLEANROOM', 'ZONE_WAREHOUSE']
+
     kpis = {
         'total': total_wos,
         'in_progress': in_progress,
@@ -1221,7 +1644,21 @@ def portal_work_orders(request):
         'completed': completed
     }
     
-    return render(request, 'work_orders.html', {'work_orders_data': wo_data, 'assets': assets, 'users': users, 'kpis': kpis})
+    return render(request, 'work_orders.html', {
+        'work_orders_data': wo_data,
+        'assets': assets,
+        'assets_json': json.dumps(assets_dict),
+        'users': technicians,
+        'technicians': technicians,
+        'tools': tools,
+        'skills': skills,
+        'cert_types': cert_types,
+        'available_zones': available_zones,
+        'locations_list': locations_list,
+        'locations_json': json.dumps(locations_list, default=str),
+        'wo_metadata_json': json.dumps(wo_metadata),
+        'kpis': kpis
+    })
 
 @login_required(login_url='portal_login')
 @permission_required('inventory:read')
@@ -1633,6 +2070,942 @@ def custom_403_view(request, exception=None):
         'requested_path': request.path,
     }
     return render(request, '403.html', context, status=403)
+
+
+# ==============================================================================
+# WORKFORCE & TOOLS (MAINTENANCE RESOURCES MANAGEMENT)
+# ==============================================================================
+
+@login_required(login_url='portal_login')
+def portal_workforce_tools(request):
+    """
+    Unified Hub for Maintenance Workforce Competency, Shifts, Specialized Tools & Calibration.
+    Accessible with 'workforce:read', 'work_order:read', or 'user:read'.
+    """
+    if not check_perm(request, ['workforce:read', 'work_order:read', 'user:read']):
+        return portal_permission_denied(request, 'workforce:read')
+
+    from users.models import (
+        WorkforceSkill, CertificationType, ShiftTemplate,
+        TechnicianSchedule, User
+    )
+    from assets.models import Tool, ToolInstance, ToolReservation
+    from datetime import timedelta
+    from django.utils import timezone
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    now = timezone.now()
+    today = now.date()
+
+    # Active Tab
+    active_tab = request.GET.get('tab', 'skills')
+
+    # Week calculation for Roster Matrix
+    week_offset = int(request.GET.get('week_offset', 0))
+    base_monday = (today - timedelta(days=today.weekday())) + timedelta(weeks=week_offset)
+    days_of_week = [base_monday + timedelta(days=i) for i in range(7)]
+
+    # 1. Skills & Certifications Data
+    skills = list(WorkforceSkill.objects.filter(tenant_id=tenant_id).order_by('category', 'name'))
+    cert_types = list(CertificationType.objects.filter(tenant_id=tenant_id).order_by('name'))
+
+    # 2. Shift Templates & Weekly Roster
+    shift_templates = list(ShiftTemplate.objects.filter(tenant_id=tenant_id).order_by('start_time'))
+    tech_qs = User.all_objects.filter(
+        tenant_id=tenant_id,
+        status='ACTIVE',
+        technician_profile__isnull=False
+    ).distinct().select_related('technician_profile').order_by('username')
+    technicians = list(tech_qs)
+
+    schedules_qs = TechnicianSchedule.objects.filter(
+        tenant_id=tenant_id,
+        work_date__in=days_of_week
+    ).select_related('shift_template', 'user')
+
+    schedule_lookup = {}
+    for sc in schedules_qs:
+        schedule_lookup[(str(sc.user_id), sc.work_date.isoformat())] = sc
+
+    roster_rows = []
+    for tech in technicians:
+        profile = getattr(tech, 'technician_profile', None)
+        day_cells = []
+        for d in days_of_week:
+            d_str = d.isoformat()
+            sc = schedule_lookup.get((str(tech.id), d_str))
+            day_cells.append({
+                'date': d,
+                'date_str': d_str,
+                'is_today': (d == today),
+                'schedule': sc,
+                'status': sc.status if sc else 'UNASSIGNED',
+                'duty_zone_id': getattr(sc, 'duty_zone_id', '') if sc else '',
+                'shift_name': sc.shift_template.name if (sc and sc.shift_template) else ('Nghỉ ca' if (sc and sc.status == 'OFF') else ('Nghỉ phép' if (sc and sc.status == 'LEAVE') else 'Chưa xếp ca')),
+                'shift_color': sc.shift_template.color_code if (sc and sc.shift_template) else ('#94a3b8' if (sc and sc.status in ['OFF', 'LEAVE']) else '#cbd5e1'),
+                'is_overnight': sc.shift_template.is_overnight if (sc and sc.shift_template) else False,
+            })
+        roster_rows.append({
+            'tech': tech,
+            'profile': profile,
+            'days': day_cells
+        })
+
+    # 3. Specialized Tools & Calibration Instances
+    tools = list(Tool.objects.filter(tenant_id=tenant_id).order_by('name'))
+    tool_instances = list(
+        ToolInstance.objects.filter(tenant_id=tenant_id)
+        .select_related('tool')
+        .order_by('tool__name', 'serial_number')
+    )
+
+    total_instances = len(tool_instances)
+    passed_count = sum(1 for ti in tool_instances if ti.inspection_status == 'PASSED' and ti.status == 'AVAILABLE')
+    expired_count = sum(1 for ti in tool_instances if ti.inspection_status == 'EXPIRED' or (ti.calibration_due_date and ti.calibration_due_date < today))
+    due_soon_count = sum(1 for ti in tool_instances if ti.inspection_status == 'DUE_SOON' or (ti.calibration_due_date and 0 <= (ti.calibration_due_date - today).days <= 30 and ti.inspection_status != 'EXPIRED'))
+
+    # 4. Tool Reservations
+    reservations = list(
+        ToolReservation.objects.filter(tenant_id=tenant_id)
+        .select_related('tool', 'tool_instance', 'work_order')
+        .order_by('-reserved_at')[:50]
+    )
+
+    # 5. Locations & Zones (Master Data for Spatial & Shift Duty)
+    from assets.models import Location
+    locations = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).order_by('name'))
+    locations_data = [
+        {
+            'id': str(l.id),
+            'code': l.code,
+            'name': l.name,
+            'zone_type': l.zone_type,
+            'zone_type_display': dict(Location.ZONE_TYPE_CHOICES).get(l.zone_type, l.zone_type),
+            'floor_level': l.floor_level,
+            'center_x': l.center_x,
+            'center_y': l.center_y,
+            'description': l.description or '',
+            'has_floorplan': bool(l.floorplan_image),
+            'floorplan_image': l.floorplan_image or '',
+        }
+        for l in locations
+    ]
+
+    # Permission flags
+    can_manage_workforce = check_perm(request, ['user:update', 'tenant:update'])
+    can_manage_tools = check_perm(request, ['work_order:update', 'inventory:update'])
+
+    context = {
+        'active_tab': active_tab,
+        'skills': skills,
+        'cert_types': cert_types,
+        'shift_templates': shift_templates,
+        'roster_rows': roster_rows,
+        'days_of_week': days_of_week,
+        'base_monday': base_monday,
+        'week_offset': week_offset,
+        'today': today,
+        'tools': tools,
+        'tool_instances': tool_instances,
+        'reservations': reservations,
+        'locations': locations,
+        'locations_data': locations_data,
+        'locations_json': json.dumps(locations_data, default=str),
+        'stats': {
+            'total_tools': len(tools),
+            'total_instances': total_instances,
+            'passed_count': passed_count,
+            'expired_count': expired_count,
+            'due_soon_count': due_soon_count,
+            'active_reservations': sum(1 for r in reservations if r.status in ['RESERVED', 'IN_USE']),
+        },
+        'can_manage_workforce': can_manage_workforce,
+        'can_manage_tools': can_manage_tools,
+    }
+    return render(request, 'workforce_tools.html', context)
+
+
+@login_required(login_url='portal_login')
+def portal_workforce_skills_api(request):
+    """API for Managing Skills (Create, Update, Toggle Active)"""
+    from django.http import JsonResponse
+    import json
+    from users.models import WorkforceSkill
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['user:update', 'tenant:update']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền cập nhật danh mục kỹ năng (Yêu cầu: user:update hoặc tenant:update)'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            code = (data.get('code') or '').strip().upper()
+            name = (data.get('name') or '').strip()
+            category = (data.get('category') or 'GENERAL').strip()
+            description = (data.get('description') or '').strip()
+            is_active = bool(data.get('is_active', True))
+            skill_id = data.get('id')
+
+            if not code or not name:
+                return JsonResponse({'success': False, 'error': 'Mã và Tên kỹ năng không được để trống.'}, status=400)
+
+            if skill_id:
+                skill = WorkforceSkill.objects.filter(id=skill_id, tenant_id=tenant_id).first()
+                if not skill:
+                    return JsonResponse({'success': False, 'error': 'Kỹ năng không tồn tại.'}, status=404)
+                skill.code = code
+                skill.name = name
+                skill.category = category
+                skill.description = description
+                skill.is_active = is_active
+                skill.save()
+            else:
+                if WorkforceSkill.objects.filter(code=code, tenant_id=tenant_id).exists():
+                    return JsonResponse({'success': False, 'error': f"Mã kỹ năng '{code}' đã tồn tại trong tổ chức."}, status=400)
+                skill = WorkforceSkill.objects.create(
+                    tenant_id=tenant_id,
+                    code=code,
+                    name=name,
+                    category=category,
+                    description=description,
+                    is_active=is_active
+                )
+
+            return JsonResponse({'success': True, 'id': str(skill.id), 'code': skill.code, 'name': skill.name})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    elif request.method == 'DELETE':
+        try:
+            skill_id = request.GET.get('id')
+            skill = WorkforceSkill.objects.filter(id=skill_id, tenant_id=tenant_id).first()
+            if skill:
+                skill.delete()
+                return JsonResponse({'success': True})
+            return JsonResponse({'success': False, 'error': 'Kỹ năng không tồn tại.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_cert_types_api(request):
+    """API for Managing Certification Types"""
+    from django.http import JsonResponse
+    import json
+    from users.models import CertificationType
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['user:update', 'tenant:update']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền cập nhật danh mục chứng chỉ.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            code = (data.get('code') or '').strip().upper()
+            name = (data.get('name') or '').strip()
+            issuing_body = (data.get('issuing_body') or '').strip()
+            validity_months = int(data.get('validity_months') or 12)
+            description = (data.get('description') or '').strip()
+            is_active = bool(data.get('is_active', True))
+            cert_id = data.get('id')
+
+            if not code or not name:
+                return JsonResponse({'success': False, 'error': 'Mã và Tên chứng chỉ không được để trống.'}, status=400)
+
+            if cert_id:
+                cert = CertificationType.objects.filter(id=cert_id, tenant_id=tenant_id).first()
+                if not cert:
+                    return JsonResponse({'success': False, 'error': 'Loại chứng chỉ không tồn tại.'}, status=404)
+                cert.code = code
+                cert.name = name
+                cert.issuing_body = issuing_body
+                cert.validity_months = validity_months
+                cert.description = description
+                cert.is_active = is_active
+                cert.save()
+            else:
+                if CertificationType.objects.filter(code=code, tenant_id=tenant_id).exists():
+                    return JsonResponse({'success': False, 'error': f"Mã chứng chỉ '{code}' đã tồn tại."}, status=400)
+                cert = CertificationType.objects.create(
+                    tenant_id=tenant_id,
+                    code=code,
+                    name=name,
+                    issuing_body=issuing_body,
+                    validity_months=validity_months,
+                    description=description,
+                    is_active=is_active
+                )
+            return JsonResponse({'success': True, 'id': str(cert.id), 'code': cert.code, 'name': cert.name})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_shift_templates_api(request):
+    """API for Managing Shift Templates"""
+    from django.http import JsonResponse
+    import json
+    from users.models import ShiftTemplate
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['tenant:update', 'user:update']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền cấu hình mẫu ca trực.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            code = (data.get('code') or '').strip().upper()
+            name = (data.get('name') or '').strip()
+            start_time = data.get('start_time')
+            end_time = data.get('end_time')
+            is_overnight = bool(data.get('is_overnight', False))
+            color_code = (data.get('color_code') or '#3b82f6').strip()
+            shift_id = data.get('id')
+
+            if not code or not name or not start_time or not end_time:
+                return JsonResponse({'success': False, 'error': 'Vui lòng điền đủ Mã, Tên, Giờ bắt đầu và Giờ kết thúc.'}, status=400)
+
+            if shift_id:
+                sh = ShiftTemplate.objects.filter(id=shift_id, tenant_id=tenant_id).first()
+                if not sh:
+                    return JsonResponse({'success': False, 'error': 'Mẫu ca trực không tồn tại.'}, status=404)
+                sh.code = code
+                sh.name = name
+                sh.start_time = start_time
+                sh.end_time = end_time
+                sh.is_overnight = is_overnight
+                sh.color_code = color_code
+                sh.save()
+            else:
+                if ShiftTemplate.objects.filter(code=code, tenant_id=tenant_id).exists():
+                    return JsonResponse({'success': False, 'error': f"Mã ca trực '{code}' đã tồn tại."}, status=400)
+                sh = ShiftTemplate.objects.create(
+                    tenant_id=tenant_id,
+                    code=code,
+                    name=name,
+                    start_time=start_time,
+                    end_time=end_time,
+                    is_overnight=is_overnight,
+                    color_code=color_code,
+                    is_active=True
+                )
+            return JsonResponse({'success': True, 'id': str(sh.id), 'name': sh.name})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_schedules_api(request):
+    """API for Updating Technician Schedules on Specific Dates"""
+    from django.http import JsonResponse
+    import json
+    from users.models import TechnicianSchedule, ShiftTemplate, User
+    from datetime import datetime
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, 'user:update'):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền xếp lịch trực cho kỹ thuật viên (Yêu cầu: user:update)'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            work_date_str = data.get('work_date')
+            shift_template_id = data.get('shift_template_id')
+            status = data.get('status', 'ON_DUTY')
+            notes = data.get('notes', '')
+
+            if not user_id or not work_date_str:
+                return JsonResponse({'success': False, 'error': 'Thiếu user_id hoặc work_date.'}, status=400)
+
+            user = User.all_objects.filter(id=user_id, tenant_id=tenant_id).first()
+            if not user:
+                return JsonResponse({'success': False, 'error': 'Kỹ thuật viên không tồn tại.'}, status=404)
+
+            work_date = datetime.strptime(work_date_str, '%Y-%m-%d').date()
+            shift_template = None
+            if shift_template_id and status == 'ON_DUTY':
+                shift_template = ShiftTemplate.objects.filter(id=shift_template_id, tenant_id=tenant_id).first()
+
+            duty_zone_id = (data.get('duty_zone_id') or '').strip()
+
+            sched, created = TechnicianSchedule.objects.update_or_create(
+                tenant_id=tenant_id,
+                user=user,
+                work_date=work_date,
+                defaults={
+                    'shift_template': shift_template,
+                    'status': status,
+                    'duty_zone_id': duty_zone_id,
+                    'notes': notes
+                }
+            )
+
+            # If today, sync with technician profile
+            from django.utils import timezone
+            from datetime import timedelta
+            now = timezone.now()
+            if work_date == now.date():
+                profile = getattr(user, 'technician_profile', None)
+                if profile:
+                    if status == 'OFF':
+                        profile.is_on_duty = False
+                        profile.availability_status = 'AVAILABLE'
+                    elif status == 'LEAVE':
+                        profile.is_on_duty = False
+                        profile.availability_status = 'ON_LEAVE'
+                    elif status == 'ON_DUTY' and shift_template:
+                        profile.is_on_duty = True
+                        profile.availability_status = 'AVAILABLE'
+                        end_t = shift_template.end_time
+                        end_dt = now.replace(hour=end_t.hour, minute=end_t.minute, second=end_t.second, microsecond=0)
+                        if shift_template.is_overnight or end_dt < now:
+                            end_dt += timedelta(days=1)
+                        profile.shift_end_time = end_dt
+                        if duty_zone_id:
+                            profile.zone_id = duty_zone_id
+                    profile.save()
+
+            # Trigger real-time & mobile push notification for the technician
+            try:
+                from notifications.services import notify_technician_shift_assigned
+                notify_technician_shift_assigned(sched, actor=request.user, is_update=not created)
+            except Exception as notif_ex:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to dispatch schedule notification: {notif_ex}")
+
+            return JsonResponse({
+                'success': True,
+                'schedule_id': str(sched.id),
+                'status': sched.status,
+                'duty_zone_id': sched.duty_zone_id,
+                'shift_name': shift_template.name if shift_template else sched.status
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_locations_api(request):
+    """API for Managing Locations / Zones with Floorplan & Spatial Coordinates"""
+    from django.http import JsonResponse
+    import json
+    from assets.models import Location
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['asset:read', 'work_order:read', 'user:read']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền truy cập danh mục khu vực.'}, status=403)
+
+    if request.method == 'GET':
+        locs = Location.objects.filter(tenant_id=tenant_id, is_active=True).exclude(code__startswith='__').order_by('name')
+        data = [
+            {
+                'id': str(l.id),
+                'code': l.code,
+                'name': l.name,
+                'zone_type': l.zone_type,
+                'zone_type_display': dict(Location.ZONE_TYPE_CHOICES).get(l.zone_type, l.zone_type),
+                'parent_id': l.parent_id or '',
+                'floor_level': l.floor_level,
+                'center_x': l.center_x,
+                'center_y': l.center_y,
+                'description': l.description or '',
+                'has_floorplan': bool(l.floorplan_image),
+                'floorplan_image': l.floorplan_image or '',
+            }
+            for l in locs
+        ]
+        spatials_loc = Location.objects.filter(tenant_id=tenant_id, code='__SPATIAL_ELEMENTS__').first()
+        spatials_data = json.loads(spatials_loc.description) if (spatials_loc and spatials_loc.description) else []
+        factory_dim_loc = Location.objects.filter(tenant_id=tenant_id, code='__FACTORY_DIMENSIONS__').first()
+        factory_dim_data = json.loads(factory_dim_loc.description) if (factory_dim_loc and factory_dim_loc.description) else {}
+        return JsonResponse({
+            'success': True,
+            'data': data,
+            'spatials': spatials_data,
+            'factory_dim': factory_dim_data
+        })
+
+    if not check_perm(request, ['asset:update', 'tenant:update', 'user:update', 'asset_category:update', 'asset_category:delete', 'asset_category:create']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền quản lý khu vực.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            action = request.GET.get('action') or data.get('action')
+            if action == 'place_asset':
+                asset_id = data.get('asset_id')
+                target_loc_id = data.get('location_id')
+                cx = float(data.get('coords_x')) if data.get('coords_x') is not None else None
+                cy = float(data.get('coords_y')) if data.get('coords_y') is not None else None
+                fl = int(data.get('floor_level') or 1)
+                
+                from assets.models import Asset
+                asset_obj = Asset.objects.filter(id=asset_id, tenant_id=tenant_id).first()
+                if not asset_obj:
+                    return JsonResponse({'success': False, 'error': 'Thiết bị không tồn tại.'}, status=404)
+                
+                if target_loc_id:
+                    target_loc = Location.objects.filter(id=target_loc_id, tenant_id=tenant_id).first()
+                    if target_loc:
+                        asset_obj.location = target_loc
+                        asset_obj.zone_id = target_loc.code or target_loc.name
+                # Note: Assets must always belong to a specific location (Asset Register requirement), never set to None
+                    
+                asset_obj.coords_x = cx
+                asset_obj.coords_y = cy
+                asset_obj.floor_level = fl
+                asset_obj.save()
+                return JsonResponse({
+                    'success': True,
+                    'asset_id': str(asset_obj.id),
+                    'location_id': str(asset_obj.location_id) if asset_obj.location_id else None,
+                    'coords_x': asset_obj.coords_x,
+                    'coords_y': asset_obj.coords_y,
+                    'zone_id': asset_obj.zone_id
+                })
+
+            if action == 'update_zone_position':
+                loc_id = data.get('location_id') or data.get('id')
+                cx = float(data.get('center_x') or 0.0)
+                cy = float(data.get('center_y') or 0.0)
+                fl = int(data.get('floor_level') or 1)
+                target_loc = Location.objects.filter(id=loc_id, tenant_id=tenant_id).first()
+                if not target_loc:
+                    return JsonResponse({'success': False, 'error': 'Phân xưởng không tồn tại.'}, status=404)
+                target_loc.center_x = cx
+                target_loc.center_y = cy
+                target_loc.floor_level = fl
+                target_loc.save()
+                return JsonResponse({
+                    'success': True,
+                    'location_id': str(target_loc.id),
+                    'center_x': target_loc.center_x,
+                    'center_y': target_loc.center_y,
+                    'floor_level': target_loc.floor_level
+                })
+
+            if action == 'delete_zone':
+                loc_id = data.get('location_id') or data.get('id')
+                import uuid
+                loc = None
+                try:
+                    uuid_val = uuid.UUID(str(loc_id))
+                    loc = Location.objects.filter(id=uuid_val, tenant_id=tenant_id).first()
+                except (ValueError, TypeError):
+                    loc = None
+
+                if loc:
+                    from assets.models import Asset
+                    # Nếu yêu cầu chỉ gỡ khỏi sơ đồ (xoá toạ độ X, Y), không xoá hẳn khỏi DB
+                    if data.get('only_coords') or data.get('from_studio'):
+                        loc.center_x = None
+                        loc.center_y = None
+                        loc.save()
+                        # Đồng thời gỡ toạ độ tất cả tài sản trực thuộc khu vực này khỏi sơ đồ
+                        Asset.objects.filter(location=loc, tenant_id=tenant_id).update(coords_x=None, coords_y=None)
+                        return JsonResponse({
+                            'success': True,
+                            'message': f'Đã gỡ phân xưởng "{loc.name}" và các tài sản trực thuộc khỏi sơ đồ.'
+                        })
+
+                    # Check if there are active assets directly belonging to this workshop zone
+                    assigned_count = Asset.objects.filter(location=loc, tenant_id=tenant_id, is_active=True).count()
+                    if assigned_count > 0:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Không thể xóa phân xưởng "{loc.name}" vì đang có {assigned_count} tài sản trực thuộc. Theo quy định, mọi tài sản bắt buộc luôn phải thuộc về một kho xưởng cụ thể.'
+                        }, status=400)
+                    loc.is_active = False
+                    loc.save()
+                    return JsonResponse({
+                        'success': True,
+                        'message': f'Đã xóa phân xưởng "{loc.name}".'
+                    })
+                else:
+                    return JsonResponse({
+                        'success': True,
+                        'message': 'Đã xóa phân xưởng khỏi sơ đồ.'
+                    })
+
+            if action == 'delete_asset':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Không được phép xóa tài sản từ sơ đồ mặt bằng. Vui lòng thực hiện tại trang Danh mục tài sản (Asset Register).'
+                }, status=400)
+
+            if action == 'batch_save':
+                from assets.models import Asset
+                from django.db import transaction
+                import uuid
+                import re
+                saved_assets = 0
+                saved_zones = 0
+                new_zone_map = {}
+                with transaction.atomic():
+                    for a_item in data.get('assets', []):
+                        a_id = a_item.get('id')
+                        if not a_id:
+                            continue
+                        a_obj = None
+                        try:
+                            a_uuid = uuid.UUID(str(a_id))
+                            a_obj = Asset.objects.filter(id=a_uuid, tenant_id=tenant_id).first()
+                        except (ValueError, TypeError, Exception):
+                            a_obj = None
+
+                        if a_obj:
+                            t_loc_id = a_item.get('location_id')
+                            if t_loc_id:
+                                try:
+                                    t_loc_uuid = uuid.UUID(str(t_loc_id))
+                                    t_loc = Location.objects.filter(id=t_loc_uuid, tenant_id=tenant_id).first()
+                                except (ValueError, TypeError, Exception):
+                                    t_loc = None
+                                if t_loc:
+                                    a_obj.location = t_loc
+                                    a_obj.zone_id = t_loc.code or t_loc.name
+                            if 'coords_x' in a_item:
+                                a_obj.coords_x = float(a_item['coords_x']) if a_item['coords_x'] is not None else None
+                            if 'coords_y' in a_item:
+                                a_obj.coords_y = float(a_item['coords_y']) if a_item['coords_y'] is not None else None
+                            if 'floor_level' in a_item and a_item['floor_level'] is not None:
+                                a_obj.floor_level = int(a_item['floor_level'])
+                            a_obj.save()
+                            saved_assets += 1
+
+                    for z_item in data.get('zones', []):
+                        z_id = z_item.get('id')
+                        z_obj = None
+                        if z_id:
+                            try:
+                                z_uuid = uuid.UUID(str(z_id))
+                                z_obj = Location.objects.filter(id=z_uuid, tenant_id=tenant_id).first()
+                            except (ValueError, TypeError, Exception):
+                                z_obj = None
+
+                        if z_obj:
+                            if 'name' in z_item and z_item['name']:
+                                z_obj.name = z_item['name']
+                            if 'code' in z_item and z_item['code']:
+                                z_obj.code = z_item['code']
+                            if 'parent_id' in z_item:
+                                z_obj.parent_id = z_item['parent_id'] if z_item['parent_id'] else None
+                            if 'center_x' in z_item:
+                                z_obj.center_x = float(z_item['center_x']) if z_item['center_x'] is not None else None
+                            if 'center_y' in z_item:
+                                z_obj.center_y = float(z_item['center_y']) if z_item['center_y'] is not None else None
+                            if 'floor_level' in z_item and z_item['floor_level'] is not None:
+                                z_obj.floor_level = int(z_item['floor_level'])
+                            poly_pts = z_item.get('polygon_points')
+                            if 'width_m' in z_item and 'height_m' in z_item:
+                                w_m = float(z_item['width_m'])
+                                h_m = float(z_item['height_m'])
+                                cur_desc = z_obj.description or ''
+                                clean_desc = re.sub(r'\[DIM:[\d\.]+x[\d\.]+\]', '', cur_desc).strip()
+                                clean_desc = re.sub(r'\[POLYGON:.*?\]', '', clean_desc).strip()
+                                poly_str = f" [POLYGON:{json.dumps(poly_pts)}]" if poly_pts else ""
+                                z_obj.description = f"{clean_desc} [DIM:{w_m}x{h_m}]{poly_str}".strip()
+                            elif poly_pts:
+                                cur_desc = z_obj.description or ''
+                                clean_desc = re.sub(r'\[POLYGON:.*?\]', '', cur_desc).strip()
+                                z_obj.description = f"{clean_desc} [POLYGON:{json.dumps(poly_pts)}]".strip()
+                            z_obj.save()
+                            saved_zones += 1
+                        elif z_item.get('is_new'):
+                            new_name = z_item.get('name') or 'Phòng trống'
+                            new_code = z_item.get('code') or ('ROOM-' + str(uuid.uuid4())[:4].upper())
+                            w_m = float(z_item.get('width_m') or 36.0)
+                            h_m = float(z_item.get('height_m') or 26.0)
+                            poly_pts = z_item.get('polygon_points')
+                            poly_str = f" [POLYGON:{json.dumps(poly_pts)}]" if poly_pts else ""
+                            desc = (z_item.get('description') or 'Khu vực mặt bằng mới') + f" [DIM:{w_m}x{h_m}]{poly_str}"
+                            new_loc = Location.objects.create(
+                                tenant_id=tenant_id,
+                                name=new_name,
+                                code=new_code,
+                                parent_id=z_item.get('parent_id') or None,
+                                zone_type=z_item.get('zone_type', 'STANDARD'),
+                                floor_level=int(z_item.get('floor_level', 1)),
+                                center_x=float(z_item.get('center_x', 25.0)),
+                                center_y=float(z_item.get('center_y', 20.0)),
+                                description=desc,
+                                is_active=True
+                            )
+                            if z_id:
+                                new_zone_map[str(z_id)] = str(new_loc.id)
+                            saved_zones += 1
+
+                    # Lưu các thành phần cấu trúc không gian (Đường đi xe nâng, lối đi bộ, vách ngăn, dock...)
+                    spatials = data.get('spatials')
+                    if spatials is not None:
+                        sp_loc, _ = Location.objects.get_or_create(
+                            tenant_id=tenant_id,
+                            code='__SPATIAL_ELEMENTS__',
+                            defaults={'name': 'Spatial Layout', 'is_active': False, 'floor_level': 1}
+                        )
+                        sp_loc.description = json.dumps(spatials)
+                        sp_loc.save()
+
+                    # Lưu thông số kích thước nhà xưởng
+                    factory_dim = data.get('factory_dim')
+                    if factory_dim:
+                        fd_loc, _ = Location.objects.get_or_create(
+                            tenant_id=tenant_id,
+                            code='__FACTORY_DIMENSIONS__',
+                            defaults={'name': 'Factory Dimensions', 'is_active': False, 'floor_level': 1}
+                        )
+                        fd_loc.description = json.dumps(factory_dim)
+                        fd_loc.save()
+
+                return JsonResponse({
+                    'success': True,
+                    'saved_assets': saved_assets,
+                    'saved_zones': saved_zones,
+                    'new_zone_map': new_zone_map,
+                    'message': f'Đã lưu thành công {saved_assets} thiết bị và {saved_zones} phân xưởng.'
+                })
+
+            loc_id = data.get('id')
+            code = (data.get('code') or '').strip().upper()
+            name = (data.get('name') or '').strip()
+            zone_type = data.get('zone_type', 'STANDARD')
+            floor_level = int(data.get('floor_level') or 1)
+            center_x = float(data.get('center_x') or 0.0)
+            center_y = float(data.get('center_y') or 0.0)
+            description = (data.get('description') or '').strip()
+            floorplan_image = data.get('floorplan_image', '')
+
+            if not code or not name:
+                return JsonResponse({'success': False, 'error': 'Mã và Tên khu vực không được để trống.'}, status=400)
+
+            if loc_id:
+                loc = Location.objects.filter(id=loc_id, tenant_id=tenant_id).first()
+                if not loc:
+                    return JsonResponse({'success': False, 'error': 'Khu vực không tồn tại.'}, status=404)
+                loc.code = code
+                loc.name = name
+                loc.zone_type = zone_type
+                loc.floor_level = floor_level
+                loc.center_x = center_x
+                loc.center_y = center_y
+                loc.description = description
+                if floorplan_image is not None and floorplan_image != '':
+                    loc.floorplan_image = floorplan_image
+                loc.is_active = True
+                loc.save()
+            else:
+                existing = Location.objects.filter(code=code, tenant_id=tenant_id, is_active=True).first()
+                if existing:
+                    return JsonResponse({'success': False, 'error': f"Mã khu vực '{code}' đã tồn tại."}, status=400)
+                loc = Location.objects.create(
+                    tenant_id=tenant_id,
+                    code=code,
+                    name=name,
+                    zone_type=zone_type,
+                    floor_level=floor_level,
+                    center_x=center_x,
+                    center_y=center_y,
+                    description=description,
+                    floorplan_image=floorplan_image or '',
+                    is_active=True
+                )
+
+            return JsonResponse({'success': True, 'id': str(loc.id), 'code': loc.code, 'name': loc.name})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    elif request.method == 'DELETE':
+        try:
+            data = json.loads(request.body)
+            loc_id = data.get('id') or data.get('location_id')
+            loc = Location.objects.filter(id=loc_id, tenant_id=tenant_id).first()
+            if loc:
+                from assets.models import Asset
+                Asset.objects.filter(location=loc, tenant_id=tenant_id).update(
+                    location=None,
+                    zone_id='',
+                    coords_x=0.0,
+                    coords_y=0.0
+                )
+                loc.is_active = False
+                loc.save()
+            return JsonResponse({'success': True, 'message': 'Đã xóa phân xưởng và giải phóng thiết bị thành công.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_tools_api(request):
+    """API for Managing Specialized Tools"""
+    from django.http import JsonResponse
+    import json
+    from assets.models import Tool
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['work_order:update', 'inventory:update']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền quản lý công cụ chuyên dụng.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            code = (data.get('code') or '').strip().upper()
+            name = (data.get('name') or '').strip()
+            qty = int(data.get('available_quantity') or 1)
+            tool_id = data.get('id')
+
+            if not code or not name:
+                return JsonResponse({'success': False, 'error': 'Mã và Tên công cụ không được để trống.'}, status=400)
+
+            if tool_id:
+                tool = Tool.objects.filter(id=tool_id, tenant_id=tenant_id).first()
+                if not tool:
+                    return JsonResponse({'success': False, 'error': 'Công cụ không tồn tại.'}, status=404)
+                tool.code = code
+                tool.name = name
+                tool.available_quantity = qty
+                tool.save()
+            else:
+                if Tool.objects.filter(code=code, tenant_id=tenant_id).exists():
+                    return JsonResponse({'success': False, 'error': f"Mã công cụ '{code}' đã tồn tại."}, status=400)
+                tool = Tool.objects.create(
+                    tenant_id=tenant_id,
+                    code=code,
+                    name=name,
+                    available_quantity=qty,
+                    is_active=True
+                )
+            return JsonResponse({'success': True, 'id': str(tool.id), 'code': tool.code, 'name': tool.name})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_tool_instances_api(request):
+    """API for Managing Tool Instances (Serial Numbers & Calibration)"""
+    from django.http import JsonResponse
+    import json
+    from assets.models import Tool, ToolInstance
+    from datetime import datetime
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['work_order:update', 'inventory:update']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền cập nhật serial/hiệu chuẩn công cụ.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            tool_id = data.get('tool_id')
+            serial_number = (data.get('serial_number') or '').strip()
+            asset_tag = (data.get('asset_tag') or '').strip()
+            cal_date_str = data.get('calibration_date')
+            due_date_str = data.get('calibration_due_date')
+            inspection_status = data.get('inspection_status', 'PASSED')
+            status = data.get('status', 'AVAILABLE')
+            notes = data.get('notes', '')
+            instance_id = data.get('id')
+
+            if not tool_id or not serial_number:
+                return JsonResponse({'success': False, 'error': 'Vui lòng chọn công cụ cha và nhập số Serial.'}, status=400)
+
+            tool = Tool.objects.filter(id=tool_id, tenant_id=tenant_id).first()
+            if not tool:
+                return JsonResponse({'success': False, 'error': 'Công cụ cha không tồn tại.'}, status=404)
+
+            cal_date = datetime.strptime(cal_date_str, '%Y-%m-%d').date() if cal_date_str else None
+            due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date() if due_date_str else None
+
+            if instance_id:
+                inst = ToolInstance.objects.filter(id=instance_id, tenant_id=tenant_id).first()
+                if not inst:
+                    return JsonResponse({'success': False, 'error': 'Thiết bị không tồn tại.'}, status=404)
+                inst.tool = tool
+                inst.serial_number = serial_number
+                inst.asset_tag = asset_tag
+                inst.calibration_date = cal_date
+                inst.calibration_due_date = due_date
+                inst.inspection_status = inspection_status
+                inst.status = status
+                inst.notes = notes
+                inst.save()
+            else:
+                if ToolInstance.objects.filter(tool=tool, serial_number=serial_number, tenant_id=tenant_id).exists():
+                    return JsonResponse({'success': False, 'error': f"Serial '{serial_number}' đã tồn tại cho công cụ này."}, status=400)
+                inst = ToolInstance.objects.create(
+                    tenant_id=tenant_id,
+                    tool=tool,
+                    serial_number=serial_number,
+                    asset_tag=asset_tag,
+                    calibration_date=cal_date,
+                    calibration_due_date=due_date,
+                    inspection_status=inspection_status,
+                    status=status,
+                    notes=notes
+                )
+            return JsonResponse({'success': True, 'id': str(inst.id), 'serial': inst.serial_number})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_tool_reservations_api(request):
+    """API for Managing Tool Reservations (Mark Returned, Cancel)"""
+    from django.http import JsonResponse
+    import json
+    from assets.models import ToolReservation
+    from django.utils import timezone
+    from django.db import transaction
+
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
+    if not check_perm(request, ['work_order:update', 'inventory:update']):
+        return JsonResponse({'success': False, 'error': 'Bạn không có quyền quản lý cấp phát công cụ.'}, status=403)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            res_id = data.get('id')
+            action = data.get('action', 'RETURN')  # 'RETURN' or 'CANCEL'
+
+            with transaction.atomic():
+                res = ToolReservation.objects.select_for_update().filter(id=res_id, tenant_id=tenant_id).first()
+                if not res:
+                    return JsonResponse({'success': False, 'error': 'Bản ghi giữ chỗ không tồn tại.'}, status=404)
+
+                tool = res.tool
+                if action == 'RETURN' and res.status in ['RESERVED', 'IN_USE']:
+                    res.status = 'RETURNED'
+                    res.returned_at = timezone.now()
+                    res.save()
+                    # Increment tool available quantity
+                    tool.available_quantity = tool.available_quantity + res.reserved_quantity
+                    tool.save()
+                elif action == 'CANCEL' and res.status == 'RESERVED':
+                    res.status = 'CANCELLED'
+                    res.returned_at = timezone.now()
+                    res.save()
+                    tool.available_quantity = tool.available_quantity + res.reserved_quantity
+                    tool.save()
+
+            return JsonResponse({'success': True, 'status': res.status})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
 
 
 

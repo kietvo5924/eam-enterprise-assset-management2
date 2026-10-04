@@ -29,6 +29,7 @@ Trợ lý RAG đóng vai trò là "Kỹ sư trưởng ảo" đồng hành cùng 
   - `WorkOrder`: Vector hóa toàn bộ các ghi chú giải quyết sự cố (`resolution_notes`) của các phiếu đã hoàn thành để biến thành nguồn tri thức ngầm; hỗ trợ nút tạo nhanh bản thảo Work Order từ đoạn chat.
   - `SparePart`: Liên kết trực tiếp kiểm tra tồn kho và vị trí kệ chứa của các phụ tùng được nhắc tới trong quy trình.
 - **Bảo Mật Dữ Liệu Công Nghệ (On-Premises LLM)**: Tuyệt đối không gửi tài liệu bí mật công nghệ hoặc dữ liệu vận hành nhà máy lên các API đám mây công cộng (OpenAI, Claude, v.v.). Hệ thống bắt buộc chạy mô hình mã nguồn mở trên máy chủ nội bộ thông qua dịch vụ Ollama cục bộ (`temperature = 0.1`).
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn trợ lý kỹ thuật AI RAG (bộ lọc ngắt an toàn sinh mạng Emergency Interceptor, kiểm định mâu thuẫn phủ định Negation Contradiction Check, pipeline sinh embeddings và truy xuất PGVector đa nguồn, client kết nối Ollama on-premises, và bộ lọc tiếng lóng chuyên ngành bảo trì) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/rag_chatbot/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật AI RAG khỏi các tầng controller/CRUD thông thường.
 
 ---
 

@@ -1,0 +1,1286 @@
+{% extends "base.html" %}
+
+{% block title %}Workforce & Tools - EAM System{% endblock %}
+{% block breadcrumb %}Workspace / Workforce & Tools{% endblock %}
+
+{% block content %}
+<div class="bg-transparent h-full flex flex-col space-y-6">
+
+  <!-- Header Banner -->
+  <div class="bg-white backdrop-blur-2xl p-6 md:p-8 rounded-3xl border border-neutral-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
+    <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
+
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
+      <div class="flex items-center gap-5">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500/10 to-primary-600/20 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.25)] border border-primary-200 transform rotate-6 group-hover:-rotate-6 group-hover:scale-110 transition duration-500">
+          <i class="ph-fill ph-toolbox text-3xl drop-shadow-sm"></i>
+        </div>
+        <div>
+          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 tracking-tight m-0 drop-shadow-sm">
+            Tài nguyên & Công cụ Bảo trì
+          </h2>
+          <p class="text-neutral-500 text-sm md:text-base font-medium mt-1 mb-0 flex items-center gap-2">
+            <i class="ph-fill ph-check-circle text-emerald-500"></i>
+            Quản lý kỹ năng KTV, lịch phân ca trực ngày, định danh serial & theo dõi kiểm định thiết bị đo kiểm.
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex flex-wrap items-center gap-3">
+        {% if can_manage_workforce %}
+        <button onclick="openSkillModal()" class="rounded-xl h-10 px-4 bg-white hover:bg-neutral-50 border border-neutral-300 font-bold text-neutral-700 flex items-center gap-2 text-sm shadow-sm transition hover:scale-105">
+          <i class="ph ph-plus-circle text-primary text-base"></i> Thêm Kỹ năng
+        </button>
+        <button onclick="openShiftModal()" class="rounded-xl h-10 px-4 bg-white hover:bg-neutral-50 border border-neutral-300 font-bold text-neutral-700 flex items-center gap-2 text-sm shadow-sm transition hover:scale-105">
+          <i class="ph ph-clock text-amber-600 text-base"></i> Thêm Mẫu ca
+        </button>
+        {% endif %}
+        {% if can_manage_tools %}
+        <button onclick="openToolInstanceModal()" class="rounded-xl h-10 px-5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-0.5 font-bold text-white flex items-center gap-2 text-sm hover:scale-105">
+          <i class="ph ph-wrench font-bold"></i> Thêm Thiết bị Serial
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 shrink-0">
+    <!-- Card 1: Skills & Certs -->
+    <div class="bg-gradient-to-br from-white to-sky-50/50 rounded-2xl p-5 border border-sky-100 shadow-sm hover:shadow-md transition group">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-xs font-bold text-sky-700 uppercase tracking-wider mb-1">Chuyên môn & Bằng cấp</p>
+          <h3 class="text-2xl font-black text-neutral-900 m-0">{{ skills|length }} <span class="text-sm font-medium text-neutral-500">Skills / {{ cert_types|length }} Certs</span></h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-certificate"></i>
+        </div>
+      </div>
+      <p class="text-xs text-neutral-500 mt-3 mb-0 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-sky-500"></span> Đa ngành nghề: Điện, Cơ khí, Tự động hóa
+      </p>
+    </div>
+
+    <!-- Card 2: Shifts & Roster -->
+    <div class="bg-gradient-to-br from-white to-indigo-50/50 rounded-2xl p-5 border border-indigo-100 shadow-sm hover:shadow-md transition group">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1">Ca trực & Lịch phân ca</p>
+          <h3 class="text-2xl font-black text-neutral-900 m-0">{{ shift_templates|length }} <span class="text-sm font-medium text-neutral-500">Mẫu ca / {{ roster_rows|length }} KTV</span></h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-calendar-check"></i>
+        </div>
+      </div>
+      <p class="text-xs text-neutral-500 mt-3 mb-0 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-indigo-500"></span> Hỗ trợ ca đêm qua ngày
+      </p>
+    </div>
+
+    <!-- Card 3: Specialized Tools -->
+    <div class="bg-gradient-to-br from-white to-emerald-50/50 rounded-2xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition group">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">Dụng cụ & Máy đo kiểm</p>
+          <h3 class="text-2xl font-black text-neutral-900 m-0">{{ stats.total_instances }} <span class="text-sm font-medium text-neutral-500">máy - {{ stats.passed_count }} Đạt</span></h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-gauge"></i>
+        </div>
+      </div>
+      <p class="text-xs text-neutral-500 mt-3 mb-0 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> {{ stats.total_tools }} dòng chủng loại thiết bị
+      </p>
+    </div>
+
+    <!-- Card 4: Calibration Alert & Reservations -->
+    <div class="bg-gradient-to-br from-white {% if stats.expired_count > 0 %}to-rose-50/60 border-rose-200{% else %}to-amber-50/60 border-amber-200{% endif %} rounded-2xl p-5 border shadow-sm hover:shadow-md transition group">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-xs font-bold {% if stats.expired_count > 0 %}text-rose-700{% else %}text-amber-700{% endif %} uppercase tracking-wider mb-1">Cảnh báo Kiểm định & Giữ chỗ</p>
+          <h3 class="text-2xl font-black {% if stats.expired_count > 0 %}text-rose-600{% else %}text-neutral-900{% endif %} m-0">
+            {{ stats.expired_count }} <span class="text-sm font-medium text-neutral-500">Hết hạn / {{ stats.active_reservations }} Giữ chỗ</span>
+          </h3>
+        </div>
+        <div class="w-12 h-12 rounded-xl {% if stats.expired_count > 0 %}bg-rose-100 text-rose-600 animate-pulse{% else %}bg-amber-100 text-amber-600{% endif %} flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+          <i class="ph-fill ph-warning-circle"></i>
+        </div>
+      </div>
+      <p class="text-xs {% if stats.expired_count > 0 %}text-rose-600 font-semibold{% else %}text-neutral-500{% endif %} mt-3 mb-0 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full {% if stats.expired_count > 0 %}bg-rose-500{% else %}bg-amber-500{% endif %}"></span>
+        {% if stats.expired_count > 0 %}Có thiết bị quá hạn hiệu chuẩn cần xử lý!{% else %}Tất cả thiết bị trong hạn an toàn{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Unified Tab Bar -->
+  <div class="bg-white rounded-2xl p-2 border border-neutral-200/80 shadow-sm flex items-center gap-2 overflow-x-auto shrink-0">
+    <button onclick="switchTab('skills')" id="tab-btn-skills" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all duration-200 {% if active_tab == 'skills' %}bg-primary text-white shadow-md shadow-primary/25{% else %}text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900{% endif %}">
+      <i class="ph ph-graduation-cap text-lg"></i>
+      <span>1. Kỹ năng & Chứng chỉ</span>
+      <span class="px-2 py-0.5 rounded-full text-xs {% if active_tab == 'skills' %}bg-white/20 text-white{% else %}bg-neutral-100 text-neutral-600{% endif %}">{{ skills|length }}</span>
+    </button>
+
+    <button onclick="switchTab('roster')" id="tab-btn-roster" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all duration-200 {% if active_tab == 'roster' %}bg-primary text-white shadow-md shadow-primary/25{% else %}text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900{% endif %}">
+      <i class="ph ph-calendar text-lg"></i>
+      <span>2. Ca trực & Bảng xếp ca</span>
+      <span class="px-2 py-0.5 rounded-full text-xs {% if active_tab == 'roster' %}bg-white/20 text-white{% else %}bg-neutral-100 text-neutral-600{% endif %}">{{ roster_rows|length }} KTV</span>
+    </button>
+
+    <button onclick="switchTab('tools')" id="tab-btn-tools" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all duration-200 {% if active_tab == 'tools' %}bg-primary text-white shadow-md shadow-primary/25{% else %}text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900{% endif %}">
+      <i class="ph ph-wrench text-lg"></i>
+      <span>3. Dụng cụ & Kiểm định Serial</span>
+      <span class="px-2 py-0.5 rounded-full text-xs {% if active_tab == 'tools' %}bg-white/20 text-white{% else %}bg-neutral-100 text-neutral-600{% endif %}">{{ stats.total_instances }}</span>
+    </button>
+
+    <button onclick="switchTab('reservations')" id="tab-btn-reservations" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all duration-200 {% if active_tab == 'reservations' %}bg-primary text-white shadow-md shadow-primary/25{% else %}text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900{% endif %}">
+      <i class="ph ph-clock-countdown text-lg"></i>
+      <span>4. Nhật ký Giữ chỗ Lệnh</span>
+    </button>
+  </div>
+
+  <!-- TAB 1: KỸ NĂNG & CHỨNG CHỈ -->
+  <div id="tab-content-skills" class="tab-pane {% if active_tab != 'skills' %}hidden{% endif %} flex-1">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Card Kỹ Năng -->
+      <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-neutral-50/50 to-white">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-lg font-bold">
+              <i class="ph-fill ph-gear-six"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-neutral-900 text-base m-0">Kỹ năng Chuyên môn</h4>
+              <p class="text-xs text-neutral-500 m-0">Danh mục kỹ năng động theo đặc thù Tenant</p>
+            </div>
+          </div>
+          {% if can_manage_workforce %}
+          <button onclick="openSkillModal()" class="px-3.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="ph ph-plus font-bold"></i> Thêm kỹ năng
+          </button>
+          {% endif %}
+        </div>
+
+        <div class="overflow-x-auto flex-1">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
+              <tr>
+                <th class="py-3 px-4">Mã</th>
+                <th class="py-3 px-4">Tên kỹ năng</th>
+                <th class="py-3 px-4">Phân nhóm</th>
+                <th class="py-3 px-4 text-center">Trạng thái</th>
+                <th class="py-3 px-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-100 text-neutral-700">
+              {% for s in skills %}
+              <tr class="hover:bg-neutral-50/80 transition group">
+                <td class="py-3 px-4 font-mono font-bold text-xs text-sky-700">{{ s.code }}</td>
+                <td class="py-3 px-4 font-semibold text-neutral-900">{{ s.name }}</td>
+                <td class="py-3 px-4">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700 border border-neutral-200">
+                    {{ s.category }}
+                  </span>
+                </td>
+                <td class="py-3 px-4 text-center">
+                  {% if s.is_active %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Hoạt động
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-500">
+                    <span class="w-1.5 h-1.5 rounded-full bg-neutral-400"></span> Khóa
+                  </span>
+                  {% endif %}
+                </td>
+                <td class="py-3 px-4 text-right">
+                  {% if can_manage_workforce %}
+                  <button onclick="editSkill('{{ s.id }}', '{{ s.code }}', '{{ s.name|escapejs }}', '{{ s.category|escapejs }}', '{{ s.description|escapejs }}', {{ s.is_active|yesno:'true,false' }})" class="p-1.5 rounded-lg text-neutral-400 hover:text-sky-600 hover:bg-sky-50 transition" title="Chỉnh sửa">
+                    <i class="ph ph-pencil-simple text-base"></i>
+                  </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="py-8 text-center text-neutral-400">Chưa có kỹ năng nào được cấu hình.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Card Chứng Chỉ -->
+      <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col">
+        <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-neutral-50/50 to-white">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg font-bold">
+              <i class="ph-fill ph-certificate"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-neutral-900 text-base m-0">Chứng chỉ & Bằng cấp</h4>
+              <p class="text-xs text-neutral-500 m-0">Tiêu chuẩn an toàn và chứng chỉ hành nghề bắt buộc</p>
+            </div>
+          </div>
+          {% if can_manage_workforce %}
+          <button onclick="openCertModal()" class="px-3.5 py-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="ph ph-plus font-bold"></i> Thêm chứng chỉ
+          </button>
+          {% endif %}
+        </div>
+
+        <div class="overflow-x-auto flex-1">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
+              <tr>
+                <th class="py-3 px-4">Mã</th>
+                <th class="py-3 px-4">Tên chứng chỉ</th>
+                <th class="py-3 px-4">Cơ quan cấp</th>
+                <th class="py-3 px-4 text-center">Thời hạn</th>
+                <th class="py-3 px-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-100 text-neutral-700">
+              {% for c in cert_types %}
+              <tr class="hover:bg-neutral-50/80 transition group">
+                <td class="py-3 px-4 font-mono font-bold text-xs text-purple-700">{{ c.code }}</td>
+                <td class="py-3 px-4 font-semibold text-neutral-900">{{ c.name }}</td>
+                <td class="py-3 px-4 text-xs text-neutral-500">{{ c.issuing_body|default:"Nội bộ / Tổng cục" }}</td>
+                <td class="py-3 px-4 text-center">
+                  {% if c.validity_months > 0 %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                    {{ c.validity_months }} tháng
+                  </span>
+                  {% else %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-600">
+                    Vô thời hạn
+                  </span>
+                  {% endif %}
+                </td>
+                <td class="py-3 px-4 text-right">
+                  {% if can_manage_workforce %}
+                  <button onclick="editCert('{{ c.id }}', '{{ c.code }}', '{{ c.name|escapejs }}', '{{ c.issuing_body|escapejs }}', {{ c.validity_months }}, '{{ c.description|escapejs }}', {{ c.is_active|yesno:'true,false' }})" class="p-1.5 rounded-lg text-neutral-400 hover:text-purple-600 hover:bg-purple-50 transition" title="Chỉnh sửa">
+                    <i class="ph ph-pencil-simple text-base"></i>
+                  </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="py-8 text-center text-neutral-400">Chưa có loại chứng chỉ nào được cấu hình.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TAB 2: CA TRỰC & BẢNG XẾP CA (ROSTER) -->
+  <div id="tab-content-roster" class="tab-pane {% if active_tab != 'roster' %}hidden{% endif %} flex-1 flex flex-col space-y-6">
+    
+    <!-- Khung ca trực sẵn có -->
+    <div class="bg-white rounded-2xl p-5 border border-neutral-200/80 shadow-sm">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div>
+          <h4 class="font-bold text-neutral-900 text-base m-0 flex items-center gap-2">
+            <i class="ph-fill ph-clock text-amber-500"></i> Định nghĩa Khung ca làm việc
+          </h4>
+          <p class="text-xs text-neutral-500 m-0 mt-0.5">Khung giờ chuẩn được động cơ Hungarian đối chiếu để tính phạt tăng ca hoặc ca đêm qua ngày</p>
+        </div>
+        {% if can_manage_workforce %}
+        <button onclick="openShiftModal()" class="px-3.5 py-1.5 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold text-xs flex items-center gap-1.5 transition">
+          <i class="ph ph-plus font-bold"></i> Thêm khung ca mới
+        </button>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {% for sh in shift_templates %}
+        <div class="p-4 rounded-xl border border-neutral-200 hover:border-neutral-300 transition bg-neutral-50/50 flex flex-col justify-between relative overflow-hidden group">
+          <div class="absolute top-0 left-0 w-1.5 h-full" style="background-color: {{ sh.color_code }};"></div>
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="font-mono text-xs font-extrabold text-neutral-500">{{ sh.code }}</span>
+              {% if sh.is_overnight %}
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 flex items-center gap-1">
+                <i class="ph ph-moon"></i> Qua đêm
+              </span>
+              {% endif %}
+            </div>
+            <h5 class="font-bold text-neutral-900 text-sm mt-1 mb-2">{{ sh.name }}</h5>
+            <div class="flex items-center gap-2 text-xs font-bold text-neutral-700">
+              <i class="ph ph-clock"></i>
+              <span>{{ sh.start_time|time:"H:i" }} — {{ sh.end_time|time:"H:i" }}</span>
+            </div>
+          </div>
+          {% if can_manage_workforce %}
+          <div class="mt-3 pt-2 border-t border-neutral-200/60 flex justify-end">
+            <button onclick="editShift('{{ sh.id }}', '{{ sh.code }}', '{{ sh.name|escapejs }}', '{{ sh.start_time|time:'H:i' }}', '{{ sh.end_time|time:'H:i' }}', {{ sh.is_overnight|yesno:'true,false' }}, '{{ sh.color_code }}')" class="text-xs text-neutral-500 hover:text-primary font-semibold flex items-center gap-1">
+              <i class="ph ph-pencil"></i> Sửa
+            </button>
+          </div>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div class="col-span-4 py-4 text-center text-neutral-400 text-sm">Chưa có mẫu ca trực nào.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Ma trận Lịch phân ca (Roster Matrix) -->
+    <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col flex-1">
+      <div class="p-5 border-b border-neutral-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-neutral-50/50 to-white">
+        <div>
+          <h4 class="font-bold text-neutral-900 text-base m-0 flex items-center gap-2">
+            <i class="ph-fill ph-calendar-blank text-primary"></i> Bảng Lịch phân ca Tuần
+          </h4>
+          <p class="text-xs text-neutral-500 m-0 mt-0.5">Click vào ô ca trực của KTV để đổi ca hoặc đặt trạng thái Nghỉ ca hoặc Nghỉ phép</p>
+        </div>
+
+        <!-- Week Navigation -->
+        <div class="flex items-center gap-2">
+          <a href="?tab=roster&week_offset={{ week_offset|add:'-1' }}" class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-600 hover:bg-neutral-100 transition" title="Tuần trước">
+            <i class="ph ph-caret-left"></i>
+          </a>
+          <span class="px-3 py-1.5 rounded-lg bg-neutral-100 font-bold text-xs text-neutral-800">
+            {{ base_monday|date:"d/m" }} — {{ days_of_week.6|date:"d/m/Y" }}
+            {% if week_offset == 0 %}<span class="ml-1 text-primary">Tuần hiện tại</span>{% endif %}
+          </span>
+          <a href="?tab=roster&week_offset={{ week_offset|add:'1' }}" class="w-8 h-8 rounded-lg border border-neutral-200 flex items-center justify-center text-neutral-600 hover:bg-neutral-100 transition" title="Tuần sau">
+            <i class="ph ph-caret-right"></i>
+          </a>
+          {% if week_offset != 0 %}
+          <a href="?tab=roster&week_offset=0" class="ml-2 text-xs font-bold text-primary hover:underline">Hôm nay</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="overflow-x-auto flex-1">
+        <table class="w-full text-left text-sm border-collapse min-w-[800px]">
+          <thead class="bg-neutral-50 text-neutral-600 font-bold text-xs uppercase border-b border-neutral-200">
+            <tr>
+              <th class="py-3.5 px-4 w-60">Kỹ thuật viên</th>
+              {% for d in days_of_week %}
+              <th class="py-3.5 px-3 text-center {% if d == today %}bg-primary-50/60 text-primary border-b-2 border-primary{% endif %}">
+                <div class="font-extrabold">{{ d|date:"D" }}</div>
+                <div class="text-[11px] font-normal opacity-80">{{ d|date:"d/m" }}</div>
+              </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100 text-neutral-700">
+            {% for row in roster_rows %}
+            <tr class="hover:bg-neutral-50/60 transition {% if row.tech.id == request.user.id %}bg-primary-50/40 border-l-4 border-primary font-semibold{% endif %}">
+              <!-- Cột KTV -->
+              <td class="py-3 px-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-primary-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                    {{ row.tech.first_name|default:row.tech.username|slice:":2"|upper }}
+                  </div>
+                  <div>
+                    <div class="font-bold text-neutral-900 text-xs md:text-sm flex items-center gap-1.5">
+                      <span>{{ row.tech.get_full_name|default:row.tech.username }}</span>
+                      {% if row.tech.id == request.user.id %}
+                      <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-primary text-white shadow-xs">Bạn</span>
+                      {% endif %}
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[11px] text-neutral-400">
+                      <span class="font-semibold text-sky-700">Bậc {{ row.profile.skill_level|default:1 }}</span>
+                      <span>•</span>
+                      <span>{{ row.profile.zone_id|default:"Tự do" }}</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- 7 Cột Ngày -->
+              {% for cell in row.days %}
+              <td class="py-2 px-2 text-center {% if cell.is_today %}bg-primary-50/20{% endif %}">
+                <div onclick="openScheduleModal('{{ row.tech.id }}', '{{ row.tech.get_full_name|default:row.tech.username|escapejs }}', '{{ cell.date_str }}', '{{ cell.schedule.shift_template_id|default:'' }}', '{{ cell.status }}', '{{ cell.duty_zone_id|default:''|escapejs }}')"
+                     class="cursor-pointer p-2 rounded-xl border transition transform hover:scale-105 select-none
+                            {% if cell.status == 'ON_DUTY' %}border-neutral-200 bg-white shadow-sm hover:shadow
+                            {% elif cell.status == 'OFF' %}border-slate-200 bg-slate-50 text-slate-500
+                            {% elif cell.status == 'LEAVE' %}border-amber-200 bg-amber-50 text-amber-700
+                            {% else %}border-dashed border-neutral-300 hover:border-primary text-neutral-400 hover:text-primary{% endif %}">
+                  
+                  {% if cell.status == 'ON_DUTY' %}
+                    <div class="flex items-center justify-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full" style="background-color: {{ cell.shift_color }};"></span>
+                      <span class="font-bold text-xs text-neutral-800">{{ cell.shift_name }}</span>
+                    </div>
+                    {% if cell.duty_zone_id %}
+                    <div class="mt-1 flex items-center justify-center">
+                      <span class="inline-flex items-center gap-1 text-[10px] text-primary-700 font-bold bg-primary-50 px-1.5 py-0.5 rounded border border-primary/20 max-w-[110px] truncate" title="Khu vực trực: {{ cell.duty_zone_id }}">
+                        <i class="ph ph-map-pin"></i> {{ cell.duty_zone_id }}
+                      </span>
+                    </div>
+                    {% endif %}
+                    {% if cell.is_overnight %}
+                    <span class="text-[9px] text-indigo-600 block mt-0.5">Qua đêm</span>
+                    {% endif %}
+                  {% elif cell.status == 'OFF' %}
+                    <span class="text-xs font-semibold text-slate-500 flex items-center justify-center gap-1">
+                      <i class="ph ph-prohibit"></i> Nghỉ ca
+                    </span>
+                  {% elif cell.status == 'LEAVE' %}
+                    <span class="text-xs font-semibold text-amber-700 flex items-center justify-center gap-1">
+                      <i class="ph ph-airplane-tilt"></i> Nghỉ phép
+                    </span>
+                  {% else %}
+                    <span class="text-xs text-neutral-400 hover:text-primary font-medium flex items-center justify-center gap-1">
+                      <i class="ph ph-plus"></i> Xếp ca
+                    </span>
+                  {% endif %}
+                </div>
+              </td>
+              {% endfor %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-10 text-center text-neutral-400">Chưa có kỹ thuật viên nào trong tổ chức.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: DỤNG CỤ & KIỂM ĐỊNH SERIAL -->
+  <div id="tab-content-tools" class="tab-pane {% if active_tab != 'tools' %}hidden{% endif %} flex-1 flex flex-col space-y-6">
+    <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col flex-1">
+      <div class="p-5 border-b border-neutral-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-neutral-50/50 to-white">
+        <div>
+          <h4 class="font-bold text-neutral-900 text-base m-0 flex items-center gap-2">
+            <i class="ph-fill ph-wrench text-emerald-600"></i> Danh mục Dụng cụ & Máy đo kiểm chuyên dụng
+          </h4>
+          <p class="text-xs text-neutral-500 m-0 mt-0.5">Quản lý từng thiết bị theo Serial, ngày hiệu chuẩn gần nhất và thời hạn kiểm định định kỳ</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          {% if can_manage_tools %}
+          <button onclick="openToolModal()" class="px-3.5 py-1.5 rounded-xl border border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-bold text-xs flex items-center gap-1.5 transition">
+            <i class="ph ph-plus-circle text-primary"></i> Thêm Chủng loại công cụ
+          </button>
+          <button onclick="openToolInstanceModal()" class="px-3.5 py-1.5 rounded-xl bg-primary text-white hover:bg-primary-600 font-bold text-xs flex items-center gap-1.5 transition shadow-sm">
+            <i class="ph ph-plus font-bold"></i> Thêm Serial Thiết bị
+          </button>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Table Tool Instances -->
+      <div class="overflow-x-auto flex-1">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
+            <tr>
+              <th class="py-3 px-4">Chủng loại công cụ</th>
+              <th class="py-3 px-4">Serial Number</th>
+              <th class="py-3 px-4">Mã tài sản</th>
+              <th class="py-3 px-4">Ngày hiệu chuẩn</th>
+              <th class="py-3 px-4">Hạn kiểm định</th>
+              <th class="py-3 px-4 text-center">Tình trạng kiểm định</th>
+              <th class="py-3 px-4 text-center">Trạng thái kho</th>
+              <th class="py-3 px-4 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100 text-neutral-700">
+            {% for inst in tool_instances %}
+            <tr class="hover:bg-neutral-50/80 transition group">
+              <!-- Công cụ cha -->
+              <td class="py-3.5 px-4 font-semibold text-neutral-900">
+                <div>{{ inst.tool.name }}</div>
+                <div class="font-mono text-xs text-sky-700 font-bold">{{ inst.tool.code }}</div>
+              </td>
+              <!-- Serial -->
+              <td class="py-3.5 px-4 font-mono font-bold text-neutral-800">{{ inst.serial_number }}</td>
+              <!-- Asset Tag -->
+              <td class="py-3.5 px-4 text-xs text-neutral-500">{{ inst.asset_tag|default:"—" }}</td>
+              <!-- Ngày hiệu chuẩn -->
+              <td class="py-3.5 px-4 text-xs text-neutral-600">{{ inst.calibration_date|date:"d/m/Y"|default:"Chưa ghi nhận" }}</td>
+              <!-- Hạn hiệu chuẩn -->
+              <td class="py-3.5 px-4 text-xs font-semibold {% if inst.inspection_status == 'EXPIRED' %}text-rose-600{% else %}text-neutral-800{% endif %}">
+                {{ inst.calibration_due_date|date:"d/m/Y"|default:"Vô thời hạn" }}
+              </td>
+              <!-- Tình trạng kiểm định -->
+              <td class="py-3.5 px-4 text-center">
+                {% if inst.inspection_status == 'PASSED' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Đạt chuẩn
+                </span>
+                {% elif inst.inspection_status == 'DUE_SOON' %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Sắp đến hạn
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+                  <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Quá hạn kiểm định
+                </span>
+                {% endif %}
+              </td>
+              <!-- Trạng thái sử dụng -->
+              <td class="py-3.5 px-4 text-center">
+                {% if inst.status == 'AVAILABLE' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-700">Khả dụng</span>
+                {% elif inst.status == 'IN_USE' %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700">Đang xuất dùng</span>
+                {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700">Bảo dưỡng</span>
+                {% endif %}
+              </td>
+              <!-- Thao tác -->
+              <td class="py-3.5 px-4 text-right">
+                {% if can_manage_tools %}
+                <button onclick="editToolInstance('{{ inst.id }}', '{{ inst.tool_id }}', '{{ inst.serial_number|escapejs }}', '{{ inst.asset_tag|escapejs }}', '{{ inst.calibration_date|date:'Y-m-d'|default:'' }}', '{{ inst.calibration_due_date|date:'Y-m-d'|default:'' }}', '{{ inst.inspection_status }}', '{{ inst.status }}', '{{ inst.notes|escapejs }}')" class="p-1.5 rounded-lg text-neutral-400 hover:text-emerald-600 hover:bg-emerald-50 transition" title="Chỉnh sửa / Cập nhật hiệu chuẩn">
+                  <i class="ph ph-pencil-simple text-base"></i>
+                </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="py-10 text-center text-neutral-400">Chưa có thiết bị đo kiểm nào có số serial.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: NHẬT KÝ GIỮ CHỖ LỆNH BẢO TRÌ (TOOL RESERVATIONS) -->
+  <div id="tab-content-reservations" class="tab-pane {% if active_tab != 'reservations' %}hidden{% endif %} flex-1 flex flex-col space-y-6">
+    <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col flex-1">
+      <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-neutral-50/50 to-white">
+        <div>
+          <h4 class="font-bold text-neutral-900 text-base m-0 flex items-center gap-2">
+            <i class="ph-fill ph-clock-countdown text-indigo-600"></i> Nhật ký Giữ chỗ & Cấp phát Công cụ
+          </h4>
+          <p class="text-xs text-neutral-500 m-0 mt-0.5">Theo dõi các công cụ đã được khóa cho Work Order và thực hiện hoàn trả về kho</p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto flex-1">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
+            <tr>
+              <th class="py-3 px-4">Lệnh bảo trì</th>
+              <th class="py-3 px-4">Công cụ đã giữ chỗ</th>
+              <th class="py-3 px-4">Số lượng</th>
+              <th class="py-3 px-4">Thiết bị Serial</th>
+              <th class="py-3 px-4">Thời điểm đặt</th>
+              <th class="py-3 px-4 text-center">Trạng thái</th>
+              <th class="py-3 px-4 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-100 text-neutral-700">
+            {% for res in reservations %}
+            <tr class="hover:bg-neutral-50/80 transition">
+              <td class="py-3.5 px-4 font-semibold text-neutral-900">
+                <a href="{% url 'portal_work_orders' %}?q={{ res.work_order.code }}" class="text-primary hover:underline font-mono font-bold">
+                  {{ res.work_order.code }}
+                </a>
+                <div class="text-xs text-neutral-500 truncate max-w-xs">{{ res.work_order.title }}</div>
+              </td>
+              <td class="py-3.5 px-4">
+                <div class="font-bold text-neutral-800">{{ res.tool.name }}</div>
+                <div class="font-mono text-xs text-neutral-400">{{ res.tool.code }}</div>
+              </td>
+              <td class="py-3.5 px-4 font-bold text-neutral-900">{{ res.reserved_quantity }} cái</td>
+              <td class="py-3.5 px-4 font-mono text-xs text-neutral-600">{{ res.tool_instance.serial_number|default:"Chưa chỉ định serial" }}</td>
+              <td class="py-3.5 px-4 text-xs text-neutral-500">{{ res.reserved_at|date:"d/m/Y H:i" }}</td>
+              <td class="py-3.5 px-4 text-center">
+                {% if res.status == 'RESERVED' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-sky-500 mr-1.5"></span> Đã giữ chỗ
+                </span>
+                {% elif res.status == 'IN_USE' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5"></span> Đang xuất dùng
+                </span>
+                {% elif res.status == 'RETURNED' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span> Đã hoàn trả
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-neutral-100 text-neutral-500">
+                  Đã hủy
+                </span>
+                {% endif %}
+              </td>
+              <td class="py-3.5 px-4 text-right">
+                {% if can_manage_tools and res.status in 'RESERVED,IN_USE' %}
+                <button onclick="returnToolReservation('{{ res.id }}')" class="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs transition inline-flex items-center gap-1">
+                  <i class="ph ph-arrow-u-down-left font-bold"></i> Trả kho
+                </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="py-10 text-center text-neutral-400">Chưa có nhật ký giữ chỗ công cụ nào.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================================== -->
+<!-- MODALS -->
+<!-- ============================================================================== -->
+
+<!-- 1. Modal Kỹ Năng -->
+<div id="modal-skill" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white">
+      <h3 id="skill-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Kỹ năng mới</h3>
+      <button onclick="closeModal('modal-skill')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
+    </div>
+    <form id="form-skill" onsubmit="submitSkill(event)" class="p-6 space-y-4">
+      <input type="hidden" id="skill-id" name="id">
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Kỹ năng *</label>
+        <input type="text" id="skill-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary uppercase" placeholder="VD: WELD_6G, PLC_SIEMENS">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Kỹ năng *</label>
+        <input type="text" id="skill-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Hàn áp lực cao 6G">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Nhóm Ngành nghề</label>
+        <select id="skill-category" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+          <option value="Cơ khí">Cơ khí & Gia công</option>
+          <option value="Điện">Điện & Trạm biến áp</option>
+          <option value="Tự động hóa">Tự động hóa & PLC</option>
+          <option value="Nhiệt lạnh">HVAC & Làm lạnh công nghiệp</option>
+          <option value="Tổng hợp">Bảo trì tổng hợp</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mô tả chi tiết</label>
+        <textarea id="skill-desc" rows="2" class="w-full p-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Mô tả tiêu chuẩn năng lực..."></textarea>
+      </div>
+      <div class="flex items-center gap-2 pt-2">
+        <input type="checkbox" id="skill-active" checked class="w-4 h-4 text-primary rounded">
+        <label for="skill-active" class="text-sm font-semibold text-neutral-700">Kích hoạt kỹ năng này</label>
+      </div>
+      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
+        <button type="button" onclick="closeModal('modal-skill')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold shadow-md shadow-primary/25 hover:bg-primary-600">Lưu Kỹ năng</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 2. Modal Chứng Chỉ -->
+<div id="modal-cert" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white">
+      <h3 id="cert-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Loại Chứng chỉ</h3>
+      <button onclick="closeModal('modal-cert')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
+    </div>
+    <form id="form-cert" onsubmit="submitCert(event)" class="p-6 space-y-4">
+      <input type="hidden" id="cert-id" name="id">
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Chứng chỉ *</label>
+        <input type="text" id="cert-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary uppercase" placeholder="VD: CERT_HIGH_VOLTAGE">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Chứng chỉ *</label>
+        <input type="text" id="cert-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Chứng chỉ an toàn điện cao áp">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Cơ quan / Tổ chức cấp</label>
+        <input type="text" id="cert-body" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Cục Kỹ thuật An toàn Lao động">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Thời hạn hiệu lực theo tháng</label>
+        <input type="number" id="cert-validity" value="12" min="0" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="0 = Vô thời hạn, 12 = 1 năm, 24 = 2 năm">
+      </div>
+      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
+        <button type="button" onclick="closeModal('modal-cert')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-md shadow-purple-600/25 hover:bg-purple-700">Lưu Chứng chỉ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 3. Modal Ca Trực -->
+<div id="modal-shift" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-amber-50 to-white">
+      <h3 id="shift-modal-title" class="font-black text-lg text-neutral-900 m-0">Khung Mẫu Ca Trực</h3>
+      <button onclick="closeModal('modal-shift')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
+    </div>
+    <form id="form-shift" onsubmit="submitShift(event)" class="p-6 space-y-4">
+      <input type="hidden" id="shift-id" name="id">
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Ca *</label>
+        <input type="text" id="shift-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: SHIFT_1, SHIFT_NIGHT">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Ca trực *</label>
+        <input type="text" id="shift-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Ca 1 Sáng, Ca Đêm">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Giờ bắt đầu *</label>
+          <input type="time" id="shift-start" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Giờ kết thúc *</label>
+          <input type="time" id="shift-end" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+        </div>
+      </div>
+      <div class="flex items-center gap-2 pt-2">
+        <input type="checkbox" id="shift-overnight" class="w-4 h-4 text-primary rounded">
+        <label for="shift-overnight" class="text-sm font-semibold text-neutral-700">Ca trực kéo dài qua ngày hôm sau</label>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Màu sắc nhận diện</label>
+        <div class="flex items-center gap-3">
+          <input type="color" id="shift-color" value="#0284c7" class="w-10 h-10 p-0 border-0 rounded-lg cursor-pointer">
+          <span class="text-xs text-neutral-500">Màu hiển thị trên ma trận lịch trực</span>
+        </div>
+      </div>
+      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
+        <button type="button" onclick="closeModal('modal-shift')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-amber-600 text-white text-sm font-bold shadow-md hover:bg-amber-700">Lưu Mẫu ca</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 4. Modal Xếp Ca Lịch Trực KTV -->
+<div id="modal-schedule" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-primary-50 to-white">
+      <div>
+        <h3 class="font-black text-lg text-neutral-900 m-0">Xếp Ca Trực</h3>
+        <p id="schedule-modal-subtitle" class="text-xs text-neutral-500 m-0 mt-0.5">KTV: Nguyễn Văn An — Ngày: 03/10/2026</p>
+      </div>
+      <button onclick="closeModal('modal-schedule')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
+    </div>
+    <form id="form-schedule" onsubmit="submitSchedule(event)" class="p-6 space-y-4">
+      <input type="hidden" id="sched-user-id">
+      <input type="hidden" id="sched-work-date">
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-2">Trạng thái làm việc trong ngày *</label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-primary has-[:checked]:bg-primary-50">
+            <input type="radio" name="sched-status" value="ON_DUTY" checked onchange="toggleShiftSelect(true)" class="hidden">
+            <i class="ph ph-briefcase text-xl text-primary mb-1"></i>
+            <span class="text-xs font-bold text-neutral-800">Đi ca</span>
+          </label>
+          <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100">
+            <input type="radio" name="sched-status" value="OFF" onchange="toggleShiftSelect(false)" class="hidden">
+            <i class="ph ph-prohibit text-xl text-slate-500 mb-1"></i>
+            <span class="text-xs font-bold text-neutral-800">Nghỉ ca</span>
+          </label>
+          <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+            <input type="radio" name="sched-status" value="LEAVE" onchange="toggleShiftSelect(false)" class="hidden">
+            <i class="ph ph-airplane-tilt text-xl text-amber-600 mb-1"></i>
+            <span class="text-xs font-bold text-neutral-800">Nghỉ phép</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="sched-shift-container">
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Chọn Ca trực *</label>
+        <select id="sched-shift-id" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+          {% for sh in shift_templates %}
+          <option value="{{ sh.id }}">{{ sh.name }} ({{ sh.start_time|time:'H:i' }} - {{ sh.end_time|time:'H:i' }}){% if sh.is_overnight %} [Qua đêm]{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="sched-zone-container">
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Khu vực phân công trực ca (Duty Zone)</label>
+        <select id="sched-duty-zone" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+          <option value="">-- Mặc định theo hồ sơ KTV --</option>
+          {% for loc in locations %}
+          <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}] - {{ loc.get_zone_type_display }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-[11px] text-neutral-500 mt-1">KTV sẽ đóng chốt trực và ưu tiên giải quyết sự cố tại khu vực này trong suốt ca làm việc.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ghi chú phân ca</label>
+        <input type="text" id="sched-notes" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Đổi ca trực với thợ B...">
+      </div>
+
+      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
+        <button type="button" onclick="closeModal('modal-schedule')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold shadow-md hover:bg-primary-600">Cập nhật Lịch trực</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 5. Modal Thêm/Sửa Serial Thiết Bị Đo Kiểm -->
+<div id="modal-tool-instance" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
+      <h3 id="instance-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Serial Thiết bị Đo Kiểm</h3>
+      <button onclick="closeModal('modal-tool-instance')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
+    </div>
+    <form id="form-tool-instance" onsubmit="submitToolInstance(event)" class="p-6 space-y-4">
+      <input type="hidden" id="inst-id" name="id">
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Chủng loại Công cụ cha *</label>
+        <select id="inst-tool-id" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+          {% for t in tools %}
+          <option value="{{ t.id }}">{{ t.name }} - {{ t.code }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số Serial S/N *</label>
+          <input type="text" id="inst-serial" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: SN-FLK-88912">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã tài sản</label>
+          <input type="text" id="inst-tag" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: TAG-0045">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ngày hiệu chuẩn gần nhất</label>
+          <input type="date" id="inst-cal-date" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Hạn hiệu chuẩn kế tiếp *</label>
+          <input type="date" id="inst-due-date" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Kết quả kiểm định</label>
+          <select id="inst-inspection" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+            <option value="PASSED">Đạt chuẩn</option>
+            <option value="DUE_SOON">Sắp đến hạn</option>
+            <option value="EXPIRED">Quá hạn kiểm định</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Trạng thái máy</label>
+          <select id="inst-status" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+            <option value="AVAILABLE">Khả dụng</option>
+            <option value="IN_USE">Đang sử dụng</option>
+            <option value="MAINTENANCE">Đang bảo dưỡng</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ghi chú tình trạng</label>
+        <input type="text" id="inst-notes" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Tem kiểm định dán tại phòng thí nghiệm Quatest 3...">
+      </div>
+      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
+        <button type="button" onclick="closeModal('modal-tool-instance')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Thiết bị Serial</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 6. Modal Chủng loại công cụ -->
+<div id="modal-tool" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
+      <h3 id="tool-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Dòng Công cụ</h3>
+      <button onclick="closeModal('modal-tool')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
+    </div>
+    <form id="form-tool" onsubmit="submitTool(event)" class="p-6 space-y-4">
+      <input type="hidden" id="tool-id" name="id">
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Công cụ *</label>
+        <input type="text" id="tool-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: TOOL_THERMAL_CAM">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Công cụ *</label>
+        <input type="text" id="tool-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Camera Nhiệt Fluke Ti480 Pro">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số lượng khả dụng mặc định *</label>
+        <input type="number" id="tool-qty" value="1" min="1" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+      </div>
+      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
+        <button type="button" onclick="closeModal('modal-tool')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Dòng Công cụ</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Scripts for Tabs & Modals -->
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => {
+    el.classList.remove('bg-primary', 'text-white', 'shadow-md', 'shadow-primary/25');
+    el.classList.add('text-neutral-600', 'hover:bg-neutral-100');
+  });
+
+  const activeContent = document.getElementById('tab-content-' + tabId);
+  const activeBtn = document.getElementById('tab-btn-' + tabId);
+  if (activeContent) activeContent.classList.remove('hidden');
+  if (activeBtn) {
+    activeBtn.classList.remove('text-neutral-600', 'hover:bg-neutral-100');
+    activeBtn.classList.add('bg-primary', 'text-white', 'shadow-md', 'shadow-primary/25');
+  }
+
+  // Update URL without reload
+  const url = new URL(window.location);
+  url.searchParams.set('tab', tabId);
+  window.history.replaceState({}, '', url);
+}
+
+function handleApiError(msg) {
+  if (typeof showToast === 'function') {
+    showToast(msg, 'error');
+  } else {
+    alert('Lỗi: ' + msg);
+  }
+}
+
+function openModal(id) {
+  const m = document.getElementById(id);
+  if (m) m.classList.remove('hidden');
+}
+function closeModal(id) {
+  const m = document.getElementById(id);
+  if (m) m.classList.add('hidden');
+}
+
+// 1. Skill Actions
+function openSkillModal() {
+  document.getElementById('form-skill').reset();
+  document.getElementById('skill-id').value = '';
+  document.getElementById('skill-modal-title').innerText = 'Thêm Kỹ năng mới';
+  openModal('modal-skill');
+}
+function editSkill(id, code, name, category, desc, isActive) {
+  document.getElementById('skill-id').value = id;
+  document.getElementById('skill-code').value = code;
+  document.getElementById('skill-name').value = name;
+  document.getElementById('skill-category').value = category;
+  document.getElementById('skill-desc').value = desc;
+  document.getElementById('skill-active').checked = isActive;
+  document.getElementById('skill-modal-title').innerText = 'Chỉnh sửa Kỹ năng: ' + code;
+  openModal('modal-skill');
+}
+async function submitSkill(e) {
+  e.preventDefault();
+  const payload = {
+    id: document.getElementById('skill-id').value || null,
+    code: document.getElementById('skill-code').value,
+    name: document.getElementById('skill-name').value,
+    category: document.getElementById('skill-category').value,
+    description: document.getElementById('skill-desc').value,
+    is_active: document.getElementById('skill-active').checked
+  };
+  try {
+    const res = await fetch("{% url 'portal_workforce_skills_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể lưu kỹ năng.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+
+// 2. Cert Actions
+function openCertModal() {
+  document.getElementById('form-cert').reset();
+  document.getElementById('cert-id').value = '';
+  document.getElementById('cert-modal-title').innerText = 'Thêm Loại Chứng chỉ';
+  openModal('modal-cert');
+}
+function editCert(id, code, name, body, validity, desc, isActive) {
+  document.getElementById('cert-id').value = id;
+  document.getElementById('cert-code').value = code;
+  document.getElementById('cert-name').value = name;
+  document.getElementById('cert-body').value = body;
+  document.getElementById('cert-validity').value = validity;
+  document.getElementById('cert-modal-title').innerText = 'Chỉnh sửa Chứng chỉ: ' + code;
+  openModal('modal-cert');
+}
+async function submitCert(e) {
+  e.preventDefault();
+  const payload = {
+    id: document.getElementById('cert-id').value || null,
+    code: document.getElementById('cert-code').value,
+    name: document.getElementById('cert-name').value,
+    issuing_body: document.getElementById('cert-body').value,
+    validity_months: document.getElementById('cert-validity').value,
+  };
+  try {
+    const res = await fetch("{% url 'portal_cert_types_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể lưu chứng chỉ.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+
+// 3. Shift Actions
+function openShiftModal() {
+  document.getElementById('form-shift').reset();
+  document.getElementById('shift-id').value = '';
+  document.getElementById('shift-modal-title').innerText = 'Khung Mẫu Ca Trực';
+  openModal('modal-shift');
+}
+function editShift(id, code, name, start, end, overnight, color) {
+  document.getElementById('shift-id').value = id;
+  document.getElementById('shift-code').value = code;
+  document.getElementById('shift-name').value = name;
+  document.getElementById('shift-start').value = start;
+  document.getElementById('shift-end').value = end;
+  document.getElementById('shift-overnight').checked = overnight;
+  document.getElementById('shift-color').value = color || '#0284c7';
+  document.getElementById('shift-modal-title').innerText = 'Chỉnh sửa Khung ca: ' + name;
+  openModal('modal-shift');
+}
+async function submitShift(e) {
+  e.preventDefault();
+  const payload = {
+    id: document.getElementById('shift-id').value || null,
+    code: document.getElementById('shift-code').value,
+    name: document.getElementById('shift-name').value,
+    start_time: document.getElementById('shift-start').value,
+    end_time: document.getElementById('shift-end').value,
+    is_overnight: document.getElementById('shift-overnight').checked,
+    color_code: document.getElementById('shift-color').value,
+  };
+  try {
+    const res = await fetch("{% url 'portal_shift_templates_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể lưu mẫu ca.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+
+// 4. Schedule Actions
+function openScheduleModal(userId, techName, dateStr, shiftId, status, dutyZoneId) {
+  document.getElementById('sched-user-id').value = userId;
+  document.getElementById('sched-work-date').value = dateStr;
+  document.getElementById('schedule-modal-subtitle').innerText = 'KTV: ' + techName + ' — Ngày: ' + dateStr;
+
+  const statusInputs = document.getElementsByName('sched-status');
+  for (let r of statusInputs) {
+    if (r.value === status) {
+      r.checked = true;
+      toggleShiftSelect(status === 'ON_DUTY');
+    }
+  }
+  if (shiftId) {
+    document.getElementById('sched-shift-id').value = shiftId;
+  }
+  const dutyZoneSelect = document.getElementById('sched-duty-zone');
+  if (dutyZoneSelect) {
+    dutyZoneSelect.value = dutyZoneId || '';
+  }
+  openModal('modal-schedule');
+}
+function toggleShiftSelect(isOnDuty) {
+  const c = document.getElementById('sched-shift-container');
+  const z = document.getElementById('sched-zone-container');
+  if (isOnDuty) {
+    if (c) c.classList.remove('hidden');
+    if (z) z.classList.remove('hidden');
+  } else {
+    if (c) c.classList.add('hidden');
+    if (z) z.classList.add('hidden');
+  }
+}
+async function submitSchedule(e) {
+  e.preventDefault();
+  let status = 'ON_DUTY';
+  const statusInputs = document.getElementsByName('sched-status');
+  for (let r of statusInputs) {
+    if (r.checked) status = r.value;
+  }
+  const dutyZoneSelect = document.getElementById('sched-duty-zone');
+  const payload = {
+    user_id: document.getElementById('sched-user-id').value,
+    work_date: document.getElementById('sched-work-date').value,
+    shift_template_id: status === 'ON_DUTY' ? document.getElementById('sched-shift-id').value : null,
+    status: status,
+    duty_zone_id: status === 'ON_DUTY' && dutyZoneSelect ? dutyZoneSelect.value : '',
+    notes: document.getElementById('sched-notes').value || ''
+  };
+  try {
+    const res = await fetch("{% url 'portal_schedules_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể lưu lịch phân ca.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+
+// 5. Tool & Tool Instance Actions
+function openToolModal() {
+  document.getElementById('form-tool').reset();
+  document.getElementById('tool-id').value = '';
+  document.getElementById('tool-modal-title').innerText = 'Thêm Dòng Công cụ';
+  openModal('modal-tool');
+}
+async function submitTool(e) {
+  e.preventDefault();
+  const payload = {
+    id: document.getElementById('tool-id').value || null,
+    code: document.getElementById('tool-code').value,
+    name: document.getElementById('tool-name').value,
+    available_quantity: document.getElementById('tool-qty').value
+  };
+  try {
+    const res = await fetch("{% url 'portal_tools_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể lưu công cụ.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+
+function openToolInstanceModal() {
+  document.getElementById('form-tool-instance').reset();
+  document.getElementById('inst-id').value = '';
+  document.getElementById('instance-modal-title').innerText = 'Thêm Serial Thiết bị Đo Kiểm';
+  openModal('modal-tool-instance');
+}
+function editToolInstance(id, toolId, serial, tag, calDate, dueDate, inspStatus, status, notes) {
+  document.getElementById('inst-id').value = id;
+  document.getElementById('inst-tool-id').value = toolId;
+  document.getElementById('inst-serial').value = serial;
+  document.getElementById('inst-tag').value = tag;
+  document.getElementById('inst-cal-date').value = calDate;
+  document.getElementById('inst-due-date').value = dueDate;
+  document.getElementById('inst-inspection').value = inspStatus;
+  document.getElementById('inst-status').value = status;
+  document.getElementById('inst-notes').value = notes;
+  document.getElementById('instance-modal-title').innerText = 'Cập nhật Serial: ' + serial;
+  openModal('modal-tool-instance');
+}
+async function submitToolInstance(e) {
+  e.preventDefault();
+  const payload = {
+    id: document.getElementById('inst-id').value || null,
+    tool_id: document.getElementById('inst-tool-id').value,
+    serial_number: document.getElementById('inst-serial').value,
+    asset_tag: document.getElementById('inst-tag').value,
+    calibration_date: document.getElementById('inst-cal-date').value || null,
+    calibration_due_date: document.getElementById('inst-due-date').value,
+    inspection_status: document.getElementById('inst-inspection').value,
+    status: document.getElementById('inst-status').value,
+    notes: document.getElementById('inst-notes').value
+  };
+  try {
+    const res = await fetch("{% url 'portal_tool_instances_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể lưu thiết bị serial.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+
+// 6. Tool Reservation Return
+async function returnToolReservation(resId) {
+  if (!confirm('Xác nhận thu hồi và hoàn trả công cụ này về kho?')) return;
+  try {
+    const res = await fetch("{% url 'portal_tool_reservations_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+      body: JSON.stringify({ id: resId, action: 'RETURN' })
+    });
+    const d = await res.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      handleApiError(d.error || 'Không thể hoàn trả công cụ.');
+    }
+  } catch (err) {
+    handleApiError('Lỗi kết nối: ' + err.message);
+  }
+}
+</script>
+
+{% endblock %}

@@ -36,6 +36,7 @@ class WorkOrderMaterialSerializer(serializers.ModelSerializer):
         fields = ['id', 'sparePartId', 'sparePart', 'quantity', 'actualCost']
 
 class WorkOrderSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(read_only=True)
     assetId = serializers.UUIDField(source='asset.id', read_only=True)
     assignedTo = serializers.UUIDField(source='assigned_to.id', read_only=True)
     parentId = serializers.UUIDField(source='parent_id.id', read_only=True)
@@ -49,6 +50,11 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     assigneeName = serializers.CharField(source='assigned_to.username', read_only=True, default=None)
     assignee = UserSerializer(source='assigned_to', read_only=True)
     
+    coordsX = serializers.FloatField(source='coords_x', read_only=True)
+    coordsY = serializers.FloatField(source='coords_y', read_only=True)
+    floorLevel = serializers.IntegerField(source='floor_level', read_only=True)
+    zoneId = serializers.CharField(source='zone_id', read_only=True)
+
     asset = AssetSerializer(read_only=True)
     checklists = WorkOrderChecklistItemSerializer(many=True, read_only=True)
     attachments = WorkOrderAttachmentSerializer(many=True, read_only=True)
@@ -57,12 +63,13 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkOrder
         fields = [
-            'id', 'assetId', 'parentId', 'title', 'description', 
+            'id', 'code', 'assetId', 'parentId', 'title', 'description', 
             'priority', 'status', 'deadline', 'assignedTo', 'assigneeName',
             'assignee',
             'estimatedDurationMinutes', 'actualDurationMinutes',
             'sourceReference', 'actualStartTime', 'assignedAt',
-            'completedAt', 'resolutionNotes', 'created_at', 'updated_at',
+            'completedAt', 'resolutionNotes', 'coordsX', 'coordsY',
+            'floorLevel', 'zoneId', 'created_at', 'updated_at',
             'asset', 'checklists', 'attachments', 'materials'
         ]
 
@@ -120,3 +127,24 @@ class WorkOrderNoteUpdateRequestSerializer(serializers.Serializer):
         if not attrs.get('resolutionNotes') and not attrs.get('notes'):
             raise serializers.ValidationError("resolutionNotes or notes is required")
         return attrs
+
+
+class WorkOrderAutoAssignPreviewRequestSerializer(serializers.Serializer):
+    workOrderIds = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list
+    )
+
+
+class WorkOrderAssignmentPairSerializer(serializers.Serializer):
+    workOrderId = serializers.UUIDField()
+    technicianId = serializers.UUIDField()
+    slotRole = serializers.CharField(required=False, default='SOLO')
+
+
+class WorkOrderAutoAssignApplyRequestSerializer(serializers.Serializer):
+    assignments = serializers.ListField(
+        child=WorkOrderAssignmentPairSerializer(),
+        allow_empty=False
+    )

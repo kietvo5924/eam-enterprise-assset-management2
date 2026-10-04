@@ -32,6 +32,7 @@ Mô hình dự báo chi phí là điểm hội tụ tài chính của toàn bộ
   - `PmPlan`: Lịch bảo dưỡng định kỳ trong tương lai phục vụ tính toán phần ngân sách PM xác định.
 - **Tiền Tệ Chuẩn Hóa**: Mọi chi phí và dự báo tuân thủ nghiêm ngặt kiểu dữ liệu `Decimal` / `DECIMAL(18, 2)` Việt Nam Đồng (VNĐ). Tuyệt đối không làm tròn thô bạo làm sai lệch số liệu kế toán.
 - **Tích Hợp Hệ Thống Thông Báo Thời Gian Thực (Task 10.1)**: Tự động gửi cảnh báo mức `WARNING` hoặc `CRITICAL_OVERRUN` đến Quản trị viên và Kế toán trưởng khi ngân sách dự báo vượt ngưỡng.
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật dự báo chi phí (trích xuất đặc trưng đa biến, mô hình rừng hồi quy phân vị Quantile Regression Forests - QRF, động cơ lập ngân sách lai ghép hai bước, kiểm toán tài sản chanh chua Lemon Asset, và phân tích nợ bảo trì trì hoãn) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/cost_forecasting/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật dự báo tài chính khỏi các tầng controller/CRUD thông thường.
 
 ---
 

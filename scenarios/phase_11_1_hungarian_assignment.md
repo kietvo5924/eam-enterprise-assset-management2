@@ -29,6 +29,7 @@ Tại thời điểm đầu ca trực hoặc giao ca, có một tập hợp $M$ 
   - `TechnicianProfile`: Chuyên môn (`skills`), bậc thợ (`skill_level`), chứng chỉ (`certifications`), vị trí hiện tại (`coords_x, coords_y, floor_level, zone_id`), thời gian hết ca (`shift_end_time`).
   - `WorkOrder`: Trạng thái `status = 'CREATED'`, mức độ ưu tiên `priority`, thời gian ước tính (`estimated_duration_hours`), công cụ yêu cầu (`required_tools`), quan hệ phụ thuộc (`depends_on_wo_id`).
 - **Tích Hợp Luồng Phân Công Hiện Có**: Sau khi người quản lý xác nhận phương án phân công, hệ thống cập nhật `assigned_to` của Work Order, chuyển trạng thái sang `ASSIGNED` và kích hoạt thông báo thời gian thực (Task 10.1).
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật toán học (xây dựng ma trận chi phí đa tầng Manhattan, solver Kuhn-Munkres, đệm dummy, tie-breaking, và các bộ lọc guardrails) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/hungarian/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật toán học khỏi các tầng controller/CRUD thông thường (`workorders/views.py` chỉ đóng vai trò thin controller gọi vào service giải thuật).
 
 ---
 
@@ -346,53 +347,53 @@ Dưới đây là bảng ma trận kiểm thử chi tiết hóa toàn bộ 12 k�
 
 ### 9.1. Ma Trận Kịch Bản Nghiệp Vụ & Thuật Toán Tối Ưu
 
-- [ ] **TC-HUNGARY-01: Ma trận vuông cân bằng ($N = M$)**
+- [x] **TC-HUNGARY-01: Ma trận vuông cân bằng ($N = M$)**
   - *Mô tả*: 3 thợ và 3 việc với chi phí xác định.
   - *Kỳ vọng*: Thuật toán tìm ra phương án phân công có tổng chi phí nhỏ nhất đúng 100% so với giải pháp toán học Kuhn-Munkres.
 
-- [ ] **TC-HUNGARY-02: Điểm ưu tiên phát huy tác dụng nhờ Hệ số nhân (Priority Multiplier)**
+- [x] **TC-HUNGARY-02: Điểm ưu tiên phát huy tác dụng nhờ Hệ số nhân (Priority Multiplier)**
   - *Mô tả*: Việc 1 là `URGENT` (Multiplier $\times 2.5$), Việc 2 là `LOW` (Multiplier $\times 1.0$). Thợ A gần Việc 1 (10m) và Thợ B xa hơn một chút (30m).
   - *Kỳ vọng*: Hệ thống ép buộc Thợ A phải nhận Việc 1 (URGENT), không để Thợ B làm Việc 1. Khắc phục triệt để lỗ hổng vô hiệu hóa của phép trừ hằng số.
 
-- [ ] **TC-HUNGARY-03: Rào cản không gian và khu vực cách ly (Zone Transition Penalty)**
+- [x] **TC-HUNGARY-03: Rào cản không gian và khu vực cách ly (Zone Transition Penalty)**
   - *Mô tả*: Thợ A ở trong Phòng Sạch (Cleanroom) cách Máy 1 chỉ 10m. Thợ B ở xưởng thường cách Máy 1 40m. Máy 1 nằm ở xưởng thường.
   - *Kỳ vọng*: Thợ A bị cộng thêm $40$ điểm phạt chuyển vùng ($\text{Pen}_{\text{zone}}$); thuật toán quyết định gán Thợ B đi làm để tránh việc Thợ A phải tốn 30 phút thay đồ bảo hộ và khử khuẩn.
 
-- [ ] **TC-HUNGARY-04: Xung đột thời gian giao ca (Shift Handover Clash)**
+- [x] **TC-HUNGARY-04: Xung đột thời gian giao ca (Shift Handover Clash)**
   - *Mô tả*: Thợ A còn 30 phút là hết ca. Thợ B vừa vào ca còn 7.5 tiếng. Work Order yêu cầu thời gian dự kiến 3 tiếng.
   - *Kỳ vọng*: Thợ A bị cộng $40$ điểm phạt $\text{Pen}_{\text{shift}}$; thuật toán gán cho Thợ B để tránh tăng ca ngoài ý muốn.
 
-- [ ] **TC-HUNGARY-05: Nhận diện xung đột công cụ dùng chung (Shared Tool Bottleneck)**
+- [x] **TC-HUNGARY-05: Nhận diện xung đột công cụ dùng chung (Shared Tool Bottleneck)**
   - *Mô tả*: WO 1 và WO 2 cùng yêu cầu `TOOL_THERMAL_CAM_01` (toàn xưởng chỉ có 1 cái). Cả 2 phiếu đều được gán cho 2 thợ trong cùng đợt điều phối.
   - *Kỳ vọng*: Thuật toán phát hiện xung đột và trả về mảng `sharedToolConflicts`; giao diện Modal hiển thị cảnh báo màu cam rõ ràng cho Quản lý.
 
-- [ ] **TC-HUNGARY-06: Lọc bỏ công việc bị phụ thuộc (Task Dependency Filtering)**
+- [x] **TC-HUNGARY-06: Lọc bỏ công việc bị phụ thuộc (Task Dependency Filtering)**
   - *Mô tả*: WO 2 phụ thuộc vào WO 1 (`depends_on_wo_id = WO-1`). Hiện tại WO 1 đang ở trạng thái `IN_PROGRESS` (chưa hoàn thành).
   - *Kỳ vọng*: WO 2 bị tự động loại bỏ khỏi tập đầu vào của ma trận Hungarian đợt này, không bị gán sớm cho bất kỳ ai.
 
-- [ ] **TC-HUNGARY-07: Phân rã công việc tổ đội nhiều thợ (Crew Task Slot)**
+- [x] **TC-HUNGARY-07: Phân rã công việc tổ đội nhiều thợ (Crew Task Slot)**
   - *Mô tả*: Phiếu WO 3 yêu cầu 1 thợ chính Bậc $\ge 4$ và 1 thợ phụ Bậc $\ge 2$ (`is_crew_task = True`).
   - *Kỳ vọng*: Ma trận Hungarian tự động tạo 2 cột nhiệm vụ: `WO-3-Lead` và `WO-3-Assistant`, gán thành công cho 2 kỹ thuật viên khác nhau thỏa mãn bậc thợ.
 
-- [ ] **TC-HUNGARY-08: Ràng buộc chứng chỉ an toàn tuyệt đối (Big-M Penalty)**
+- [x] **TC-HUNGARY-08: Ràng buộc chứng chỉ an toàn tuyệt đối (Big-M Penalty)**
   - *Mô tả*: Phiếu sửa biến áp cao thế yêu cầu chứng chỉ `CERT_HIGH_VOLTAGE`. Thợ 1 ở cách 5m nhưng không có chứng chỉ; Thợ 2 ở cách 100m có chứng chỉ.
   - *Kỳ vọng*: Thợ 1 nhận chi phí phạt $10^7$; hệ thống tuyệt đối không gán Thợ 1, bắt buộc gán Thợ 2.
 
-- [ ] **TC-HUNGARY-09: Phá vỡ thế hòa điểm số công bằng (Deterministic Tie-Breaking)**
+- [x] **TC-HUNGARY-09: Phá vỡ thế hòa điểm số công bằng (Deterministic Tie-Breaking)**
   - *Mô tả*: Thợ 1 và Thợ 2 có điểm số chi phí bằng hệt nhau đối với WO 1. Thợ 1 đã tích lũy 160 giờ công trong tháng, Thợ 2 mới tích lũy 120 giờ công.
   - *Kỳ vọng*: Thuật toán luôn luôn ưu tiên gán cho Thợ 2 để đảm bảo công bằng thu nhập và san sẻ khối lượng công việc trong đội ngũ.
 
 ### 9.2. Ma Trận Kịch Bản Kỹ Thuật, Cạnh Tranh & Đa Khách Hàng
 
-- [ ] **TC-HUNGARY-10: Khóa chống tranh chấp phân công đồng thời (Concurrency Conflict)**
+- [x] **TC-HUNGARY-10: Khóa chống tranh chấp phân công đồng thời (Concurrency Conflict)**
   - *Mô tả*: 2 Quản lý cùng mở modal phân công. Quản lý 1 bấm xác nhận gán Thợ An. Sau đó 1 giây, Quản lý 2 bấm xác nhận gán Thợ An cho việc khác.
   - *Kỳ vọng*: Giao dịch của Quản lý 2 bị chặn lại bởi `select_for_update`, trả về HTTP 409 Conflict với thông báo dữ liệu thợ đã thay đổi, bảo vệ toàn vẹn dữ liệu.
 
-- [ ] **TC-HUNGARY-11: Cân bằng ma trận khi dư thợ hoặc thiếu thợ (Dummy Padding)**
+- [x] **TC-HUNGARY-11: Cân bằng ma trận khi dư thợ hoặc thiếu thợ (Dummy Padding)**
   - *Mô tả*: 5 thợ nhưng chỉ có 2 việc (hoặc 2 thợ nhưng có 5 việc).
   - *Kỳ vọng*: Kỹ thuật đệm node ảo hoạt động trơn tru; không phát sinh lỗi lệch ma trận không vuông; thợ dư thừa được đưa vào trạng thái Standby.
 
-- [ ] **TC-HUNGARY-12: Cách ly tuyệt đối đa khách hàng (Multi-Tenant Isolation)**
+- [x] **TC-HUNGARY-12: Cách ly tuyệt đối đa khách hàng (Multi-Tenant Isolation)**
   - *Mô tả*: Tenant A và Tenant B cùng kích hoạt phân công tự động.
   - *Kỳ vọng*: Thợ và việc của Tenant A tuyệt đối không xuất hiện trong ma trận chi phí của Tenant B.
 
@@ -480,26 +481,26 @@ def apply_assignments(tenant, assignment_pairs):
 
 ## 11. Kế Hoạch Triển Khai & Nghiệm Thu (Implementation Checklist)
 
-- [ ] **Task 11.1.1 — Multi-Factor Cost Matrix Service with Multiplier & Penalties**
-  - [ ] Cài đặt công thức ma trận chi phí mới với `Priority_Multiplier` dạng nhân.
-  - [ ] Tích hợp tính khoảng cách đa tầng Manhattan ($D_{ij}$) và điểm phạt rào cản khu vực/phòng sạch ($\text{Pen}_{\text{zone}}$).
-  - [ ] Tích hợp điểm phạt xung đột ca trực ($\text{Pen}_{\text{shift}}$) và phạt gián đoạn việc dở dang ($\text{Pen}_{\text{disrupt}}$).
-  - [ ] Áp dụng cơ chế phạt Big-M ($10^7$) cho vi phạm chứng chỉ chuyên môn an toàn.
-- [ ] **Task 11.1.2 — Pre-processing & Post-processing Engines**
-  - [ ] Xây dựng bộ lọc loại bỏ các phiếu bị chặn do phụ thuộc (`depends_on_wo_id`).
-  - [ ] Xây dựng bộ phân rã công việc tổ đội nhiều thợ (`is_crew_task`).
-  - [ ] Xây dựng bộ phát hiện xung đột công cụ dùng chung sau khi giải nghiệm.
-  - [ ] Cơ chế đệm node ảo (Zero-Cost Dummy Padding) và Tie-breaking xác định dựa trên số giờ công tích lũy trong tháng.
-- [ ] **Task 11.1.3 — Core Hungarian Solver Integration**
-  - [ ] Tích hợp thư viện `scipy.optimize.linear_sum_assignment`.
-  - [ ] Tối ưu hóa chuyển đổi ma trận NumPy và trích xuất cặp tối ưu.
-- [ ] **Task 11.1.4 — Auto-Assignment REST APIs with Concurrency Locking**
-  - [ ] Endpoint xem trước giải trình: `POST /api/v1/work-orders/auto-assign/preview/`.
-  - [ ] Endpoint áp dụng phân công chính thức: `POST /api/v1/work-orders/auto-assign/apply/` kèm khóa `select_for_update`.
-  - [ ] Tích hợp thông báo Real-time (Task 10.1) sau khi phân công thành công.
-- [ ] **Task 11.1.5 — Web Portal UI Integration & Explainable Modal**
-  - [ ] Thêm nút thao tác "Phân công tối ưu (Hungary)" trên giao diện danh sách Work Orders.
-  - [ ] Thiết kế Modal hiển thị ma trận giải trình, tooltip bóc tách chi phí và banner cảnh báo xung đột công cụ màu cam.
-  - [ ] Hỗ trợ Quản lý điều chỉnh thợ thủ công (Manual Override) trước khi xác nhận.
-- [ ] **Task 11.1.6 — Verification & Testing Suite**
-  - [ ] Viết test cases kiểm thử đầy đủ 12 kịch bản chấp nhận và trường hợp biên (`TC-HUNGARY-01` đến `TC-HUNGARY-12`).
+- [x] **Task 11.1.1 — Multi-Factor Cost Matrix Service with Multiplier & Penalties**
+  - [x] Cài đặt công thức ma trận chi phí mới với `Priority_Multiplier` dạng nhân.
+  - [x] Tích hợp tính khoảng cách đa tầng Manhattan ($D_{ij}$) và điểm phạt rào cản khu vực/phòng sạch ($\text{Pen}_{\text{zone}}$).
+  - [x] Tích hợp điểm phạt xung đột ca trực ($\text{Pen}_{\text{shift}}$) và phạt gián đoạn việc dở dang ($\text{Pen}_{\text{disrupt}}$).
+  - [x] Áp dụng cơ chế phạt Big-M ($10^7$) cho vi phạm chứng chỉ chuyên môn an toàn.
+- [x] **Task 11.1.2 — Pre-processing & Post-processing Engines**
+  - [x] Xây dựng bộ lọc loại bỏ các phiếu bị chặn do phụ thuộc (`depends_on_wo_id`).
+  - [x] Xây dựng bộ phân rã công việc tổ đội nhiều thợ (`is_crew_task`).
+  - [x] Xây dựng bộ phát hiện xung đột công cụ dùng chung sau khi giải nghiệm.
+  - [x] Cơ chế đệm node ảo (Zero-Cost Dummy Padding) và Tie-breaking xác định dựa trên số giờ công tích lũy trong tháng.
+- [x] **Task 11.1.3 — Core Hungarian Solver Integration**
+  - [x] Tích hợp thư viện `scipy.optimize.linear_sum_assignment`.
+  - [x] Tối ưu hóa chuyển đổi ma trận NumPy và trích xuất cặp tối ưu.
+- [x] **Task 11.1.4 — Auto-Assignment REST APIs with Concurrency Locking**
+  - [x] Endpoint xem trước giải trình: `POST /api/v1/work-orders/auto-assign/preview/`.
+  - [x] Endpoint áp dụng phân công chính thức: `POST /api/v1/work-orders/auto-assign/apply/` kèm khóa `select_for_update`.
+  - [x] Tích hợp thông báo Real-time (Task 10.1) sau khi phân công thành công.
+- [x] **Task 11.1.5 — Web Portal UI Integration & Explainable Modal**
+  - [x] Thêm nút thao tác "Phân công tối ưu (Hungary)" trên giao diện danh sách Work Orders.
+  - [x] Thiết kế Modal hiển thị ma trận giải trình, tooltip bóc tách chi phí và banner cảnh báo xung đột công cụ màu cam.
+  - [x] Hỗ trợ Quản lý điều chỉnh thợ thủ công (Manual Override) trước khi xác nhận.
+- [x] **Task 11.1.6 — Verification & Testing Suite**
+  - [x] Viết test cases kiểm thử đầy đủ 12 kịch bản chấp nhận và trường hợp biên (`TC-HUNGARY-01` đến `TC-HUNGARY-12`).

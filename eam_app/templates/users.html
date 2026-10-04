@@ -168,10 +168,15 @@
               {% endif %}
             </td>
             <td class="px-4 py-3">
-              <div class="flex flex-wrap gap-1">
+              <div class="flex flex-wrap gap-1 items-center">
                 {% for role in u.roles.all %}
                   <span class="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-xs">{{ role.name }}</span>
                 {% endfor %}
+                {% if u.can_execute_wo %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-md text-xs font-bold shadow-xs" title="Kỹ thuật viên thực thi công việc: work_order:execute">
+                    <i class="ph-bold ph-wrench text-[11px]"></i> Thợ Bậc {{ u.technician_profile.skill_level|default:1 }}
+                  </span>
+                {% endif %}
               </div>
             </td>
             <td class="px-4 py-3 text-right">
@@ -273,6 +278,136 @@
                 <option value="{{ r.id }}">{{ r.name }}</option>
                 {% endfor %}
             </select>
+          </div>
+
+          <!-- Dynamic Technician Competency Section (Permission-Driven: work_order:execute) -->
+          <div id="technician-competency-section" class="hidden border border-primary/20 bg-primary-50/25 rounded-2xl p-4 space-y-3.5 transition-all">
+            <div class="flex items-center justify-between pb-2 border-b border-primary/10">
+              <div class="flex items-center gap-2 text-primary font-bold text-sm">
+                <i class="ph-fill ph-wrench text-base"></i>
+                <span>Hồ sơ Kỹ thuật viên Bảo trì & Vận hành</span>
+              </div>
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+                <i class="ph-bold ph-shield-check"></i> work_order:execute
+              </span>
+            </div>
+            <p class="text-xs text-neutral-500 m-0 leading-relaxed">
+              Tài khoản có vai trò thực thi công việc. Vui lòng thiết lập bậc thợ, chuyên môn và vị trí trực để thuật toán Hungarian tối ưu hóa phân công công việc.
+            </p>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label class="block text-xs font-bold text-neutral-700 mb-1">Bậc thợ chuyên môn</label>
+                <select id="tech-skill-level" class="w-full px-3 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+                  <option value="1">Bậc 1 - Sơ cấp, phụ việc</option>
+                  <option value="2">Bậc 2 - Trung cấp, thợ chính</option>
+                  <option value="3" selected>Bậc 3 - Chuyên gia, trưởng ca</option>
+                  <option value="4">Bậc 4 - Bậc thầy, quản đốc kỹ thuật</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-neutral-700 mb-1">Ca trực hiện tại</label>
+                <select id="tech-shift-code" class="w-full px-3 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+                  {% if shift_templates %}
+                    {% for sh in shift_templates %}
+                    <option value="{{ sh.code }}">{{ sh.name }} - {{ sh.start_time|time:'H:i' }} đến {{ sh.end_time|time:'H:i' }}{% if sh.is_overnight %} - Qua đêm{% endif %}</option>
+                    {% endfor %}
+                  {% else %}
+                    <option value="SHIFT_1">Ca 1: 06:00 đến 14:00</option>
+                    <option value="SHIFT_2">Ca 2: 14:00 đến 22:00</option>
+                    <option value="SHIFT_3">Ca 3: 22:00 đến 06:00</option>
+                  {% endif %}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-neutral-700 mb-1">Kỹ năng chuyên môn</label>
+              <div class="flex flex-wrap gap-2 text-xs">
+                {% if workforce_skills %}
+                  {% for sk in workforce_skills %}
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-skill-cb rounded text-primary" value="{{ sk.code }}"> {{ sk.name }}
+                  </label>
+                  {% endfor %}
+                {% else %}
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-skill-cb rounded text-primary" value="ELECTRICAL" checked> Điện / Tự động hóa
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-skill-cb rounded text-primary" value="MECHANICAL"> Cơ khí chế tạo
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-skill-cb rounded text-primary" value="HVAC"> Điện lạnh & HVAC
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-skill-cb rounded text-primary" value="HYDRAULIC"> Thủy lực / Khí nén
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-skill-cb rounded text-primary" value="GENERAL"> Bảo dưỡng chung
+                  </label>
+                {% endif %}
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-neutral-700 mb-1">Chứng chỉ chuyên môn đặc thù</label>
+              <div class="flex flex-wrap gap-2 text-xs">
+                {% if certification_types %}
+                  {% for ct in certification_types %}
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-cert-cb rounded text-primary" value="{{ ct.code }}"> {{ ct.name }}
+                  </label>
+                  {% endfor %}
+                {% else %}
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-cert-cb rounded text-primary" value="CERT_HIGH_VOLTAGE"> Điện cao thế
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-cert-cb rounded text-primary" value="CERT_BOILER"> Nồi hơi & Bình áp lực
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-cert-cb rounded text-primary" value="CERT_CLEANROOM"> Phòng sạch ISO-5
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-white cursor-pointer hover:bg-neutral-50 transition">
+                    <input type="checkbox" class="tech-cert-cb rounded text-primary" value="CERT_SAFETY"> An toàn hóa chất / khí gas
+                  </label>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div>
+                <label class="block text-xs font-bold text-neutral-700 mb-1">Khu vực trực</label>
+                <select id="tech-zone" onchange="onTechZoneChanged(this.value)" class="w-full px-3 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+                  <option value="">-- Mặc định --</option>
+                  {% for loc in locations_list %}
+                  <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}]</option>
+                  {% empty %}
+                    {% for z in available_zones %}
+                    <option value="{{ z }}">{{ z }}</option>
+                    {% endfor %}
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-neutral-700 mb-1">Tầng trực</label>
+                <input type="number" id="tech-floor" value="1" min="1" max="10" class="w-full px-3 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-neutral-700 mb-1">Tọa độ trực X - Y</label>
+                <div class="flex items-center gap-1.5">
+                  <input type="number" step="0.1" id="tech-coords-x" placeholder="X" value="20.0" class="w-1/2 px-2 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+                  <input type="number" step="0.1" id="tech-coords-y" placeholder="Y" value="20.0" class="w-1/2 px-2 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+                </div>
+              </div>
+            </div>
+            <div>
+              <button type="button" onclick="openFloorplanPickerForUser()" class="w-full py-2 px-3 rounded-xl bg-primary-50 hover:bg-primary-100 text-primary font-bold text-xs flex items-center justify-center gap-1.5 border border-primary/20 transition">
+                <i class="ph-bold ph-map-pin"></i>
+                <span>Chọn trạm trực trên sơ đồ mặt bằng</span>
+              </button>
+            </div>
           </div>
           
           <div class="pt-4 flex justify-end gap-3 mt-6">
@@ -405,7 +540,307 @@
   </div>
 </div>
 
+<!-- Modal Trình Ghim Vị Trí Mặt Bằng Trực Quan Cho Technician -->
+<div id="modal-floorplan-picker" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-md hidden z-[120] flex items-center justify-center p-2 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+    <!-- Modal Header -->
+    <div class="px-6 py-4 bg-gradient-to-r from-neutral-900 via-slate-900 to-sky-950 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0 border-b border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 text-xl font-bold">
+          <i class="ph ph-map-pin"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 id="floorplan-picker-title" class="text-base font-black text-white m-0">Sơ đồ Mặt bằng & Ghim Trạm Trực</h3>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/30 text-sky-200 border border-sky-400/30">Google Maps Style</span>
+          </div>
+          <p id="floorplan-picker-subtitle" class="text-xs text-slate-300 m-0 mt-0.5">Nhấp chuột vào mặt bằng để cắm ghim trạm làm việc của kỹ thuật viên</p>
+        </div>
+      </div>
+
+      <!-- Controls & Blueprint Preset -->
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <select id="floorplan-preset-select" onchange="changeFloorplanPreset(this.value)" class="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-sky-400">
+          <option value="PRESS">Sơ đồ Mẫu: Xưởng Cơ khí & Dập</option>
+          <option value="CLEANROOM">Sơ đồ Mẫu: Phòng Sạch Điện tử ISO-5</option>
+          <option value="WAREHOUSE">Sơ đồ Mẫu: Kho Vận Logistics</option>
+          <option value="STANDARD">Sơ đồ Mẫu: Mặt Bằng Tầng Tổng Thể</option>
+        </select>
+        <button onclick="closeFloorplanModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+          <i class="ph ph-x text-base"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Interactive Canvas / Viewport Area -->
+    <div class="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center select-none" id="floorplan-viewport" style="min-height: 480px; max-height: 65vh;">
+      <div class="absolute top-3 left-3 z-20 flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl text-xs backdrop-blur-sm text-slate-200 font-mono shadow-lg">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Tọa độ ghim:</span>
+        <span class="text-sky-400 font-bold" id="hud-coord-x">X: 20.0m</span>
+        <span class="text-slate-500">|</span>
+        <span class="text-sky-400 font-bold" id="hud-coord-y">Y: 20.0m</span>
+        <span class="text-slate-500">|</span>
+        <span class="text-amber-400 font-bold" id="hud-coord-floor">Tầng 1</span>
+      </div>
+
+      <div class="absolute top-3 right-3 z-20 flex flex-col gap-1.5 bg-slate-900/90 border border-slate-700/80 p-1.5 rounded-xl backdrop-blur-sm shadow-lg">
+        <button onclick="adjustFloorplanZoom(0.15)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-sm font-bold" title="Phóng to">
+          <i class="ph ph-plus"></i>
+        </button>
+        <button onclick="adjustFloorplanZoom(-0.15)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-sm font-bold" title="Thu nhỏ">
+          <i class="ph ph-minus"></i>
+        </button>
+        <button onclick="resetFloorplanZoom()" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold" title="Vừa màn hình">
+          <i class="ph ph-arrows-out-simple"></i>
+        </button>
+      </div>
+
+      <div id="floorplan-container" class="relative w-full h-full max-w-[880px] max-h-[520px] transition-transform duration-100 cursor-crosshair"
+           onclick="handleFloorplanContainerClick(event)">
+        <svg id="floorplan-svg" class="w-full h-full rounded-2xl border border-slate-800 shadow-2xl" viewBox="0 0 1000 700" preserveAspectRatio="none">
+          <defs>
+            <pattern id="user-fp-grid-major" width="200" height="175" patternUnits="userSpaceOnUse">
+              <path d="M 200 0 L 0 0 0 175" fill="none" stroke="#1e293b" stroke-width="1.2"/>
+            </pattern>
+            <pattern id="user-fp-grid-minor" width="50" height="43.75" patternUnits="userSpaceOnUse">
+              <path d="M 50 0 L 0 0 0 43.75" fill="none" stroke="#0f172a" stroke-width="0.6"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="#070b13" />
+          <rect width="100%" height="100%" fill="url(#user-fp-grid-minor)" />
+          <rect width="100%" height="100%" fill="url(#user-fp-grid-major)" />
+          <g fill="#475569" font-size="11" font-family="monospace">
+            <text x="30" y="25">0m</text>
+            <text x="230" y="25">20m</text>
+            <text x="430" y="25">40m</text>
+            <text x="630" y="25">60m</text>
+            <text x="830" y="25">80m</text>
+            <text x="960" y="25">100m</text>
+            <text x="15" y="195">20m</text>
+            <text x="15" y="370">40m</text>
+            <text x="15" y="545">60m</text>
+            <text x="15" y="685">80m</text>
+          </g>
+          <rect x="50" y="40" width="910" height="620" rx="8" stroke="#0284c7" stroke-width="2.5" fill="#0369a1" fill-opacity="0.04"/>
+          <g id="floorplan-preset-content"></g>
+        </svg>
+
+        <div id="floorplan-pin" class="absolute z-30 transform -translate-x-1/2 -translate-y-full transition-all duration-150 pointer-events-none" style="left: 20%; top: 25%;">
+          <div class="relative flex flex-col items-center">
+            <div class="absolute -bottom-1 w-6 h-6 rounded-full bg-rose-500/40 animate-ping"></div>
+            <div class="absolute -bottom-1 w-3 h-3 rounded-full bg-rose-500 border-2 border-white shadow-md"></div>
+            <div class="px-2.5 py-1 rounded-xl bg-rose-600 text-white text-[11px] font-bold shadow-xl border border-rose-400 flex items-center gap-1 mb-1 whitespace-nowrap">
+              <i class="ph ph-map-pin-fill text-xs"></i>
+              <span id="pin-label-text">Trạm trực KTV</span>
+            </div>
+            <svg class="w-8 h-8 text-rose-500 filter drop-shadow-lg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer / Action Bar -->
+    <div class="px-6 py-4 bg-white border-t border-neutral-100 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-neutral-600">Tầng:</label>
+          <input type="number" id="picker-input-floor" value="1" min="1" max="20" class="w-14 h-9 px-2 text-center rounded-xl border border-neutral-300 text-xs font-bold" onchange="onFloorplanManualInputChange()">
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-neutral-600">X (m):</label>
+          <input type="number" step="0.1" id="picker-input-x" value="20.0" class="w-20 h-9 px-2 text-center rounded-xl border border-neutral-300 text-xs font-mono font-bold" onchange="onFloorplanManualInputChange()">
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-bold text-neutral-600">Y (m):</label>
+          <input type="number" step="0.1" id="picker-input-y" value="20.0" class="w-20 h-9 px-2 text-center rounded-xl border border-neutral-300 text-xs font-mono font-bold" onchange="onFloorplanManualInputChange()">
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <button type="button" onclick="closeFloorplanModal()" class="px-5 py-2.5 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50 transition">
+          Hủy bỏ
+        </button>
+        <button type="button" onclick="confirmFloorplanForUser()" class="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-600 text-white text-sm font-bold shadow-md shadow-primary/25 transition flex items-center gap-2">
+          <i class="ph ph-check-circle text-base"></i>
+          <span>Xác nhận Tọa độ này</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+    const LOCATIONS_LIST = {{ locations_json|default:'[]'|safe }};
+    const LOCATIONS_MAP = {};
+    if (Array.isArray(LOCATIONS_LIST)) {
+      LOCATIONS_LIST.forEach(l => {
+        if (l.code) LOCATIONS_MAP[l.code] = l;
+      });
+    }
+
+    function onTechZoneChanged(zoneCode) {
+      if (!zoneCode || !LOCATIONS_MAP[zoneCode]) return;
+      const loc = LOCATIONS_MAP[zoneCode];
+      if (document.getElementById('tech-floor') && loc.floor_level) {
+        document.getElementById('tech-floor').value = loc.floor_level;
+      }
+      if (document.getElementById('tech-coords-x') && loc.center_x !== undefined) {
+        document.getElementById('tech-coords-x').value = loc.center_x;
+      }
+      if (document.getElementById('tech-coords-y') && loc.center_y !== undefined) {
+        document.getElementById('tech-coords-y').value = loc.center_y;
+      }
+    }
+
+    window.userFloorplanCurrentZoom = 1.0;
+    function openFloorplanPickerForUser() {
+      const zoneCode = (document.getElementById('tech-zone') ? document.getElementById('tech-zone').value : '') || 'ZONE';
+      const floor = parseInt(document.getElementById('tech-floor') ? document.getElementById('tech-floor').value : 1) || 1;
+      const x = parseFloat(document.getElementById('tech-coords-x') ? document.getElementById('tech-coords-x').value : 20.0) || 20.0;
+      const y = parseFloat(document.getElementById('tech-coords-y') ? document.getElementById('tech-coords-y').value : 20.0) || 20.0;
+
+      let defaultPreset = 'STANDARD';
+      const upper = zoneCode.toUpperCase();
+      if (upper.includes('PRESS') || upper.includes('DAP') || upper.includes('CO_KHI')) defaultPreset = 'PRESS';
+      else if (upper.includes('CLEAN') || upper.includes('SACH')) defaultPreset = 'CLEANROOM';
+      else if (upper.includes('KHO') || upper.includes('WAREHOUSE')) defaultPreset = 'WAREHOUSE';
+
+      const sel = document.getElementById('floorplan-preset-select');
+      if (sel) {
+        sel.value = defaultPreset;
+        changeFloorplanPreset(defaultPreset);
+      }
+      updateFloorplanPin(x, y, floor);
+      resetFloorplanZoom();
+      const modal = document.getElementById('modal-floorplan-picker');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeFloorplanModal() {
+      const modal = document.getElementById('modal-floorplan-picker');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function confirmFloorplanForUser() {
+      const x = parseFloat(document.getElementById('picker-input-x').value || 0);
+      const y = parseFloat(document.getElementById('picker-input-y').value || 0);
+      const floor = parseInt(document.getElementById('picker-input-floor').value || 1);
+
+      if (document.getElementById('tech-coords-x')) document.getElementById('tech-coords-x').value = x;
+      if (document.getElementById('tech-coords-y')) document.getElementById('tech-coords-y').value = y;
+      if (document.getElementById('tech-floor')) document.getElementById('tech-floor').value = floor;
+
+      closeFloorplanModal();
+    }
+
+    function changeFloorplanPreset(presetKey) {
+      renderPresetSVG(presetKey);
+    }
+
+    function renderPresetSVG(preset) {
+      const g = document.getElementById('floorplan-preset-content');
+      if (!g) return;
+      if (preset === 'PRESS') {
+        g.innerHTML = `
+          <rect x="70" y="320" width="870" height="60" fill="#0284c7" fill-opacity="0.08" stroke="#38bdf8" stroke-dasharray="6 4" stroke-width="1"/>
+          <text x="500" y="355" fill="#38bdf8" font-size="12" font-family="monospace" text-anchor="middle" font-weight="bold">HÀNH LANG VẬN CHUYỂN PHÔI THÉP (MAIN AISLE 4.0M)</text>
+          <g stroke="#38bdf8" stroke-width="1.5" fill="#1e293b">
+            <rect x="100" y="90" width="160" height="190" rx="6"/><text x="180" y="180" fill="#f8fafc" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MÁY DẬP 500T</text>
+            <rect x="310" y="90" width="160" height="190" rx="6"/><text x="390" y="180" fill="#f8fafc" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MÁY DẬP 300T</text>
+            <rect x="520" y="90" width="160" height="190" rx="6"/><text x="600" y="180" fill="#f8fafc" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">MÁY DẬP 200T</text>
+            <rect x="100" y="420" width="220" height="200" rx="6" fill="#0f172a" stroke="#64748b"/><text x="210" y="515" fill="#f8fafc" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">TRUNG TÂM PHAY CNC</text>
+            <rect x="360" y="420" width="220" height="200" rx="6" fill="#0f172a" stroke="#64748b"/><text x="470" y="515" fill="#f8fafc" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">KHO KHUÔN MẪU DẬP</text>
+          </g>
+          <rect x="800" y="60" width="140" height="110" rx="4" fill="#334155" stroke="#f59e0b" stroke-width="2"/>
+          <text x="870" y="110" fill="#fef08a" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">CẦU THANG BỘ</text>
+        `;
+      } else if (preset === 'CLEANROOM') {
+        g.innerHTML = `
+          <rect x="80" y="70" width="850" height="560" rx="8" stroke="#06b6d4" stroke-width="2" fill="#083344" fill-opacity="0.3"/>
+          <rect x="100" y="90" width="180" height="150" rx="6" fill="#164e63" stroke="#22d3ee" stroke-width="1.5"/><text x="190" y="160" fill="#cffafe" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">BUỒNG THỔI KHÍ</text>
+          <rect x="320" y="90" width="280" height="240" rx="6" fill="#713f12" fill-opacity="0.4" stroke="#eab308" stroke-width="2"/><text x="460" y="200" fill="#fef08a" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">PHÒNG QUANG KHẮC (YELLOW)</text>
+          <rect x="100" y="380" width="340" height="220" rx="6" fill="#0e7490" fill-opacity="0.2" stroke="#06b6d4" stroke-width="1.5"/><text x="270" y="485" fill="#e0f2fe" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">BÀN THAO TÁC KHÍ DÒNG DỌC</text>
+          <rect x="480" y="380" width="300" height="220" rx="6" fill="#4c0519" fill-opacity="0.3" stroke="#f43f5e" stroke-width="1.5"/><text x="630" y="485" fill="#ffe4e6" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">TỦ HÚT HÓA CHẤT ĂN MÒN</text>
+        `;
+      } else if (preset === 'WAREHOUSE') {
+        g.innerHTML = `
+          <g stroke="#94a3b8" stroke-width="1" fill="#1e293b">
+            <rect x="100" y="80" width="750" height="60" rx="4"/><text x="475" y="115" fill="#f8fafc" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">DÃY KỆ PALLET A</text>
+            <rect x="100" y="200" width="750" height="60" rx="4"/><text x="475" y="235" fill="#f8fafc" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">DÃY KỆ PALLET B</text>
+            <rect x="100" y="320" width="750" height="60" rx="4"/><text x="475" y="355" fill="#f8fafc" font-size="12" font-weight="bold" font-family="monospace" text-anchor="middle">DÃY KỆ PALLET C</text>
+            <rect x="100" y="450" width="400" height="170" rx="6" fill="#0f172a" stroke="#22c55e" stroke-width="1.5"/><text x="300" y="530" fill="#bbf7d0" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">CỬA XUẤT HÀNG DOCK 1 - 3</text>
+            <rect x="540" y="450" width="310" height="170" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/><text x="695" y="530" fill="#bfdbfe" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">KHU TIẾP NHẬN INBOUND</text>
+          </g>
+        `;
+      } else {
+        g.innerHTML = `
+          <g stroke="#38bdf8" stroke-dasharray="4 4" stroke-width="1" fill="#0f172a" fill-opacity="0.4">
+            <rect x="80" y="70" width="390" height="260" rx="6"/><text x="275" y="195" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">PHÂN XƯỞNG CƠ KHÍ & GIA CÔNG</text>
+            <rect x="520" y="70" width="410" height="260" rx="6"/><text x="725" y="195" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">PHÂN XƯỞNG LẮP RÁP & ĐIỆN TỬ</text>
+            <rect x="80" y="360" width="390" height="260" rx="6"/><text x="275" y="485" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">TRẠM ĐIỆN & KHÍ NÉN TRUNG TÂM</text>
+            <rect x="520" y="360" width="410" height="260" rx="6"/><text x="725" y="485" fill="#f8fafc" font-size="15" font-weight="bold" font-family="monospace" text-anchor="middle">KHO PHỤ TÙNG & VẬT TƯ TIÊU HAO</text>
+          </g>
+        `;
+      }
+    }
+
+    function handleFloorplanContainerClick(e) {
+      const container = document.getElementById('floorplan-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const pctX = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+      const pctY = Math.max(0, Math.min(100, (clickY / rect.height) * 100));
+
+      const metersX = Math.round((pctX / 100 * 100) * 10) / 10;
+      const metersY = Math.round((pctY / 100 * 80) * 10) / 10;
+      const currentFloor = parseInt(document.getElementById('picker-input-floor').value || 1);
+
+      updateFloorplanPin(metersX, metersY, currentFloor);
+    }
+
+    function updateFloorplanPin(metersX, metersY, floor) {
+      const pin = document.getElementById('floorplan-pin');
+      if (!pin) return;
+
+      const pctX = Math.max(0, Math.min(100, (metersX / 100) * 100));
+      const pctY = Math.max(0, Math.min(100, (metersY / 80) * 100));
+
+      pin.style.left = pctX + '%';
+      pin.style.top = pctY + '%';
+
+      document.getElementById('picker-input-x').value = metersX.toFixed(1);
+      document.getElementById('picker-input-y').value = metersY.toFixed(1);
+      document.getElementById('picker-input-floor').value = floor || 1;
+
+      document.getElementById('hud-coord-x').innerText = 'X: ' + metersX.toFixed(1) + 'm';
+      document.getElementById('hud-coord-y').innerText = 'Y: ' + metersY.toFixed(1) + 'm';
+      document.getElementById('hud-coord-floor').innerText = 'Tầng ' + (floor || 1);
+    }
+
+    function onFloorplanManualInputChange() {
+      const x = parseFloat(document.getElementById('picker-input-x').value || 0);
+      const y = parseFloat(document.getElementById('picker-input-y').value || 0);
+      const floor = parseInt(document.getElementById('picker-input-floor').value || 1);
+      updateFloorplanPin(x, y, floor);
+    }
+
+    function adjustFloorplanZoom(delta) {
+      window.userFloorplanCurrentZoom = Math.max(0.7, Math.min(2.5, (window.userFloorplanCurrentZoom || 1.0) + delta));
+      const c = document.getElementById('floorplan-container');
+      if (c) c.style.transform = `scale(${window.userFloorplanCurrentZoom})`;
+    }
+
+    function resetFloorplanZoom() {
+      window.userFloorplanCurrentZoom = 1.0;
+      const c = document.getElementById('floorplan-container');
+      if (c) c.style.transform = 'scale(1)';
+    }
     let currentPage = 1;
     const rowsPerPage = 15;
     let allRows = [];
@@ -556,7 +991,7 @@
             btn.innerText = 'Save Changes';
             icon.innerHTML = '<i class="ph-fill ph-pencil-simple text-xl"></i>';
             document.getElementById('user-password').required = false;
-            pwdLabel.innerHTML = 'Password <span class="text-neutral-400 font-normal text-xs">(Leave blank to keep current)</span>';
+            pwdLabel.innerHTML = 'Password <span class="text-neutral-400 font-normal text-xs">- Để trống nếu không đổi</span>';
             document.getElementById('status-field').classList.remove('hidden');
         } else {
             title.innerText = 'Add New User';
@@ -571,12 +1006,48 @@
         if (window.userRolesSelect) {
             window.userRolesSelect.setValue(roleIds);
         }
+        
+        if (typeof checkTechnicianRoles === 'function') {
+            checkTechnicianRoles();
+        }
+
+        // Prepopulate technician competency fields
+        const prof = (id && window.USER_PROFILES && window.USER_PROFILES[id]) ? window.USER_PROFILES[id] : {
+            skill_level: 3,
+            skills: ['ELECTRICAL'],
+            certifications: [],
+            zone_id: '',
+            floor_level: 1,
+            coords_x: 20.0,
+            coords_y: 20.0
+        };
+
+        if (document.getElementById('tech-skill-level')) {
+            document.getElementById('tech-skill-level').value = prof.skill_level || 3;
+            document.getElementById('tech-zone').value = prof.zone_id || '';
+            document.getElementById('tech-floor').value = prof.floor_level || 1;
+            document.getElementById('tech-coords-x').value = prof.coords_x !== undefined ? prof.coords_x : 20.0;
+            document.getElementById('tech-coords-y').value = prof.coords_y !== undefined ? prof.coords_y : 20.0;
+
+            const userSkills = (prof.skills || []).map(s => String(s).trim().toUpperCase());
+            document.querySelectorAll('.tech-skill-cb').forEach(cb => {
+                cb.checked = userSkills.includes(cb.value.toUpperCase());
+            });
+
+            const userCerts = (prof.certifications || []).map(c => String(c).trim().toUpperCase());
+            document.querySelectorAll('.tech-cert-cb').forEach(cb => {
+                cb.checked = userCerts.includes(cb.value.toUpperCase());
+            });
+        }
+
         document.getElementById('user-msg').classList.add('hidden');
     }
 
     function closeUserModal() {
         document.getElementById('user-modal').classList.add('hidden');
         document.getElementById('user-form').reset();
+        const techSec = document.getElementById('technician-competency-section');
+        if (techSec) techSec.classList.add('hidden');
         if (window.userRolesSelect) {
             window.userRolesSelect.clear();
         }
@@ -585,8 +1056,14 @@
     document.getElementById('user-form').addEventListener('submit', function(e) {
         e.preventDefault();
         const id = document.getElementById('user-id').value;
-        const roleSelect = document.getElementById('user-roles');
-        const selectedRoles = Array.from(roleSelect.selectedOptions).map(opt => opt.value);
+        let selectedRoles = [];
+        if (window.userRolesSelect) {
+            const val = window.userRolesSelect.getValue();
+            selectedRoles = Array.isArray(val) ? val : (val ? [val] : []);
+        } else {
+            const roleSelect = document.getElementById('user-roles');
+            selectedRoles = Array.from(roleSelect.selectedOptions).map(opt => opt.value);
+        }
 
         const data = {
             id: id,
@@ -596,6 +1073,21 @@
             status: document.getElementById('user-status').value,
             roles: selectedRoles
         };
+
+        const techSec = document.getElementById('technician-competency-section');
+        const isTech = techSec && !techSec.classList.contains('hidden');
+        if (isTech) {
+            data.technicianProfile = {
+                skill_level: parseInt(document.getElementById('tech-skill-level').value || '1'),
+                shift_code: document.getElementById('tech-shift-code').value || 'SHIFT_1',
+                skills: Array.from(document.querySelectorAll('.tech-skill-cb:checked')).map(cb => cb.value),
+                certifications: Array.from(document.querySelectorAll('.tech-cert-cb:checked')).map(cb => cb.value),
+                zone_id: document.getElementById('tech-zone').value || '',
+                floor_level: parseInt(document.getElementById('tech-floor').value || '1'),
+                coords_x: parseFloat(document.getElementById('tech-coords-x').value || '20.0'),
+                coords_y: parseFloat(document.getElementById('tech-coords-y').value || '20.0'),
+            };
+        }
         
         const method = id ? 'PUT' : 'POST';
         const btn = document.getElementById('btn-save-user');
@@ -830,12 +1322,34 @@
   }
 </style>
 <script>
+  window.ROLES_CAN_EXECUTE = {{ roles_can_execute_json|safe }};
+  window.USER_PROFILES = {{ user_profiles_json|safe }};
+
+  function checkTechnicianRoles() {
+      if (!window.userRolesSelect) return false;
+      const selected = window.userRolesSelect.getValue();
+      const roleArr = Array.isArray(selected) ? selected : (selected ? [selected] : []);
+      const canExecute = roleArr.some(roleId => window.ROLES_CAN_EXECUTE && window.ROLES_CAN_EXECUTE[roleId] === true);
+      const section = document.getElementById('technician-competency-section');
+      if (section) {
+          if (canExecute) {
+              section.classList.remove('hidden');
+          } else {
+              section.classList.add('hidden');
+          }
+      }
+      return canExecute;
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
       const tsSettings = {
           plugins: ['remove_button'],
           create: false,
           maxItems: null,
-          hideSelected: true
+          hideSelected: true,
+          onChange: function() {
+              checkTechnicianRoles();
+          }
       };
       if (document.getElementById('user-roles')) {
           window.userRolesSelect = new TomSelect('#user-roles', tsSettings);

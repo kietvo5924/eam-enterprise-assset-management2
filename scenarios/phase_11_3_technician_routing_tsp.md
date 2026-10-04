@@ -28,6 +28,7 @@ Hệ thống điều phối bảo trì thông minh của EAM hoạt động theo
   - `Location`: Cấu trúc cây phân cấp (`parent_id`, `type`: `SITE`, `BUILDING`, `FLOOR`, `ROOM`), ảnh sơ đồ 2D (nếu có).
   - `Asset`: Tọa độ $(X, Y)$ (nếu có), vị trí hiện tại (`current_location_id`).
   - `WorkOrder`: Vị trí sự cố (`incident_location_id`), mức độ ưu tiên (`priority`), khung thời gian cho phép dừng máy (`maintenance_window_start`, `maintenance_window_end`).
+- **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn giải thuật tối ưu hóa lộ trình định tuyến (ma trận khoảng cách tô-pô phân cấp, ATSP / TSPTW solver, tìm kiếm cục bộ Or-opt, và dynamic mid-shift re-routing) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/tsp_routing/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật định tuyến khỏi các tầng controller/CRUD thông thường.
 
 ---
 
