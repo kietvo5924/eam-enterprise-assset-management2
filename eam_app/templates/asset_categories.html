@@ -2893,25 +2893,78 @@
         return !isNaN(cx) && !isNaN(cy) && (cx > 0 || cy > 0);
     }
 
+    // Helper: Tìm ID mặt bằng gốc của một khu vực (xử lý quan hệ phân cấp cha con, ltree dot-path)
+    function getZoneFloorplanId(loc) {
+        if (!loc) return '';
+        if (loc.zone_type === 'FLOORPLAN') return String(loc.id);
+
+        let curr = loc;
+        let visited = new Set();
+        while (curr) {
+            const cid = String(curr.id);
+            if (visited.has(cid)) break;
+            visited.add(cid);
+
+            if (curr.zone_type === 'FLOORPLAN') return String(curr.id);
+
+            const pid = curr.parent_id ? String(curr.parent_id).trim() : '';
+            if (!pid) break;
+
+            // Kiểm tra xem pid có khớp trực tiếp hoặc tiền tố ltree với Mặt bằng không
+            const fp = (floorplansData || []).find(f => 
+                String(f.id) === pid || 
+                (f.code && f.code.trim() === pid) || 
+                (f.name && f.name.trim() === pid) ||
+                pid.startsWith(String(f.id) + '.') ||
+                (f.code && pid.startsWith(f.code.trim() + '.'))
+            );
+            if (fp) return String(fp.id);
+
+            // Duyệt ngược lên qua khu vực cha
+            const parentLoc = (locationsData || []).find(l => 
+                String(l.id) === pid || 
+                (l.code && l.code.trim() === pid) || 
+                (l.name && l.name.trim() === pid)
+            );
+            if (!parentLoc) break;
+            if (parentLoc.zone_type === 'FLOORPLAN') return String(parentLoc.id);
+            curr = parentLoc;
+        }
+
+        // Nếu tenant chỉ có duy nhất 1 mặt bằng thì mặc định khu vực thuộc mặt bằng đó
+        if (floorplansData && floorplansData.length === 1) {
+            return String(floorplansData[0].id);
+        }
+        return '';
+    }
+
     // Kiểm tra 2 khu vực có bị xung đột / đè lấn bất hợp lệ không
     // QUY TẮC CỐT LÕI:
-    // 1. Nếu một phòng nằm trọn trong hoặc sát góc/mép tường trong của xưởng lớn (quan hệ lồng nhau),
+    // 1. Phải cùng Mặt bằng (Floorplan) và cùng Tầng (Floor Level). Khác mặt bằng thì không thể đè lấn.
+    // 2. Nếu một phòng nằm trọn trong hoặc sát góc/mép tường trong của xưởng lớn (quan hệ lồng nhau),
     //    đó là quan hệ Phân cấp Cha - Con hoàn toàn hợp lệ -> KHÔNG BÁO ĐỎ (return false).
-    // 2. Chỉ khi 2 khu vực ngang hàng bị đè lấn một phần lên nhau (cắt lấn viền tường nửa trong nửa ngoài),
+    // 3. Chỉ khi 2 khu vực ngang hàng bị đè lấn một phần lên nhau (cắt lấn viền tường nửa trong nửa ngoài),
     //    mới tính là xung đột mặt bằng và báo đỏ (return true).
     function checkTwoZonesOverlap(locA, locB) {
         if (!locA || !locB || String(locA.id) === String(locB.id)) return false;
         if (!isZonePlaced(locA) || !isZonePlaced(locB)) return false;
+        
+        // 1. Phải cùng tầng
         const floorA = parseInt(locA.floor_level) || 1;
         const floorB = parseInt(locB.floor_level) || 1;
         if (floorA !== floorB) return false;
+
+        // 2. Phải cùng Mặt bằng (Tòa nhà / Floorplan)
+        const fpA = getZoneFloorplanId(locA);
+        const fpB = getZoneFloorplanId(locB);
+        if (!fpA || !fpB || fpA !== fpB) return false;
 
         const ptsA = getZonePoints(locA);
         const ptsB = getZonePoints(locB);
         const bbA = getPolygonBoundingBox(ptsA);
         const bbB = getPolygonBoundingBox(ptsB);
 
-        // 1. Kiểm tra va chạm khung bao ngoài (dung sai 0.4m cho phép 2 phòng đứng sát vách nhau)
+        // 3. Kiểm tra va chạm khung bao ngoài (dung sai 0.4m cho phép 2 phòng đứng sát vách nhau)
         const interMinX = Math.max(bbA.minX, bbB.minX);
         const interMaxX = Math.min(bbA.maxX, bbB.maxX);
         const interMinY = Math.max(bbA.minY, bbB.minY);
@@ -2925,7 +2978,7 @@
             return false;
         }
 
-        // 2. Kiểm tra quan hệ lồng nhau (Một phòng nhỏ nằm lọt lòng trong khu vực lớn)
+        // 4. Kiểm tra quan hệ lồng nhau (Một phòng nhỏ nằm lọt lòng trong khu vực lớn)
         const areaA = getPolygonArea(ptsA);
         const areaB = getPolygonArea(ptsB);
         const TOL = 0.6; // Dung sai 0.6m để cho phép phòng con nằm tựa sát góc tường ngoài của xưởng cha
@@ -2952,7 +3005,7 @@
             }
         }
 
-        // 3. Nếu là đa giác chữ L/U: kiểm tra xem vùng giao nhau có thực sự chạm vào phần thân đa giác không
+        // 5. Nếu là đa giác chữ L/U: kiểm tra xem vùng giao nhau có thực sự chạm vào phần thân đa giác không
         const interCx = (interMinX + interMaxX) / 2;
         const interCy = (interMinY + interMaxY) / 2;
         const inA = isPointInPolygon({ x: interCx, y: interCy }, ptsA);
@@ -2963,7 +3016,7 @@
             return false;
         }
 
-        // 4. Cả 2 đều giao nhau và không phải quan hệ lồng nhau -> XUNG ĐỘT TRÙNG ĐÈ!
+        // 6. Cả 2 đều giao nhau và không phải quan hệ lồng nhau -> XUNG ĐỘT TRÙNG ĐÈ!
         return true;
     }
 
@@ -2984,24 +3037,6 @@
         return overlaps;
     }
 
-    // Helper: Tìm ID mặt bằng gốc của một khu vực (xử lý quan hệ phân cấp cha con)
-    function getZoneFloorplanId(loc) {
-        if (!loc) return '';
-        let curr = loc;
-        let visited = new Set();
-        while (curr && !visited.has(String(curr.id))) {
-            visited.add(String(curr.id));
-            if (curr.zone_type === 'FLOORPLAN') return String(curr.id);
-            if (!curr.parent_id) break;
-            const pid = String(curr.parent_id);
-            const p = (locationsData || []).find(l => String(l.id) === pid || (l.code && l.code === pid) || (l.name && l.name === pid));
-            if (!p) break;
-            if (p.zone_type === 'FLOORPLAN') return String(p.id);
-            curr = p;
-        }
-        return String(loc.parent_id || '');
-    }
-
     // Helper: Tính toán toàn bộ các cặp khu vực bị đè lấn nhau (trả về Map: zoneId -> [Tên các khu vực bị đè])
     function computeAllZoneOverlaps(filterFloorplanId = null) {
         const overlapMap = new Map();
@@ -3010,17 +3045,24 @@
         for (let i = 0; i < placed.length; i++) {
             const locA = placed[i];
             const fpA = getZoneFloorplanId(locA);
-            if (filterFloorplanId && fpA && fpA !== String(filterFloorplanId)) continue;
+            // Nếu lọc theo một mặt bằng cụ thể: locA bắt buộc phải thuộc mặt bằng đó
+            if (filterFloorplanId) {
+                if (fpA !== String(filterFloorplanId)) continue;
+            }
             const flA = parseInt(locA.floor_level) || 1;
 
             for (let j = i + 1; j < placed.length; j++) {
                 const locB = placed[j];
                 const fpB = getZoneFloorplanId(locB);
-                if (filterFloorplanId && fpB && fpB !== String(filterFloorplanId)) continue;
-                const flB = parseInt(locB.floor_level) || 1;
+                // Nếu lọc theo một mặt bằng cụ thể: locB bắt buộc phải thuộc mặt bằng đó
+                if (filterFloorplanId) {
+                    if (fpB !== String(filterFloorplanId)) continue;
+                } else {
+                    // Cây phân cấp toàn cục: chỉ so sánh khi 2 khu vực cùng thuộc 1 mặt bằng xác định
+                    if (!fpA || !fpB || fpA !== fpB) continue;
+                }
 
-                // Chỉ tính xung đột khi cùng mặt bằng và cùng tầng
-                if (fpA && fpB && fpA !== fpB) continue;
+                const flB = parseInt(locB.floor_level) || 1;
                 if (flA !== flB) continue;
 
                 if (checkTwoZonesOverlap(locA, locB)) {
@@ -4336,49 +4378,7 @@
             }
         }
         const curFpId = String(currentFloorplanId);
-        const curFp = floorplansData.find(f => String(f.id) === curFpId);
-        const curFpCode = curFp ? (curFp.code || '').trim() : '';
-        const curFpName = curFp ? (curFp.name || '').trim() : '';
-
-        // Direct parent match
-        const pid = l.parent_id ? String(l.parent_id).trim() : '';
-        if (!pid) {
-            return floorplansData.length > 0 && String(floorplansData[0].id) === curFpId;
-        }
-        if (pid === curFpId || (curFpCode && pid === curFpCode) || (curFpName && pid === curFpName)) {
-            return true;
-        }
-        if (pid.startsWith(curFpId + '.') || (curFpCode && pid.startsWith(curFpCode + '.'))) {
-            return true;
-        }
-
-        // Ancestor hierarchy traversal for nested sub-zones
-        let curr = l;
-        let visited = new Set();
-        while (curr) {
-            if (visited.has(String(curr.id))) break;
-            visited.add(String(curr.id));
-
-            const curPid = curr.parent_id ? String(curr.parent_id).trim() : '';
-            if (!curPid) {
-                return floorplansData.length > 0 && String(floorplansData[0].id) === curFpId;
-            }
-            if (curPid === curFpId || (curFpCode && curPid === curFpCode) || (curFpName && curPid === curFpName)) {
-                return true;
-            }
-            if (curPid.startsWith(curFpId + '.') || (curFpCode && curPid.startsWith(curFpCode + '.'))) {
-                return true;
-            }
-
-            const parentLoc = locationsData.find(p => String(p.id) === curPid || (p.code && p.code === curPid) || (p.name && p.name === curPid));
-            if (!parentLoc) break;
-            if (parentLoc.zone_type === 'FLOORPLAN') {
-                return String(parentLoc.id) === curFpId || (curFpCode && parentLoc.code === curFpCode);
-            }
-            curr = parentLoc;
-        }
-
-        return false;
+        return getZoneFloorplanId(l) === curFpId;
     }
 
     function getStudioFloorLocations() {
