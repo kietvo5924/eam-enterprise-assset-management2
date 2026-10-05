@@ -186,6 +186,7 @@
               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
           },
           body: JSON.stringify({ 
+              email: (document.getElementById('forgotEmail') ? document.getElementById('forgotEmail').value : '').trim(),
               code: document.getElementById('resetCode').value,
               newPassword: document.getElementById('resetNewPassword').value
           })

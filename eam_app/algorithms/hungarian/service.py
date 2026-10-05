@@ -298,6 +298,18 @@ class HungarianAssignmentService:
             "workOrders": [s.display_name for s in active_slots] + [f"{b['workOrderTitle']} (Blocked)" for b in blocked_wos]
         }
 
+        available_techs = [
+            {
+                "id": str(t.user_id),
+                "name": get_user_display_name(t.user),
+                "username": t.user.username,
+                "skillLevel": t.skill_level,
+                "skills": t.skills or [],
+                "zoneId": t.zone_id or ""
+            }
+            for t in sorted_techs
+        ]
+
         return {
             "totalOptimalCost": total_optimal_cost,
             "assignmentsCount": len(assignments),
@@ -306,6 +318,7 @@ class HungarianAssignmentService:
             "unassignedSlots": unassigned_slots_list,
             "blockedWorkOrders": blocked_wos,
             "sharedToolConflicts": shared_tool_conflicts,
+            "availableTechnicians": available_techs,
             "matrixHeader": matrix_header,
             "costMatrix": raw_matrix
         }

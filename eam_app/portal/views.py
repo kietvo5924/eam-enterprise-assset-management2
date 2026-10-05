@@ -359,7 +359,11 @@ def portal_reset_password(request):
             if not new_password or len(new_password) < 6:
                 return JsonResponse({'success': False, 'error': 'New password must be at least 6 characters long.'}, status=400)
                 
-            user = User.all_objects.filter(reset_token=code).first()
+            email = (data.get('email') or '').strip().lower()
+            if email:
+                user = User.all_objects.filter(email=email, reset_token=code).first()
+            else:
+                user = User.all_objects.filter(reset_token=code).first()
             if not user:
                 return JsonResponse({'success': False, 'error': 'Invalid or incorrect reset code.'}, status=400)
                 

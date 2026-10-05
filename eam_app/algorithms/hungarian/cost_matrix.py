@@ -455,7 +455,14 @@ def evaluate_pair_cost(tech_profile, wo_slot, active_workload: int = 0,
             "shiftPenalty": BIG_M,
             "disruptionPenalty": 0.0,
             "isHardViolation": True,
-            "violationReason": "; ".join(reasons_hard)
+            "violationReason": "; ".join(reasons_hard),
+            "distance_cost": 0.0,
+            "skill_cost": 0.0,
+            "workload_cost": 0.0,
+            "priority_multiplier": PRIORITY_MULTIPLIERS.get(wo.priority, 1.0),
+            "zone_penalty": 0.0,
+            "shift_penalty": BIG_M,
+            "disruption_penalty": 0.0,
         }
         explanation = f"VI PHẠM RÀNG BUỘC CỨNG Big-M: {'; '.join(reasons_hard)}."
         return BIG_M, breakdown, explanation
@@ -492,7 +499,14 @@ def evaluate_pair_cost(tech_profile, wo_slot, active_workload: int = 0,
         "shiftPenalty": shift_pen,
         "disruptionPenalty": disrupt_pen,
         "isHardViolation": False,
-        "violationReason": ""
+        "violationReason": "",
+        "distance_cost": dist_score,
+        "skill_cost": skill_score,
+        "workload_cost": workload_score,
+        "priority_multiplier": multiplier,
+        "zone_penalty": zone_pen,
+        "shift_penalty": shift_pen,
+        "disruption_penalty": disrupt_pen,
     }
 
     # Generate Explainable Narrative for UI Tooltip

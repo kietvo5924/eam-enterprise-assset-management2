@@ -415,18 +415,19 @@ class ForgotPasswordView(APIView):
         if not email:
             raise ValidationError("Email is required")
 
-        # Java logic: Get the first active user across tenants (or all users by email)
-        users = User.all_objects.filter(email=email)
+        email_clean = email.strip().lower()
+        users = User.all_objects.filter(email=email_clean)
         if users.exists():
             user = users.first()
-            import random
+            import secrets
             from django.utils import timezone
             import datetime
 
-            code = f"{random.randint(0, 999999):06d}"
+            # Cryptographically secure 6-digit OTP code
+            code = f"{secrets.randbelow(1000000):06d}"
             user.reset_token = code
             user.reset_token_expiry = timezone.now() + datetime.timedelta(minutes=15)
-            user.save()
+            user.save(update_fields=['reset_token', 'reset_token_expiry'])
 
             # Sending email
             from django.core.mail import send_mail
@@ -442,7 +443,7 @@ class ForgotPasswordView(APIView):
                 subject="EAM System - Password Reset Code",
                 message=message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
+                recipient_list=[email_clean],
                 fail_silently=False,
             )
 
@@ -454,28 +455,38 @@ class ResetPasswordView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        code = request.data.get('code')
+        code = str(request.data.get('code') or '').strip()
         new_password = request.data.get('newPassword')
+        email = request.data.get('email')
 
         if not code or not new_password:
             raise ValidationError("code and newPassword are required")
 
-        # In Django, our token might not be unique if we didn't enforce it, 
-        # but for this logic we just find the user with the valid token.
+        if len(code) != 6:
+            return Response({"success": False, "message": "Mã xác thực phải gồm 6 chữ số."}, status=400)
+
+        if len(new_password) < 6:
+            return Response({"success": False, "message": "Mật khẩu mới phải có ít nhất 6 ký tự."}, status=400)
+
         from django.utils import timezone
-        user = User.all_objects.filter(reset_token=code).first()
+
+        # Anti-brute force: Verify against specific email if provided
+        if email:
+            user = User.all_objects.filter(email=email.strip().lower(), reset_token=code).first()
+        else:
+            user = User.all_objects.filter(reset_token=code).first()
 
         if user:
             if user.reset_token_expiry and user.reset_token_expiry > timezone.now():
                 user.set_password(new_password)
                 user.reset_token = None
                 user.reset_token_expiry = None
-                user.save()
-                return success_response(None)
+                user.save(update_fields=['password', 'reset_token', 'reset_token_expiry'])
+                return success_response(None, message="Mật khẩu đã được đặt lại thành công.")
             else:
-                return Response({"success": False, "message": "Reset code has expired"}, status=400)
+                return Response({"success": False, "message": "Mã xác thực đã hết hạn (15 phút). Vui lòng yêu cầu mã mới."}, status=400)
         
-        return Response({"success": False, "message": "Invalid reset code"}, status=400)
+        return Response({"success": False, "message": "Mã xác thực không hợp lệ hoặc không khớp."}, status=400)
 
 
 class UserMeProfileView(APIView):

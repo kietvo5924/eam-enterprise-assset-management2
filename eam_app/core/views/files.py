@@ -16,6 +16,21 @@ class FileUploadView(APIView):
         if not file_obj:
             raise ValidationError("No file provided")
 
+        ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.svg'}
+        ALLOWED_MIME_TYPES = {'image/png', 'image/jpeg', 'image/pjpeg', 'image/webp', 'image/svg+xml'}
+        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+        extension = os.path.splitext(file_obj.name)[1].lower()
+        if extension not in ALLOWED_EXTENSIONS:
+            raise ValidationError(f"Định dạng tệp '{extension}' không được phép. Chỉ chấp nhận các định dạng ảnh: .png, .jpg, .jpeg, .webp, .svg")
+
+        content_type = getattr(file_obj, 'content_type', '').lower()
+        if content_type and content_type not in ALLOWED_MIME_TYPES:
+            raise ValidationError(f"Loại nội dung '{content_type}' không hợp lệ cho hình ảnh logo.")
+
+        if file_obj.size > MAX_FILE_SIZE:
+            raise ValidationError("Kích thước tệp vượt quá giới hạn tối đa cho phép (5MB).")
+
         try:
             client = Minio(
                 settings.MINIO_ENDPOINT,

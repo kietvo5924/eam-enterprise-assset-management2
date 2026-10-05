@@ -25,3 +25,9 @@ db.sqlite3
 firebase_credentials.json
 *google-services*.json
 google-services.json
+
+# Temporary & Disposable Test Scripts
+*live_chrome*.py
+*test_chrome*.py
+*_temp*.py
+*_scratch*.py
