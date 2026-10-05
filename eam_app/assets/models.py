@@ -4,6 +4,7 @@ import uuid
 
 class Location(BaseTenantModel):
     ZONE_TYPE_CHOICES = (
+        ('FLOORPLAN', 'Mặt bằng tổng thể'),
         ('STANDARD', 'Tiêu chuẩn'),
         ('CONTROLLED', 'Kiểm soát đặc thù / Phòng sạch'),
         ('GENERAL', 'Chung / Toàn nhà máy'),

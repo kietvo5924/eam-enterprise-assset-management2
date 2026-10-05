@@ -649,12 +649,26 @@ def portal_users(request):
 
     # Available Zones & Locations Master Data
     from assets.models import Location
-    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image'))
+    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
     loc_codes = [l['code'] for l in locations_list if l['code']]
     asset_zones = list(Asset.objects.filter(tenant_id=tenant_id).exclude(zone_id='').values_list('zone_id', flat=True).distinct())
     available_zones = sorted(list(set(loc_codes + asset_zones)))
     if not available_zones:
         available_zones = ['ZONE_MAIN', 'ZONE_PRESS', 'ZONE_CLEANROOM', 'ZONE_WAREHOUSE']
+
+    floorplans_list = [l for l in locations_list if l['zone_type'] == 'FLOORPLAN']
+    if not floorplans_list:
+        fps_objs = Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True)
+        if not fps_objs.exists():
+            default_fp = Location.objects.create(
+                tenant_id=tenant_id,
+                name='Mặt Bằng Nhà Máy Chính',
+                code='MB-MAIN-' + str(tenant_id)[:4].upper(),
+                zone_type='FLOORPLAN',
+                floor_level=1,
+                is_active=True
+            )
+            floorplans_list = [{'id': default_fp.id, 'name': default_fp.name, 'code': default_fp.code, 'zone_type': 'FLOORPLAN'}]
 
     from users.models import WorkforceSkill, CertificationType, ShiftTemplate
     workforce_skills = list(WorkforceSkill.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name', 'category'))
@@ -669,6 +683,8 @@ def portal_users(request):
         'available_zones': available_zones,
         'locations_list': locations_list,
         'locations_json': json.dumps(locations_list, default=str),
+        'floorplans_list': floorplans_list,
+        'floorplans_json': json.dumps(floorplans_list, default=str),
         'workforce_skills': workforce_skills,
         'certification_types': certification_types,
         'shift_templates': shift_templates,
@@ -857,12 +873,22 @@ def portal_asset_categories(request):
         dim_match = re.search(r'\[DIM:([\d\.]+)x([\d\.]+)\]', loc.description or '')
         w_m = float(dim_match.group(1)) if dim_match else 36.0
         h_m = float(dim_match.group(2)) if dim_match else 26.0
+        raw_desc = loc.description or ''
+        clean_d = raw_desc
+        if raw_desc.strip().startswith('{'):
+            try:
+                parsed_desc = json.loads(raw_desc)
+                if isinstance(parsed_desc, dict):
+                    clean_d = parsed_desc.get('description') or ''
+            except Exception:
+                pass
         loc_list.append({
             'id': str(loc.id),
             'name': loc.name,
             'code': loc.code or '',
             'zone_type': loc.zone_type,
-            'description': loc.description or '',
+            'description': clean_d,
+            'raw_description': raw_desc,
             'parent_id': loc.parent_id or '',
             'center_x': loc.center_x,
             'center_y': loc.center_y,
@@ -926,11 +952,69 @@ def portal_asset_categories(request):
     factory_dim_loc = Location.objects.filter(tenant_id=tenant_id, code='__FACTORY_DIMENSIONS__').first()
     factory_dim_json = factory_dim_loc.description if (factory_dim_loc and factory_dim_loc.description) else '{}'
 
+    # Multi-Floorplan Master Data
+    floorplans_qs = Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True).order_by('name')
+    floorplans_list = []
+    for fp in floorplans_qs:
+        fp_desc = {}
+        raw_desc = fp.description or ''
+        try:
+            fp_desc = json.loads(raw_desc) if raw_desc else {}
+            if not isinstance(fp_desc, dict): fp_desc = {'description': raw_desc}
+        except Exception:
+            fp_desc = {'description': raw_desc}
+        floorplans_list.append({
+            'id': str(fp.id),
+            'name': fp.name,
+            'code': fp.code or '',
+            'description': fp_desc.get('description') or raw_desc or '',
+            'floor_level': fp.floor_level or 1,
+            'width_m': float(fp_desc.get('width_m') or 120.0),
+            'height_m': float(fp_desc.get('height_m') or 80.0),
+            'building_shape': fp_desc.get('building_shape') or 'RECTANGLE',
+            'polygon_points': fp_desc.get('polygon_points') or [],
+            'spatials': fp_desc.get('spatials') or [],
+            'floorplan_image': fp.floorplan_image or '',
+            'is_active': fp.is_active
+        })
+
+    if not floorplans_list:
+        default_fp = Location.objects.create(
+            tenant_id=tenant_id,
+            name='Mặt Bằng Nhà Máy Chính',
+            code='MB-MAIN-' + str(tenant_id)[:4].upper(),
+            zone_type='FLOORPLAN',
+            floor_level=1,
+            is_active=True,
+            description=json.dumps({
+                'is_floorplan': True,
+                'width_m': 120.0,
+                'height_m': 80.0,
+                'building_shape': 'RECTANGLE',
+                'spatials': []
+            })
+        )
+        floorplans_list.append({
+            'id': str(default_fp.id),
+            'name': default_fp.name,
+            'code': default_fp.code,
+            'floor_level': 1,
+            'width_m': 120.0,
+            'height_m': 80.0,
+            'building_shape': 'RECTANGLE',
+            'polygon_points': [],
+            'spatials': [],
+            'floorplan_image': '',
+            'is_active': True
+        })
+
     return render(request, 'asset_categories.html', {
         'categories': categories,
         'templates': templates,
         'locations': loc_list,
         'locations_json': json.dumps(loc_list, default=str),
+        'floorplans': floorplans_list,
+        'floorplans_json': json.dumps(floorplans_list, default=str),
         'assets_list': assets_list,
         'assets_json': json.dumps(assets_list, default=str),
         'technicians_list': techs_list,
@@ -1069,28 +1153,58 @@ def portal_locations(request):
         try:
             import uuid
             data = json.loads(request.body)
-            name = data.get('name')
-            parent_id = data.get('parentId')
+            name = (data.get('name') or '').strip()
+            parent_id = data.get('parentId') or data.get('parent_id') or None
             code = (data.get('code') or '').strip().upper()
             zone_type = data.get('zone_type', 'STANDARD')
             floor_level = int(data.get('floor_level') or 1)
             center_x = float(data.get('center_x') or 25.0)
             center_y = float(data.get('center_y') or 20.0)
             floorplan_image = data.get('floorplan_image', '')
+
+            if not name:
+                return JsonResponse({'success': False, 'error': 'Tên không được để trống.'}, status=400)
+
+            if zone_type == 'FLOORPLAN':
+                parent_id = None
+                code = code or ('MB-' + str(uuid.uuid4())[:6].upper())
+                desc_val = data.get('description')
+                if any(k in data for k in ('width_m', 'height_m', 'building_shape', 'polygon_points', 'spatials')):
+                    desc_obj = {
+                        'is_floorplan': True,
+                        'width_m': float(data.get('width_m') or 120.0),
+                        'height_m': float(data.get('height_m') or 80.0),
+                        'building_shape': data.get('building_shape') or 'RECTANGLE',
+                        'description': (desc_val or '').strip(),
+                        'polygon_points': data.get('polygon_points') or [],
+                        'spatials': data.get('spatials') or []
+                    }
+                    description_to_save = json.dumps(desc_obj, ensure_ascii=False)
+                else:
+                    description_to_save = desc_val
+            else:
+                # MANDATORY: Zone MUST belong to a Floorplan
+                if not parent_id:
+                    return JsonResponse({'success': False, 'error': 'Khu vực bắt buộc phải trực thuộc một Mặt Bằng.'}, status=400)
+                parent_fp = Location.objects.filter(id=parent_id, tenant_id=tenant_id, is_active=True).first()
+                if not parent_fp:
+                    return JsonResponse({'success': False, 'error': 'Mặt Bằng được chọn không tồn tại hoặc đã bị khóa.'}, status=400)
+                code = code or ('LOC-' + str(uuid.uuid4())[:6].upper())
+                description_to_save = data.get('description')
             
             if Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exists():
-                return JsonResponse({'success': False, 'error': 'Location name already exists under this parent'}, status=400)
+                return JsonResponse({'success': False, 'error': 'Tên này đã tồn tại trong cùng cấp phân nhóm.'}, status=400)
             
             l = Location.objects.create(
                 tenant_id=tenant_id,
                 name=name,
-                code=code or ('LOC-' + str(uuid.uuid4())[:6].upper()),
+                code=code,
                 zone_type=zone_type,
                 floor_level=floor_level,
                 center_x=center_x,
                 center_y=center_y,
                 floorplan_image=floorplan_image or '',
-                description=data.get('description'),
+                description=description_to_save,
                 parent_id=parent_id,
                 is_active=data.get('is_active', True)
             )
@@ -1104,16 +1218,34 @@ def portal_locations(request):
         try:
             data = json.loads(request.body)
             l = Location.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            name = data.get('name')
-            parent_id = data.get('parentId')
+            name = (data.get('name') or l.name).strip()
+            zone_type = data.get('zone_type', l.zone_type)
+            parent_id = data.get('parentId') if 'parentId' in data else (data.get('parent_id') if 'parent_id' in data else l.parent_id)
+
+            if zone_type != 'FLOORPLAN' and l.zone_type != 'FLOORPLAN':
+                if not parent_id:
+                    return JsonResponse({'success': False, 'error': 'Khu vực bắt buộc phải trực thuộc một Mặt Bằng.'}, status=400)
             
-            if (name != l.name or parent_id != l.parent_id) and Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exists():
-                return JsonResponse({'success': False, 'error': 'Location name already exists under this parent'}, status=400)
+            if (name != l.name or parent_id != l.parent_id) and Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exclude(id=l.id).exists():
+                return JsonResponse({'success': False, 'error': 'Tên này đã tồn tại trong cùng cấp phân nhóm.'}, status=400)
                 
             l.name = name
-            if 'description' in data:
+            if (zone_type == 'FLOORPLAN' or l.zone_type == 'FLOORPLAN') and any(k in data for k in ('width_m', 'height_m', 'building_shape', 'polygon_points', 'spatials')):
+                try:
+                    cur_desc = json.loads(l.description) if l.description else {}
+                    if not isinstance(cur_desc, dict): cur_desc = {'description': l.description or ''}
+                except Exception:
+                    cur_desc = {'description': l.description or ''}
+                if 'description' in data: cur_desc['description'] = data.get('description')
+                if 'width_m' in data: cur_desc['width_m'] = float(data.get('width_m') or 120.0)
+                if 'height_m' in data: cur_desc['height_m'] = float(data.get('height_m') or 80.0)
+                if 'building_shape' in data: cur_desc['building_shape'] = data.get('building_shape') or 'RECTANGLE'
+                if 'polygon_points' in data: cur_desc['polygon_points'] = data.get('polygon_points')
+                if 'spatials' in data: cur_desc['spatials'] = data.get('spatials')
+                l.description = json.dumps(cur_desc, ensure_ascii=False)
+            elif 'description' in data:
                 l.description = data.get('description')
-            if 'parentId' in data:
+            if 'parentId' in data or 'parent_id' in data:
                 l.parent_id = parent_id
             if 'is_active' in data:
                 l.is_active = data.get('is_active')
@@ -1180,6 +1312,12 @@ def portal_asset_registry(request):
             category_id = data.get('category_id')
             location_id = data.get('location_id')
             template_id = data.get('hierarchy_template_id')
+            zone_id_val = data.get('zone_id') or ''
+            if location_id and not zone_id_val:
+                t_loc = Location.objects.filter(id=location_id, tenant_id=tenant_id).first()
+                if t_loc and t_loc.zone_type != 'FLOORPLAN':
+                    zone_id_val = t_loc.code or t_loc.name
+
             a = Asset.objects.create(
                 tenant_id=tenant_id,
                 name=data.get('name'),
@@ -1189,6 +1327,7 @@ def portal_asset_registry(request):
                 status=data.get('status', 'OPERATIONAL'),
                 category_id=category_id if category_id else None,
                 location_id=location_id if location_id else None,
+                zone_id=zone_id_val,
                 hierarchy_template_id=template_id if template_id else None,
                 parent_id=data.get('parent_id') or None,
                 manufacturer=data.get('manufacturer') or None,
@@ -1220,6 +1359,10 @@ def portal_asset_registry(request):
             if 'location_id' in data:
                 location_id = data.get('location_id')
                 a.location_id = location_id if location_id else None
+                if location_id:
+                    t_loc = Location.objects.filter(id=location_id, tenant_id=tenant_id).first()
+                    if t_loc and t_loc.zone_type != 'FLOORPLAN':
+                        a.zone_id = t_loc.code or t_loc.name
 
             if 'hierarchy_template_id' in data:
                 template_id = data.get('hierarchy_template_id')
@@ -1276,24 +1419,94 @@ def portal_asset_registry(request):
         ltree = re.sub(r'^[\._]+|[\._]+$', '', ltree)
         return ltree
 
-    # Build Tree Data
-    def build_location_tree(parent_path=None):
+    floorplans = [l for l in locations_list if l.zone_type == 'FLOORPLAN']
+    zones = [l for l in locations_list if l.zone_type != 'FLOORPLAN' and not l.code.startswith('__')]
+    
+    floorplans_data = [{'id': str(fp.id), 'name': fp.name, 'code': fp.code} for fp in floorplans]
+    zones_data = [{'id': str(z.id), 'name': z.name, 'code': z.code, 'parent_id': str(z.parent_id or ''), 'floor_level': z.floor_level, 'center_x': z.center_x, 'center_y': z.center_y} for z in zones]
+
+    # Build 2-Tier Tree Data (Floorplan -> Zones)
+    def build_location_tree(parent_fp_id=None):
         nodes = []
-        for loc in locations_list:
-            if loc.parent_id == parent_path or (parent_path is None and not loc.parent_id):
-                loc_assets = [a for a in assets if str(a.location_id) == str(loc.id)]
-                loc_path = f"{loc.parent_id}.{format_to_ltree(loc.name)}" if loc.parent_id else format_to_ltree(loc.name)
+        if parent_fp_id is None:
+            # Root level: Floorplans
+            for fp in floorplans:
+                child_zones_of_fp = [z for z in zones if str(z.parent_id) == str(fp.id)]
+                child_zone_codes = {z.code for z in child_zones_of_fp if z.code}
+                child_zone_names = {z.name for z in child_zones_of_fp if z.name}
+                child_zone_ids = {str(z.id) for z in child_zones_of_fp}
+
+                def asset_belongs_to_child(a):
+                    if a.location_id and str(a.location_id) in child_zone_ids:
+                        return True
+                    if a.zone_id and (a.zone_id in child_zone_codes or a.zone_id in child_zone_names):
+                        return True
+                    return False
+
+                # Only assets assigned to fp that DO NOT belong to any child zone
+                fp_assets = [
+                    a for a in assets 
+                    if a.location and str(a.location.id) == str(fp.id) and not asset_belongs_to_child(a)
+                ]
                 nodes.append({
-                    'id': str(loc.id),
-                    'name': loc.name,
-                    'is_active': loc.is_active,
-                    'assets': loc_assets,
-                    'children': build_location_tree(loc_path)
+                    'id': str(fp.id),
+                    'name': fp.name,
+                    'code': fp.code,
+                    'zone_type': 'FLOORPLAN',
+                    'is_active': fp.is_active,
+                    'assets': fp_assets,
+                    'children': build_location_tree(str(fp.id))
+                })
+            # Also catch any legacy zones without parent
+            orphan_zones = [z for z in zones if not z.parent_id or not any(str(fp.id) == str(z.parent_id) for fp in floorplans)]
+            for oz in orphan_zones:
+                oz_assets = [
+                    a for a in assets 
+                    if str(a.location_id) == str(oz.id) or (
+                        not a.location_id and a.zone_id and (a.zone_id == oz.code or a.zone_id == oz.name)
+                    )
+                ]
+                nodes.append({
+                    'id': str(oz.id),
+                    'name': oz.name,
+                    'code': oz.code,
+                    'zone_type': oz.zone_type,
+                    'is_active': oz.is_active,
+                    'assets': oz_assets,
+                    'children': []
+                })
+        else:
+            # Child level: Zones under this floorplan
+            child_zones = [z for z in zones if str(z.parent_id) == str(parent_fp_id)]
+            for z in child_zones:
+                z_assets = [
+                    a for a in assets 
+                    if str(a.location_id) == str(z.id) or (
+                        (not a.location_id or str(a.location_id) == str(parent_fp_id)) and 
+                        a.zone_id and (a.zone_id == z.code or a.zone_id == z.name)
+                    )
+                ]
+                nodes.append({
+                    'id': str(z.id),
+                    'name': z.name,
+                    'code': z.code,
+                    'zone_type': z.zone_type,
+                    'is_active': z.is_active,
+                    'assets': z_assets,
+                    'children': []
                 })
         return nodes
         
     tree_locations = build_location_tree(None)
-    unassigned_assets = [a for a in assets if not a.location_id]
+    assigned_in_tree_ids = set()
+    def collect_tree_asset_ids(tree_nodes):
+        for n in tree_nodes:
+            for a in n.get('assets', []):
+                assigned_in_tree_ids.add(str(a.id))
+            collect_tree_asset_ids(n.get('children', []))
+    collect_tree_asset_ids(tree_locations)
+
+    unassigned_assets = [a for a in assets if str(a.id) not in assigned_in_tree_ids]
     
     context = {
         'assets': assets,
@@ -1301,6 +1514,9 @@ def portal_asset_registry(request):
         'tree_locations': tree_locations,
         'unassigned_assets': unassigned_assets,
         'locations': locations_list,
+        'floorplans': floorplans,
+        'floorplans_json': json.dumps(floorplans_data, default=str),
+        'zones_json': json.dumps(zones_data, default=str),
         'templates': HierarchyTemplate.objects.filter(tenant_id=tenant_id, is_active=True)
     }
     return render(request, 'asset_registry.html', context)
@@ -1611,6 +1827,7 @@ def portal_work_orders(request):
         assets_dict[str(a.id)] = {
             'name': a.name,
             'zone_id': a.zone_id or '',
+            'location_id': str(a.location_id) if a.location_id else '',
             'floor_level': a.floor_level or 1,
             'coords_x': a.coords_x if a.coords_x is not None else 0.0,
             'coords_y': a.coords_y if a.coords_y is not None else 0.0,
@@ -1630,12 +1847,14 @@ def portal_work_orders(request):
 
     # Available Zones & Locations Master Data
     from assets.models import Location
-    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image'))
+    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
     loc_codes = [l['code'] for l in locations_list if l['code']]
     asset_zones = list(Asset.objects.filter(tenant_id=tenant_id).exclude(zone_id='').values_list('zone_id', flat=True).distinct())
     available_zones = sorted(list(set(loc_codes + asset_zones)))
     if not available_zones:
         available_zones = ['ZONE_MAIN', 'ZONE_PRESS', 'ZONE_CLEANROOM', 'ZONE_WAREHOUSE']
+
+    floorplans_list = [l for l in locations_list if l['zone_type'] == 'FLOORPLAN']
 
     kpis = {
         'total': total_wos,
@@ -1656,6 +1875,8 @@ def portal_work_orders(request):
         'available_zones': available_zones,
         'locations_list': locations_list,
         'locations_json': json.dumps(locations_list, default=str),
+        'floorplans_list': floorplans_list,
+        'floorplans_json': json.dumps(floorplans_list, default=str),
         'wo_metadata_json': json.dumps(wo_metadata),
         'kpis': kpis
     })
@@ -2185,11 +2406,14 @@ def portal_workforce_tools(request):
             'center_x': l.center_x,
             'center_y': l.center_y,
             'description': l.description or '',
+            'parent_id': l.parent_id or '',
             'has_floorplan': bool(l.floorplan_image),
             'floorplan_image': l.floorplan_image or '',
         }
         for l in locations
     ]
+
+    floorplans_list = [l for l in locations_data if l['zone_type'] == 'FLOORPLAN']
 
     # Permission flags
     can_manage_workforce = check_perm(request, ['user:update', 'tenant:update'])
@@ -2211,6 +2435,8 @@ def portal_workforce_tools(request):
         'locations': locations,
         'locations_data': locations_data,
         'locations_json': json.dumps(locations_data, default=str),
+        'floorplans': floorplans_list,
+        'floorplans_json': json.dumps(floorplans_list, default=str),
         'stats': {
             'total_tools': len(tools),
             'total_instances': total_instances,
@@ -2506,6 +2732,38 @@ def portal_locations_api(request):
 
     if request.method == 'GET':
         locs = Location.objects.filter(tenant_id=tenant_id, is_active=True).exclude(code__startswith='__').order_by('name')
+        
+        # Floorplans list
+        fps = Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True).order_by('name')
+        fps_data = []
+        for fp in fps:
+            fp_desc = {}
+            try:
+                fp_desc = json.loads(fp.description or '{}') if fp.description else {}
+                if not isinstance(fp_desc, dict): fp_desc = {}
+            except Exception:
+                fp_desc = {}
+            fps_data.append({
+                'id': str(fp.id),
+                'name': fp.name,
+                'code': fp.code or '',
+                'floor_level': fp.floor_level or 1,
+                'width_m': float(fp_desc.get('width_m') or 120.0),
+                'height_m': float(fp_desc.get('height_m') or 80.0),
+                'building_shape': fp_desc.get('building_shape') or 'RECTANGLE',
+                'polygon_points': fp_desc.get('polygon_points') or [],
+                'spatials': fp_desc.get('spatials') or [],
+                'floorplan_image': fp.floorplan_image or '',
+            })
+
+        req_type = request.GET.get('type')
+        if req_type == 'floorplans':
+            return JsonResponse({'success': True, 'data': fps_data})
+
+        req_fp_id = request.GET.get('floorplan_id')
+        if req_fp_id:
+            locs = locs.filter(parent_id=req_fp_id)
+
         data = [
             {
                 'id': str(l.id),
@@ -2530,6 +2788,7 @@ def portal_locations_api(request):
         return JsonResponse({
             'success': True,
             'data': data,
+            'floorplans': fps_data,
             'spatials': spatials_data,
             'factory_dim': factory_dim_data
         })
@@ -2728,11 +2987,17 @@ def portal_locations_api(request):
                             poly_pts = z_item.get('polygon_points')
                             poly_str = f" [POLYGON:{json.dumps(poly_pts)}]" if poly_pts else ""
                             desc = (z_item.get('description') or 'Khu vực mặt bằng mới') + f" [DIM:{w_m}x{h_m}]{poly_str}"
+                            current_fp_id = data.get('floorplan_id')
+                            if not current_fp_id:
+                                first_fp = Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True).first()
+                                if first_fp:
+                                    current_fp_id = str(first_fp.id)
+
                             new_loc = Location.objects.create(
                                 tenant_id=tenant_id,
                                 name=new_name,
                                 code=new_code,
-                                parent_id=z_item.get('parent_id') or None,
+                                parent_id=z_item.get('parent_id') or current_fp_id or None,
                                 zone_type=z_item.get('zone_type', 'STANDARD'),
                                 floor_level=int(z_item.get('floor_level', 1)),
                                 center_x=float(z_item.get('center_x', 25.0)),
@@ -2746,6 +3011,30 @@ def portal_locations_api(request):
 
                     # Lưu các thành phần cấu trúc không gian (Đường đi xe nâng, lối đi bộ, vách ngăn, dock...)
                     spatials = data.get('spatials')
+                    factory_dim = data.get('factory_dim')
+                    current_fp_id = data.get('floorplan_id')
+
+                    if current_fp_id:
+                        fp_target = Location.objects.filter(id=current_fp_id, tenant_id=tenant_id).first()
+                        if fp_target:
+                            fp_desc = {}
+                            try:
+                                fp_desc = json.loads(fp_target.description or '{}') if fp_target.description else {}
+                                if not isinstance(fp_desc, dict): fp_desc = {}
+                            except Exception:
+                                fp_desc = {}
+                            fp_desc['is_floorplan'] = True
+                            if factory_dim:
+                                fp_desc['width_m'] = float(factory_dim.get('width_m') or 120.0)
+                                fp_desc['height_m'] = float(factory_dim.get('height_m') or 80.0)
+                                fp_desc['building_shape'] = factory_dim.get('shape') or 'RECTANGLE'
+                                if 'polygon_points' in factory_dim:
+                                    fp_desc['polygon_points'] = factory_dim['polygon_points']
+                            if spatials is not None:
+                                fp_desc['spatials'] = spatials
+                            fp_target.description = json.dumps(fp_desc)
+                            fp_target.save()
+
                     if spatials is not None:
                         sp_loc, _ = Location.objects.get_or_create(
                             tenant_id=tenant_id,
@@ -2756,7 +3045,6 @@ def portal_locations_api(request):
                         sp_loc.save()
 
                     # Lưu thông số kích thước nhà xưởng
-                    factory_dim = data.get('factory_dim')
                     if factory_dim:
                         fd_loc, _ = Location.objects.get_or_create(
                             tenant_id=tenant_id,

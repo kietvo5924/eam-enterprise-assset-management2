@@ -350,7 +350,7 @@ def notify_work_order_assigned(work_order, assignee=None, is_reassigned=False, s
 
     # Title & Message with rich location details
     if is_urgent:
-        title = f"🚨 [KHẨN CẤP] Phân công sự cố: {work_order.title}"
+        title = f"🚨 [KHẨN CẤP] Phân công công việc: {work_order.title}"
     else:
         title = f"Phân công công việc: {work_order.title}"
 

@@ -176,6 +176,9 @@ def build_tenant_competency_catalog(tenant) -> Dict[str, Any]:
         'cert_code_to_names': {},      # code_token -> set of name_tokens
         'cert_name_to_codes': {},      # name_token -> set of code_tokens
         'user_valid_certs': {},        # user_id -> {'valid': set(), 'expired': set()}
+        'zone_to_floorplan': {},       # zone_token -> floorplan_id (str)
+        'floorplan_names': {},         # floorplan_id -> floorplan_name (str)
+        'floorplan_ids': set(),        # set of all floorplan IDs as str
     }
     if not tenant:
         return catalog
@@ -215,6 +218,29 @@ def build_tenant_competency_catalog(tenant) -> Dict[str, Any]:
                 catalog['user_valid_certs'][uid]['valid'].update([c_tok, n_tok])
             else:
                 catalog['user_valid_certs'][uid]['expired'].update([c_tok, n_tok])
+
+        # 4. Spatial Floorplans & Zones mapping (Multi-Facility ISA-95 Separation)
+        from assets.models import Location
+        locations = Location.objects.filter(tenant=tenant, is_active=True)
+        for loc in locations:
+            c_tok = normalize_text_token(loc.code)
+            n_tok = normalize_text_token(loc.name)
+            lid_tok = str(loc.id)
+            if loc.zone_type == 'FLOORPLAN':
+                catalog['floorplan_ids'].add(str(loc.id))
+                catalog['floorplan_names'][str(loc.id)] = loc.name
+                if c_tok:
+                    catalog['zone_to_floorplan'][c_tok] = str(loc.id)
+                if n_tok:
+                    catalog['zone_to_floorplan'][n_tok] = str(loc.id)
+                catalog['zone_to_floorplan'][lid_tok] = str(loc.id)
+            elif loc.parent_id:
+                pid = str(loc.parent_id)
+                if c_tok:
+                    catalog['zone_to_floorplan'][c_tok] = pid
+                if n_tok:
+                    catalog['zone_to_floorplan'][n_tok] = pid
+                catalog['zone_to_floorplan'][lid_tok] = pid
     except Exception:
         pass
 
@@ -333,6 +359,51 @@ def is_certification_satisfied(required_cert: str, tech_certs_list: list, tech_u
     return False
 
 
+def check_floorplan_hard_constraint(tech, wo, catalog: Dict[str, Any] = None) -> Tuple[bool, str]:
+    """
+    Evaluates whether technician and work order are in conflicting Floorplans.
+    If both belong to identified but different Floorplans, returns (True, violation_reason).
+    Exemptions:
+    - Technician zone is in GENERAL_ZONE_TOKENS (plant-wide / roving)
+    - WO zone is empty or in GENERAL_ZONE_TOKENS
+    - Either party has no assigned floorplan
+    """
+    if not catalog:
+        return False, ""
+
+    tech_zone_tok = normalize_text_token(getattr(tech, 'zone_id', ''))
+    wo_zone_tok = normalize_text_token(getattr(wo, 'zone_id', ''))
+
+    if not tech_zone_tok or not wo_zone_tok:
+        return False, ""
+    if tech_zone_tok in GENERAL_ZONE_TOKENS or wo_zone_tok in GENERAL_ZONE_TOKENS:
+        return False, ""
+    if any(g in tech_zone_tok for g in {'TOAN_NHA_MAY', 'TOAN_CONG_TY', 'CO_DONG', 'ROVING', 'ALL', 'CHUNG'}):
+        return False, ""
+    if any(g in wo_zone_tok for g in {'TOAN_NHA_MAY', 'TOAN_CONG_TY', 'CO_DONG', 'ROVING', 'ALL', 'CHUNG'}):
+        return False, ""
+
+    zone_to_fp = catalog.get('zone_to_floorplan', {})
+    fp_names = catalog.get('floorplan_names', {})
+
+    tech_fp = zone_to_fp.get(tech_zone_tok)
+    wo_fp = zone_to_fp.get(wo_zone_tok)
+
+    if not wo_fp:
+        raw_wo = getattr(wo, 'work_order', None)
+        if raw_wo:
+            asset = getattr(raw_wo, 'asset', None)
+            if asset and getattr(asset, 'location', None) and asset.location.parent_id:
+                wo_fp = str(asset.location.parent_id)
+
+    if tech_fp and wo_fp and tech_fp != wo_fp:
+        tech_name = fp_names.get(tech_fp, getattr(tech, 'zone_id', 'Mặt bằng hiện tại'))
+        wo_name = fp_names.get(wo_fp, getattr(wo, 'zone_id', 'Mặt bằng phiếu'))
+        return True, f"Khác mặt bằng cơ sở ({tech_name} ≠ {wo_name})"
+
+    return False, ""
+
+
 def evaluate_pair_cost(tech_profile, wo_slot, active_workload: int = 0,
                        has_in_progress: bool = False, current_time=None,
                        catalog: Dict[str, Any] = None) -> Tuple[float, Dict[str, Any], str]:
@@ -368,6 +439,11 @@ def evaluate_pair_cost(tech_profile, wo_slot, active_workload: int = 0,
     )
     if is_shift_hard:
         reasons_hard.append(f"Thời gian việc {wo.estimated_duration_hours}h vượt quá ca trực hơn 2h tăng ca")
+
+    # 1.4 Multi-Floorplan Hard Constraint (ISA-95 Multi-Facility Separation)
+    is_fp_hard, fp_reason = check_floorplan_hard_constraint(tech, wo, catalog=catalog)
+    if is_fp_hard:
+        reasons_hard.append(fp_reason)
 
     if reasons_hard:
         breakdown = {

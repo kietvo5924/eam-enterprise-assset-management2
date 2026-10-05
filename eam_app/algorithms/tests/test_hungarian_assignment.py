@@ -431,3 +431,64 @@ class HungarianAssignmentTestCase(TestCase):
         # Zone penalty should be 0.0 because Tech 1 is already inside Zone B
         self.assertEqual(bdown["zonePenalty"], 0.0)
 
+    def test_multi_floorplan_hard_constraint(self):
+        """
+        Rule Multi-Facility: Technicians stationed at Floorplan 1 cannot be assigned
+        to Work Orders in Floorplan 2 (incurs BIG_M penalty), unless roving/plant-wide.
+        """
+        from assets.models import Location
+        # Create Floorplan 1 and Floorplan 2
+        fp1 = Location.objects.create(
+            name="Nhà máy Sản xuất A",
+            code="FACILITY_A",
+            zone_type="FLOORPLAN",
+            tenant=self.tenant_a
+        )
+        fp2 = Location.objects.create(
+            name="Kho Logistics B",
+            code="FACILITY_B",
+            zone_type="FLOORPLAN",
+            tenant=self.tenant_a
+        )
+        # Create child zones under each floorplan
+        zone_a = Location.objects.create(
+            name="Xưởng Dập Thép A",
+            code="ZONE_PRESS_A",
+            zone_type="STANDARD",
+            parent_id=str(fp1.id),
+            tenant=self.tenant_a
+        )
+        zone_b = Location.objects.create(
+            name="Kho Pallet B",
+            code="ZONE_STORAGE_B",
+            zone_type="STANDARD",
+            parent_id=str(fp2.id),
+            tenant=self.tenant_a
+        )
+
+        # Tech A stationed in Facility A (Zone Press A)
+        u_a, p_a = self._create_tech("tech_facility_a", zone="ZONE_PRESS_A")
+        # Tech Roving (Plant-wide general pool)
+        u_rov, p_rov = self._create_tech("tech_roving", zone="CHUNG")
+
+        # Work Order in Facility B (Zone Storage B)
+        wo_b = self._create_wo(
+            "Repair Pallet Rack in Facility B",
+            zone="ZONE_STORAGE_B",
+            status="CREATED"
+        )
+
+        preview = HungarianAssignmentService.preview(tenant=self.tenant_a, work_order_ids=[wo_b.id])
+        self.assertEqual(preview["assignmentsCount"], 1)
+        assigned = preview["assignments"][0]
+
+        # The Roving tech MUST be assigned instead of Tech A who is blocked by Big-M
+        self.assertEqual(assigned["technicianId"], str(u_rov.id))
+
+        # Check cost matrix: Tech A vs WO B has Big-M hard violation
+        matrix = preview["costMatrix"]
+        tech_names = preview["matrixHeader"]["technicians"]
+        idx_a = tech_names.index(u_a.username)
+        cost_a_to_b = matrix[idx_a][0]
+        self.assertGreaterEqual(cost_a_to_b, 1000000.0)
+

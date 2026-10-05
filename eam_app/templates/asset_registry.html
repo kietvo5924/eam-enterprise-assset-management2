@@ -311,14 +311,20 @@
         <i class="ph ph-x text-xl"></i>
       </button>
     </div>
-    <div class="p-6">
-        <div class="mb-4">
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Vị trí mới</label>
-          <select id="move-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-              <option value="">-- Chọn vị trí --</option>
-              {% for loc in locations %}
-              <option value="{{ loc.id }}">{{ loc.name }}</option>
+    <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mặt Bằng mới</label>
+          <select id="move-floorplan" onchange="onMoveFloorplanChange(this.value)" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="">-- Chọn Mặt Bằng --</option>
+              {% for fp in floorplans %}
+              <option value="{{ fp.id }}">{{ fp.name }}</option>
               {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Khu Vực mới</label>
+          <select id="move-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+              <option value="">-- Chọn Khu Vực --</option>
           </select>
         </div>
         <div class="flex justify-end gap-3 pt-4 border-t border-neutral-100">
@@ -400,13 +406,19 @@
               <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Vị trí (Location)</label>
-            <select id="asset-location" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
-              <option value="">-- Chọn vị trí --</option>
-              {% for loc in locations %}
-              <option value="{{ loc.id }}">{{ loc.name }}</option>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mặt Bằng (Floorplan) <span class="text-danger">*</span></label>
+            <select id="asset-floorplan" onchange="onAssetFloorplanChange(this.value)" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="">-- Chọn Mặt Bằng --</option>
+              {% for fp in floorplans %}
+              <option value="{{ fp.id }}">{{ fp.name }}</option>
               {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Khu Vực (Zone / Room)</label>
+            <select id="asset-location" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="">-- Chọn Khu Vực --</option>
             </select>
           </div>
           <div class="md:col-span-2">
@@ -457,12 +469,18 @@
         </select>
       </div>
       <div>
-        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Vị trí</label>
-        <select id="bulk-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
-          <option value="">Tất cả vị trí</option>
-          {% for loc in locations %}
-          <option value="{{ loc.id }}">{{ loc.name }}</option>
+        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Mặt Bằng</label>
+        <select id="bulk-floorplan" onchange="onBulkFloorplanChange(this.value)" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
+          <option value="">Tất cả mặt bằng</option>
+          {% for fp in floorplans %}
+          <option value="{{ fp.id }}">{{ fp.name }}</option>
           {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Khu Vực</label>
+        <select id="bulk-location" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
+          <option value="">Tất cả khu vực</option>
         </select>
       </div>
       <div>
@@ -543,10 +561,63 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script id="floorplans-data" type="application/json">{{ floorplans_json|safe }}</script>
+<script id="zones-data" type="application/json">{{ zones_json|safe }}</script>
 <script>
   let treeCollapsed = false;
   let currentSelectedAssetId = null;
   let expandedNodes = JSON.parse(localStorage.getItem('assetTreeExpandedNodes') || '[]');
+
+  let floorplansData = [];
+  let zonesData = [];
+  try {
+    const fpEl = document.getElementById('floorplans-data');
+    if (fpEl) floorplansData = JSON.parse(fpEl.textContent || '[]');
+    const znEl = document.getElementById('zones-data');
+    if (znEl) zonesData = JSON.parse(znEl.textContent || '[]');
+  } catch(e) { console.error('Error parsing floorplans/zones data', e); }
+
+  function onAssetFloorplanChange(floorplanId, selectedLocationId = '') {
+    const locSelect = document.getElementById('asset-location');
+    if (!locSelect) return;
+    locSelect.innerHTML = '<option value="">-- Chọn Khu Vực --</option>';
+    if (!floorplanId) return;
+
+    const childZones = zonesData.filter(z => String(z.parent_id) === String(floorplanId));
+    childZones.forEach(z => {
+      const isSel = (selectedLocationId && String(z.id) === String(selectedLocationId)) ? 'selected' : '';
+      locSelect.innerHTML += `<option value="${z.id}" ${isSel}>${z.name} (${z.code || 'Khu vực'})</option>`;
+    });
+  }
+
+  function onMoveFloorplanChange(floorplanId, selectedLocationId = '') {
+    const locSelect = document.getElementById('move-location');
+    if (!locSelect) return;
+    locSelect.innerHTML = '<option value="">-- Chọn Khu Vực --</option>';
+    if (!floorplanId) return;
+
+    const childZones = zonesData.filter(z => String(z.parent_id) === String(floorplanId));
+    childZones.forEach(z => {
+      const isSel = (selectedLocationId && String(z.id) === String(selectedLocationId)) ? 'selected' : '';
+      locSelect.innerHTML += `<option value="${z.id}" ${isSel}>${z.name} (${z.code || 'Khu vực'})</option>`;
+    });
+  }
+
+  function onBulkFloorplanChange(floorplanId) {
+    const locSelect = document.getElementById('bulk-location');
+    if (!locSelect) return;
+    locSelect.innerHTML = '<option value="">Tất cả khu vực</option>';
+    if (!floorplanId) {
+      zonesData.forEach(z => {
+        locSelect.innerHTML += `<option value="${z.id}">${z.name}</option>`;
+      });
+      return;
+    }
+    const childZones = zonesData.filter(z => String(z.parent_id) === String(floorplanId));
+    childZones.forEach(z => {
+      locSelect.innerHTML += `<option value="${z.id}">${z.name}</option>`;
+    });
+  }
 
   window.addEventListener('DOMContentLoaded', () => {
     expandedNodes.forEach(id => {
@@ -607,8 +678,7 @@
     "{{ asset.id }}": {
       name: "{{ asset.name|escapejs }}",
       status: "{{ asset.status }}",
-      serial: "{{ asset.serial_number|default:'N/A'|escapejs }}",
-      location: "{{ asset.location.name|default:'Chưa gán vị trí'|escapejs }}",
+      location: "{% if asset.location.parent %}{{ asset.location.parent.name|escapejs }}.{% endif %}{{ asset.location.name|default:'Chưa gán vị trí'|escapejs }}",
       template: "{{ asset.hierarchy_template.name|default:'Chưa gán cấu trúc'|escapejs }}",
       category: "{{ asset.category.name|default:'-'|escapejs }}",
       category_id: "{{ asset.category_id|default:'' }}",
@@ -671,7 +741,7 @@
       }
       
       document.getElementById('detail-serial').innerText = data.serial;
-      document.getElementById('detail-location').innerText = data.location;
+      document.getElementById('detail-location').innerText = data.location.includes('.') ? data.location.split('.').join(' > ') : data.location;
       document.getElementById('detail-template').innerText = data.template;
       
       const formatBreadcrumbs = (str) => {
@@ -772,7 +842,23 @@
     document.getElementById('asset-purchase').value = purchase_date;
     document.getElementById('asset-value').value = value;
     document.getElementById('asset-template').value = template_id;
-    document.getElementById('asset-location').value = location_id;
+    
+    const fpSelect = document.getElementById('asset-floorplan');
+    if (fpSelect) {
+      let matchedFpId = '';
+      if (location_id) {
+        const zoneObj = zonesData.find(z => String(z.id) === String(location_id));
+        if (zoneObj && zoneObj.parent_id) {
+          matchedFpId = String(zoneObj.parent_id);
+        } else if (floorplansData.some(f => String(f.id) === String(location_id))) {
+          matchedFpId = String(location_id);
+        }
+      }
+      fpSelect.value = matchedFpId;
+      onAssetFloorplanChange(matchedFpId, location_id);
+    } else {
+      document.getElementById('asset-location').value = location_id;
+    }
     document.getElementById('asset-is-active').checked = is_active;
 
     document.getElementById('asset-modal-title').innerText = id ? 'Chỉnh Sửa Tài Sản' : 'Thêm Tài Sản Mới';
@@ -799,7 +885,12 @@
     const purchase_date = document.getElementById('asset-purchase').value;
     const value = document.getElementById('asset-value').value;
     const template_id = document.getElementById('asset-template').value;
-    const location_id = document.getElementById('asset-location').value;
+    
+    const floorplan_id = document.getElementById('asset-floorplan') ? document.getElementById('asset-floorplan').value : '';
+    let location_id = document.getElementById('asset-location').value;
+    if (!location_id && floorplan_id) {
+      location_id = floorplan_id;
+    }
 
     const btn = document.getElementById('btn-save-asset');
     const msg = document.getElementById('asset-error');
@@ -870,7 +961,22 @@
   function handleMove() {
     if (!currentSelectedAssetId) return;
     const data = assetsData[currentSelectedAssetId];
-    document.getElementById('move-location').value = data.location_id || '';
+    const fpSelect = document.getElementById('move-floorplan');
+    let matchedFpId = '';
+    if (data.location_id) {
+      const zoneObj = zonesData.find(z => String(z.id) === String(data.location_id));
+      if (zoneObj && zoneObj.parent_id) {
+        matchedFpId = String(zoneObj.parent_id);
+      } else if (floorplansData.some(f => String(f.id) === String(data.location_id))) {
+        matchedFpId = String(data.location_id);
+      }
+    }
+    if (fpSelect) {
+      fpSelect.value = matchedFpId;
+      onMoveFloorplanChange(matchedFpId, data.location_id);
+    } else {
+      document.getElementById('move-location').value = data.location_id || '';
+    }
     document.getElementById('move-modal').classList.remove('hidden');
   }
 
@@ -881,7 +987,11 @@
   function submitMoveAsset() {
     if (!currentSelectedAssetId) return;
     const data = assetsData[currentSelectedAssetId];
-    const newLocationId = document.getElementById('move-location').value;
+    let newLocationId = document.getElementById('move-location').value;
+    const newFpId = document.getElementById('move-floorplan') ? document.getElementById('move-floorplan').value : '';
+    if (!newLocationId && newFpId) {
+      newLocationId = newFpId;
+    }
     
     if (newLocationId === data.location_id) {
       closeMoveModal();

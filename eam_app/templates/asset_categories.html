@@ -28,10 +28,11 @@
       <div class="flex flex-wrap items-center gap-3">
         {% if 'asset_category:create' in user_permissions %}
         <button
-          onclick="openModal()"
+          id="global-create-btn"
+          onclick="handleGlobalCreate()"
           class="rounded-xl h-10 px-6 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-1 transform-gpu font-bold text-white flex items-center justify-center gap-2 text-base hover:scale-105"
         >
-          <i class="ph ph-plus font-bold"></i> Create <span id="create-btn-text">Category</span>
+          <i id="create-btn-icon" class="ph ph-plus font-bold"></i> <span id="create-btn-text">Create Category</span>
         </button>
         {% endif %}
       </div>
@@ -262,14 +263,14 @@
 
             <!-- SUB-VIEW 1: Hierarchical Table -->
             <div id="locations-view-table" class="flex-1 flex flex-col overflow-x-auto">
-                <table class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+                <table class="w-full text-left border-collapse custom-beautiful-table min-w-full">
                     <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
                         <tr class="border-b border-neutral-200/60">
-                            <th class="px-4 py-3 font-bold tracking-wider">Mã & Tên Khu vực</th>
-                            <th class="px-4 py-3 font-bold tracking-wider">Phân loại Khu vực</th>
-                            <th class="px-4 py-3 font-bold tracking-wider">Tọa độ Tâm (m)</th>
-                            <th class="px-4 py-3 font-bold tracking-wider">Mô tả</th>
-                            <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none relative group">
+                            <th class="px-4 py-3 font-bold tracking-wider min-w-[240px]">Mã & Tên Khu vực</th>
+                            <th class="px-4 py-3 font-bold tracking-wider whitespace-nowrap">Phân loại Khu vực</th>
+                            <th class="px-4 py-3 font-bold tracking-wider whitespace-nowrap">Tọa độ Tâm (m)</th>
+                            <th class="px-4 py-3 font-bold tracking-wider min-w-[180px] max-w-[320px]">Mô tả</th>
+                            <th class="px-4 py-3 font-bold tracking-wider whitespace-nowrap cursor-pointer select-none relative group">
                                 <div class="flex items-center" onclick="toggleFilterDropdown(event, 'locations-status-filter')">
                                     Trạng thái <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
                                 </div>
@@ -282,7 +283,7 @@
                                     </label>
                                 </div>
                             </th>
-                            <th class="px-4 py-3 text-right font-bold tracking-wider">Thao tác</th>
+                            <th class="px-4 py-3 text-right font-bold tracking-wider whitespace-nowrap">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-neutral-100 text-sm font-medium" id="locations-tbody">
@@ -349,112 +350,126 @@
                 
                 <!-- 1. DRAW.IO TOP RIBBON TOOLBAR -->
                 <div class="px-3 py-2 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-white shrink-0 z-30 shadow-md">
-                    <!-- Brand & Active Tool Selector -->
-                    <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-primary-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20 font-black">
-                            <i class="ph ph-blueprint text-lg"></i>
+                    <!-- Left: Brand, Mặt Bằng & Tầng Combined, và Tool Selector -->
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <!-- Brand -->
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-primary-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20 font-black">
+                                <i class="ph ph-blueprint text-lg"></i>
+                            </div>
+                            <div class="hidden sm:block">
+                                <h4 class="text-xs font-black text-white m-0 tracking-tight flex items-center gap-1.5">
+                                    <span>EAM Studio</span>
+                                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30">DRAW.IO</span>
+                                </h4>
+                            </div>
                         </div>
-                        <div class="hidden sm:block">
-                            <h4 class="text-xs font-black text-white m-0 tracking-tight flex items-center gap-1.5">
-                                <span>EAM Studio</span>
-                                <span class="px-1.5 py-0.2 rounded-none text-[9px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30">DRAW.IO MODE</span>
-                            </h4>
-                            <p class="text-[10px] text-slate-400 m-0">Không gian kéo thả & quy hoạch mặt bằng 2D</p>
+
+                        <!-- Mặt Bằng & Tầng nằm chung một khối (Facility & Floor Combined Selector) -->
+                        <div class="flex items-center bg-slate-800/90 rounded-lg border border-slate-700/80 p-0.5 shadow-sm">
+                            <!-- Mặt Bằng -->
+                            <div class="flex items-center gap-1.5 px-2 py-1" title="Chọn Mặt Bằng Cơ Sở">
+                                <i class="ph-bold ph-buildings text-sky-400 text-sm"></i>
+                                <span class="text-slate-300 font-semibold text-xs hidden md:inline">Mặt Bằng:</span>
+                                <select id="studio-floorplan-select" onchange="switchStudioFloorplan(this.value)" class="bg-slate-900 text-xs font-bold text-white focus:outline-none cursor-pointer rounded px-2 py-0.5 border border-slate-700 max-w-[170px] truncate">
+                                    <!-- Populated dynamically from floorplansData -->
+                                </select>
+                                <button type="button" onclick="openCreateFloorplanModal()" class="w-5 h-5 flex items-center justify-center bg-sky-500/20 hover:bg-sky-500 text-sky-300 hover:text-white rounded transition text-xs font-black shadow-sm" title="Tạo Mặt Bằng Mới">
+                                    <i class="ph ph-plus font-bold"></i>
+                                </button>
+                            </div>
+
+                            <div class="w-px h-5 bg-slate-700 my-auto"></div>
+
+                            <!-- Tầng (Nằm chung với mặt bằng, không ngoặc đơn) -->
+                            <div class="flex items-center gap-1.5 px-2 py-1" title="Chọn Tầng">
+                                <i class="ph-bold ph-stack text-sky-400 text-sm"></i>
+                                <span class="text-slate-300 font-semibold text-xs hidden md:inline">Tầng:</span>
+                                <select id="studio-floor-select" onchange="onStudioFloorChange(this.value)" class="bg-slate-900 text-xs font-bold text-sky-300 focus:outline-none cursor-pointer rounded px-1.5 py-0.5 border border-slate-700">
+                                    <option value="1">Tầng 1</option>
+                                    <option value="2">Tầng 2</option>
+                                    <option value="3">Tầng 3</option>
+                                    <option value="__add__">+ Thêm tầng mới...</option>
+                                </select>
+                                <button type="button" onclick="promptAddNewStudioFloor()" class="w-5 h-5 flex items-center justify-center bg-sky-500/20 hover:bg-sky-500 text-sky-300 hover:text-white rounded transition text-xs font-black shadow-sm" title="Cộng thêm tầng mới">
+                                    <i class="ph ph-plus font-bold"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Tool Mode Selector (Pointer V vs Pan H) -->
-                        <div class="flex items-center bg-slate-800/90 rounded-none p-0.5 border border-slate-700/80 ml-1">
-                            <button type="button" id="btn-tool-select" onclick="setStudioTool('select')" class="px-2.5 py-1 rounded-none text-xs font-bold transition flex items-center gap-1 bg-sky-500 text-white shadow-sm" title="Công cụ chọn & kéo thả (Phím V)">
+                        <div class="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700/80 shadow-sm">
+                            <button type="button" id="btn-tool-select" onclick="setStudioTool('select')" class="px-2.5 py-1 rounded text-xs font-bold transition flex items-center gap-1 bg-sky-500 text-white shadow-sm" title="Công cụ chọn & kéo thả (Phím V)">
                                 <i class="ph ph-cursor text-sm"></i>
-                                <span class="hidden md:inline">Chọn (V)</span>
+                                <span class="hidden lg:inline">Chọn (V)</span>
                             </button>
-                            <button type="button" id="btn-tool-pan" onclick="setStudioTool('pan')" class="px-2.5 py-1 rounded-none text-xs font-bold transition flex items-center gap-1 text-slate-300 hover:text-white" title="Công cụ kéo xem sơ đồ (Phím H / Giữ Space)">
+                            <button type="button" id="btn-tool-pan" onclick="setStudioTool('pan')" class="px-2.5 py-1 rounded text-xs font-bold transition flex items-center gap-1 text-slate-300 hover:text-white" title="Công cụ kéo xem sơ đồ (Phím H / Giữ Space)">
                                 <i class="ph ph-hand-grabbing text-sm"></i>
-                                <span class="hidden md:inline">Kéo (H)</span>
+                                <span class="hidden lg:inline">Kéo (H)</span>
                             </button>
                         </div>
-
-                        <!-- Quick Add Buttons -->
-                        <button type="button" onclick="openModal('locations')" class="px-2.5 py-1 rounded-none bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1" title="Thêm khu vực / vị trí mới">
-                            <i class="ph ph-plus font-bold text-sky-400"></i>
-                            <span class="hidden lg:inline">Khu Vực</span>
-                        </button>
                     </div>
 
-                    <!-- Center: Dirty Status & Save Button -->
+                    <!-- Center: Dirty Status, Building Dimensions Badge & Save Button -->
                     <div class="flex items-center gap-2">
-                        <div id="studio-dirty-badge" class="hidden px-2.5 py-1 rounded-none text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-sm animate-pulse">
+                        <!-- Chỉ số kích thước & hình dạng mặt bằng đường lưới tức thời -->
+                        <div id="studio-building-dim-badge" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-800/90 text-sky-300 border border-slate-700/80 shadow-sm" title="Kích thước và hình dạng mặt bằng đường lưới hiện tại">
+                            <i class="ph ph-frame-corners text-sky-400 font-bold"></i>
+                            <span id="studio-building-dim-text">120m × 80m</span>
+                            <span id="studio-building-shape-badge" class="px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 border border-sky-400/30 text-[9px] font-sans font-bold uppercase">Chữ Nhật</span>
+                        </div>
+
+                        <!-- Nút 2: Về giữa mặt bằng khi lỡ kéo ra xa -->
+                        <button type="button" id="btn-studio-center" onclick="centerStudioFloorplan()" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-sky-300 hover:text-white border border-slate-700/80 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Quay lại chính giữa mặt bằng (Ctrl + 0)">
+                            <i class="ph ph-crosshair font-bold text-sky-400"></i>
+                            <span class="hidden md:inline">Về Giữa</span>
+                        </button>
+
+                        <!-- Nút 1: Quay về lúc lưu gần nhất (Huỷ thay đổi chưa lưu) -->
+                        <button type="button" id="btn-studio-revert" onclick="revertStudioChanges()" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700/80 hover:border-rose-500/40 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Quay về dữ liệu lúc lưu gần nhất">
+                            <i class="ph ph-arrow-counter-clockwise font-bold text-amber-400"></i>
+                            <span class="hidden md:inline">Về Lúc Lưu</span>
+                        </button>
+
+                        <div id="studio-dirty-badge" class="hidden px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-sm animate-pulse">
                             <span class="w-2 h-2 rounded-full bg-amber-400"></span>
                             <span><span id="studio-dirty-count">0</span> thay đổi chưa lưu</span>
                         </div>
-                        <button type="button" id="btn-studio-save" onclick="saveStudioChanges()" class="px-3 py-1.5 rounded-none bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-md shadow-primary/25 flex items-center gap-1.5 transition transform hover:scale-105" title="Lưu toàn bộ toạ độ tài sản và khu vực (Ctrl+S)">
+                        <button type="button" id="btn-studio-save" onclick="saveStudioChanges()" class="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-md shadow-primary/25 flex items-center gap-1.5 transition transform hover:scale-105" title="Lưu toàn bộ toạ độ tài sản và khu vực (Ctrl+S)">
                             <i class="ph ph-floppy-disk font-bold text-sm"></i>
                             <span>Lưu Sơ Đồ</span>
                         </button>
                     </div>
 
-                    <!-- Right Controls: Floor, Asset Layer Toggle, Opacity, Snap, Grid, Zoom & Fullscreen -->
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                        <!-- Floor Level with Add Floor Button -->
-                        <div class="flex items-center gap-1 bg-slate-800/90 pl-2 pr-1 py-1 rounded-xl border border-slate-700/80 text-xs shadow-sm">
-                            <span class="text-slate-400 font-semibold text-[11px]">Tầng:</span>
-                            <select id="studio-floor-select" onchange="onStudioFloorChange(this.value)" class="bg-slate-900 text-xs font-bold text-sky-300 focus:outline-none cursor-pointer rounded px-1.5 py-0.5 border border-slate-700">
-                                <option value="1">Tầng 1 (Trệt)</option>
-                                <option value="2">Tầng 2</option>
-                                <option value="3">Tầng 3</option>
-                                <option value="__add__">+ Thêm tầng mới...</option>
-                            </select>
-                            <button type="button" onclick="promptAddNewStudioFloor()" class="w-5 h-5 flex items-center justify-center bg-sky-500/20 hover:bg-sky-500 text-sky-300 hover:text-white rounded-lg transition text-xs font-black shadow-sm" title="Cộng thêm tầng mới">
-                                <i class="ph ph-plus font-bold"></i>
-                            </button>
-                        </div>
-
+                    <!-- Right Controls: Hiện tài sản, Bật lưới, Zoom & Fullscreen -->
+                    <div class="flex items-center gap-1.5">
                         <!-- Toggle Assets Layer (Hiện / Tắt tài sản) -->
-                        <button type="button" id="btn-toggle-show-machines" onclick="toggleStudioMachineLayer()" class="px-2.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-slate-700/80 text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Bật/Tắt hiển thị tài sản trên mặt bằng">
+                        <button type="button" id="btn-toggle-show-machines" onclick="toggleStudioMachineLayer()" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-sky-300 border border-slate-700/80 text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Bật/Tắt hiển thị tài sản trên mặt bằng">
                             <i id="icon-toggle-machines" class="ph ph-cube text-sky-400"></i>
-                            <span id="text-toggle-machines">Hiện tài sản</span>
+                            <span id="text-toggle-machines" class="hidden md:inline">Hiện tài sản</span>
                         </button>
 
-                        <!-- Background Underlay Opacity Slider -->
-                        <div class="hidden xl:flex items-center gap-1.5 bg-slate-800/90 px-2 py-1 rounded-xl border border-slate-700/80 text-xs text-slate-300" title="Độ mờ bản đồ nền CAD / Mặt bằng">
-                            <i class="ph ph-eye text-slate-400 text-xs"></i>
-                            <input type="range" id="studio-bg-opacity" min="0" max="100" value="50" oninput="changeStudioBgOpacity(this.value)" class="w-14 accent-sky-400 h-1 bg-slate-700 rounded-lg cursor-pointer">
-                            <span id="studio-bg-opacity-text" class="text-[10px] font-mono text-sky-300 w-6">50%</span>
-                        </div>
-
-                        <!-- Snap to Grid -->
-                        <div class="flex items-center gap-1 bg-slate-800/90 px-2 py-1 rounded-xl border border-slate-700/80 text-xs shadow-sm">
-                            <i class="ph ph-magnet text-sky-400 text-xs"></i>
-                            <select id="studio-snap-select" onchange="onStudioSnapChange(this.value)" class="bg-slate-900 text-xs font-bold text-sky-300 focus:outline-none cursor-pointer rounded px-1.5 py-0.5 border border-slate-700" title="Căn dính lưới toạ độ (Snap)">
-                                <option value="1.0">Snap: 1m</option>
-                                <option value="2.0">Snap: 2m</option>
-                                <option value="5.0">Snap: 5m</option>
-                                <option value="0.5">Snap: 0.5m</option>
-                                <option value="0">Tắt Snap</option>
-                            </select>
-                        </div>
-
                         <!-- Grid Toggle -->
-                        <button type="button" id="btn-toggle-grid" onclick="toggleStudioGrid()" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 rounded-xl transition" title="Bật/Tắt đường lưới Draw.io">
+                        <button type="button" id="btn-toggle-grid" onclick="toggleStudioGrid()" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 rounded-lg transition shadow-sm" title="Bật/Tắt đường lưới">
                             <i class="ph ph-grid-four font-bold"></i>
                         </button>
 
-                        <!-- Zoom Controls (Draw.io style) -->
-                        <div class="flex items-center bg-slate-800/90 rounded-xl border border-slate-700/80 p-0.5">
-                            <button type="button" onclick="adjustStudioZoom(-0.15)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition" title="Thu nhỏ (Ctrl + Scroll)">
+                        <!-- Zoom Controls -->
+                        <div class="flex items-center bg-slate-800/90 rounded-lg border border-slate-700/80 p-0.5 shadow-sm">
+                            <button type="button" onclick="adjustStudioZoom(-0.15)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded transition" title="Thu nhỏ (Ctrl + Scroll)">
                                 <i class="ph ph-minus text-xs font-bold"></i>
                             </button>
                             <span id="studio-zoom-text" class="text-[10px] font-mono px-1.5 text-slate-200 font-bold min-w-[38px] text-center">100%</span>
-                            <button type="button" onclick="adjustStudioZoom(0.15)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition" title="Phóng to (Ctrl + Scroll)">
+                            <button type="button" onclick="adjustStudioZoom(0.15)" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded transition" title="Phóng to (Ctrl + Scroll)">
                                 <i class="ph ph-plus text-xs font-bold"></i>
                             </button>
-                            <button type="button" onclick="resetStudioZoom()" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition" title="Vừa khung nhìn (Fit)">
+                            <button type="button" onclick="resetStudioZoom()" class="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 rounded transition" title="Vừa khung nhìn (Fit)">
                                 <i class="ph ph-arrows-out-simple text-xs"></i>
                             </button>
                         </div>
 
                         <!-- Fullscreen Toggle -->
-                        <button type="button" onclick="toggleStudioFullscreen()" class="w-7 h-7 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl transition" title="Toàn màn hình Workspace">
+                        <button type="button" onclick="toggleStudioFullscreen()" class="w-8 h-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition shadow-sm" title="Toàn màn hình Workspace">
                             <i id="studio-fullscreen-icon" class="ph ph-corners-out font-bold"></i>
                         </button>
                     </div>
@@ -464,21 +479,28 @@
                 <div class="flex-1 flex overflow-hidden min-h-[580px] relative">
                     
                     <!-- LEFT: DRAW.IO SHAPE PALETTE / STENCIL LIBRARY -->
-                    <div class="w-80 md:w-84 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl backdrop-blur-md overflow-hidden">
-                        <!-- Palette Tabs (2 Categories: Khu vực | Không gian mặt bằng) -->
-                        <div class="grid grid-cols-2 p-1 gap-1 bg-slate-950/80 border-b border-slate-800 shrink-0">
-                            <button type="button" onclick="switchStudioSidebarTab('zones')" id="studio-tab-btn-zones"
-                                    class="py-1.5 px-1 rounded-none text-[11px] font-bold text-sky-400 bg-sky-950/70 border border-sky-800/60 flex items-center justify-center gap-1 transition shadow-sm min-w-0"
-                                    title="Danh mục khu vực / vị trí">
-                                <i class="ph ph-buildings text-xs shrink-0 text-emerald-400"></i>
-                                <span class="truncate">Khu vực</span>
-                                <span id="studio-zones-badge" class="px-1.5 py-0.2 rounded-none text-[9px] bg-slate-800 text-slate-300 font-black shrink-0">0</span>
-                            </button>
-                            <button type="button" onclick="switchStudioSidebarTab('spaces')" id="studio-tab-btn-spaces"
-                                    class="py-1.5 px-1 rounded-none text-[11px] font-bold text-slate-400 hover:text-slate-200 border border-transparent flex items-center justify-center gap-1 transition min-w-0"
-                                    title="Không gian mặt bằng: Đường đi, phòng trống, cửa, vách ngăn">
-                                <i class="ph ph-bounding-box text-xs shrink-0 text-amber-400"></i>
-                                <span class="truncate">Không gian</span>
+                    <div id="studio-left-sidebar" class="w-80 md:w-84 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl backdrop-blur-md overflow-hidden transition-all duration-200">
+                        <!-- Palette Tabs (2 Categories: Khu vực | Không gian) & Close Button -->
+                        <div class="flex items-center p-1 gap-1 bg-slate-950/80 border-b border-slate-800 shrink-0">
+                            <div class="grid grid-cols-2 gap-1 flex-1 min-w-0">
+                                <button type="button" onclick="switchStudioSidebarTab('zones')" id="studio-tab-btn-zones"
+                                        class="py-1.5 px-1 rounded-none text-[11px] font-bold text-sky-400 bg-sky-950/70 border border-sky-800/60 flex items-center justify-center gap-1 transition shadow-sm min-w-0"
+                                        title="Danh mục khu vực / vị trí">
+                                    <i class="ph ph-factory text-xs shrink-0 text-emerald-400"></i>
+                                    <span class="truncate">Khu vực</span>
+                                    <span id="studio-zones-badge" class="px-1 py-0.2 rounded-none text-[9px] bg-slate-800 text-slate-300 font-black shrink-0">0</span>
+                                </button>
+                                <button type="button" onclick="switchStudioSidebarTab('spaces')" id="studio-tab-btn-spaces"
+                                        class="py-1.5 px-1 rounded-none text-[11px] font-bold text-slate-400 hover:text-slate-200 border border-transparent flex items-center justify-center gap-1 transition min-w-0"
+                                        title="Không gian mặt bằng: Đường đi, phòng trống, cửa, vách ngăn">
+                                    <i class="ph ph-bounding-box text-xs shrink-0 text-amber-400"></i>
+                                    <span class="truncate">Không gian</span>
+                                </button>
+                            </div>
+                            <button type="button" onclick="toggleStudioLeftSidebar(false)"
+                                    class="w-7 h-7 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-sky-300 border border-slate-800 rounded-none transition shrink-0"
+                                    title="Thu gọn bảng Khu vực (Đóng sang trái)">
+                                <i class="ph ph-caret-left font-bold text-base"></i>
                             </button>
                         </div>
 
@@ -490,7 +512,7 @@
                             </div>
                         </div>
 
-                        <!-- Pane 1: Zones List (Default Active) -->
+                        <!-- Pane 1: Zones List -->
                         <div id="studio-sidebar-pane-zones" class="flex-1 flex flex-col overflow-hidden min-h-0 p-3">
                             <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1.5 shrink-0">
                                 <span class="flex items-center gap-1 text-sky-400 font-semibold truncate">
@@ -524,13 +546,13 @@
                     <div class="flex-1 bg-slate-950 overflow-hidden relative flex flex-col select-none" id="studio-canvas-viewport">
                         
                         <!-- Top Horizontal Ruler (Meters Scale) -->
-                        <div id="studio-ruler-top" class="h-6 bg-slate-900 border-b border-slate-800 flex items-end pl-16 text-[10px] font-mono text-slate-500 overflow-hidden shrink-0 select-none z-10">
+                        <div id="studio-ruler-top" class="h-6 bg-slate-900 border-b border-slate-800 flex items-end pl-10 text-[9px] font-mono text-slate-400 overflow-hidden shrink-0 select-none z-10">
                             <!-- Injected / Rendered dynamically via JS to match zoom/pan -->
                         </div>
 
                         <div class="flex-1 flex overflow-hidden relative">
-                            <!-- Left Vertical Ruler (Meters Scale) - Horizontal numbers for clarity up to 1000m+ -->
-                            <div id="studio-ruler-left" class="w-16 bg-slate-900 border-r border-slate-800 flex flex-col pt-1 text-[9px] font-mono text-slate-400 overflow-hidden shrink-0 select-none z-10 text-right pr-1">
+                            <!-- Left Vertical Ruler (Meters Scale) -->
+                            <div id="studio-ruler-left" class="w-10 bg-slate-900 border-r border-slate-800 flex flex-col pt-1 text-[9px] font-mono text-slate-400 overflow-hidden shrink-0 select-none z-10 text-right pr-0.5">
                                 <!-- Injected / Rendered dynamically via JS to match zoom/pan -->
                             </div>
 
@@ -540,6 +562,22 @@
                                  ondragleave="handleCanvasDragLeave(event)"
                                  ondrop="handleCanvasDrop(event)"
                                  class="flex-1 overflow-hidden relative bg-[#070b13] cursor-default">
+
+                                <!-- Floating Button to Expand Left Sidebar when collapsed -->
+                                <button type="button" id="btn-expand-left-sidebar" onclick="toggleStudioLeftSidebar(true)"
+                                        class="hidden absolute left-0 top-1/2 -translate-y-1/2 z-40 bg-slate-900/90 hover:bg-sky-600 border border-l-0 border-slate-700 hover:border-sky-500 text-sky-400 hover:text-white px-1.5 py-3 shadow-xl transition cursor-pointer flex flex-col items-center gap-1 group/btn-left"
+                                        title="Mở danh sách Khu vực & Không gian">
+                                    <i class="ph ph-caret-right font-bold text-sm group-hover/btn-left:translate-x-0.5 transition-transform"></i>
+                                    <span class="text-[9px] font-bold [writing-mode:vertical-lr] tracking-widest uppercase">Khu Vực</span>
+                                </button>
+
+                                <!-- Floating Button to Expand Right Sidebar when collapsed -->
+                                <button type="button" id="btn-expand-right-sidebar" onclick="toggleStudioRightSidebar(true)"
+                                        class="hidden absolute right-0 top-1/2 -translate-y-1/2 z-40 bg-slate-900/90 hover:bg-sky-600 border border-r-0 border-slate-700 hover:border-sky-500 text-sky-400 hover:text-white px-1.5 py-3 shadow-xl transition cursor-pointer flex flex-col items-center gap-1 group/btn-right"
+                                        title="Mở bảng Thông số sơ đồ">
+                                    <i class="ph ph-caret-left font-bold text-sm group-hover/btn-right:-translate-x-0.5 transition-transform"></i>
+                                    <span class="text-[9px] font-bold [writing-mode:vertical-lr] tracking-widest uppercase">Thông Số</span>
+                                </button>
                                 
                                 <!-- Floating Status & Coordinate HUD -->
                                 <div class="absolute top-3 left-3 z-30 flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded text-xs backdrop-blur-md text-slate-200 font-mono shadow-xl pointer-events-none">
@@ -555,7 +593,7 @@
                                 <div id="studio-canvas-world" class="absolute top-0 left-0 w-[1000px] h-[700px] shadow-2xl origin-top-left" style="transform: translate3d(0px, 0px, 0px) scale(1); will-change: transform;">
                                     
                                     <!-- Base SVG Blueprint with Draw.io Major & Minor Grids (Square corners) -->
-                                    <svg id="studio-svg-blueprint" class="w-full h-full rounded-none border border-slate-800 shadow-2xl overflow-hidden block" viewBox="0 0 1000 700" preserveAspectRatio="none">
+                                    <svg id="studio-svg-blueprint" class="w-full h-full rounded-none border border-slate-800 shadow-2xl block" style="overflow: visible;" viewBox="0 0 1000 700" preserveAspectRatio="none">
                                         <defs>
                                             <!-- Major Grid (10m = 100px) -->
                                             <pattern id="studio-grid-major" width="100" height="100" patternUnits="userSpaceOnUse">
@@ -574,17 +612,17 @@
                                         <!-- Canvas Void Background (Phần bên ngoài ranh giới tòa nhà) -->
                                         <rect id="svg-outer-void-bg" width="100%" height="100%" fill="#050811" />
 
-                                        <!-- TÒA NHÀ LỚN NHẤT (Nơi chứa các đường lưới) -->
+                                        <!-- TÒA NHÀ LỚN NHẤT (Nơi chứa các đường lưới - Cắt chính xác bên trong khung viền) -->
                                         <g id="studio-building-interior-group" clip-path="url(#studio-building-clippath)">
-                                            <rect id="svg-canvas-bg" width="1000" height="700" fill="#090d16" />
-                                            <rect id="svg-grid-minor-layer" width="1000" height="700" fill="url(#studio-grid-minor)" />
-                                            <rect id="svg-grid-major-layer" width="1000" height="700" fill="url(#studio-grid-major)" />
+                                            <rect id="svg-canvas-bg" width="10000" height="10000" fill="#090d16" />
+                                            <rect id="svg-grid-minor-layer" width="10000" height="10000" fill="url(#studio-grid-minor)" />
+                                            <rect id="svg-grid-major-layer" width="10000" height="10000" fill="url(#studio-grid-major)" />
                                             <image id="studio-svg-underlay-image" href="" x="0" y="0" width="1000" height="700" preserveAspectRatio="none" opacity="0.5" class="transition-opacity duration-200" />
                                         </g>
 
                                         <!-- Viền tường bao quanh tòa nhà lớn nhất (Building Outer Wall) -->
                                         <polygon id="svg-building-outer-wall" points="0,0 1000,0 1000,700 0,700"
-                                                 fill="none" stroke="#0284c7" stroke-width="4" stroke-linejoin="miter" class="pointer-events-none" />
+                                                 fill="none" stroke="#0284c7" stroke-width="4" stroke-linejoin="round" class="pointer-events-none" />
 
                                         <!-- Chốt góc và cạnh uốn bẻ góc tòa nhà lớn nhất -->
                                         <g id="studio-building-handles-group" class="pointer-events-auto"></g>
@@ -625,7 +663,19 @@
                     </div>
 
                     <!-- RIGHT: DRAW.IO FORMAT / PROPERTY INSPECTOR -->
-                    <div class="w-80 md:w-88 bg-slate-900/95 border-l border-slate-800 flex flex-col shrink-0 z-20 p-4 studio-stealth-scroll shadow-2xl backdrop-blur-md" id="studio-inspector">
+                    <div class="w-80 md:w-88 bg-slate-900/95 border-l border-slate-800 flex flex-col shrink-0 z-20 p-4 studio-stealth-scroll shadow-2xl backdrop-blur-md relative transition-all duration-200" id="studio-inspector">
+                        <!-- Top Inspector Close Row -->
+                        <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800 text-slate-400 shrink-0">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                <i class="ph ph-sliders text-sky-400"></i> Bảng Thuộc Tính & Thông Số
+                            </span>
+                            <button type="button" onclick="toggleStudioRightSidebar(false)"
+                                    class="w-6 h-6 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-none border border-slate-700 transition"
+                                    title="Thu gọn bảng thông số (Đóng sang phải)">
+                                <i class="ph ph-caret-right font-bold text-sm"></i>
+                            </button>
+                        </div>
+
                         <!-- 1. Canvas Settings (When nothing is selected) -->
                         <div id="inspector-canvas" class="space-y-4">
                             <!-- Injected via JS: Canvas dimensions, Floor info, Quick stats, Grid controls -->
@@ -796,12 +846,82 @@
   </div>
 </div>
 
+<!-- Create Floorplan Modal -->
+<div id="modal-create-floorplan" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] border border-neutral-200">
+    <div class="px-6 py-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+          <i class="ph-bold ph-buildings text-2xl"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-black text-neutral-900 m-0">Tạo Mặt Bằng Cơ Sở Mới</h3>
+          <p class="text-xs text-neutral-500 m-0">Định nghĩa cơ sở / nhà máy / phân xưởng mới cho hệ thống</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeCreateFloorplanModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors p-1 rounded-lg">
+        <i class="ph ph-x text-xl font-bold"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto p-6">
+      <form id="form-create-floorplan" onsubmit="submitCreateFloorplan(event)" class="space-y-4">
+        {% csrf_token %}
+        <div id="create-floorplan-msg" class="hidden p-3 rounded-xl text-sm font-medium"></div>
+
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Tên Mặt Bằng Cơ Sở <span class="text-danger">*</span></label>
+          <input type="text" id="fp-name" required placeholder="VD: Mặt bằng Nhà máy Số 2 (Tân Bình)" class="w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Mã Cơ Sở / Mặt Bằng <span class="text-danger">*</span></label>
+          <input type="text" id="fp-code" required placeholder="VD: MB_NHA_MAY_2" class="w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1">Chiều Dài Quy Hoạch (m) <span class="text-danger">*</span></label>
+            <input type="number" id="fp-width" step="1" min="20" max="500" value="120" required class="w-full h-11 px-3 bg-white border border-neutral-200 rounded-xl text-xs font-bold font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+          </div>
+          <div>
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1">Chiều Rộng Quy Hoạch (m) <span class="text-danger">*</span></label>
+            <input type="number" id="fp-height" step="1" min="20" max="500" value="80" required class="w-full h-11 px-3 bg-white border border-neutral-200 rounded-xl text-xs font-bold font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1">Hình Dạng Mặt Bằng Ban Đầu</label>
+          <select id="fp-shape" class="w-full h-11 px-3 bg-white border border-neutral-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+            <option value="RECTANGLE">Hình chữ nhật chuẩn (Khung thẳng 4 góc)</option>
+            <option value="L_SHAPE">Hình chữ L (Phân xưởng góc 6 đỉnh)</option>
+            <option value="U_SHAPE">Hình chữ U (Tổ hợp 3 dãy 8 đỉnh)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Mô Tả / Địa Chỉ Cơ Sở</label>
+          <textarea id="fp-desc" rows="2" placeholder="Ghi chú vị trí địa lý, địa chỉ hoặc quy mô phân xưởng..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+        </div>
+
+        <div class="pt-4 flex justify-end gap-3 border-t border-neutral-100">
+          <button type="button" onclick="closeCreateFloorplanModal()" class="rounded-xl h-10 px-5 font-bold text-xs text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition">Hủy</button>
+          <button type="submit" id="btn-submit-fp" class="rounded-xl h-10 px-6 bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-md shadow-primary/20 flex items-center gap-1.5 transition hover:scale-105">
+            <i class="ph-bold ph-plus"></i>
+            <span>Tạo Mặt Bằng</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {{ locations|json_script:"locations-data" }}
 {{ assets_list|json_script:"assets-data" }}
 {{ technicians_list|json_script:"technicians-data" }}
 {{ active_wos_list|json_script:"active-wos-data" }}
 <script id="spatials-data" type="application/json">{{ spatials_json|safe }}</script>
 <script id="factory-dim-data" type="application/json">{{ factory_dim_json|safe }}</script>
+<script id="floorplans-data" type="application/json">{{ floorplans_json|safe }}</script>
 
 <script>
     const canUpdateCategory = {% if 'asset_category:update' in user_permissions %}true{% else %}false{% endif %};
@@ -810,6 +930,8 @@
     let assetsData = [];
     let techniciansData = [];
     let activeWosData = [];
+    let floorplansData = [];
+    let currentFloorplanId = '';
     let locationsViewMode = localStorage.getItem('locationsViewMode') || 'table';
     let currentPage = 1;
     const rowsPerPage = 15;
@@ -879,6 +1001,19 @@
                 }
                 if (Array.isArray(parsedDim.polygon_points) && parsedDim.polygon_points.length >= 3) {
                     buildingPolygonPoints = parsedDim.polygon_points;
+                    if (parsedDim.preset) {
+                        currentBuildingPreset = parsedDim.preset;
+                    } else if (buildingPolygonPoints.length === 4) {
+                        currentBuildingPreset = 'rect';
+                    } else if (buildingPolygonPoints.length === 6) {
+                        currentBuildingPreset = 'L';
+                    } else if (buildingPolygonPoints.length === 8) {
+                        currentBuildingPreset = 'U';
+                    } else {
+                        currentBuildingPreset = 'custom';
+                    }
+                } else {
+                    currentBuildingPreset = 'rect';
                 }
             }
             // Xóa các bộ đệm rác cũ trong localStorage để đảm bảo dữ liệu luôn nạp từ CSDL chuẩn
@@ -889,14 +1024,82 @@
             localStorage.removeItem('studio_zone_sizes');
         } catch(e) { console.error('Error parsing factory-dim-data', e); }
 
+        // Parse floorplans data
+        try {
+            const fpEl = document.getElementById('floorplans-data');
+            if (fpEl) floorplansData = JSON.parse(fpEl.textContent || '[]');
+        } catch(e) { console.error('Error parsing floorplans-data', e); }
+
+        const savedFpId = localStorage.getItem('selectedFloorplanId');
+        if (savedFpId && floorplansData.some(f => String(f.id) === String(savedFpId))) {
+            currentFloorplanId = savedFpId;
+        } else if (floorplansData.length > 0) {
+            currentFloorplanId = String(floorplansData[0].id);
+        }
+
+        populateStudioFloorplanSelect();
+
+        // If active floorplan has dimensions/spatials, initialize with them
+        if (currentFloorplanId) {
+            const activeFp = floorplansData.find(f => String(f.id) === currentFloorplanId);
+            if (activeFp) {
+                if (activeFp.width_m) {
+                    FACTORY_WIDTH_METERS = parseFloat(activeFp.width_m) || FACTORY_WIDTH_METERS;
+                }
+                if (activeFp.height_m) {
+                    FACTORY_HEIGHT_METERS = parseFloat(activeFp.height_m) || FACTORY_HEIGHT_METERS;
+                }
+                if (Array.isArray(activeFp.polygon_points) && activeFp.polygon_points.length >= 3) {
+                    buildingPolygonPoints = activeFp.polygon_points;
+                    const bbb = getPolygonBoundingBox(buildingPolygonPoints);
+                    FACTORY_WIDTH_METERS = Math.max(FACTORY_WIDTH_METERS, Math.ceil(bbb.maxX / 10) * 10);
+                    FACTORY_HEIGHT_METERS = Math.max(FACTORY_HEIGHT_METERS, Math.ceil(bbb.maxY / 10) * 10);
+                } else {
+                    buildingPolygonPoints = [
+                        {x: 0, y: 0},
+                        {x: FACTORY_WIDTH_METERS, y: 0},
+                        {x: FACTORY_WIDTH_METERS, y: FACTORY_HEIGHT_METERS},
+                        {x: 0, y: FACTORY_HEIGHT_METERS}
+                    ];
+                }
+                CANVAS_WIDTH_PX = FACTORY_WIDTH_METERS * 10.0;
+                CANVAS_HEIGHT_PX = FACTORY_HEIGHT_METERS * 10.0;
+                if (Array.isArray(activeFp.spatials) && activeFp.spatials.length > 0) {
+                    studioSpatialElements = activeFp.spatials;
+                }
+                updateFactoryDimensions(FACTORY_WIDTH_METERS, FACTORY_HEIGHT_METERS);
+            }
+        }
+
         renderLocationsTree();
         if (typeof captureStudioBaseline === 'function') {
             captureStudioBaseline();
         }
+        if (typeof captureLastSavedStudioSnapshot === 'function') {
+            captureLastSavedStudioSnapshot();
+        }
+        if (typeof updateStudioBuildingDimUI === 'function') {
+            updateStudioBuildingDimUI();
+        }
 
-        // Switch to the saved active tab (now that all data has been parsed and tree initialized)
-        const tab = localStorage.getItem('assetConfigActiveTab') || 'categories';
-        switchTab(tab);
+        // Switch to the active tab (query param takes precedence over localStorage)
+        const urlParamsInit = new URLSearchParams(window.location.search);
+        const initialTab = urlParamsInit.get('tab') || localStorage.getItem('assetConfigActiveTab') || 'categories';
+        switchTab(initialTab);
+
+        // Sau khi render sơ đồ ban đầu, xoá sạch dirty và đồng bộ baseline để không bị hiện dirty badge ảo khi vừa reload trang
+        if (typeof dirtyChanges !== 'undefined') {
+            dirtyChanges.clear();
+        }
+        if (typeof updateDirtyBadge === 'function') {
+            updateDirtyBadge();
+        }
+        if (typeof captureStudioBaseline === 'function') {
+            captureStudioBaseline();
+        }
+        if (typeof captureLastSavedStudioSnapshot === 'function') {
+            captureLastSavedStudioSnapshot();
+        }
         
         // Restore Sorting State
         const urlParams = new URLSearchParams(window.location.search);
@@ -935,10 +1138,174 @@
         window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
     }
 
+    function populateStudioFloorplanSelect() {
+        const select = document.getElementById('studio-floorplan-select');
+        if (!select) return;
+        select.innerHTML = '';
+        floorplansData.forEach(fp => {
+            const opt = document.createElement('option');
+            opt.value = fp.id;
+            opt.innerText = fp.name + (fp.code ? ` (${fp.code})` : '');
+            if (String(fp.id) === String(currentFloorplanId)) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    }
+
+    function switchStudioFloorplan(fpId) {
+        if (!fpId) return;
+
+        // Lưu lại spatials của mặt bằng hiện tại vào memory trước khi chuyển sang mặt bằng khác
+        if (currentFloorplanId) {
+            const prevFp = floorplansData.find(f => String(f.id) === String(currentFloorplanId));
+            if (prevFp) {
+                prevFp.spatials = Array.isArray(studioSpatialElements) ? [...studioSpatialElements] : [];
+            }
+        }
+
+        currentFloorplanId = String(fpId);
+        localStorage.setItem('selectedFloorplanId', currentFloorplanId);
+
+        const select = document.getElementById('studio-floorplan-select');
+        if (select && select.value !== currentFloorplanId) {
+            select.value = currentFloorplanId;
+        }
+
+        const fp = floorplansData.find(f => String(f.id) === currentFloorplanId);
+        if (fp) {
+            FACTORY_WIDTH_METERS = parseFloat(fp.width_m) || 120.0;
+            FACTORY_HEIGHT_METERS = parseFloat(fp.height_m) || 80.0;
+
+            currentBuildingPreset = (fp.building_shape || 'RECTANGLE').toLowerCase();
+            if (currentBuildingPreset === 'rectangle') currentBuildingPreset = 'rect';
+
+            if (Array.isArray(fp.polygon_points) && fp.polygon_points.length >= 3) {
+                buildingPolygonPoints = fp.polygon_points;
+                const bbb = getPolygonBoundingBox(buildingPolygonPoints);
+                FACTORY_WIDTH_METERS = Math.max(FACTORY_WIDTH_METERS, Math.ceil(bbb.maxX / 10) * 10);
+                FACTORY_HEIGHT_METERS = Math.max(FACTORY_HEIGHT_METERS, Math.ceil(bbb.maxY / 10) * 10);
+            } else {
+                buildingPolygonPoints = [
+                    {x: 0, y: 0},
+                    {x: FACTORY_WIDTH_METERS, y: 0},
+                    {x: FACTORY_WIDTH_METERS, y: FACTORY_HEIGHT_METERS},
+                    {x: 0, y: FACTORY_HEIGHT_METERS}
+                ];
+            }
+            CANVAS_WIDTH_PX = FACTORY_WIDTH_METERS * 10.0;
+            CANVAS_HEIGHT_PX = FACTORY_HEIGHT_METERS * 10.0;
+
+            studioSpatialElements = Array.isArray(fp.spatials) ? fp.spatials : [];
+            updateFactoryDimensions(FACTORY_WIDTH_METERS, FACTORY_HEIGHT_METERS);
+        }
+
+        if (typeof updateStudioBuildingDimUI === 'function') {
+            updateStudioBuildingDimUI();
+        }
+
+        renderStudio();
+        // Không xóa dirtyChanges khi đổi mặt bằng để bảo toàn các thay đổi chưa lưu
+        if (typeof updateDirtyBadge === 'function') {
+            updateDirtyBadge();
+        }
+        if (typeof resetStudioZoom === 'function') {
+            requestAnimationFrame(() => resetStudioZoom());
+        }
+        showStudioToast(`Đã chuyển sang mặt bằng: ${fp ? fp.name : 'Mặt Bằng'}`);
+    }
+
+    function openCreateFloorplanModal() {
+        const modal = document.getElementById('modal-create-floorplan');
+        if (modal) modal.classList.remove('hidden');
+        const msg = document.getElementById('create-floorplan-msg');
+        if (msg) msg.classList.add('hidden');
+        const form = document.getElementById('form-create-floorplan');
+        if (form) form.reset();
+    }
+
+    function closeCreateFloorplanModal() {
+        const modal = document.getElementById('modal-create-floorplan');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function submitCreateFloorplan(e) {
+        e.preventDefault();
+        const name = document.getElementById('fp-name').value.trim();
+        const code = document.getElementById('fp-code').value.trim();
+        const width_m = parseFloat(document.getElementById('fp-width').value) || 120;
+        const height_m = parseFloat(document.getElementById('fp-height').value) || 80;
+        const shape = document.getElementById('fp-shape').value;
+        const descText = document.getElementById('fp-desc').value.trim();
+        const msg = document.getElementById('create-floorplan-msg');
+        const btn = document.getElementById('btn-submit-fp');
+
+        if (!name || !code) {
+            msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+            msg.innerText = 'Vui lòng nhập đầy đủ Tên và Mã Mặt Bằng.';
+            msg.classList.remove('hidden');
+            return;
+        }
+
+        btn.disabled = true;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '';
+
+        const payload = {
+            name: name,
+            code: code,
+            zone_type: 'FLOORPLAN',
+            parent_id: '',
+            parentId: '',
+            width_m: width_m,
+            height_m: height_m,
+            building_shape: shape,
+            description: descText,
+            is_active: true
+        };
+
+        fetch('{% url "portal_locations" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if (resData.success) {
+                localStorage.setItem('selectedFloorplanId', resData.id || '');
+                localStorage.setItem('assetConfigActiveTab', 'locations');
+                window.location.reload();
+            } else {
+                msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+                msg.innerText = resData.error || 'Đã xảy ra lỗi khi tạo mặt bằng.';
+                msg.classList.remove('hidden');
+            }
+        })
+        .catch(err => {
+            msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+            msg.innerText = 'Lỗi kết nối máy chủ: ' + err.message;
+            msg.classList.remove('hidden');
+        })
+        .finally(() => {
+            btn.disabled = false;
+        });
+    }
+
+    function handleGlobalCreate() {
+        if (activeTab === 'locations') {
+            openCreateFloorplanModal();
+        } else {
+            openModal();
+        }
+    }
+
     function renderLocationsTree() {
         const formatLtree = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
         const map = new Map();
         const roots = [];
+        const overlapMap = (typeof computeAllZoneOverlaps === 'function') ? computeAllZoneOverlaps() : new Map();
 
         locationsData.forEach(l => {
             l.fullPath = l.parent_id ? `${l.parent_id}.${formatLtree(l.name)}` : formatLtree(l.name);
@@ -947,8 +1314,11 @@
             map.set(String(l.id), l);
         });
 
+        // Floorplans are Level 1 (Roots)
         locationsData.forEach(l => {
-            if(l.parent_id) {
+            if (l.zone_type === 'FLOORPLAN') {
+                roots.push(l);
+            } else if (l.parent_id) {
                 const parent = map.get(l.parent_id);
                 if (parent && parent !== l) {
                     parent.children.push(l);
@@ -962,12 +1332,43 @@
 
         let html = '';
         function renderNode(node, depth=0) {
-            const indent = depth * 24; // 24px per level
-            const isRoot = depth === 0;
-            const icon = isRoot ? 'ph-buildings text-neutral-400' : 'ph-factory text-neutral-400';
-            const statusHtml = node.is_active ? `<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Hoạt động</span>` : `<span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Khóa</span>`;
+            const isFloorplan = node.zone_type === 'FLOORPLAN';
+            const indent = isFloorplan ? 0 : (depth > 0 ? depth * 28 : 28);
+            const icon = isFloorplan ? 'ph-buildings text-primary font-bold text-lg' : 'ph-factory text-neutral-400';
+            const statusHtml = node.is_active 
+                ? `<span class="inline-block px-2.5 py-1 bg-green-100 text-green-700 rounded text-xs font-bold whitespace-nowrap">Hoạt động</span>` 
+                : `<span class="inline-block px-2.5 py-1 bg-red-100 text-red-700 rounded text-xs font-bold whitespace-nowrap">Khóa</span>`;
             
+            const overlapsWith = (!isFloorplan && node.is_active && isZonePlaced(node)) ? overlapMap.get(String(node.id)) : null;
+            const hasOverlap = overlapsWith && overlapsWith.length > 0;
+            const overlapBadge = hasOverlap ? `
+                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shrink-0 cursor-help whitespace-nowrap" title="Đè lấn ranh giới với: ${overlapsWith.join(', ')}">
+                    <i class="ph-bold ph-warning text-rose-600"></i> Đè lấn (${overlapsWith.length})
+                </span>
+            ` : '';
+
+            let rawDesc = node.description || '';
+            let cleanDesc = rawDesc;
+            try {
+                if (typeof rawDesc === 'string' && rawDesc.trim().startsWith('{')) {
+                    const parsed = JSON.parse(rawDesc);
+                    if (parsed && typeof parsed === 'object') {
+                        cleanDesc = parsed.description || parsed.desc || parsed.notes || '';
+                    }
+                }
+            } catch (_) {}
+            cleanDesc = (cleanDesc || '')
+                .replace(/\[DIM:[\d\.]+x[\d\.]+\]/g, '')
+                .replace(/\[POLYGON:.*?\]/g, '')
+                .trim();
+            if (!cleanDesc && (node.description || '').includes('[DIM:')) {
+                const dimMatch = (node.description || '').match(/\[DIM:([\d\.]+)x([\d\.]+)\]/);
+                if (dimMatch) cleanDesc = `Kích thước: ${dimMatch[1]}m × ${dimMatch[2]}m`;
+            }
+            const fullDescTooltip = cleanDesc || node.description || '';
+
             const zoneTypeConfig = {
+                'FLOORPLAN': { label: '🏢 Mặt Bằng Cơ Sở', badge: 'bg-indigo-50 text-indigo-700 border-indigo-200 font-extrabold' },
                 'PRODUCTION': { label: 'Sản xuất', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
                 'CLEANROOM': { label: 'Phòng sạch', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
                 'WAREHOUSE': { label: 'Kho hàng', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -976,47 +1377,82 @@
                 'RESTRICTED': { label: 'Hạn chế', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
             };
             const zInfo = zoneTypeConfig[node.zone_type] || { label: node.zone_type || 'Tiêu chuẩn', badge: 'bg-neutral-100 text-neutral-700 border-neutral-200' };
-            const codeDisplay = node.code ? `<span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-bold">${node.code}</span>` : '<span class="text-[10px] text-neutral-400 italic">Chưa có mã</span>';
-            const coordsDisplay = (node.center_x !== null && node.center_x !== undefined && node.center_y !== null && node.center_y !== undefined) ? `<span class="font-mono text-xs text-neutral-600 bg-neutral-50 px-2 py-1 rounded border border-neutral-200/60">X:${node.center_x}m, Y:${node.center_y}m <span class="text-neutral-400">|</span> T${node.floor_level || 1}</span>` : `<span class="font-mono text-[11px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">Chưa trên sơ đồ</span>`;
+            const codeDisplay = node.code ? `<span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-bold whitespace-nowrap shrink-0">${node.code}</span>` : '<span class="text-[10px] text-neutral-400 italic whitespace-nowrap shrink-0">Chưa có mã</span>';
+            
+            let coordsDisplay = '';
+            if (isFloorplan) {
+                coordsDisplay = `<span class="font-mono text-xs text-primary font-bold bg-primary/5 px-2.5 py-1 rounded border border-primary/20 whitespace-nowrap inline-block">${node.width_m || 120}m × ${node.height_m || 80}m</span>`;
+            } else if (node.center_x !== null && node.center_x !== undefined && node.center_y !== null && node.center_y !== undefined) {
+                coordsDisplay = `<span class="font-mono text-xs text-neutral-600 bg-neutral-50 px-2.5 py-1 rounded border border-neutral-200/60 whitespace-nowrap inline-block">X:${node.center_x}m, Y:${node.center_y}m <span class="text-neutral-400">|</span> T${node.floor_level || 1}</span>`;
+            } else {
+                coordsDisplay = `<span class="font-mono text-[11px] text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200/60 whitespace-nowrap inline-block">Chưa trên sơ đồ</span>`;
+            }
 
-            const actionBtns = canUpdateCategory ? `
-                <button onclick="openModal('locations', '${node.id}', '${(node.name||'').replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id||''}', '${node.is_active}', '${(node.code||'').replace(/'/g, "\\'")}', '${node.zone_type||'PRODUCTION'}', '${node.floor_level||1}', '${node.center_x??25}', '${node.center_y??20}', '${(node.floorplan_image||'').replace(/'/g, "\\'")}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Sửa khu vực"><i class="ph ph-pencil-simple text-lg"></i></button>
-                <button onclick="toggleStatus('locations', '${node.id}', '${(node.name||'').replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id||''}', ${node.is_active})" class="${node.is_active ? 'text-amber-500 hover:bg-amber-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'} transition-colors p-1.5 ml-1 rounded-lg" title="${node.is_active ? 'Khóa' : 'Mở khóa'}">
-                <i class="ph ${node.is_active ? 'ph-lock' : 'ph-lock-open'} text-lg"></i>
-                </button>
-                <button onclick="deleteStudioZone('${node.id}')" class="text-danger hover:bg-red-50 transition-colors p-1.5 ml-1 rounded-lg" title="Gỡ khu vực khỏi sơ đồ (Xoá toạ độ X, Y)">
-                <i class="ph ph-trash text-lg"></i>
-                </button>
-            ` : `
-                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
-                    <i class="ph ph-eye text-xs"></i> Chỉ đọc
-                </span>
-            `;
+            const parentObj = node.parent_id ? map.get(node.parent_id) : null;
+            const parentName = parentObj ? parentObj.name : '';
+
+            let actionBtns = '';
+            if (canUpdateCategory) {
+                if (isFloorplan) {
+                    actionBtns = `
+                        <button onclick="switchStudioFloorplan('${node.id}'); switchLocationViewMode('studio');" class="text-sky-600 hover:text-sky-700 hover:bg-sky-50 transition-colors p-1.5 rounded-lg shrink-0" title="Mở trên Studio Mặt Bằng"><i class="ph ph-layout text-lg"></i></button>
+                        <button onclick="openModal('locations', '${node.id}', '${(node.name||'').replace(/'/g, "\\'")}', '${(cleanDesc||node.description||'').replace(/'/g, "\\'")}', '', '${node.is_active}', '${(node.code||'').replace(/'/g, "\\'")}', 'FLOORPLAN')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg shrink-0" title="Sửa tên mặt bằng"><i class="ph ph-pencil-simple text-lg"></i></button>
+                        <button onclick="toggleStatus('locations', '${node.id}', '${(node.name||'').replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '', ${node.is_active})" class="${node.is_active ? 'text-amber-500 hover:bg-amber-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'} transition-colors p-1.5 ml-1 rounded-lg shrink-0" title="${node.is_active ? 'Khóa' : 'Mở khóa'}">
+                        <i class="ph ${node.is_active ? 'ph-lock' : 'ph-lock-open'} text-lg"></i>
+                        </button>
+                    `;
+                } else {
+                    actionBtns = `
+                        <button onclick="openModal('locations', '${node.id}', '${(node.name||'').replace(/'/g, "\\'")}', '${(cleanDesc||node.description||'').replace(/'/g, "\\'")}', '${node.parent_id||''}', '${node.is_active}', '${(node.code||'').replace(/'/g, "\\'")}', '${node.zone_type||'PRODUCTION'}', '${node.floor_level||1}', '${node.center_x??25}', '${node.center_y??20}', '${(node.floorplan_image||'').replace(/'/g, "\\'")}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg shrink-0" title="Sửa khu vực"><i class="ph ph-pencil-simple text-lg"></i></button>
+                        <button onclick="toggleStatus('locations', '${node.id}', '${(node.name||'').replace(/'/g, "\\'")}', '${(node.description||'').replace(/'/g, "\\'")}', '${node.parent_id||''}', ${node.is_active})" class="${node.is_active ? 'text-amber-500 hover:bg-amber-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'} transition-colors p-1.5 ml-1 rounded-lg shrink-0" title="${node.is_active ? 'Khóa' : 'Mở khóa'}">
+                        <i class="ph ${node.is_active ? 'ph-lock' : 'ph-lock-open'} text-lg"></i>
+                        </button>
+                        <button onclick="deleteStudioZone('${node.id}')" class="text-danger hover:bg-red-50 transition-colors p-1.5 ml-1 rounded-lg shrink-0" title="Gỡ khu vực khỏi sơ đồ (Xoá toạ độ X, Y)">
+                        <i class="ph ph-trash text-lg"></i>
+                        </button>
+                    `;
+                }
+            } else {
+                actionBtns = `
+                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200 whitespace-nowrap">
+                        <i class="ph ph-eye text-xs"></i> Chỉ đọc
+                    </span>
+                `;
+            }
+
+            const rowBg = isFloorplan ? 'bg-slate-50/70 font-semibold' : 'hover:bg-primary-50/30';
 
             html += `
-            <tr class="hover:bg-primary-50/30 transition-colors list-row list-locations" data-name="${node.name.toLowerCase()}" data-desc="${(node.description||'').toLowerCase()}" data-active="${node.is_active ? 'true' : 'false'}">
+            <tr class="${rowBg} transition-colors list-row list-locations border-b border-neutral-200/60" data-name="${node.name.toLowerCase()}" data-desc="${(cleanDesc || node.description || '').toLowerCase()}" data-active="${node.is_active ? 'true' : 'false'}">
                 <td class="px-4 py-3 font-semibold text-neutral-800">
-                    <div style="padding-left: ${indent}px" class="flex items-center gap-2">
-                        <i class="ph-fill ${icon}"></i>
-                        <div class="flex flex-col">
-                            <div class="flex items-center gap-2">
-                                <span>${node.name}</span>
-                                ${codeDisplay}
+                    <div style="padding-left: ${indent}px" class="flex items-start gap-2.5">
+                        <i class="ph-fill ${icon} mt-0.5 shrink-0 text-base"></i>
+                        <div class="flex flex-col min-w-0">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="${isFloorplan ? 'font-black text-neutral-900 text-sm' : 'font-medium text-neutral-800 text-[13px]'} leading-snug break-words">${node.name}</span>
+                                <span class="shrink-0">${codeDisplay}</span>
+                                ${overlapBadge}
                             </div>
-                            ${!isRoot ? `<span class="text-[10px] text-neutral-400 font-mono mt-0.5 truncate" title="${node.parent_id}">Thuộc: ${node.parent_id}</span>` : ''}
+                            ${!isFloorplan && parentName ? `<span class="text-[10px] text-neutral-400 font-mono mt-0.5 break-words">Thuộc: <b>${parentName}</b></span>` : ''}
                         </div>
                     </div>
                 </td>
-                <td class="px-4 py-3">
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${zInfo.badge}">
+                <td class="px-4 py-3 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${zInfo.badge}">
                         ${zInfo.label}
                     </span>
                 </td>
-                <td class="px-4 py-3">${coordsDisplay}</td>
-                <td class="px-4 py-3 text-neutral-600">${node.description || "-"}</td>
-                <td class="px-4 py-3">${statusHtml}</td>
-                <td class="px-4 py-3 text-right">
-                    ${actionBtns}
+                <td class="px-4 py-3 whitespace-nowrap">${coordsDisplay}</td>
+                <td class="px-4 py-3 text-neutral-600 min-w-[180px] max-w-[320px]">
+                    <div class="line-clamp-2 break-words text-xs text-neutral-600 leading-relaxed" title="${fullDescTooltip.replace(/"/g, '&quot;')}">
+                        ${cleanDesc || "-"}
+                    </div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap">${statusHtml}</td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                    <div class="inline-flex items-center justify-end gap-1">
+                        ${actionBtns}
+                    </div>
                 </td>
             </tr>
             `;
@@ -1051,7 +1487,7 @@
         
         const createBtnText = document.getElementById('create-btn-text');
         if (createBtnText) {
-            createBtnText.innerText = tab === 'categories' ? 'Category' : (tab === 'templates' ? 'Template' : 'Location');
+            createBtnText.innerText = tab === 'categories' ? 'Create Category' : (tab === 'templates' ? 'Create Template' : 'Tạo Mặt Bằng');
         }
         
         if (tab === 'locations') {
@@ -1182,10 +1618,12 @@
 
     function populateParentSelect(currentId) {
         const select = document.getElementById('item-parent');
-        select.innerHTML = '<option value="">-- None (Top-level) --</option>';
-        locationsData.forEach(l => {
-            if (currentId && l.id === currentId) return; // Cannot be parent of itself
-            select.innerHTML += `<option value="${l.fullPath}">${l.name} (${l.fullPath})</option>`;
+        select.innerHTML = '<option value="">-- Chọn Mặt Bằng Cơ Sở Trực Thuộc * --</option>';
+        const floorplans = locationsData.filter(l => l.zone_type === 'FLOORPLAN');
+        floorplans.forEach(l => {
+            if (currentId && String(l.id) === String(currentId)) return; // Cannot be parent of itself
+            const isSelected = (currentFloorplanId && String(l.id) === String(currentFloorplanId)) ? 'selected' : '';
+            select.innerHTML += `<option value="${l.id}" ${isSelected}>🏢 ${l.name} (${l.code || 'Mặt Bằng'})</option>`;
         });
     }
 
@@ -1210,11 +1648,20 @@
             pathTags = (extra && extra !== 'None') ? extra.split('.') : [''];
             renderPathTags();
         } else if (tab === 'locations') {
-            title += 'Khu vực / Vị trí';
-            document.getElementById('location-parent-section').classList.remove('hidden');
-            document.getElementById('location-spatial-section').classList.remove('hidden');
-            populateParentSelect(id);
-            document.getElementById('item-parent').value = (extra && extra !== 'None') ? extra : '';
+            title += (zoneType === 'FLOORPLAN' ? 'Mặt Bằng Cơ Sở' : 'Khu vực / Vị trí');
+            if (zoneType !== 'FLOORPLAN') {
+                document.getElementById('location-parent-section').classList.remove('hidden');
+                document.getElementById('location-spatial-section').classList.remove('hidden');
+                populateParentSelect(id);
+                if (extra && extra !== 'None') {
+                    document.getElementById('item-parent').value = extra;
+                } else if (currentFloorplanId) {
+                    document.getElementById('item-parent').value = currentFloorplanId;
+                }
+            } else {
+                document.getElementById('location-parent-section').classList.add('hidden');
+                document.getElementById('location-spatial-section').classList.add('hidden');
+            }
             document.getElementById('loc-code').value = (code && code !== 'None') ? code : '';
             document.getElementById('loc-zone-type').value = zoneType || 'PRODUCTION';
             document.getElementById('loc-floor-level').value = floorLevel || 1;
@@ -1267,13 +1714,29 @@
             is_active: document.getElementById('item-active').checked
         };
 
+        const msg = document.getElementById('unified-msg');
+        const btn = document.getElementById('btn-save');
+
         if (activeTab === 'templates') {
             const inputs = document.querySelectorAll('.path-tag-input');
             const formatLtree = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
             const p = Array.from(inputs).map(inp => formatLtree(inp.value)).filter(t => t.length > 0).join('.');
             data.path = p;
         } else if (activeTab === 'locations') {
-            data.parentId = document.getElementById('item-parent').value;
+            const locObj = id ? locationsData.find(l => String(l.id) === String(id)) : null;
+            const isFp = locObj ? (locObj.zone_type === 'FLOORPLAN') : false;
+
+            if (!isFp) {
+                data.parentId = document.getElementById('item-parent').value;
+                if (!data.parentId) {
+                    msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
+                    msg.innerText = 'Vui lòng chọn Mặt Bằng cơ sở trực thuộc cho khu vực này.';
+                    msg.classList.remove('hidden');
+                    return;
+                }
+            } else {
+                data.parentId = '';
+            }
             data.code = document.getElementById('loc-code').value;
             data.zone_type = document.getElementById('loc-zone-type').value;
             data.floor_level = parseInt(document.getElementById('loc-floor-level').value) || 1;
@@ -1300,8 +1763,6 @@
         }
         
         const method = id ? 'PUT' : 'POST';
-        const btn = document.getElementById('btn-save');
-        const msg = document.getElementById('unified-msg');
         btn.disabled = true;
         
         let url = '{% url "portal_asset_categories" %}';
@@ -1427,7 +1888,7 @@
     let selectedZoneId = null;
     let selectedAssetId = null;
     let selectedSpatialId = null;
-    let snapGrid = 1.0; // In meters (1.0m default snap)
+    let snapGrid = 0; // Tắt snap hoàn toàn (di chuyển tự do mượt mà)
     let gridVisible = true;
     let bgOpacity = 0.5;
     let dirtyChanges = new Map(); // id -> { type: 'asset'|'zone', ... }
@@ -1471,17 +1932,19 @@
         if (svg) {
             svg.setAttribute('viewBox', `0 0 ${CANVAS_WIDTH_PX} ${CANVAS_HEIGHT_PX}`);
         }
+        const gridW = Math.max(CANVAS_WIDTH_PX, 10000);
+        const gridH = Math.max(CANVAS_HEIGHT_PX, 10000);
         if (bg) {
-            bg.setAttribute('width', CANVAS_WIDTH_PX);
-            bg.setAttribute('height', CANVAS_HEIGHT_PX);
+            bg.setAttribute('width', gridW);
+            bg.setAttribute('height', gridH);
         }
         if (gridMinor) {
-            gridMinor.setAttribute('width', CANVAS_WIDTH_PX);
-            gridMinor.setAttribute('height', CANVAS_HEIGHT_PX);
+            gridMinor.setAttribute('width', gridW);
+            gridMinor.setAttribute('height', gridH);
         }
         if (gridMajor) {
-            gridMajor.setAttribute('width', CANVAS_WIDTH_PX);
-            gridMajor.setAttribute('height', CANVAS_HEIGHT_PX);
+            gridMajor.setAttribute('width', gridW);
+            gridMajor.setAttribute('height', gridH);
         }
         if (underlay) {
             underlay.setAttribute('width', CANVAS_WIDTH_PX - 40);
@@ -1536,6 +1999,21 @@
     // =========================================================================
 
     let buildingPolygonPoints = null;
+    let currentBuildingPreset = 'rect';
+
+    function updateStudioBuildingDimUI() {
+        const dimText = document.getElementById('studio-building-dim-text');
+        const shapeBadge = document.getElementById('studio-building-shape-badge');
+        const nameMap = { 'rect': 'Chữ Nhật', 'L': 'Chữ L', 'U': 'Chữ U', 'T': 'Chữ T', 'custom': 'Đa giác' };
+        const pts = getBuildingPoints();
+        const shapeName = nameMap[currentBuildingPreset] || `Đa giác (${pts.length} góc)`;
+        if (dimText) {
+            dimText.innerText = `${Math.round(FACTORY_WIDTH_METERS)}m × ${Math.round(FACTORY_HEIGHT_METERS)}m`;
+        }
+        if (shapeBadge) {
+            shapeBadge.innerText = shapeName;
+        }
+    }
 
     function getBuildingPoints() {
         if (Array.isArray(buildingPolygonPoints) && buildingPolygonPoints.length >= 3) {
@@ -1559,10 +2037,18 @@
             updateFactoryDimensions(newW, newH);
         }
         renderStudioBuilding();
+        updateStudioBuildingDimUI();
+
+        // Cập nhật lại các khu vực: phát hiện khu vực bị đè viền hoặc lọt ra ngoài khi mặt bằng thay đổi
+        const floorLocs = (typeof getStudioFloorLocations === 'function') ? getStudioFloorLocations() : locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active && (!currentFloorplanId || String(l.parent_id) === String(currentFloorplanId)));
+        renderStudioZonesLayer(floorLocs);
+        renderStudioZonesSidebar(floorLocs);
+
         if (recordDirty) {
             markStudioDirty('factory_dim', 'global', {
                 width: FACTORY_WIDTH_METERS,
                 height: FACTORY_HEIGHT_METERS,
+                preset: currentBuildingPreset,
                 polygon_points: newPts
             });
         }
@@ -1588,9 +2074,34 @@
         clipPoly.setAttribute('points', pointsStr);
         outerWall.setAttribute('points', pointsStr);
 
-        if (!handlesGroup) return;
+        // Kiểm tra xem người dùng có đang chọn mặt bằng đường lưới hay không
+        const isCanvasSelected = !selectedZoneId && !selectedAssetId && !selectedSpatialId;
 
-        // Render Chốt góc tường và Nút (+) chèn góc tường tòa nhà lớn nhất
+        if (!isCanvasSelected) {
+            // Khi không chọn mặt bằng đường lưới: viền mờ đi và ẩn toàn bộ chốt tạo hình
+            outerWall.setAttribute('stroke', '#475569');
+            outerWall.setAttribute('stroke-width', '2');
+            outerWall.setAttribute('stroke-opacity', '0.35');
+            outerWall.setAttribute('stroke-dasharray', '6,4');
+            outerWall.removeAttribute('filter');
+            if (handlesGroup) {
+                handlesGroup.style.display = 'none';
+                handlesGroup.innerHTML = '';
+            }
+            return;
+        }
+
+        // Khi chọn mặt bằng đường lưới: viền sáng nổi bật và hiện chốt tạo hình
+        outerWall.setAttribute('stroke', '#0284c7');
+        outerWall.setAttribute('stroke-width', '3.5');
+        outerWall.setAttribute('stroke-opacity', '1.0');
+        outerWall.removeAttribute('stroke-dasharray');
+        outerWall.setAttribute('filter', 'drop-shadow(0 0 6px rgba(2,132,199,0.5))');
+
+        if (!handlesGroup) return;
+        handlesGroup.style.display = 'block';
+
+        // Render Nút (+) chèn góc tường và Chốt bẻ góc tòa nhà (Hitbox chống nháy 100%)
         const n = pxPts.length;
         const edgeElements = pxPts.map((p1, i) => {
             const p2 = pxPts[(i + 1) % n];
@@ -1598,26 +2109,30 @@
             const midY = (p1.py + p2.py) / 2;
             const lenM = Math.hypot(pts[(i + 1) % n].x - pts[i].x, pts[(i + 1) % n].y - pts[i].y);
             return `
-                <g class="pointer-events-auto cursor-pointer"
+                <g class="pointer-events-auto cursor-pointer select-none group/edge-btn"
                    onmousedown="event.stopPropagation(); event.preventDefault(); handleBuildingInsertVertex(${i});"
                    title="Thêm góc tường tòa nhà tại đây (Đoạn tường ${lenM.toFixed(1)}m)">
-                    <circle cx="${midX.toFixed(1)}" cy="${midY.toFixed(1)}" r="7.5" fill="#0284c7" stroke="#ffffff" stroke-width="1.8" class="hover:fill-sky-400 transition-colors shadow" />
-                    <text x="${midX.toFixed(1)}" y="${(midY + 3.8).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="900" pointer-events="none">+</text>
+                    <circle cx="${midX.toFixed(1)}" cy="${midY.toFixed(1)}" r="14" fill="transparent" class="cursor-pointer" />
+                    <circle cx="${midX.toFixed(1)}" cy="${midY.toFixed(1)}" r="8" fill="#0284c7" stroke="#ffffff" stroke-width="2" class="group-hover/edge-btn:fill-sky-400 group-hover/edge-btn:stroke-sky-100 transition-colors shadow pointer-events-none" />
+                    <text x="${midX.toFixed(1)}" y="${(midY + 3.8).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="900" pointer-events="none">+</text>
                 </g>
             `;
         }).join('');
 
         const vertexElements = pxPts.map((pt, i) => {
             return `
-                <g class="pointer-events-auto cursor-crosshair"
+                <g class="pointer-events-auto cursor-crosshair select-none group/vertex-btn"
                    onmousedown="event.stopPropagation(); handleBuildingVertexMouseDown(event, ${i});"
                    ondblclick="event.stopPropagation(); event.preventDefault(); handleBuildingDeleteVertex(${i});"
-                   title="Góc tường tòa nhà #${i + 1} (${pt.mx.toFixed(1)}m, ${pt.my.toFixed(1)}m) | Kéo để uốn bẻ góc tường | Nhấp đúp để xoá góc">
+                   title="Góc tường tòa nhà #${i + 1} (${pt.mx.toFixed(1)}m, ${pt.my.toFixed(1)}m) | Kéo để bẻ góc | Nhấp đúp để xoá">
+                    <rect x="${(pt.px - 14).toFixed(1)}" y="${(pt.py - 14).toFixed(1)}"
+                          width="28" height="28"
+                          fill="transparent" class="cursor-crosshair" />
                     <rect id="building-vertex-handle-${i}"
-                          x="${(pt.px - 6).toFixed(1)}" y="${(pt.py - 6).toFixed(1)}"
-                          width="12" height="12"
+                          x="${(pt.px - 7).toFixed(1)}" y="${(pt.py - 7).toFixed(1)}"
+                          width="14" height="14" rx="2"
                           fill="#ffffff" stroke="#0284c7" stroke-width="2.5"
-                          class="hover:fill-sky-300 hover:scale-125 transition-transform shadow-md" />
+                          class="group-hover/vertex-btn:fill-sky-100 group-hover/vertex-btn:stroke-sky-400 transition-colors shadow-md pointer-events-none" />
                 </g>
             `;
         }).join('');
@@ -1626,6 +2141,7 @@
     }
 
     function handleBuildingInsertVertex(edgeIdx) {
+        currentBuildingPreset = 'custom';
         const pts = [...getBuildingPoints()];
         const n = pts.length;
         const p1 = pts[edgeIdx];
@@ -1645,6 +2161,7 @@
             showStudioToast('Tòa nhà phải có ít nhất 3 góc tường.', true);
             return;
         }
+        currentBuildingPreset = 'custom';
         pts.splice(vertexIdx, 1);
         setBuildingPoints(pts, true);
         showStudioToast('Đã xóa 1 góc tường tòa nhà');
@@ -1703,8 +2220,8 @@
             const vHandle = document.getElementById(`building-vertex-handle-${vertexIdx}`);
             if (vHandle) {
                 const { px: hPx, py: hPy } = metersToCanvasPx(lastSnappedX, lastSnappedY);
-                vHandle.setAttribute('x', (hPx - 6).toFixed(1));
-                vHandle.setAttribute('y', (hPy - 6).toFixed(1));
+                vHandle.setAttribute('x', (hPx - 7).toFixed(1));
+                vHandle.setAttribute('y', (hPy - 7).toFixed(1));
             }
 
             if (tooltip && tooltipText) {
@@ -1723,6 +2240,7 @@
 
             if (tooltip) tooltip.classList.add('hidden');
 
+            currentBuildingPreset = 'custom';
             pts[vertexIdx] = { x: lastSnappedX, y: lastSnappedY };
             setBuildingPoints(pts, true);
         }
@@ -1732,6 +2250,7 @@
     }
 
     function applyBuildingShapePreset(shapeType) {
+        currentBuildingPreset = shapeType;
         const W = FACTORY_WIDTH_METERS;
         const H = FACTORY_HEIGHT_METERS;
         let newPts = [];
@@ -1777,6 +2296,7 @@
             ];
         } else {
             // Default: Rect
+            currentBuildingPreset = 'rect';
             newPts = [
                 { x: 0, y: 0 },
                 { x: W, y: 0 },
@@ -1794,28 +2314,26 @@
         const pts = getBuildingPoints();
         const W = FACTORY_WIDTH_METERS;
         const H = FACTORY_HEIGHT_METERS;
-        const cx = W / 2;
-        const cy = H / 2;
+
+        // Xoay 90 độ theo chiều kim đồng hồ: hoán đổi chiều rộng W và chiều cao H mà không bị bóp thành hình vuông
+        const newW = H;
+        const newH = W;
+        updateFactoryDimensions(newW, newH);
 
         const rotated = pts.map(p => ({
-            x: Math.round((cx - (p.y - cy)) * 10) / 10,
-            y: Math.round((cy + (p.x - cx)) * 10) / 10
+            x: Math.round((H - p.y) * 10) / 10,
+            y: Math.round(p.x * 10) / 10
         }));
 
-        const bb = getPolygonBoundingBox(rotated);
-        const norm = rotated.map(p => ({
-            x: Math.max(0, Math.min(FACTORY_WIDTH_METERS, Math.round((p.x - bb.minX) * 10) / 10)),
-            y: Math.max(0, Math.min(FACTORY_HEIGHT_METERS, Math.round((p.y - bb.minY) * 10) / 10))
-        }));
-
-        setBuildingPoints(norm, true);
-        showStudioToast('Đã xoay hướng hình dạng tòa nhà 90°');
+        setBuildingPoints(rotated, true);
+        showStudioToast(`Đã xoay hướng tòa nhà 90° (${newW}m × ${newH}m)`);
     }
 
     function snapBuildingTo90Degrees() {
         const pts = [...getBuildingPoints()];
         const n = pts.length;
         if (n < 4) return;
+        currentBuildingPreset = 'custom';
         for (let i = 0; i < n; i++) {
             const nextIdx = (i + 1) % n;
             const dx = Math.abs(pts[nextIdx].x - pts[i].x);
@@ -2269,7 +2787,7 @@
         const targetsY = [{ val: 35.0, label: 'Tâm sàn 35m' }];
 
         // Other zones on current floor
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active && String(l.id) !== String(currentId));
+        const floorLocations = getStudioFloorLocations().filter(l => String(l.id) !== String(currentId));
         floorLocations.forEach(l => {
             const dims = getZoneDimensions(l);
             const cx = parseFloat(l.center_x) || 25.0;
@@ -2466,6 +2984,147 @@
         return overlaps;
     }
 
+    // Helper: Tìm ID mặt bằng gốc của một khu vực (xử lý quan hệ phân cấp cha con)
+    function getZoneFloorplanId(loc) {
+        if (!loc) return '';
+        let curr = loc;
+        let visited = new Set();
+        while (curr && !visited.has(String(curr.id))) {
+            visited.add(String(curr.id));
+            if (curr.zone_type === 'FLOORPLAN') return String(curr.id);
+            if (!curr.parent_id) break;
+            const pid = String(curr.parent_id);
+            const p = (locationsData || []).find(l => String(l.id) === pid || (l.code && l.code === pid) || (l.name && l.name === pid));
+            if (!p) break;
+            if (p.zone_type === 'FLOORPLAN') return String(p.id);
+            curr = p;
+        }
+        return String(loc.parent_id || '');
+    }
+
+    // Helper: Tính toán toàn bộ các cặp khu vực bị đè lấn nhau (trả về Map: zoneId -> [Tên các khu vực bị đè])
+    function computeAllZoneOverlaps(filterFloorplanId = null) {
+        const overlapMap = new Map();
+        const placed = (locationsData || []).filter(l => l.zone_type !== 'FLOORPLAN' && l.is_active && isZonePlaced(l));
+
+        for (let i = 0; i < placed.length; i++) {
+            const locA = placed[i];
+            const fpA = getZoneFloorplanId(locA);
+            if (filterFloorplanId && fpA && fpA !== String(filterFloorplanId)) continue;
+            const flA = parseInt(locA.floor_level) || 1;
+
+            for (let j = i + 1; j < placed.length; j++) {
+                const locB = placed[j];
+                const fpB = getZoneFloorplanId(locB);
+                if (filterFloorplanId && fpB && fpB !== String(filterFloorplanId)) continue;
+                const flB = parseInt(locB.floor_level) || 1;
+
+                // Chỉ tính xung đột khi cùng mặt bằng và cùng tầng
+                if (fpA && fpB && fpA !== fpB) continue;
+                if (flA !== flB) continue;
+
+                if (checkTwoZonesOverlap(locA, locB)) {
+                    const idA = String(locA.id);
+                    const idB = String(locB.id);
+                    if (!overlapMap.has(idA)) overlapMap.set(idA, []);
+                    if (!overlapMap.has(idB)) overlapMap.set(idB, []);
+                    overlapMap.get(idA).push(locB.name);
+                    overlapMap.get(idB).push(locA.name);
+                }
+            }
+        }
+        return overlapMap;
+    }
+
+    function distancePointToSegment(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const l2 = dx * dx + dy * dy;
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function distancePointToPolygonBoundary(pt, poly) {
+        if (!poly || poly.length < 2) return Infinity;
+        let minDist = Infinity;
+        const n = poly.length;
+        for (let i = 0; i < n; i++) {
+            const p1 = poly[i];
+            const p2 = poly[(i + 1) % n];
+            const d = distancePointToSegment(pt.x, pt.y, p1.x, p1.y, p2.x, p2.y);
+            if (d < minDist) minDist = d;
+        }
+        return minDist;
+    }
+
+    // Kiểm tra khu vực có bị tràn ra ngoài hoặc đè/cắt lên viền tòa nhà lớn nhất hay không
+    function checkZoneViolatesBuildingBoundary(loc, buildingPts) {
+        if (!isZonePlaced(loc)) return false;
+        const bPts = buildingPts || getBuildingPoints();
+        if (!bPts || bPts.length < 3) return false;
+
+        const zPts = getZonePoints(loc);
+        if (!zPts || zPts.length < 3) return false;
+
+        const bBox = getPolygonBoundingBox(bPts);
+        const zBox = getPolygonBoundingBox(zPts);
+        const TOL = 0.4; // Dung sai 40cm cho các phòng tựa sát vách tường và làm tròn số thực
+
+        // 1. Kiểm tra nhanh qua khung bao ngoài (Bounding box)
+        if (zBox.minX < bBox.minX - TOL || zBox.maxX > bBox.maxX + TOL ||
+            zBox.minY < bBox.minY - TOL || zBox.maxY > bBox.maxY + TOL) {
+            return true;
+        }
+
+        // 2. Kiểm tra toàn bộ các đỉnh, trung điểm các cạnh và tâm của khu vực
+        const checkPts = [];
+        const n = zPts.length;
+        for (let i = 0; i < n; i++) {
+            const p1 = zPts[i];
+            const p2 = zPts[(i + 1) % n];
+            checkPts.push(p1);
+            checkPts.push({ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 });
+        }
+        const cx = zPts.reduce((s, p) => s + p.x, 0) / n;
+        const cy = zPts.reduce((s, p) => s + p.y, 0) / n;
+        checkPts.push({ x: cx, y: cy });
+
+        for (const pt of checkPts) {
+            if (!isPointInPolygon(pt, bPts)) {
+                const dist = distancePointToPolygonBoundary(pt, bPts);
+                if (dist > TOL) {
+                    return true;
+                }
+            }
+        }
+
+        // 3. Kiểm tra xem có góc tường tòa nhà nào cắm thụt sâu vào trong lòng khu vực không (ví dụ góc khuyết chữ L/U)
+        for (const bp of bPts) {
+            if (isPointInPolygon(bp, zPts)) {
+                const distToZoneWall = distancePointToPolygonBoundary(bp, zPts);
+                if (distToZoneWall > TOL) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    function getBuildingBoundaryViolatingZones(floorLocations) {
+        const violating = new Set();
+        const placed = (floorLocations || []).filter(isZonePlaced);
+        const bPts = getBuildingPoints();
+        placed.forEach(loc => {
+            if (checkZoneViolatesBuildingBoundary(loc, bPts)) {
+                violating.add(String(loc.id));
+            }
+        });
+        return violating;
+    }
+
     // Helper: Tìm khu vực cha bao bọc trực tiếp (enclosing zone) trên cùng tầng
     function findEnclosingParentZone(targetLoc, candidateZones) {
         if (!isZonePlaced(targetLoc)) return null;
@@ -2506,7 +3165,8 @@
     // Tự động đồng bộ quan hệ phân cấp không gian giữa sơ đồ và Cây/Bảng
     function syncZoneSpatialHierarchy(floor = currentFloor) {
         const formatLtree = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-        const placedOnFloor = locationsData.filter(l => (parseInt(l.floor_level) || 1) === floor && l.is_active && isZonePlaced(l));
+        const curFpId = currentFloorplanId ? String(currentFloorplanId) : (floorplansData.length > 0 ? String(floorplansData[0].id) : '');
+        const placedOnFloor = locationsData.filter(l => (parseInt(l.floor_level) || 1) === floor && l.is_active && isZonePlaced(l) && isLocationInCurrentFloorplan(l));
 
         let changed = false;
 
@@ -2521,17 +3181,22 @@
             const enclosingParent = findEnclosingParentZone(loc, placedOnFloor);
             let expectedParentId = '';
             if (enclosingParent) {
-                const parentPath = enclosingParent.parent_id
-                    ? `${enclosingParent.parent_id}.${formatLtree(enclosingParent.name)}`
-                    : formatLtree(enclosingParent.name);
-                expectedParentId = parentPath;
+                // Zone con lồng trong một zone cha
+                expectedParentId = String(enclosingParent.id);
             } else {
-                // Đang đặt trên sơ đồ nhưng không nằm trong khu vực nào -> là cấp gốc (không cha)
-                expectedParentId = '';
+                // Không nằm trong zone nào khác -> Là cấp gốc thuộc Mặt Bằng hiện tại
+                const isExistingParentFp = floorplansData.some(f => String(f.id) === String(loc.parent_id));
+                if (isExistingParentFp) {
+                    expectedParentId = String(loc.parent_id);
+                } else if (curFpId) {
+                    expectedParentId = curFpId;
+                } else {
+                    expectedParentId = loc.parent_id || '';
+                }
             }
 
-            const currentParentId = loc.parent_id || '';
-            if (currentParentId !== expectedParentId) {
+            const currentParentId = loc.parent_id ? String(loc.parent_id).trim() : '';
+            if (currentParentId !== expectedParentId && expectedParentId !== '') {
                 loc.parent_id = expectedParentId;
                 loc.fullPath = loc.parent_id ? `${loc.parent_id}.${formatLtree(loc.name)}` : formatLtree(loc.name);
                 changed = true;
@@ -2617,7 +3282,7 @@
 
         let html = '';
         availableFloors.forEach(f => {
-            const label = f === 1 ? 'Tầng 1 (Trệt)' : `Tầng ${f}`;
+            const label = `Tầng ${f}`;
             html += `<option value="${f}" ${f === currentFloor ? 'selected' : ''}>${label}</option>`;
         });
         html += `<option value="__add__">+ Thêm tầng mới...</option>`;
@@ -2779,7 +3444,7 @@
         const worldX = (centerX - panX) / studioZoom;
         const worldY = (centerY - panY) / studioZoom;
 
-        const newZoom = Math.min(2.8, Math.max(0.35, Math.round((studioZoom + delta) * 100) / 100));
+        const newZoom = Math.min(2.8, Math.max(0.05, Math.round((studioZoom + delta) * 100) / 100));
         panX = centerX - worldX * newZoom;
         panY = centerY - worldY * newZoom;
         studioZoom = newZoom;
@@ -2795,7 +3460,7 @@
         // Fit 1000x700 inside stage with 60px margin
         const scaleX = (stageRect.width - 60) / CANVAS_WIDTH_PX;
         const scaleY = (stageRect.height - 60) / CANVAS_HEIGHT_PX;
-        studioZoom = Math.min(1.2, Math.max(0.45, Math.min(scaleX, scaleY)));
+        studioZoom = Math.min(1.2, Math.max(0.05, Math.min(scaleX, scaleY)));
 
         // Center canvas
         panX = (stageRect.width - CANVAS_WIDTH_PX * studioZoom) / 2;
@@ -2803,6 +3468,26 @@
 
         applyCanvasTransform(true);
         showStudioToast('Đã căn chỉnh vừa khung màn hình');
+    }
+
+    // Nút 2: Căn góc nhìn camera quay trở lại chính giữa mặt bằng khi lỡ kéo ra xa
+    function centerStudioFloorplan() {
+        const stage = document.getElementById('studio-canvas-stage');
+        if (!stage) return;
+        const stageRect = stage.getBoundingClientRect();
+        if (!stageRect.width || !stageRect.height) return;
+
+        // Căn chỉnh tỉ lệ zoom vừa vặn (tối đa 110%) để nhìn thấy trọn vẹn mặt bằng
+        const scaleX = (stageRect.width - 60) / CANVAS_WIDTH_PX;
+        const scaleY = (stageRect.height - 60) / CANVAS_HEIGHT_PX;
+        studioZoom = Math.min(1.1, Math.max(0.05, Math.min(scaleX, scaleY)));
+
+        // Căn giữa mặt bằng vào tâm màn hình
+        panX = Math.round((stageRect.width - CANVAS_WIDTH_PX * studioZoom) / 2);
+        panY = Math.round((stageRect.height - CANVAS_HEIGHT_PX * studioZoom) / 2);
+
+        applyCanvasTransform(true);
+        showStudioToast('Đã quay lại chính giữa mặt bằng');
     }
 
     // Helper: Định vị camera căn giữa góc nhìn vào một điểm toạ độ (mét)
@@ -2879,8 +3564,8 @@
         const rulerLeft = document.getElementById('studio-ruler-left');
         if (!rulerTop || !rulerLeft) return;
 
-        const stepX = FACTORY_WIDTH_METERS > 500 ? 50 : (FACTORY_WIDTH_METERS > 200 ? 20 : 10);
-        const stepY = FACTORY_HEIGHT_METERS > 500 ? 50 : (FACTORY_HEIGHT_METERS > 200 ? 20 : 10);
+        const stepX = FACTORY_WIDTH_METERS > 500 ? 50 : (FACTORY_WIDTH_METERS > 100 ? 20 : 10);
+        const stepY = FACTORY_HEIGHT_METERS > 500 ? 50 : (FACTORY_HEIGHT_METERS > 100 ? 20 : 10);
 
         // Render Top Scale (0 to FACTORY_WIDTH_METERS)
         let topHtml = `<div class="relative w-full h-full">`;
@@ -2896,14 +3581,14 @@
         topHtml += `</div>`;
         rulerTop.innerHTML = topHtml;
 
-        // Render Left Scale (0 to FACTORY_HEIGHT_METERS) - Horizontal numbers for clarity up to 1000m+
+        // Render Left Scale (0 to FACTORY_HEIGHT_METERS) - Horizontal numbers matching top ruler exactly
         let leftHtml = `<div class="relative w-full h-full">`;
         for (let m = 0; m <= FACTORY_HEIGHT_METERS; m += stepY) {
             const screenPy = panY + (m / FACTORY_HEIGHT_METERS) * CANVAS_HEIGHT_PX * studioZoom;
             leftHtml += `
                 <div class="absolute right-0 flex items-center justify-end pointer-events-none pr-1 w-full" style="top: ${screenPy}px; transform: translateY(-50%);">
-                    <span class="text-[10px] font-mono leading-none text-slate-200 mr-1.5 text-right whitespace-nowrap select-none font-bold">${m}m</span>
-                    <div class="w-2 h-px bg-slate-500 shrink-0"></div>
+                    <span class="text-[9px] font-mono leading-none text-slate-400 mr-1 text-right whitespace-nowrap select-none">${m}m</span>
+                    <div class="w-1.5 h-px bg-slate-700 shrink-0"></div>
                 </div>
             `;
         }
@@ -2911,11 +3596,98 @@
         rulerLeft.innerHTML = leftHtml;
     }
 
+    // Toggle Left & Right Sidebars for Maximum Canvas Studio Viewport
+    let isStudioLeftSidebarOpen = true;
+    let isStudioRightSidebarOpen = true;
+
+    function toggleStudioLeftSidebar(forceState = null) {
+        isStudioLeftSidebarOpen = (forceState !== null) ? forceState : !isStudioLeftSidebarOpen;
+        const sidebar = document.getElementById('studio-left-sidebar');
+        const expandBtn = document.getElementById('btn-expand-left-sidebar');
+        const toggleBtn = document.getElementById('btn-toggle-left-sidebar');
+
+        if (sidebar) {
+            if (isStudioLeftSidebarOpen) {
+                sidebar.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('hidden');
+            }
+        }
+        if (expandBtn) {
+            if (isStudioLeftSidebarOpen) {
+                expandBtn.classList.add('hidden');
+            } else {
+                expandBtn.classList.remove('hidden');
+            }
+        }
+        if (toggleBtn) {
+            if (isStudioLeftSidebarOpen) {
+                toggleBtn.classList.add('text-sky-300', 'bg-slate-800');
+                toggleBtn.classList.remove('text-slate-500');
+            } else {
+                toggleBtn.classList.remove('text-sky-300', 'bg-slate-800');
+                toggleBtn.classList.add('text-slate-500');
+            }
+        }
+        renderStudioRulers();
+        updateMinimap();
+        try {
+            localStorage.setItem('studio_left_sidebar_open', isStudioLeftSidebarOpen ? '1' : '0');
+        } catch (_) {}
+    }
+
+    function toggleStudioRightSidebar(forceState = null) {
+        isStudioRightSidebarOpen = (forceState !== null) ? forceState : !isStudioRightSidebarOpen;
+        const inspector = document.getElementById('studio-inspector');
+        const expandBtn = document.getElementById('btn-expand-right-sidebar');
+        const toggleBtn = document.getElementById('btn-toggle-right-sidebar');
+
+        if (inspector) {
+            if (isStudioRightSidebarOpen) {
+                inspector.classList.remove('hidden');
+            } else {
+                inspector.classList.add('hidden');
+            }
+        }
+        if (expandBtn) {
+            if (isStudioRightSidebarOpen) {
+                expandBtn.classList.add('hidden');
+            } else {
+                expandBtn.classList.remove('hidden');
+            }
+        }
+        if (toggleBtn) {
+            if (isStudioRightSidebarOpen) {
+                toggleBtn.classList.add('text-sky-300', 'bg-slate-800');
+                toggleBtn.classList.remove('text-slate-500');
+            } else {
+                toggleBtn.classList.remove('text-sky-300', 'bg-slate-800');
+                toggleBtn.classList.add('text-slate-500');
+            }
+        }
+        renderStudioRulers();
+        updateMinimap();
+        try {
+            localStorage.setItem('studio_right_sidebar_open', isStudioRightSidebarOpen ? '1' : '0');
+        } catch (_) {}
+    }
+
     function initStudioCanvasEvents() {
         if (isCanvasInitialized) return;
         const stage = document.getElementById('studio-canvas-stage');
         if (!stage) return;
         isCanvasInitialized = true;
+
+        try {
+            const savedLeft = localStorage.getItem('studio_left_sidebar_open');
+            if (savedLeft !== null) {
+                toggleStudioLeftSidebar(savedLeft === '1');
+            }
+            const savedRight = localStorage.getItem('studio_right_sidebar_open');
+            if (savedRight !== null) {
+                toggleStudioRightSidebar(savedRight === '1');
+            }
+        } catch (_) {}
 
         // Smooth Wheel Zoom (Centered at Cursor)
         stage.addEventListener('wheel', function(e) {
@@ -2928,7 +3700,7 @@
             const worldY = (mouseY - panY) / studioZoom;
 
             const delta = e.deltaY < 0 ? 0.12 : -0.12;
-            const newZoom = Math.min(2.8, Math.max(0.35, Math.round((studioZoom + delta) * 100) / 100));
+            const newZoom = Math.min(2.8, Math.max(0.05, Math.round((studioZoom + delta) * 100) / 100));
 
             panX = mouseX - worldX * newZoom;
             panY = mouseY - worldY * newZoom;
@@ -2962,7 +3734,9 @@
                 e.target.closest('.canvas-interactive-spatial') ||
                 e.target.closest('.zone-resize-handle') ||
                 e.target.closest('.asset-resize-handle') ||
-                e.target.closest('.spatial-handle')) {
+                e.target.closest('.spatial-handle') ||
+                e.target.closest('polygon[data-zone-id]') ||
+                e.target.closest('g[id^="canvas-zone-group-"]')) {
                 return;
             }
 
@@ -3038,6 +3812,15 @@
             } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
                 saveStudioChanges();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === '0' || e.code === 'Digit0')) {
+                e.preventDefault();
+                centerStudioFloorplan();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+                e.preventDefault();
+                toggleStudioLeftSidebar();
+            } else if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+                e.preventDefault();
+                toggleStudioRightSidebar();
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (!['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
                     if (selectedSpatialId) {
@@ -3084,7 +3867,7 @@
 
     function setStudioZoneSidebarFilter(fVal) {
         studioZoneSidebarFilter = fVal;
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        const floorLocations = getStudioFloorLocations();
         const searchInput = document.getElementById('studio-palette-search');
         renderStudioZonesSidebar(floorLocations, searchInput ? searchInput.value : '');
     }
@@ -3106,7 +3889,7 @@
 
     function filterStudioPalette(query) {
         const q = (query || '').toLowerCase().trim();
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        const floorLocations = getStudioFloorLocations();
         renderStudioZonesSidebar(floorLocations, q);
         renderStudioSpaces(q);
     }
@@ -3134,15 +3917,86 @@
         } catch (_) {}
         const loc = locationsData.find(l => String(l.id) === String(zoneId));
         if (loc) {
-            autoLayoutZoneAssets(loc, true);
+            autoLayoutZoneAssets(loc, true, true);
             renderStudio();
             renderInspector();
             showStudioToast(`Đã chuyển khu vực "${loc.name}" sang chế độ ${mode === 'grid' ? 'Lưới siêu gọn' : 'Gom cụm thông minh'}`);
         }
     }
 
+    // Helper: Kiểm tra tài sản có thuộc mặt bằng hiện tại hay không
+    function isAssetInCurrentFloorplan(a) {
+        if (!a) return false;
+        if (!currentFloorplanId) return true;
+        const curFpId = String(currentFloorplanId);
+        if (a.floorplan_id && String(a.floorplan_id) !== curFpId) return false;
+        if (a.location_id) {
+            if (String(a.location_id) === curFpId) return true;
+            const aLoc = locationsData.find(l => String(l.id) === String(a.location_id));
+            if (aLoc) {
+                if (String(aLoc.id) === curFpId || aLoc.zone_type === 'FLOORPLAN') {
+                    return String(aLoc.id) === curFpId;
+                }
+                if (typeof isLocationInCurrentFloorplan === 'function') {
+                    return isLocationInCurrentFloorplan(aLoc);
+                }
+            }
+        }
+        return true;
+    }
+
+    // Helper: Lấy toàn bộ tài sản thuộc khu vực (trực tiếp, khu vực con, mã khu vực, hoặc toạ độ lọt lòng)
+    function getAssetsForZone(loc) {
+        if (!loc) return [];
+        const zoneId = String(loc.id);
+        const zoneCode = (loc.code || '').trim();
+        const zoneName = (loc.name || '').trim();
+        const zonePts = getZonePoints(loc);
+        const zoneFloor = parseInt(loc.floor_level) || currentFloor || 1;
+
+        // Danh sách ID các khu vực con trực thuộc khu vực này
+        const childZoneIds = new Set(
+            locationsData.filter(cz => cz.parent_id && (
+                String(cz.parent_id) === zoneId || 
+                (loc.fullPath && (cz.parent_id === loc.fullPath || cz.parent_id.startsWith(loc.fullPath + '.')))
+            )).map(cz => String(cz.id))
+        );
+
+        return assetsData.filter(a => {
+            // 1. Phải cùng tầng
+            const astFloor = parseInt(a.floor_level) || 1;
+            if (astFloor !== zoneFloor) return false;
+
+            // 2. Phải cùng mặt bằng hiện tại để tuyệt đối không ảnh hưởng lẫn nhau giữa 2 mặt bằng
+            if (!isAssetInCurrentFloorplan(a)) return false;
+
+            // 3. Khớp trực tiếp khu vực cha hoặc khu vực con
+            if (a.location_id && String(a.location_id) === zoneId) return true;
+            if (a.location_id && childZoneIds.has(String(a.location_id))) return true;
+
+            // 4. Nếu tài sản được gán ở cấp mặt bằng (chưa gán vào khu vực con cụ thể) hoặc chưa có location_id
+            const isAssignedAtFloorplanLevel = !a.location_id || 
+                (currentFloorplanId && String(a.location_id) === String(currentFloorplanId)) || 
+                (loc.parent_id && String(a.location_id) === String(loc.parent_id));
+
+            if (isAssignedAtFloorplanLevel) {
+                // Khớp theo mã hoặc tên khu vực
+                if (a.zone_id && (a.zone_id === zoneCode || a.zone_id === zoneName)) return true;
+
+                // Kiểm tra toạ độ lọt lòng trong ranh giới đa giác của khu vực
+                const ax = parseFloat(a.coords_x);
+                const ay = parseFloat(a.coords_y);
+                if (!isNaN(ax) && !isNaN(ay) && (ax > 0 || ay > 0) && isPointInPolygon({ x: ax, y: ay }, zonePts)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+    }
+
     // Tự động phân bổ toạ độ các tài sản thuộc khu vực này ngay ngắn bên trong ranh giới khu vực
-    function autoLayoutZoneAssets(loc, forceRelayout = false) {
+    function autoLayoutZoneAssets(loc, forceRelayout = false, shouldMarkDirty = false) {
         if (!loc || !isZonePlaced(loc)) return;
         const zoneId = String(loc.id);
         const zoneFloor = parseInt(loc.floor_level) || currentFloor;
@@ -3156,11 +4010,7 @@
         const maxY = zCy + dims.h / 2;
 
         // Tìm toàn bộ tài sản được gán cho khu vực này
-        const zoneAssets = assetsData.filter(a => {
-            if (a.location_id) return String(a.location_id) === zoneId;
-            return a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name);
-        });
-
+        const zoneAssets = getAssetsForZone(loc);
         if (zoneAssets.length === 0) return;
 
         // Ưu tiên sắp xếp theo mức độ vận hành khẩn cấp:
@@ -3179,6 +4029,30 @@
         });
 
         const effectiveMode = resolveZoneDensityMode(loc, zoneAssets.length);
+        const maxSlots = (effectiveMode === 'cluster' && zoneAssets.length > 12) ? 11 : zoneAssets.length;
+
+        // Kiểm tra xem các tài sản có đang bị trùng toạ độ (chồng đè) hoặc chưa nằm gọn trong khu vực không
+        let needsLayout = forceRelayout;
+        if (!needsLayout) {
+            const coordsSeen = new Set();
+            for (let i = 0; i < maxSlots; i++) {
+                const ast = zoneAssets[i];
+                const isPlaced = isAssetPlaced(ast) && (parseInt(ast.floor_level) || 1) === zoneFloor;
+                const ax = parseFloat(ast.coords_x);
+                const ay = parseFloat(ast.coords_y);
+                const isInside = isPlaced && (ax >= minX + 0.8 && ax <= maxX - 0.8 && ay >= minY + 0.8 && ay <= maxY - 0.8);
+                if (!isInside) {
+                    needsLayout = true;
+                    break;
+                }
+                const key = `${Math.round(ax * 2) / 2},${Math.round(ay * 2) / 2}`;
+                if (coordsSeen.has(key)) {
+                    needsLayout = true;
+                    break;
+                }
+                coordsSeen.add(key);
+            }
+        }
 
         if (effectiveMode === 'cluster' && zoneAssets.length > 12) {
             // Chế độ Gom cụm thông minh khi có > 12 tài sản:
@@ -3198,9 +4072,9 @@
                     const isPlaced = isAssetPlaced(ast) && (parseInt(ast.floor_level) || 1) === zoneFloor;
                     const ax = parseFloat(ast.coords_x);
                     const ay = parseFloat(ast.coords_y);
-                    const isInside = isPlaced && (ax >= minX + 1.0 && ax <= maxX - 1.0 && ay >= minY + 1.0 && ay <= maxY - 1.0);
+                    const isInside = isPlaced && (ax >= minX + 0.8 && ax <= maxX - 0.8 && ay >= minY + 0.8 && ay <= maxY - 0.8);
 
-                    if (!isInside || forceRelayout) {
+                    if (needsLayout || !isInside) {
                         const col = idx % cols;
                         const row = Math.floor(idx / cols);
                         const posX = Math.max(minX + 2.0, Math.min(maxX - 2.0, Math.round((minX + paddingX + col * stepX) * 10) / 10));
@@ -3212,12 +4086,14 @@
                         ast.location_id = loc.id;
                         ast.zone_id = loc.code || loc.name;
 
-                        markStudioDirty('asset', ast.id, {
-                            coords_x: posX,
-                            coords_y: posY,
-                            floor_level: zoneFloor,
-                            location_id: loc.id
-                        });
+                        if (shouldMarkDirty) {
+                            markStudioDirty('asset', ast.id, {
+                                coords_x: posX,
+                                coords_y: posY,
+                                floor_level: zoneFloor,
+                                location_id: loc.id
+                            });
+                        }
                     }
                 } else {
                     // Các máy nằm trong cụm gom (từ thứ 12 trở đi)
@@ -3251,9 +4127,9 @@
                 const isPlaced = isAssetPlaced(ast) && (parseInt(ast.floor_level) || 1) === zoneFloor;
                 const ax = parseFloat(ast.coords_x);
                 const ay = parseFloat(ast.coords_y);
-                const isInside = isPlaced && (ax >= minX + 1.0 && ax <= maxX - 1.0 && ay >= minY + 1.0 && ay <= maxY - 1.0);
+                const isInside = isPlaced && (ax >= minX + 0.8 && ax <= maxX - 0.8 && ay >= minY + 0.8 && ay <= maxY - 0.8);
 
-                if (!isInside || forceRelayout) {
+                if (needsLayout || !isInside) {
                     const col = idx % cols;
                     const row = Math.floor(idx / cols);
                     let posX = cols === 1 ? zCx : (minX + paddingX + col * stepX);
@@ -3268,12 +4144,14 @@
                     ast.location_id = loc.id;
                     ast.zone_id = loc.code || loc.name;
 
-                    markStudioDirty('asset', ast.id, {
-                        coords_x: posX,
-                        coords_y: posY,
-                        floor_level: zoneFloor,
-                        location_id: loc.id
-                    });
+                    if (shouldMarkDirty) {
+                        markStudioDirty('asset', ast.id, {
+                            coords_x: posX,
+                            coords_y: posY,
+                            floor_level: zoneFloor,
+                            location_id: loc.id
+                        });
+                    }
                 }
             });
         }
@@ -3442,17 +4320,82 @@
             floor_level: currentFloor
         });
 
-        autoLayoutZoneAssets(loc);
+        autoLayoutZoneAssets(loc, false, true);
         selectStudioZone(loc.id, true);
         renderStudio();
         showStudioToast(`Đã đưa khu vực "${loc.name}" lên sơ đồ Tầng ${currentFloor} cùng các tài sản trực thuộc.`);
+    }
+
+    function isLocationInCurrentFloorplan(l) {
+        if (!l || l.zone_type === 'FLOORPLAN') return false;
+        if (!currentFloorplanId) {
+            if (floorplansData.length > 0) {
+                currentFloorplanId = String(floorplansData[0].id);
+            } else {
+                return false;
+            }
+        }
+        const curFpId = String(currentFloorplanId);
+        const curFp = floorplansData.find(f => String(f.id) === curFpId);
+        const curFpCode = curFp ? (curFp.code || '').trim() : '';
+        const curFpName = curFp ? (curFp.name || '').trim() : '';
+
+        // Direct parent match
+        const pid = l.parent_id ? String(l.parent_id).trim() : '';
+        if (!pid) {
+            return floorplansData.length > 0 && String(floorplansData[0].id) === curFpId;
+        }
+        if (pid === curFpId || (curFpCode && pid === curFpCode) || (curFpName && pid === curFpName)) {
+            return true;
+        }
+        if (pid.startsWith(curFpId + '.') || (curFpCode && pid.startsWith(curFpCode + '.'))) {
+            return true;
+        }
+
+        // Ancestor hierarchy traversal for nested sub-zones
+        let curr = l;
+        let visited = new Set();
+        while (curr) {
+            if (visited.has(String(curr.id))) break;
+            visited.add(String(curr.id));
+
+            const curPid = curr.parent_id ? String(curr.parent_id).trim() : '';
+            if (!curPid) {
+                return floorplansData.length > 0 && String(floorplansData[0].id) === curFpId;
+            }
+            if (curPid === curFpId || (curFpCode && curPid === curFpCode) || (curFpName && curPid === curFpName)) {
+                return true;
+            }
+            if (curPid.startsWith(curFpId + '.') || (curFpCode && curPid.startsWith(curFpCode + '.'))) {
+                return true;
+            }
+
+            const parentLoc = locationsData.find(p => String(p.id) === curPid || (p.code && p.code === curPid) || (p.name && p.name === curPid));
+            if (!parentLoc) break;
+            if (parentLoc.zone_type === 'FLOORPLAN') {
+                return String(parentLoc.id) === curFpId || (curFpCode && parentLoc.code === curFpCode);
+            }
+            curr = parentLoc;
+        }
+
+        return false;
+    }
+
+    function getStudioFloorLocations() {
+        return locationsData.filter(l => {
+            if (l.zone_type === 'FLOORPLAN') return false;
+            if (!l.is_active) return false;
+            const isLevelMatch = (parseInt(l.floor_level) || 1) === currentFloor;
+            const isFpMatch = isLocationInCurrentFloorplan(l);
+            return isLevelMatch && isFpMatch;
+        });
     }
 
     function renderStudioZonesSidebar(floorLocations, searchQuery = '') {
         const container = document.getElementById('studio-zones-list');
         if (!container) return;
 
-        let zones = locationsData.filter(l => l.is_active);
+        let zones = locationsData.filter(l => l.is_active && l.zone_type !== 'FLOORPLAN' && isLocationInCurrentFloorplan(l));
 
         // Filter by floor
         if (studioZoneSidebarFilter === 'current') {
@@ -3472,24 +4415,25 @@
             );
         }
 
+        const baseFpZones = locationsData.filter(l => l.is_active && l.zone_type !== 'FLOORPLAN' && isLocationInCurrentFloorplan(l));
         const zonesBadge = document.getElementById('studio-zones-badge');
-        if (zonesBadge) zonesBadge.innerText = zones.length;
+        if (zonesBadge) zonesBadge.innerText = baseFpZones.length;
 
         // Render floor filter bar if container exists
         const filterBar = document.getElementById('studio-sidebar-floor-filters');
         if (filterBar) {
-            const currentFloorCount = locationsData.filter(l => l.is_active && (parseInt(l.floor_level)||1) === currentFloor).length;
+            const currentFloorCount = baseFpZones.filter(l => (parseInt(l.floor_level)||1) === currentFloor).length;
             filterBar.innerHTML = `
                 <button type="button" onclick="setStudioZoneSidebarFilter('all')" 
                         class="px-2 py-0.5 rounded-none font-bold text-[10px] shrink-0 transition ${studioZoneSidebarFilter === 'all' ? 'bg-sky-500 text-white shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}">
-                    Tất cả (${locationsData.filter(l => l.is_active).length})
+                    Tất cả (${baseFpZones.length})
                 </button>
                 <button type="button" onclick="setStudioZoneSidebarFilter('current')" 
                         class="px-2 py-0.5 rounded-none font-bold text-[10px] shrink-0 transition ${studioZoneSidebarFilter === 'current' ? 'bg-sky-500 text-white shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}">
                     Tầng ${currentFloor} (${currentFloorCount})
                 </button>
                 ${availableFloors.filter(f => f !== currentFloor).map(f => {
-                    const fCount = locationsData.filter(l => l.is_active && (parseInt(l.floor_level)||1) === f).length;
+                    const fCount = baseFpZones.filter(l => (parseInt(l.floor_level)||1) === f).length;
                     return `
                         <button type="button" onclick="setStudioZoneSidebarFilter('${f}')" 
                                 class="px-2 py-0.5 rounded-none font-bold text-[10px] shrink-0 transition ${studioZoneSidebarFilter === String(f) ? 'bg-sky-500 text-white shadow-sm' : 'bg-slate-800 text-slate-400 hover:text-slate-200'}">
@@ -3511,12 +4455,24 @@
             return;
         }
 
+        const overlapMap = (typeof computeAllZoneOverlaps === 'function') 
+            ? computeAllZoneOverlaps(currentFloorplanId) 
+            : new Map();
+
         container.innerHTML = zones.map(l => {
-            const placedCount = assetsData.filter(a => String(a.location_id) === String(l.id)).length;
+            const placedCount = getAssetsForZone(l).length;
             const isSelected = String(selectedZoneId) === String(l.id);
             const isPlaced = isZonePlaced(l);
             const zFloor = parseInt(l.floor_level) || 1;
             const isCurrentFloor = zFloor === currentFloor;
+
+            const overlapsWith = (isPlaced && l.is_active) ? overlapMap.get(String(l.id)) : null;
+            const hasOverlap = overlapsWith && overlapsWith.length > 0;
+            const overlapBadge = hasOverlap ? `
+                <span class="px-1.5 py-0.2 rounded-none text-[9px] font-mono font-bold bg-rose-950/90 text-rose-300 border border-rose-600/80 flex items-center gap-0.5 animate-pulse cursor-help" title="Đè lấn ranh giới với: ${overlapsWith.join(', ')}">
+                    <i class="ph-bold ph-warning text-[10px] text-rose-400"></i> Đè lấn
+                </span>
+            ` : '';
 
             return `
                 <div data-sidebar-zone-id="${l.id}"
@@ -3525,10 +4481,11 @@
                      draggable="true"
                      ondragstart="handleZoneDragStart(event, '${l.id}')"
                      onclick="selectStudioZone('${l.id}')"
-                     class="p-2.5 ${isSelected ? 'bg-sky-950/70 border-sky-400' : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80'} border rounded-none cursor-grab active:cursor-grabbing transition select-none group/zcard">
+                     class="p-2.5 ${hasOverlap ? 'border-rose-500/80 bg-rose-950/30 hover:bg-rose-900/40' : (isSelected ? 'bg-sky-950/70 border-sky-400' : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80')} border rounded-none cursor-grab active:cursor-grabbing transition select-none group/zcard">
                     <div class="flex items-center justify-between mb-1">
                         <span class="text-xs font-bold text-slate-200 truncate pr-1 group-hover/zcard:text-sky-300 transition-colors">${l.name}</span>
                         <div class="flex items-center gap-1 shrink-0">
+                            ${overlapBadge}
                             <span class="px-1.5 py-0.2 rounded-none text-[9px] font-mono font-bold ${isCurrentFloor ? 'bg-sky-950 text-sky-300 border border-sky-800/60' : 'bg-slate-900 text-slate-400 border border-slate-800'}">
                                 Tầng ${zFloor}
                             </span>
@@ -3537,8 +4494,8 @@
                     </div>
                     <div class="flex items-center justify-between text-[11px] text-slate-400 gap-1 mt-1">
                         ${isPlaced ? `
-                            <span class="font-mono text-sky-300 text-[10px] flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 bg-emerald-400 inline-block"></span>
+                            <span class="font-mono ${hasOverlap ? 'text-rose-300' : 'text-sky-300'} text-[10px] flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 ${hasOverlap ? 'bg-rose-500' : 'bg-emerald-400'} inline-block"></span>
                                 (${l.center_x}m, ${l.center_y}m)
                             </span>
                         ` : `
@@ -3550,6 +4507,12 @@
                         `}
                         <span class="font-bold text-slate-300 shrink-0 text-[10px]">${placedCount} tài sản</span>
                     </div>
+                    ${hasOverlap ? `
+                        <div class="mt-1.5 pt-1.5 border-t border-rose-900/50 flex items-center gap-1 text-[10px] text-rose-300 font-mono truncate" title="Đè lấn với: ${overlapsWith.join(', ')}">
+                            <i class="ph-bold ph-warning-octagon text-rose-400 shrink-0"></i>
+                            <span class="truncate">Đè lấn: <b>${overlapsWith.join(', ')}</b></span>
+                        </div>
+                    ` : ''}
                 </div>
             `;
         }).join('');
@@ -3559,19 +4522,71 @@
     // CANVAS RENDERING (ZONES, MACHINE NODES, SPATIAL LAYERS)
     // =========================================================================
 
+    function ensureCanvasEncompassesContent() {
+        let maxReqW = FACTORY_WIDTH_METERS;
+        let maxReqH = FACTORY_HEIGHT_METERS;
+        const bPts = getBuildingPoints();
+        if (Array.isArray(bPts) && bPts.length >= 3) {
+            const bbb = getPolygonBoundingBox(bPts);
+            maxReqW = Math.max(maxReqW, bbb.maxX);
+            maxReqH = Math.max(maxReqH, bbb.maxY);
+        }
+        const floorLocs = (typeof getStudioFloorLocations === 'function') ? getStudioFloorLocations().filter(isZonePlaced) : [];
+        floorLocs.forEach(l => {
+            const pts = getZonePoints(l);
+            const zb = getPolygonBoundingBox(pts);
+            maxReqW = Math.max(maxReqW, zb.maxX + 4);
+            maxReqH = Math.max(maxReqH, zb.maxY + 4);
+        });
+        const ceilW = Math.ceil(maxReqW / 10) * 10;
+        const ceilH = Math.ceil(maxReqH / 10) * 10;
+        if (ceilW > FACTORY_WIDTH_METERS || ceilH > FACTORY_HEIGHT_METERS) {
+            FACTORY_WIDTH_METERS = Math.max(FACTORY_WIDTH_METERS, ceilW);
+            FACTORY_HEIGHT_METERS = Math.max(FACTORY_HEIGHT_METERS, ceilH);
+            CANVAS_WIDTH_PX = FACTORY_WIDTH_METERS * 10.0;
+            CANVAS_HEIGHT_PX = FACTORY_HEIGHT_METERS * 10.0;
+            if (currentBuildingPreset === 'rect' && Array.isArray(buildingPolygonPoints)) {
+                buildingPolygonPoints = [
+                    { x: 0, y: 0 },
+                    { x: FACTORY_WIDTH_METERS, y: 0 },
+                    { x: FACTORY_WIDTH_METERS, y: FACTORY_HEIGHT_METERS },
+                    { x: 0, y: FACTORY_HEIGHT_METERS }
+                ];
+            }
+            const world = document.getElementById('studio-canvas-world');
+            const svg = document.getElementById('studio-svg-blueprint');
+            if (world) {
+                world.style.width = `${CANVAS_WIDTH_PX}px`;
+                world.style.height = `${CANVAS_HEIGHT_PX}px`;
+            }
+            if (svg) {
+                svg.setAttribute('viewBox', `0 0 ${CANVAS_WIDTH_PX} ${CANVAS_HEIGHT_PX}`);
+            }
+            const minimapDim = document.getElementById('studio-minimap-dim');
+            if (minimapDim) {
+                minimapDim.innerText = `${FACTORY_WIDTH_METERS}m x ${FACTORY_HEIGHT_METERS}m`;
+            }
+        }
+    }
+
     function renderStudio() {
         initAvailableFloors();
+        ensureCanvasEncompassesContent();
 
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        const floorLocations = getStudioFloorLocations();
 
-        // Auto layout any unplaced assets inside placed zones on current floor
+        // Auto layout any unplaced assets inside placed zones on current floor without marking dirty
         floorLocations.forEach(loc => {
             if (isZonePlaced(loc)) {
-                autoLayoutZoneAssets(loc);
+                autoLayoutZoneAssets(loc, false, false);
             }
         });
 
-        const assignedAssets = assetsData.filter(a => isAssetPlaced(a) && (parseInt(a.floor_level) || 1) === currentFloor);
+        const assignedAssets = assetsData.filter(a => {
+            if (!isAssetPlaced(a)) return false;
+            if ((parseInt(a.floor_level) || 1) !== currentFloor) return false;
+            return isAssetInCurrentFloorplan(a);
+        });
 
         const quickStats = document.getElementById('studio-quick-stats');
         if (quickStats) {
@@ -3608,12 +4623,14 @@
         const underlayImage = document.getElementById('studio-svg-underlay-image');
         if (!svgContent) return;
 
-        // Check if any zone on this floor has an enterprise floorplan image
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        // Check if current floorplan or any zone on this floor has an enterprise floorplan image
+        const curFp = floorplansData.find(f => String(f.id) === String(currentFloorplanId));
+        const floorLocations = getStudioFloorLocations();
         const locWithImage = floorLocations.find(l => l.floorplan_image && l.floorplan_image.trim() !== '');
+        const fpImage = (curFp && curFp.floorplan_image) ? curFp.floorplan_image : (locWithImage ? locWithImage.floorplan_image : null);
 
-        if (locWithImage && underlayImage) {
-            underlayImage.setAttribute('href', locWithImage.floorplan_image);
+        if (fpImage && underlayImage) {
+            underlayImage.setAttribute('href', fpImage);
             underlayImage.style.display = 'block';
         } else if (underlayImage) {
             underlayImage.style.display = 'none';
@@ -3713,6 +4730,18 @@
         const layer = document.getElementById('studio-zones-layer');
         if (!layer) return;
 
+        // Đảm bảo chỉ vẽ các khu vực thuộc Mặt Bằng và Tầng hiện tại
+        if (!floorLocations || !Array.isArray(floorLocations)) {
+            floorLocations = getStudioFloorLocations();
+        } else {
+            floorLocations = floorLocations.filter(l => 
+                l.zone_type !== 'FLOORPLAN' && 
+                l.is_active && 
+                (parseInt(l.floor_level) || 1) === currentFloor && 
+                isLocationInCurrentFloorplan(l)
+            );
+        }
+
         // Chỉ vẽ các khu vực đã có toạ độ cụ thể trên mặt bằng tầng này
         // Sắp xếp diện tích từ lớn đến bé: phòng to vẽ trước (ở dưới), phòng bé vẽ sau (ở trên)
         const placedZones = floorLocations.filter(isZonePlaced).sort((a, b) => {
@@ -3721,11 +4750,14 @@
             return getPolygonArea(ptsB) - getPolygonArea(ptsA);
         });
         const overlappingZoneIds = getOverlappingZones(placedZones);
+        const boundaryViolatingZoneIds = getBuildingBoundaryViolatingZones(placedZones);
 
         // SVG Vector Polygons Layer (Chữ L, Chữ U, Chữ T, Đa giác tự do)
         const svgZones = placedZones.map((loc) => {
             const isSelected = String(selectedZoneId) === String(loc.id);
             const isOverlap = overlappingZoneIds.has(String(loc.id));
+            const isBoundaryViolated = boundaryViolatingZoneIds.has(String(loc.id));
+            const hasError = isOverlap || isBoundaryViolated;
             const pts = getZonePoints(loc);
             const n = pts.length;
             const pxPts = pts.map(p => {
@@ -3745,11 +4777,11 @@
             };
             const baseTheme = themeMap[loc.zone_type] || themeMap['PRODUCTION'];
 
-            let strokeColor = isSelected ? '#38bdf8' : (isOverlap ? '#f43f5e' : baseTheme.stroke);
-            let fillColor = isOverlap ? 'rgba(244, 63, 94, 0.28)' : (isSelected ? 'rgba(56, 189, 248, 0.20)' : baseTheme.fill);
-            let strokeWidth = isSelected ? 3 : (isOverlap ? 3 : 2);
-            let strokeDash = isOverlap ? '8,4' : 'none';
-            let glowFilter = isSelected ? 'url(#zone-glow-selected)' : (isOverlap ? 'url(#zone-glow-overlap)' : 'none');
+            let strokeColor = isSelected ? '#38bdf8' : (hasError ? '#f43f5e' : baseTheme.stroke);
+            let fillColor = hasError ? 'rgba(244, 63, 94, 0.28)' : (isSelected ? 'rgba(56, 189, 248, 0.20)' : baseTheme.fill);
+            let strokeWidth = isSelected ? 3 : (hasError ? 3 : 2);
+            let strokeDash = hasError ? '8,4' : 'none';
+            let glowFilter = isSelected ? 'url(#zone-glow-selected)' : (hasError ? 'url(#zone-glow-overlap)' : 'none');
 
             // Handles and dimension tags if selected
             let handlesSvg = '';
@@ -3827,6 +4859,8 @@
         const htmlZones = placedZones.map((loc) => {
             const isSelected = String(selectedZoneId) === String(loc.id);
             const isOverlap = overlappingZoneIds.has(String(loc.id));
+            const isBoundaryViolated = boundaryViolatingZoneIds.has(String(loc.id));
+            const hasWarning = isOverlap || isBoundaryViolated;
             const pts = getZonePoints(loc);
             const bb = getPolygonBoundingBox(pts);
             const area = getPolygonArea(pts);
@@ -3846,12 +4880,14 @@
                      style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px; height: ${heightPx}px; z-index: ${zoneZIndex};">
 
                     <!-- Zone Name Tag Tab: Gắn ngay mép ngoài viền khu vực, hiển thị tên + diện tích thực -->
-                    <div class="absolute -top-[23px] left-2 px-2.5 py-0.5 rounded-none bg-slate-950/95 border ${isSelected ? 'border-sky-400 text-sky-200 ring-1 ring-sky-400/40 shadow-lg' : (isOverlap ? 'border-rose-500 text-rose-200' : 'border-slate-700/90 text-slate-100')} flex items-center gap-1.5 pointer-events-auto cursor-move shadow-md z-30 max-w-[calc(100%-10px)] backdrop-blur-sm"
+                    <div class="absolute -top-[23px] left-2 px-2.5 py-0.5 rounded-none bg-slate-950/95 border ${isSelected ? 'border-sky-400 text-sky-200 ring-1 ring-sky-400/40 shadow-lg' : (hasWarning ? 'border-rose-500 text-rose-200 bg-rose-950/70 animate-pulse' : 'border-slate-700/90 text-slate-100')} flex items-center gap-1.5 pointer-events-auto cursor-move shadow-md z-30 max-w-[calc(100%-10px)] backdrop-blur-sm"
                          onmousedown="handleZoneMouseDown(event, '${loc.id}')"
-                         title="${loc.name} (${getZoneShapeName(pts)} - ${area.toFixed(1)} m²)">
-                        <span class="w-1.5 h-1.5 rounded-none ${isSelected ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]' : (isOverlap ? 'bg-rose-500' : 'bg-sky-400')} flex-shrink-0"></span>
+                         title="${loc.name} (${getZoneShapeName(pts)} - ${area.toFixed(1)} m²)${isBoundaryViolated ? ' - ⚠️ NẰM NGOÀI/ĐÈ LÊN VIỀN TÒA NHÀ' : (isOverlap ? ' - ⚠️ TRÙNG ĐÈ KHU VỰC KHÁC' : '')}">
+                        <span class="w-1.5 h-1.5 rounded-none ${isSelected ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]' : (hasWarning ? 'bg-rose-500' : 'bg-sky-400')} flex-shrink-0"></span>
                         <span class="text-[11px] font-bold tracking-wide truncate">${loc.name}</span>
                         <span class="text-[9px] font-mono text-slate-400 font-normal">(${area.toFixed(0)}m²)</span>
+                        ${isBoundaryViolated ? `<span class="px-1 py-0 text-[8px] font-mono bg-rose-500/30 text-rose-300 border border-rose-500/50 uppercase font-bold flex items-center gap-0.5"><i class="ph ph-warning"></i> Ngoài viền</span>` : ''}
+                        ${(!isBoundaryViolated && isOverlap) ? `<span class="px-1 py-0 text-[8px] font-mono bg-amber-500/30 text-amber-300 border border-amber-500/50 uppercase font-bold flex items-center gap-0.5"><i class="ph ph-warning"></i> Đè phòng</span>` : ''}
                         ${pts.length > 4 ? `<span class="px-1 py-0 text-[8px] font-mono bg-sky-500/20 text-sky-300 border border-sky-400/30 uppercase">${getZoneShapeName(pts)}</span>` : ''}
                     </div>
 
@@ -3972,6 +5008,18 @@
         const layer = document.getElementById('studio-nodes-layer');
         if (!layer) return;
 
+        // Đảm bảo chỉ hiển thị tài sản của các khu vực thuộc Mặt Bằng và Tầng hiện tại
+        if (!floorLocations || !Array.isArray(floorLocations)) {
+            floorLocations = getStudioFloorLocations();
+        } else {
+            floorLocations = floorLocations.filter(l => 
+                l.zone_type !== 'FLOORPLAN' && 
+                l.is_active && 
+                (parseInt(l.floor_level) || 1) === currentFloor && 
+                isLocationInCurrentFloorplan(l)
+            );
+        }
+
         const placedZones = floorLocations.filter(isZonePlaced);
         const statusIcons = {
             'OPERATIONAL': { dot: 'bg-emerald-400', label: 'Hoạt động' },
@@ -3989,11 +5037,9 @@
             const minX = zCx - dims.w / 2;
             const minY = zCy - dims.h / 2;
 
-            const zoneAssets = assetsData.filter(a => {
+            const zoneAssets = getAssetsForZone(loc).filter(a => {
                 const fl = parseInt(a.floor_level) || 1;
-                if (fl !== currentFloor) return false;
-                if (a.location_id) return String(a.location_id) === String(loc.id);
-                return a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name);
+                return fl === currentFloor;
             });
 
             if (zoneAssets.length === 0) return;
@@ -4022,7 +5068,7 @@
                     nodesHtml += renderSingleAssetNode(a, statusIcons, false);
                 });
 
-                // Vị trí thứ 12: Thẻ gom cụm (+N máy khác)
+                // Vị trí thứ 12: Thẻ gom cụm (+N máy khác) - tinh gọn để vừa vặn khung nét đứt
                 const paddingX = 4.0;
                 const paddingY = 4.0;
                 const availableW = Math.max(8.0, dims.w - paddingX * 2);
@@ -4045,24 +5091,19 @@
                          class="canvas-interactive-cluster absolute pointer-events-auto cursor-pointer select-none group/cluster z-20"
                          style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px; height: ${heightPx}px;"
                          title="Nhấn để mở danh sách chi tiết ${zoneAssets.length} máy trong khu vực ${loc.name}">
-                        <div class="w-full h-full rounded-none bg-slate-900/95 border-2 border-dashed border-sky-400/80 hover:border-sky-300 hover:bg-sky-950/40 hover:shadow-lg hover:shadow-sky-500/20 backdrop-blur-md p-1.5 flex flex-col items-center justify-center text-center transition-all">
-                            <div class="flex items-center gap-1 text-sky-400 font-bold text-[11px]">
-                                <i class="ph ph-squares-four text-xs"></i>
-                                <span>+${overflowAssets.length} máy khác</span>
+                        <div class="w-full h-full rounded-none bg-slate-900/95 border-2 border-dashed border-sky-400/80 hover:border-sky-300 hover:bg-sky-950/50 hover:shadow-lg hover:shadow-sky-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center px-1 py-0.5 transition-all overflow-hidden">
+                            <div class="text-sky-400 font-extrabold text-[12px] leading-tight whitespace-nowrap">
+                                +${overflowAssets.length}
                             </div>
-                            <span class="text-[9px] text-slate-400 mt-0.5 font-medium leading-tight">Xem tất cả (${zoneAssets.length} máy)</span>
-                            <div class="flex items-center gap-1 mt-1">
-                                ${overflowDownCount > 0 ? `
-                                    <span class="px-1 py-0.2 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] font-bold">
-                                        🔴 ${overflowDownCount}
-                                    </span>
-                                ` : ''}
-                                ${overflowWoCount > 0 ? `
-                                    <span class="px-1 py-0.2 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold animate-pulse">
-                                        ⚠️ ${overflowWoCount}
-                                    </span>
-                                ` : ''}
+                            <div class="text-[9px] text-slate-300 font-semibold leading-tight whitespace-nowrap mt-0.5">
+                                máy khác
                             </div>
+                            ${(overflowDownCount > 0 || overflowWoCount > 0) ? `
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    ${overflowDownCount > 0 ? `<span class="w-1.5 h-1.5 rounded-none bg-rose-500" title="${overflowDownCount} máy dừng"></span>` : ''}
+                                    ${overflowWoCount > 0 ? `<span class="w-1.5 h-1.5 rounded-none bg-amber-400 animate-pulse" title="${overflowWoCount} có bảo trì"></span>` : ''}
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -4164,17 +5205,7 @@
             }
 
             // Di chuyển đồng bộ các icon tài sản thời gian thực cùng khu vực
-            const origZonePts = getZonePoints(loc);
-            const liveChildZoneIds = new Set(locationsData.filter(cz => cz.parent_id && (cz.parent_id === loc.fullPath || cz.parent_id.startsWith(loc.fullPath + '.'))).map(cz => String(cz.id)));
-            const liveAssigned = assetsData.filter(a => {
-                if (a.location_id && String(a.location_id) === String(loc.id)) return true;
-                if (a.location_id && liveChildZoneIds.has(String(a.location_id))) return true;
-                if (!a.location_id && a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name)) return true;
-                const ax = parseFloat(a.coords_x);
-                const ay = parseFloat(a.coords_y);
-                if (!isNaN(ax) && !isNaN(ay) && isPointInPolygon({ x: ax, y: ay }, origZonePts)) return true;
-                return false;
-            });
+            const liveAssigned = getAssetsForZone(loc);
             liveAssigned.forEach(ast => {
                 const nodeEl = document.getElementById(`canvas-node-${ast.id}`);
                 if (nodeEl) {
@@ -4191,7 +5222,7 @@
             });
 
             // Kiểm tra trùng đè viền thời gian thực (Item 4)
-            const floorLocs = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active && isZonePlaced(l) && String(l.id) !== String(loc.id));
+            const floorLocs = getStudioFloorLocations().filter(l => isZonePlaced(l) && String(l.id) !== String(loc.id));
             let isCurrentOverlap = false;
             const tempLoc = {
                 ...loc,
@@ -4254,16 +5285,7 @@
                 });
 
                 // Di chuyển đồng bộ các tài sản thuộc phân xưởng này đi cùng xưởng
-                const childZoneIds = new Set(childZones.map(cz => String(cz.id)));
-                const assignedToZone = assetsData.filter(a => {
-                    if (a.location_id && String(a.location_id) === String(loc.id)) return true;
-                    if (a.location_id && childZoneIds.has(String(a.location_id))) return true;
-                    if (!a.location_id && a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name)) return true;
-                    const ax = parseFloat(a.coords_x);
-                    const ay = parseFloat(a.coords_y);
-                    if (!isNaN(ax) && !isNaN(ay) && isPointInPolygon({ x: ax, y: ay }, origPts)) return true;
-                    return false;
-                });
+                const assignedToZone = getAssetsForZone(loc);
                 assignedToZone.forEach(ast => {
                     const oldAx = (ast.coords_x !== null && ast.coords_x !== undefined && !isNaN(parseFloat(ast.coords_x))) ? parseFloat(ast.coords_x) : origCx;
                     const oldAy = (ast.coords_y !== null && ast.coords_y !== undefined && !isNaN(parseFloat(ast.coords_y))) ? parseFloat(ast.coords_y) : origCy;
@@ -4637,7 +5659,7 @@
                     if (isZonePlaced(targetLoc)) {
                         ast.coords_x = parseFloat(targetLoc.center_x);
                         ast.coords_y = parseFloat(targetLoc.center_y);
-                        autoLayoutZoneAssets(targetLoc);
+                        autoLayoutZoneAssets(targetLoc, false, true);
                     } else {
                         ast.coords_x = null;
                         ast.coords_y = null;
@@ -4893,7 +5915,7 @@
     }
 
     function findZoneContainingPoint(mx, my) {
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active && isZonePlaced(l));
+        const floorLocations = getStudioFloorLocations().filter(isZonePlaced);
 
         let bestZone = null;
         let minArea = Infinity;
@@ -5017,6 +6039,7 @@
                     center_x: mx,
                     center_y: my,
                     description: 'Phòng trống mới tạo từ bản đồ kéo thả',
+                    parent_id: currentFloorplanId || '',
                     is_active: true,
                     is_new: true
                 };
@@ -5082,7 +6105,7 @@
                 parent_id: loc.parent_id || ''
             });
 
-            autoLayoutZoneAssets(loc);
+            autoLayoutZoneAssets(loc, false, true);
             selectStudioZone(loc.id);
             renderStudio();
             renderLocationsTree();
@@ -5124,9 +6147,11 @@
             renderStudio();
             showStudioToast(`Đã chuyển sang Tầng ${currentFloor} để hiển thị kiến trúc "${sp?.name || 'Không gian'}"`);
         } else {
-            renderStudioNodesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
-            renderStudioZonesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
+            const floorLocs = getStudioFloorLocations();
+            renderStudioNodesLayer(floorLocs);
+            renderStudioZonesLayer(floorLocs);
             renderStudioSvgPreset();
+            renderStudioBuilding();
             renderInspector();
         }
 
@@ -5171,9 +6196,11 @@
                 showStudioToast(`Đã chuyển sang Tầng ${currentFloor} (Tài sản "${ast.name}" trong khu vực)`);
             }
         } else {
-            renderStudioNodesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
-            renderStudioZonesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
+            const floorLocs = getStudioFloorLocations();
+            renderStudioNodesLayer(floorLocs);
+            renderStudioZonesLayer(floorLocs);
             renderStudioSvgPreset();
+            renderStudioBuilding();
             renderInspector();
         }
 
@@ -5224,11 +6251,12 @@
                 showStudioToast(`Đã chuyển sang Tầng ${currentFloor} (Khu vực "${loc.name}" chưa đặt trên sơ đồ)`);
             }
         } else {
-            renderStudioNodesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
-            renderStudioZonesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
+            const floorLocs = getStudioFloorLocations();
+            renderStudioNodesLayer(floorLocs);
+            renderStudioZonesLayer(floorLocs);
             renderStudioSvgPreset();
+            renderStudioBuilding();
             renderInspector();
-            const floorLocs = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
             renderStudioZonesSidebar(floorLocs);
         }
 
@@ -5246,11 +6274,12 @@
         selectedSpatialId = null;
         currentZoneFilterStatus = 'ALL';
         currentZoneSearchQuery = '';
-        renderStudioNodesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
-        renderStudioZonesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
+        renderStudioBuilding();
+        const floorLocs = getStudioFloorLocations();
+        renderStudioNodesLayer(floorLocs);
+        renderStudioZonesLayer(floorLocs);
         renderStudioSvgPreset();
         renderInspector();
-        const floorLocs = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
         renderStudioZonesSidebar(floorLocs);
     }
 
@@ -5493,7 +6522,7 @@
     }
 
     function renderCanvasInspector(container) {
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        const floorLocations = getStudioFloorLocations();
         const assignedAssets = assetsData.filter(a => isAssetPlaced(a) && (parseInt(a.floor_level) || 1) === currentFloor);
         const freeAssets = assetsData.filter(a => !isAssetPlaced(a));
 
@@ -5584,30 +6613,38 @@
                     <div class="flex items-center justify-between">
                         <span class="text-slate-400 text-[11px]">Hình dạng hiện tại:</span>
                         <span class="text-[10px] font-mono font-bold text-sky-300 uppercase">
-                            ${bVerticesCount === 4 ? 'Chữ Nhật' : (bVerticesCount === 6 ? 'Chữ L' : (bVerticesCount === 8 ? 'Chữ U / T' : `Đa giác (${bVerticesCount} góc)`))}
+                            ${currentBuildingPreset === 'rect' ? 'Chữ Nhật' : (currentBuildingPreset === 'L' ? 'Chữ L' : (currentBuildingPreset === 'U' ? 'Chữ U' : (currentBuildingPreset === 'T' ? 'Chữ T' : `Đa giác (${bVerticesCount} góc)`)))}
                         </span>
                     </div>
                 </div>
 
                 <!-- Chọn nhanh mẫu hình dạng tòa nhà: Chữ nhật, Chữ L, Chữ U, Chữ T -->
-                <div class="space-y-1 pt-1">
+                <div class="space-y-1.5 pt-1">
                     <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">Mẫu định hình tòa nhà 1-click:</span>
                     <div class="grid grid-cols-4 gap-1 text-[11px] font-bold">
-                        <button type="button" onclick="applyBuildingShapePreset('rect')" class="p-2 bg-slate-900 border ${bVerticesCount === 4 ? 'border-sky-400 text-sky-300 bg-sky-950/40 ring-1 ring-sky-400/40' : 'border-slate-700 text-slate-300'} hover:border-sky-400 hover:text-white rounded-none transition flex flex-col items-center gap-1" title="Hình chữ nhật truyền thống (4 góc)">
-                            <i class="ph ph-rectangle text-lg"></i>
-                            <span class="text-[9px]">Chữ nhật</span>
+                        <button type="button" onclick="applyBuildingShapePreset('rect')" class="p-2 bg-slate-900 border ${currentBuildingPreset === 'rect' ? 'border-sky-400 text-sky-300 bg-sky-950/70 ring-1 ring-sky-400/50' : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'} rounded-none transition flex flex-col items-center gap-1.5" title="Hình chữ nhật truyền thống (4 góc)">
+                            <svg width="22" height="18" viewBox="0 0 24 20" fill="none" class="shrink-0">
+                                <rect x="2" y="2" width="20" height="16" rx="1.5" fill="currentColor" fill-opacity="${currentBuildingPreset === 'rect' ? '0.35' : '0.15'}" stroke="currentColor" stroke-width="2" />
+                            </svg>
+                            <span class="text-[10px]">Chữ nhật</span>
                         </button>
-                        <button type="button" onclick="applyBuildingShapePreset('L')" class="p-2 bg-slate-900 border ${bVerticesCount === 6 ? 'border-sky-400 text-sky-300 bg-sky-950/40 ring-1 ring-sky-400/40' : 'border-slate-700 text-slate-300'} hover:border-sky-400 hover:text-white rounded-none transition flex flex-col items-center gap-1" title="Hình chữ L nhà xưởng (6 góc)">
-                            <i class="ph ph-intersect text-lg"></i>
-                            <span class="text-[9px]">Chữ L</span>
+                        <button type="button" onclick="applyBuildingShapePreset('L')" class="p-2 bg-slate-900 border ${currentBuildingPreset === 'L' ? 'border-sky-400 text-sky-300 bg-sky-950/70 ring-1 ring-sky-400/50' : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'} rounded-none transition flex flex-col items-center gap-1.5" title="Hình chữ L nhà xưởng (6 góc)">
+                            <svg width="22" height="18" viewBox="0 0 24 20" fill="none" class="shrink-0">
+                                <path d="M 2 2 L 10 2 L 10 10 L 22 10 L 22 18 L 2 18 Z" fill="currentColor" fill-opacity="${currentBuildingPreset === 'L' ? '0.35' : '0.15'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                            </svg>
+                            <span class="text-[10px]">Chữ L</span>
                         </button>
-                        <button type="button" onclick="applyBuildingShapePreset('U')" class="p-2 bg-slate-900 border ${bVerticesCount === 8 ? 'border-sky-400 text-sky-300 bg-sky-950/40 ring-1 ring-sky-400/40' : 'border-slate-700 text-slate-300'} hover:border-sky-400 hover:text-white rounded-none transition flex flex-col items-center gap-1" title="Hình chữ U nhà xưởng (8 góc)">
-                            <i class="ph ph-brackets-curly text-lg"></i>
-                            <span class="text-[9px]">Chữ U</span>
+                        <button type="button" onclick="applyBuildingShapePreset('U')" class="p-2 bg-slate-900 border ${currentBuildingPreset === 'U' ? 'border-sky-400 text-sky-300 bg-sky-950/70 ring-1 ring-sky-400/50' : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'} rounded-none transition flex flex-col items-center gap-1.5" title="Hình chữ U nhà xưởng (8 góc)">
+                            <svg width="22" height="18" viewBox="0 0 24 20" fill="none" class="shrink-0">
+                                <path d="M 2 2 L 8 2 L 8 11 L 16 11 L 16 2 L 22 2 L 22 18 L 2 18 Z" fill="currentColor" fill-opacity="${currentBuildingPreset === 'U' ? '0.35' : '0.15'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                            </svg>
+                            <span class="text-[10px]">Chữ U</span>
                         </button>
-                        <button type="button" onclick="applyBuildingShapePreset('T')" class="p-2 bg-slate-900 border border-slate-700 hover:border-sky-400 hover:text-white text-slate-300 rounded-none transition flex flex-col items-center gap-1" title="Hình chữ T nhà xưởng (8 góc)">
-                            <i class="ph ph-crosshair text-lg"></i>
-                            <span class="text-[9px]">Chữ T</span>
+                        <button type="button" onclick="applyBuildingShapePreset('T')" class="p-2 bg-slate-900 border ${currentBuildingPreset === 'T' ? 'border-sky-400 text-sky-300 bg-sky-950/70 ring-1 ring-sky-400/50' : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'} rounded-none transition flex flex-col items-center gap-1.5" title="Hình chữ T nhà xưởng (8 góc)">
+                            <svg width="22" height="18" viewBox="0 0 24 20" fill="none" class="shrink-0">
+                                <path d="M 2 2 L 22 2 L 22 8 L 16 8 L 16 18 L 8 18 L 8 8 L 2 8 Z" fill="currentColor" fill-opacity="${currentBuildingPreset === 'T' ? '0.35' : '0.15'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                            </svg>
+                            <span class="text-[10px]">Chữ T</span>
                         </button>
                     </div>
                 </div>
@@ -5684,8 +6721,7 @@
     function filterZoneInspectorAssets(zoneId, query) {
         currentZoneSearchQuery = query;
         const loc = locationsData.find(l => String(l.id) === String(zoneId));
-        if (!loc) return;
-        const assigned = assetsData.filter(a => String(a.location_id) === String(loc.id) || (a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name)));
+        const assigned = getAssetsForZone(loc);
         const listEl = document.getElementById('zone-inspector-asset-list');
         if (listEl) listEl.innerHTML = renderZoneInspectorAssetListHtml(assigned, loc);
     }
@@ -5766,11 +6802,11 @@
         if (!loc) return;
 
         const dims = getZoneDimensions(loc);
-        const placedFloorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active && isZonePlaced(l));
+        const placedFloorLocations = getStudioFloorLocations().filter(isZonePlaced);
         const overlappingZoneIds = getOverlappingZones(placedFloorLocations);
         const isOverlap = isZonePlaced(loc) && overlappingZoneIds.has(String(loc.id));
 
-        const assigned = assetsData.filter(a => String(a.location_id) === String(loc.id) || (a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name)));
+        const assigned = getAssetsForZone(loc);
         const densityMode = resolveZoneDensityMode(loc, assigned.length);
         const opCount = assigned.filter(a => a.status === 'OPERATIONAL').length;
         const downCount = assigned.filter(a => a.status === 'DOWN').length;
@@ -5831,7 +6867,7 @@
                             class="w-full h-8 px-2 bg-slate-900 border border-slate-700 rounded-none text-xs font-bold text-sky-300 focus:outline-none focus:border-sky-400 cursor-pointer">
                         ${availableFloors.map(f => `
                             <option value="${f}" ${(parseInt(loc.floor_level) || 1) === f ? 'selected' : ''}>
-                                Tầng ${f} ${f === 1 ? '(Trệt)' : ''}
+                                Tầng ${f}
                             </option>
                         `).join('')}
                         <option value="__add__">+ Thêm tầng mới...</option>
@@ -6001,7 +7037,7 @@
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-slate-200">Danh mục thiết bị (${assigned.length})</span>
                     <button type="button"
-                            onclick="autoLayoutZoneAssets(locationsData.find(l => String(l.id) === '${loc.id}'), true); renderStudio(); renderInspector(); showStudioToast('Đã căn đều vị trí lưới các máy trong khu vực!');"
+                            onclick="autoLayoutZoneAssets(locationsData.find(l => String(l.id) === '${loc.id}'), true, true); renderStudio(); renderInspector(); showStudioToast('Đã căn đều vị trí lưới các máy trong khu vực!');"
                             class="text-[10px] font-bold text-sky-400 hover:underline flex items-center gap-1"
                             title="Tự động sắp xếp lại vị trí các máy thành lưới đều đặn">
                         <i class="ph ph-arrows-clockwise font-bold"></i>
@@ -6229,7 +7265,7 @@
             'STANDBY': '<span class="px-2 py-0.5 rounded-none text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">Dự phòng</span>',
         };
 
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        const floorLocations = getStudioFloorLocations();
 
         container.innerHTML = `
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -6321,7 +7357,7 @@
     }
 
     function renderZoneSelectOptionsGrouped(currentLocId) {
-        const activeLocs = locationsData.filter(l => l.is_active);
+        const activeLocs = locationsData.filter(l => l.is_active && l.zone_type !== 'FLOORPLAN' && isLocationInCurrentFloorplan(l));
         const floorsMap = {};
         activeLocs.forEach(l => {
             const fl = parseInt(l.floor_level) || 1;
@@ -6387,7 +7423,7 @@
             location_id: ast.location_id
         });
 
-        renderStudioNodesLayer(locationsData.filter(l => (parseInt(l.floor_level)||1) === currentFloor));
+        renderStudioNodesLayer(getStudioFloorLocations());
         renderInspector();
     }
 
@@ -6409,7 +7445,7 @@
         if (isZonePlaced(loc)) {
             ast.coords_x = parseFloat(loc.center_x);
             ast.coords_y = parseFloat(loc.center_y);
-            autoLayoutZoneAssets(loc);
+            autoLayoutZoneAssets(loc, false, true);
         } else {
             ast.coords_x = null;
             ast.coords_y = null;
@@ -6467,14 +7503,7 @@
         setZonePoints(loc, newPoints, true);
 
         // Tịnh tiến đồng bộ các tài sản thuộc khu vực này
-        const assignedToZone = assetsData.filter(a => {
-            if (a.location_id && String(a.location_id) === String(loc.id)) return true;
-            if (!a.location_id && a.zone_id && (a.zone_id === loc.code || a.zone_id === loc.name)) return true;
-            const ax = parseFloat(a.coords_x);
-            const ay = parseFloat(a.coords_y);
-            if (!isNaN(ax) && !isNaN(ay) && isPointInPolygon({ x: ax, y: ay }, oldPoints)) return true;
-            return false;
-        });
+        const assignedToZone = getAssetsForZone(loc);
         assignedToZone.forEach(ast => {
             const oldAx = (ast.coords_x !== null && !isNaN(parseFloat(ast.coords_x))) ? parseFloat(ast.coords_x) : oldBb.cx;
             const oldAy = (ast.coords_y !== null && !isNaN(parseFloat(ast.coords_y))) ? parseFloat(ast.coords_y) : oldBb.cy;
@@ -6524,7 +7553,7 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Zones
-        const floorLocations = locationsData.filter(l => (parseInt(l.floor_level) || 1) === currentFloor && l.is_active);
+        const floorLocations = getStudioFloorLocations();
         floorLocations.forEach(loc => {
             const cx = loc.center_x != null ? parseFloat(loc.center_x) : 25;
             const cy = loc.center_y != null ? parseFloat(loc.center_y) : 20;
@@ -6624,8 +7653,86 @@
         // 4. Factory Dimensions
         savedStudioBaseline.set('factory_dim_global', {
             width: Math.round(parseFloat(FACTORY_WIDTH_METERS) * 10) / 10,
-            height: Math.round(parseFloat(FACTORY_HEIGHT_METERS) * 10) / 10
+            height: Math.round(parseFloat(FACTORY_HEIGHT_METERS) * 10) / 10,
+            preset: currentBuildingPreset,
+            polygon_points: JSON.stringify(getBuildingPoints())
         });
+    }
+
+    let lastSavedStudioSnapshot = null;
+
+    function captureLastSavedStudioSnapshot() {
+        try {
+            lastSavedStudioSnapshot = {
+                locations: JSON.parse(JSON.stringify(locationsData || [])),
+                assets: JSON.parse(JSON.stringify(assetsData || [])),
+                spatials: JSON.parse(JSON.stringify(studioSpatialElements || [])),
+                floorplans: JSON.parse(JSON.stringify(floorplansData || [])),
+                factoryDim: {
+                    width: FACTORY_WIDTH_METERS,
+                    height: FACTORY_HEIGHT_METERS,
+                    preset: currentBuildingPreset,
+                    polygon_points: (typeof getBuildingPoints === 'function') ? JSON.parse(JSON.stringify(getBuildingPoints())) : []
+                }
+            };
+        } catch (e) {
+            console.error('Error capturing studio snapshot', e);
+        }
+    }
+
+    // Nút 1: Quay về lúc lưu gần nhất (Huỷ thay đổi chưa lưu)
+    function revertStudioChanges() {
+        if (!lastSavedStudioSnapshot) {
+            showStudioToast('Chưa có dữ liệu bản lưu để khôi phục.');
+            return;
+        }
+
+        if (dirtyChanges.size > 0) {
+            const ok = confirm(`Bạn có chắc muốn huỷ ${dirtyChanges.size} thay đổi chưa lưu và quay về bản lưu gần nhất không?`);
+            if (!ok) return;
+        }
+
+        dirtyChanges.clear();
+
+        try {
+            locationsData = JSON.parse(JSON.stringify(lastSavedStudioSnapshot.locations));
+            assetsData = JSON.parse(JSON.stringify(lastSavedStudioSnapshot.assets));
+            studioSpatialElements = JSON.parse(JSON.stringify(lastSavedStudioSnapshot.spatials));
+            if (lastSavedStudioSnapshot.floorplans) {
+                floorplansData = JSON.parse(JSON.stringify(lastSavedStudioSnapshot.floorplans));
+            }
+
+            if (lastSavedStudioSnapshot.factoryDim) {
+                FACTORY_WIDTH_METERS = parseFloat(lastSavedStudioSnapshot.factoryDim.width) || FACTORY_WIDTH_METERS;
+                FACTORY_HEIGHT_METERS = parseFloat(lastSavedStudioSnapshot.factoryDim.height) || FACTORY_HEIGHT_METERS;
+                CANVAS_WIDTH_PX = FACTORY_WIDTH_METERS * 10.0;
+                CANVAS_HEIGHT_PX = FACTORY_HEIGHT_METERS * 10.0;
+                currentBuildingPreset = lastSavedStudioSnapshot.factoryDim.preset || currentBuildingPreset;
+                if (Array.isArray(lastSavedStudioSnapshot.factoryDim.polygon_points) && lastSavedStudioSnapshot.factoryDim.polygon_points.length >= 3) {
+                    buildingPolygonPoints = JSON.parse(JSON.stringify(lastSavedStudioSnapshot.factoryDim.polygon_points));
+                }
+            }
+
+            localStorage.removeItem('studio_zone_polygons');
+            localStorage.removeItem('studio_spatial_elements');
+            localStorage.removeItem('studio_factory_dim');
+            localStorage.removeItem('studio_asset_sizes');
+            localStorage.removeItem('studio_zone_sizes');
+        } catch (e) {
+            console.error('Error restoring studio snapshot', e);
+        }
+
+        captureStudioBaseline();
+        updateDirtyBadge();
+
+        if (typeof updateStudioBuildingDimUI === 'function') {
+            updateStudioBuildingDimUI();
+        }
+        renderLocationsTree();
+        renderStudio();
+        renderInspector();
+
+        showStudioToast('Đã quay về trạng thái lưu gần nhất!');
     }
 
     function isEntityDirty(type, id, fullData) {
@@ -6680,7 +7787,10 @@
         if (type === 'factory_dim') {
             const wMatches = eqNum(fullData.width, baseline.width);
             const hMatches = eqNum(fullData.height, baseline.height);
-            return !(wMatches && hMatches);
+            const curPts = fullData.polygon_points || getBuildingPoints();
+            const curPtsStr = JSON.stringify(curPts);
+            const ptsMatches = baseline.polygon_points ? (curPtsStr === baseline.polygon_points) : true;
+            return !(wMatches && hMatches && ptsMatches);
         }
 
         return true;
@@ -6741,6 +7851,16 @@
                     id
                 };
             }
+        } else if (type === 'factory_dim') {
+            fullData = {
+                type,
+                id,
+                width: data.width !== undefined ? data.width : FACTORY_WIDTH_METERS,
+                height: data.height !== undefined ? data.height : FACTORY_HEIGHT_METERS,
+                preset: data.preset !== undefined ? data.preset : currentBuildingPreset,
+                polygon_points: data.polygon_points !== undefined ? data.polygon_points : getBuildingPoints(),
+                ...data
+            };
         }
 
         const baseline = savedStudioBaseline.get(key);
@@ -6802,6 +7922,9 @@
                 badge.classList.add('hidden');
             }
         }
+        if (typeof updateStudioBuildingDimUI === 'function') {
+            updateStudioBuildingDimUI();
+        }
     }
 
     function saveStudioChanges() {
@@ -6837,12 +7960,14 @@
                 'X-CSRFToken': csrfToken
             },
             body: JSON.stringify({
+                floorplan_id: currentFloorplanId,
                 assets: assetsPayload,
                 zones: zonesPayload,
                 spatials: studioSpatialElements,
                 factory_dim: {
                     width: FACTORY_WIDTH_METERS,
                     height: FACTORY_HEIGHT_METERS,
+                    preset: currentBuildingPreset,
                     polygon_points: getBuildingPoints()
                 }
             })
@@ -6858,6 +7983,15 @@
                     localStorage.removeItem('studio_zone_sizes');
                 } catch (_) {}
 
+                const curFp = floorplansData.find(f => String(f.id) === String(currentFloorplanId));
+                if (curFp) {
+                    curFp.width_m = FACTORY_WIDTH_METERS;
+                    curFp.height_m = FACTORY_HEIGHT_METERS;
+                    curFp.building_shape = currentBuildingPreset.toUpperCase();
+                    curFp.polygon_points = getBuildingPoints();
+                    curFp.spatials = studioSpatialElements;
+                }
+
                 if (data.new_zone_map) {
                     Object.entries(data.new_zone_map).forEach(([oldId, newId]) => {
                         const target = locationsData.find(l => String(l.id) === String(oldId));
@@ -6869,7 +8003,11 @@
                 }
                 dirtyChanges.clear();
                 captureStudioBaseline();
+                captureLastSavedStudioSnapshot();
                 updateDirtyBadge();
+                if (typeof updateStudioBuildingDimUI === 'function') {
+                    updateStudioBuildingDimUI();
+                }
                 showStudioToast(data.message || 'Đã lưu toàn bộ toạ độ và cấu trúc sơ đồ thành công!');
             } else {
                 alert(data.error || 'Có lỗi khi lưu toạ độ sơ đồ.');

@@ -32,8 +32,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, re_path, include
 from django.http import HttpResponse
+from django.conf import settings
+from django.views.static import serve
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -48,6 +50,7 @@ urlpatterns = [
     path('api/v1/', include('notifications.urls')),
     path('api/v1/dashboard/', include('analytics.urls')),
     path('api/v1/reports/', include('analytics.report_urls')),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 
 handler403 = 'portal.views.custom_403_view'

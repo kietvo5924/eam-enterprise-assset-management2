@@ -807,14 +807,27 @@
         </select>
       </div>
 
-      <div id="sched-zone-container">
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Khu vực phân công trực ca (Duty Zone)</label>
-        <select id="sched-duty-zone" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
-          <option value="">-- Mặc định theo hồ sơ KTV --</option>
-          {% for loc in locations %}
-          <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}] - {{ loc.get_zone_type_display }}</option>
-          {% endfor %}
-        </select>
+      <div id="sched-zone-container" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mặt bằng trực ca (Duty Floorplan)</label>
+          <select id="sched-duty-floorplan" onchange="onSchedFloorplanChange(this.value)" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            <option value="">-- Tất cả / Mặc định theo KTV --</option>
+            {% for fp in floorplans %}
+            <option value="{{ fp.id }}">{{ fp.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Khu vực phân công trực ca (Duty Zone)</label>
+          <select id="sched-duty-zone" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            <option value="">-- Mặc định theo hồ sơ KTV --</option>
+            {% for loc in locations %}
+            {% if loc.zone_type != 'FLOORPLAN' %}
+            <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}] - {{ loc.get_zone_type_display }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
         <p class="text-[11px] text-neutral-500 mt-1">KTV sẽ đóng chốt trực và ưu tiên giải quyết sự cố tại khu vực này trong suốt ca làm việc.</p>
       </div>
 
@@ -929,6 +942,27 @@
 
 <!-- Scripts for Tabs & Modals -->
 <script>
+const LOCATIONS_DATA = {{ locations_json|default:'[]'|safe }};
+const FLOORPLANS_DATA = {{ floorplans_json|default:'[]'|safe }};
+
+function onSchedFloorplanChange(floorplanId, selectedZoneId = '') {
+  const zoneSelect = document.getElementById('sched-duty-zone');
+  if (!zoneSelect) return;
+  zoneSelect.innerHTML = '<option value="">-- Mặc định theo hồ sơ KTV --</option>';
+  if (!floorplanId) {
+    LOCATIONS_DATA.filter(l => l.zone_type !== 'FLOORPLAN').forEach(l => {
+      const isSel = (selectedZoneId && (l.code === selectedZoneId || l.id === selectedZoneId)) ? 'selected' : '';
+      zoneSelect.innerHTML += `<option value="${l.code || l.id}" ${isSel}>${l.name} [${l.code || ''}] - ${l.zone_type}</option>`;
+    });
+    return;
+  }
+  const childZones = LOCATIONS_DATA.filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(floorplanId));
+  childZones.forEach(l => {
+    const isSel = (selectedZoneId && (l.code === selectedZoneId || l.id === selectedZoneId)) ? 'selected' : '';
+    zoneSelect.innerHTML += `<option value="${l.code || l.id}" ${isSel}>${l.name} [${l.code || ''}] - ${l.zone_type}</option>`;
+  });
+}
+
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -1131,9 +1165,20 @@ function openScheduleModal(userId, techName, dateStr, shiftId, status, dutyZoneI
   if (shiftId) {
     document.getElementById('sched-shift-id').value = shiftId;
   }
-  const dutyZoneSelect = document.getElementById('sched-duty-zone');
-  if (dutyZoneSelect) {
-    dutyZoneSelect.value = dutyZoneId || '';
+  const dutyFloorplanSelect = document.getElementById('sched-duty-floorplan');
+  let matchedFpId = '';
+  if (dutyZoneId) {
+    const matchedLoc = LOCATIONS_DATA.find(l => l.code === dutyZoneId || l.id === dutyZoneId || l.name === dutyZoneId);
+    if (matchedLoc && matchedLoc.parent_id) {
+      matchedFpId = String(matchedLoc.parent_id);
+    }
+  }
+  if (dutyFloorplanSelect) {
+    dutyFloorplanSelect.value = matchedFpId;
+    onSchedFloorplanChange(matchedFpId, dutyZoneId);
+  } else {
+    const dutyZoneSelect = document.getElementById('sched-duty-zone');
+    if (dutyZoneSelect) dutyZoneSelect.value = dutyZoneId || '';
   }
   openModal('modal-schedule');
 }

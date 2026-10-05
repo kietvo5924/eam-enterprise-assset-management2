@@ -376,13 +376,24 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+              <div>
+                <label class="block text-xs font-bold text-neutral-700 mb-1">Mặt bằng trực</label>
+                <select id="tech-floorplan" onchange="onUserFloorplanChanged(this.value)" class="w-full px-3 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
+                  <option value="">-- Chọn mặt bằng --</option>
+                  {% for fp in floorplans_list %}
+                  <option value="{{ fp.id }}">{{ fp.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
               <div>
                 <label class="block text-xs font-bold text-neutral-700 mb-1">Khu vực trực</label>
                 <select id="tech-zone" onchange="onTechZoneChanged(this.value)" class="w-full px-3 h-10 bg-white border border-neutral-300 rounded-xl text-xs font-medium focus:outline-none focus:border-primary">
                   <option value="">-- Mặc định --</option>
                   {% for loc in locations_list %}
+                  {% if loc.zone_type != 'FLOORPLAN' %}
                   <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}]</option>
+                  {% endif %}
                   {% empty %}
                     {% for z in available_zones %}
                     <option value="{{ z }}">{{ z }}</option>
@@ -674,10 +685,29 @@
 
 <script>
     const LOCATIONS_LIST = {{ locations_json|default:'[]'|safe }};
+    const FLOORPLANS_LIST = {{ floorplans_json|default:'[]'|safe }};
     const LOCATIONS_MAP = {};
     if (Array.isArray(LOCATIONS_LIST)) {
       LOCATIONS_LIST.forEach(l => {
         if (l.code) LOCATIONS_MAP[l.code] = l;
+      });
+    }
+
+    function onUserFloorplanChanged(floorplanId, selectedZoneCode = '') {
+      const zoneSelect = document.getElementById('tech-zone');
+      if (!zoneSelect) return;
+      zoneSelect.innerHTML = '<option value="">-- Mặc định --</option>';
+      if (!floorplanId) {
+        LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN').forEach(l => {
+          const isSel = (selectedZoneCode && (l.code === selectedZoneCode || l.name === selectedZoneCode || String(l.id) === String(selectedZoneCode))) ? 'selected' : '';
+          zoneSelect.innerHTML += `<option value="${l.code || l.name}" ${isSel}>${l.name} [${l.code || ''}]</option>`;
+        });
+        return;
+      }
+      const childZones = LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(floorplanId));
+      childZones.forEach(l => {
+        const isSel = (selectedZoneCode && (l.code === selectedZoneCode || l.name === selectedZoneCode || String(l.id) === String(selectedZoneCode))) ? 'selected' : '';
+        zoneSelect.innerHTML += `<option value="${l.code || l.name}" ${isSel}>${l.name} [${l.code || ''}]</option>`;
       });
     }
 
@@ -1024,7 +1054,21 @@
 
         if (document.getElementById('tech-skill-level')) {
             document.getElementById('tech-skill-level').value = prof.skill_level || 3;
-            document.getElementById('tech-zone').value = prof.zone_id || '';
+            
+            // Find parent floorplan from prof.zone_id
+            let userFpId = '';
+            if (prof.zone_id) {
+              const matchedZone = LOCATIONS_LIST.find(l => l.code === prof.zone_id || l.name === prof.zone_id || String(l.id) === String(prof.zone_id));
+              if (matchedZone && matchedZone.parent_id) {
+                userFpId = String(matchedZone.parent_id);
+              }
+            }
+            if (document.getElementById('tech-floorplan')) {
+              document.getElementById('tech-floorplan').value = userFpId;
+              onUserFloorplanChanged(userFpId, prof.zone_id);
+            } else {
+              document.getElementById('tech-zone').value = prof.zone_id || '';
+            }
             document.getElementById('tech-floor').value = prof.floor_level || 1;
             document.getElementById('tech-coords-x').value = prof.coords_x !== undefined ? prof.coords_x : 20.0;
             document.getElementById('tech-coords-y').value = prof.coords_y !== undefined ? prof.coords_y : 20.0;

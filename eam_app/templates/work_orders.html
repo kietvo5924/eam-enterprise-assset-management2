@@ -499,13 +499,24 @@
                   </span>
                   <span class="text-[11px] text-neutral-400">Tự động điền từ Thiết bị</span>
                 </div>
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Mặt bằng</label>
+                    <select id="wo-floorplan" onchange="onWoFloorplanChanged(this.value)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+                      <option value="">-- Chọn mặt bằng --</option>
+                      {% for fp in floorplans_list %}
+                      <option value="{{ fp.id }}">{{ fp.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
                   <div>
                     <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Khu vực</label>
                     <select id="wo-zone" onchange="onWoZoneChanged(this.value)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
                       <option value="">-- Chọn khu vực --</option>
                       {% for loc in locations_list %}
-                      <option value="{{ loc.code }}">{{ loc.name }} [{{ loc.code }}]</option>
+                        {% if loc.zone_type != 'FLOORPLAN' %}
+                        <option value="{{ loc.code }}" data-floorplan="{{ loc.parent_id }}">{{ loc.name }} [{{ loc.code }}]</option>
+                        {% endif %}
                       {% endfor %}
                     </select>
                   </div>
@@ -801,6 +812,7 @@
         </button>
       </div>
     </div>
+  </div>
 </div>
 
 <!-- Modal Trình Ghim Vị Trí Mặt Bằng Trực Quan Cho Work Order -->
@@ -824,10 +836,15 @@
       <!-- Controls & Blueprint Preset -->
       <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
         <select id="floorplan-preset-select" onchange="changeFloorplanPreset(this.value)" class="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-sky-400">
-          <option value="PRESS">Sơ đồ Mẫu: Xưởng Cơ khí & Dập</option>
-          <option value="CLEANROOM">Sơ đồ Mẫu: Phòng Sạch Điện tử ISO-5</option>
-          <option value="WAREHOUSE">Sơ đồ Mẫu: Kho Vận Logistics</option>
-          <option value="STANDARD">Sơ đồ Mẫu: Mặt Bằng Tầng Tổng Thể</option>
+          {% for fp in floorplans_list %}
+          <option value="{{ fp.id }}">🏢 {{ fp.name }}</option>
+          {% endfor %}
+          <optgroup label="Sơ đồ mẫu kỹ thuật">
+            <option value="PRESS">Xưởng Cơ khí & Dập</option>
+            <option value="CLEANROOM">Phòng Sạch Điện tử ISO-5</option>
+            <option value="WAREHOUSE">Kho Vận Logistics</option>
+            <option value="STANDARD">Mặt Bằng Tầng Tổng Thể</option>
+          </optgroup>
         </select>
         <button onclick="closeFloorplanModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
           <i class="ph ph-x text-base"></i>
@@ -961,6 +978,42 @@
       }
   }
 
+  const FLOORPLANS_LIST = {{ floorplans_json|default:'[]'|safe }};
+  const LOCATIONS_LIST = {{ locations_json|default:'[]'|safe }};
+  const LOCATIONS_MAP = {};
+  if (Array.isArray(LOCATIONS_LIST)) {
+    LOCATIONS_LIST.forEach(l => {
+      if (l.code) LOCATIONS_MAP[l.code] = l;
+      if (l.id) LOCATIONS_MAP[String(l.id)] = l;
+    });
+  }
+
+  function onWoFloorplanChanged(floorplanId, selectedZoneCode = '') {
+    const zoneSelect = document.getElementById('wo-zone');
+    if (!zoneSelect) return;
+    zoneSelect.innerHTML = '<option value="">-- Chọn khu vực --</option>';
+
+    const filteredZones = (!floorplanId) 
+      ? LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN')
+      : LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(floorplanId));
+
+    filteredZones.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc.code;
+      opt.textContent = `${loc.name} [${loc.code}]`;
+      opt.dataset.floorplan = loc.parent_id || '';
+      if (selectedZoneCode && (loc.code === selectedZoneCode || String(loc.id) === String(selectedZoneCode))) {
+        opt.selected = true;
+      }
+      zoneSelect.appendChild(opt);
+    });
+
+    if (selectedZoneCode) {
+      zoneSelect.value = selectedZoneCode;
+      onWoZoneChanged(selectedZoneCode);
+    }
+  }
+
   function onAssetSelected(assetId) {
       const badge = document.getElementById('wo-asset-loc-badge');
       const text = document.getElementById('wo-asset-loc-text');
@@ -969,28 +1022,52 @@
           return;
       }
       const a = ASSETS_MAP[assetId];
-      if (document.getElementById('wo-zone') && a.zone_id) document.getElementById('wo-zone').value = a.zone_id;
+      
+      let parentFloorplanId = '';
+      let targetZoneCode = a.zone_id || '';
+      
+      let locObj = null;
+      if (a.zone_id && LOCATIONS_MAP[a.zone_id]) {
+          locObj = LOCATIONS_MAP[a.zone_id];
+      } else if (a.location_id && LOCATIONS_MAP[String(a.location_id)]) {
+          locObj = LOCATIONS_MAP[String(a.location_id)];
+      }
+
+      if (locObj) {
+          targetZoneCode = locObj.code;
+          if (locObj.parent_id) {
+              parentFloorplanId = String(locObj.parent_id);
+          }
+      }
+
+      const fpSelect = document.getElementById('wo-floorplan');
+      if (fpSelect) {
+          fpSelect.value = parentFloorplanId;
+      }
+      onWoFloorplanChanged(parentFloorplanId, targetZoneCode);
+
+      if (document.getElementById('wo-zone') && targetZoneCode) document.getElementById('wo-zone').value = targetZoneCode;
       if (document.getElementById('wo-floor') && a.floor_level) document.getElementById('wo-floor').value = a.floor_level;
       if (document.getElementById('wo-coords-x') && a.coords_x !== undefined) document.getElementById('wo-coords-x').value = a.coords_x;
       if (document.getElementById('wo-coords-y') && a.coords_y !== undefined) document.getElementById('wo-coords-y').value = a.coords_y;
 
       if (badge && text) {
-          text.innerHTML = `📍 Đã gán vị trí từ thiết bị: <b>${a.zone_id || 'Chung'}</b>, Tầng <b>${a.floor_level || 1}</b> - Tọa độ: ${a.coords_x || 0}, ${a.coords_y || 0}`;
+          const fpObj = (parentFloorplanId && FLOORPLANS_LIST.find(f => String(f.id) === parentFloorplanId));
+          const fpLabel = fpObj ? `<b>${fpObj.name}</b> &rarr; ` : '';
+          text.innerHTML = `📍 Đã gán vị trí từ thiết bị: ${fpLabel}<b>${targetZoneCode || 'Chung'}</b>, Tầng <b>${a.floor_level || 1}</b> - Tọa độ: ${a.coords_x || 0}, ${a.coords_y || 0}`;
           badge.classList.remove('hidden');
       }
-  }
-
-  const LOCATIONS_LIST = {{ locations_json|default:'[]'|safe }};
-  const LOCATIONS_MAP = {};
-  if (Array.isArray(LOCATIONS_LIST)) {
-    LOCATIONS_LIST.forEach(l => {
-      if (l.code) LOCATIONS_MAP[l.code] = l;
-    });
   }
 
   function onWoZoneChanged(zoneCode) {
     if (!zoneCode || !LOCATIONS_MAP[zoneCode]) return;
     const loc = LOCATIONS_MAP[zoneCode];
+    if (loc.parent_id) {
+      const fpSelect = document.getElementById('wo-floorplan');
+      if (fpSelect && !fpSelect.value) {
+        fpSelect.value = String(loc.parent_id);
+      }
+    }
     if (document.getElementById('wo-floor') && loc.floor_level) {
       document.getElementById('wo-floor').value = loc.floor_level;
     }
@@ -1003,7 +1080,9 @@
     const badge = document.getElementById('wo-asset-loc-badge');
     const text = document.getElementById('wo-asset-loc-text');
     if (badge && text) {
-      text.innerHTML = `📍 Đã gán tọa độ tâm từ khu vực: <b>${loc.name}</b>, Tầng <b>${loc.floor_level}</b> - Tọa độ: ${loc.center_x}, ${loc.center_y}`;
+      const fpObj = loc.parent_id ? FLOORPLANS_LIST.find(f => String(f.id) === String(loc.parent_id)) : null;
+      const fpLabel = fpObj ? `<b>${fpObj.name}</b> &rarr; ` : '';
+      text.innerHTML = `📍 Đã gán tọa độ tâm từ khu vực: ${fpLabel}<b>${loc.name}</b>, Tầng <b>${loc.floor_level}</b> - Tọa độ: ${loc.center_x}, ${loc.center_y}`;
       badge.classList.remove('hidden');
     }
   }
@@ -1021,10 +1100,16 @@
     else if (upper.includes('CLEAN') || upper.includes('SACH')) defaultPreset = 'CLEANROOM';
     else if (upper.includes('KHO') || upper.includes('WAREHOUSE')) defaultPreset = 'WAREHOUSE';
 
+    const curFpId = document.getElementById('wo-floorplan')?.value || '';
     const sel = document.getElementById('floorplan-preset-select');
     if (sel) {
-      sel.value = defaultPreset;
-      changeFloorplanPreset(defaultPreset);
+      if (curFpId && FLOORPLANS_LIST.some(f => String(f.id) === curFpId)) {
+        sel.value = curFpId;
+        changeFloorplanPreset(curFpId);
+      } else {
+        sel.value = defaultPreset;
+        changeFloorplanPreset(defaultPreset);
+      }
     }
     updateFloorplanPin(x, y, floor);
     resetFloorplanZoom();
@@ -1046,6 +1131,15 @@
     if (document.getElementById('wo-coords-y')) document.getElementById('wo-coords-y').value = y;
     if (document.getElementById('wo-floor')) document.getElementById('wo-floor').value = floor;
 
+    const sel = document.getElementById('floorplan-preset-select');
+    if (sel && sel.value && FLOORPLANS_LIST.some(f => String(f.id) === sel.value)) {
+      const fpSelect = document.getElementById('wo-floorplan');
+      if (fpSelect && fpSelect.value !== sel.value) {
+        fpSelect.value = sel.value;
+        onWoFloorplanChanged(sel.value, document.getElementById('wo-zone')?.value || '');
+      }
+    }
+
     const badge = document.getElementById('wo-asset-loc-badge');
     const text = document.getElementById('wo-asset-loc-text');
     if (badge && text) {
@@ -1063,6 +1157,34 @@
   function renderPresetSVG(preset) {
     const g = document.getElementById('floorplan-preset-content');
     if (!g) return;
+
+    const fp = FLOORPLANS_LIST.find(f => String(f.id) === String(preset));
+    if (fp) {
+      const childZones = LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(preset));
+      let svgHtml = `<rect x="50" y="40" width="900" height="620" rx="8" fill="#0369a1" fill-opacity="0.05" stroke="#38bdf8" stroke-dasharray="6 4" stroke-width="1.5"/>`;
+      svgHtml += `<text x="500" y="35" fill="#38bdf8" font-size="14" font-weight="bold" font-family="monospace" text-anchor="middle">🏢 ${fp.name.toUpperCase()}</text>`;
+      
+      if (childZones.length === 0) {
+        svgHtml += `<text x="500" y="350" fill="#64748b" font-size="14" font-family="monospace" text-anchor="middle">Chưa có phân khu con trong mặt bằng này. Nhấp chuột để ghim tọa độ.</text>`;
+      } else {
+        childZones.forEach((z, idx) => {
+          const cx = (z.center_x !== undefined && z.center_x > 0) ? (z.center_x * 9) : (100 + (idx % 3) * 280);
+          const cy = (z.center_y !== undefined && z.center_y > 0) ? (z.center_y * 6) : (100 + Math.floor(idx / 3) * 200);
+          const w = 240;
+          const h = 160;
+          svgHtml += `
+            <g stroke="#38bdf8" stroke-width="1.5" fill="#1e293b" fill-opacity="0.8">
+              <rect x="${Math.max(60, Math.min(680, cx - 120))}" y="${Math.max(50, Math.min(480, cy - 80))}" width="${w}" height="${h}" rx="6"/>
+              <text x="${Math.max(60, Math.min(680, cx - 120)) + w/2}" y="${Math.max(50, Math.min(480, cy - 80)) + 70}" fill="#f8fafc" font-size="13" font-weight="bold" font-family="monospace" text-anchor="middle">${z.name}</text>
+              <text x="${Math.max(60, Math.min(680, cx - 120)) + w/2}" y="${Math.max(50, Math.min(480, cy - 80)) + 95}" fill="#38bdf8" font-size="11" font-family="monospace" text-anchor="middle">[${z.code}]</text>
+            </g>
+          `;
+        });
+      }
+      g.innerHTML = svgHtml;
+      return;
+    }
+
     if (preset === 'PRESS') {
       g.innerHTML = `
         <rect x="70" y="320" width="870" height="60" fill="#0284c7" fill-opacity="0.08" stroke="#38bdf8" stroke-dasharray="6 4" stroke-width="1"/>
@@ -1336,7 +1458,18 @@
           }
           document.getElementById('wo-is-crew-task').checked = !!meta.is_crew_task;
           document.getElementById('wo-depends-on').value = meta.depends_on_wo_id || '';
-          document.getElementById('wo-zone').value = meta.zone_id || '';
+
+          let parentFloorplanId = '';
+          const targetZoneCode = meta.zone_id || '';
+          if (targetZoneCode && LOCATIONS_MAP[targetZoneCode]) {
+              const loc = LOCATIONS_MAP[targetZoneCode];
+              if (loc.parent_id) parentFloorplanId = String(loc.parent_id);
+          }
+          const fpSelect = document.getElementById('wo-floorplan');
+          if (fpSelect) fpSelect.value = parentFloorplanId;
+          onWoFloorplanChanged(parentFloorplanId, targetZoneCode);
+
+          if (document.getElementById('wo-zone')) document.getElementById('wo-zone').value = targetZoneCode;
           document.getElementById('wo-floor').value = meta.floor_level || 1;
           document.getElementById('wo-coords-x').value = meta.coords_x !== undefined ? meta.coords_x : 0.0;
           document.getElementById('wo-coords-y').value = meta.coords_y !== undefined ? meta.coords_y : 0.0;
@@ -1358,6 +1491,9 @@
   function closeWoModal() {
       document.getElementById('wo-modal').classList.add('hidden');
       document.getElementById('wo-form').reset();
+      const fpSelect = document.getElementById('wo-floorplan');
+      if (fpSelect) fpSelect.value = '';
+      onWoFloorplanChanged('', '');
       const badge = document.getElementById('wo-asset-loc-badge');
       if (badge) badge.classList.add('hidden');
   }
