@@ -380,6 +380,17 @@ def portal_reset_password(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
     return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
 
+FIELD_WORKFORCE_PERMISSIONS = {'work_order:execute', 'work_order:update', 'work_order:reassign', 'workforce:read'}
+TECH_ROLE_KEYWORDS = ['TECH', 'OPERATOR', 'MAINTENANCE', 'THO', 'KY_THUAT', 'BAO_TRI', 'VAN_HANH', 'HIEN_TRUONG', 'SUA_CHUA', 'CO_DIEN']
+
+def is_field_workforce_role(role):
+    name_upper = (getattr(role, 'name', '') or '').upper()
+    if name_upper in ['SUPER_ADMIN', 'SYSTEM_ADMIN']:
+        return False
+    if role.permissions.filter(id__in=FIELD_WORKFORCE_PERMISSIONS).exists():
+        return True
+    return any(k in name_upper for k in TECH_ROLE_KEYWORDS)
+
 @login_required(login_url='portal_login')
 @permission_required('user:read')
 def portal_users(request):
@@ -388,7 +399,7 @@ def portal_users(request):
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     
-    tenant_id = request.user.tenant_id
+    tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
     
     if request.method == 'POST':
         if not HasPermission('user:create')().has_permission(request, None):
@@ -457,11 +468,12 @@ def portal_users(request):
                 u.roles.clear()
 
             # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
-            # If any assigned role has 'work_order:execute', ensure and update TechnicianProfile
-            has_exec_perm = any(r.permissions.filter(id='work_order:execute').exists() for r in roles)
+            # Expanded: Check for field workforce permissions (execute, update, reassign, workforce:read) or technical roles
+            has_exec_perm = any(is_field_workforce_role(r) for r in roles)
             tech_payload = data.get('technicianProfile')
             if has_exec_perm or tech_payload:
                 from users.models import TechnicianProfile
+                from assets.models import Location
                 from datetime import timedelta
                 from django.utils import timezone
                 
@@ -481,6 +493,16 @@ def portal_users(request):
                 else:
                     shift_end = now + timedelta(hours=8)
 
+                floorplan_id = tech_data.get('floorplan_id') or None
+                fp_obj = None
+                if floorplan_id:
+                    fp_obj = Location.objects.filter(id=floorplan_id, tenant_id=tenant_id).first()
+
+                effective_zone = tech_data.get('zone_id', '') or (fp_obj.code if fp_obj else '')
+                coords_x = float(fp_obj.center_x if (fp_obj and fp_obj.center_x is not None) else tech_data.get('coords_x', 20.0))
+                coords_y = float(fp_obj.center_y if (fp_obj and fp_obj.center_y is not None) else tech_data.get('coords_y', 20.0))
+                floor_level = int(fp_obj.floor_level if fp_obj else tech_data.get('floor_level', 1))
+
                 TechnicianProfile.objects.update_or_create(
                     user=u,
                     defaults={
@@ -488,10 +510,11 @@ def portal_users(request):
                         'skill_level': int(tech_data.get('skill_level', 1)),
                         'skills': tech_data.get('skills', ['GENERAL']),
                         'certifications': tech_data.get('certifications', []),
-                        'zone_id': tech_data.get('zone_id', '') or '',
-                        'floor_level': int(tech_data.get('floor_level', 1)),
-                        'coords_x': float(tech_data.get('coords_x', 20.0)),
-                        'coords_y': float(tech_data.get('coords_y', 20.0)),
+                        'floorplan': fp_obj,
+                        'zone_id': effective_zone,
+                        'floor_level': floor_level,
+                        'coords_x': coords_x,
+                        'coords_y': coords_y,
                         'shift_end_time': shift_end,
                         'is_on_duty': True,
                         'availability_status': 'AVAILABLE'
@@ -550,10 +573,12 @@ def portal_users(request):
                 u.roles.clear()
 
             # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
-            has_exec_perm = any(r.permissions.filter(id='work_order:execute').exists() for r in roles)
+            # Expanded: Check for field workforce permissions (execute, update, reassign, workforce:read) or technical roles
+            has_exec_perm = any(is_field_workforce_role(r) for r in roles)
             tech_payload = data.get('technicianProfile')
             if has_exec_perm or tech_payload:
                 from users.models import TechnicianProfile
+                from assets.models import Location
                 from datetime import timedelta
                 from django.utils import timezone
                 
@@ -573,6 +598,16 @@ def portal_users(request):
                 else:
                     shift_end = now + timedelta(hours=8)
 
+                floorplan_id = tech_data.get('floorplan_id') or None
+                fp_obj = None
+                if floorplan_id:
+                    fp_obj = Location.objects.filter(id=floorplan_id, tenant_id=tenant_id).first()
+
+                effective_zone = tech_data.get('zone_id', '') or (fp_obj.code if fp_obj else '')
+                coords_x = float(fp_obj.center_x if (fp_obj and fp_obj.center_x is not None) else tech_data.get('coords_x', 20.0))
+                coords_y = float(fp_obj.center_y if (fp_obj and fp_obj.center_y is not None) else tech_data.get('coords_y', 20.0))
+                floor_level = int(fp_obj.floor_level if fp_obj else tech_data.get('floor_level', 1))
+
                 TechnicianProfile.objects.update_or_create(
                     user=u,
                     defaults={
@@ -580,10 +615,11 @@ def portal_users(request):
                         'skill_level': int(tech_data.get('skill_level', 1)),
                         'skills': tech_data.get('skills', ['GENERAL']),
                         'certifications': tech_data.get('certifications', []),
-                        'zone_id': tech_data.get('zone_id', '') or '',
-                        'floor_level': int(tech_data.get('floor_level', 1)),
-                        'coords_x': float(tech_data.get('coords_x', 20.0)),
-                        'coords_y': float(tech_data.get('coords_y', 20.0)),
+                        'floorplan': fp_obj,
+                        'zone_id': effective_zone,
+                        'floor_level': floor_level,
+                        'coords_x': coords_x,
+                        'coords_y': coords_y,
                         'shift_end_time': shift_end,
                         'is_on_duty': True,
                         'availability_status': 'AVAILABLE'
@@ -623,28 +659,53 @@ def portal_users(request):
     blocked_users = users.filter(status='INACTIVE').count()
     pending_users = users.filter(status='PENDING').count()
     
+    # Ensure standard TENANT_ADMIN role exists for tenant
+    from users.models import Permission
+    ta_role, created = Role.all_objects.get_or_create(
+        tenant_id=tenant_id,
+        name='TENANT_ADMIN',
+        defaults={'description': 'Administrator for Tenant', 'is_system': True}
+    )
+    if created or not ta_role.permissions.exists():
+        ta_role.permissions.set(Permission.objects.exclude(id='system:admin'))
+
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
-    if is_super:
-        roles = Role.all_objects.prefetch_related('permissions').all()
-    else:
-        roles = Role.objects.filter(tenant_id=tenant_id).prefetch_related('permissions').exclude(name='SUPER_ADMIN')
+    roles = Role.objects.filter(tenant_id=tenant_id).prefetch_related('permissions')
+    if not is_super:
+        roles = roles.exclude(name='SUPER_ADMIN')
+    roles = roles.order_by('-is_system', 'name')
     
     # RBAC: Compute permission map and user profile data for frontend
     roles_can_execute_map = {}
     for r in roles:
-        has_exec = r.permissions.filter(id='work_order:execute').exists()
-        r.can_execute_wo = has_exec
-        roles_can_execute_map[str(r.id)] = has_exec
+        can_exec = is_field_workforce_role(r)
+        r.can_execute_wo = can_exec
+        roles_can_execute_map[str(r.id)] = can_exec
+
+    # Available Locations Master Data needed for profile resolution
+    from assets.models import Location
+    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
 
     user_profiles_dict = {}
     for u in users:
         tp = getattr(u, 'technician_profile', None)
-        u.can_execute_wo = any(r.permissions.filter(id='work_order:execute').exists() for r in u.roles.all()) or (tp is not None)
+        u.can_execute_wo = any(roles_can_execute_map.get(str(r.id), False) for r in u.roles.all()) or (tp is not None)
         if tp:
+            fp_id_str = str(tp.floorplan_id) if tp.floorplan_id else ''
+            fp_name_str = tp.floorplan.name if tp.floorplan else ''
+            if not fp_id_str and tp.zone_id:
+                matched_loc = next((l for l in locations_list if l['code'] == tp.zone_id or str(l['id']) == str(tp.zone_id)), None)
+                if matched_loc and matched_loc.get('parent_id'):
+                    fp_id_str = str(matched_loc['parent_id'])
+                    parent_fp = next((l for l in locations_list if str(l['id']) == fp_id_str), None)
+                    if parent_fp:
+                        fp_name_str = parent_fp['name']
             user_profiles_dict[str(u.id)] = {
                 'skill_level': tp.skill_level,
                 'skills': tp.skills or [],
                 'certifications': tp.certifications or [],
+                'floorplan_id': fp_id_str,
+                'floorplan_name': fp_name_str,
                 'zone_id': tp.zone_id or '',
                 'floor_level': tp.floor_level or 1,
                 'coords_x': tp.coords_x or 0.0,
@@ -652,8 +713,6 @@ def portal_users(request):
             }
 
     # Available Zones & Locations Master Data
-    from assets.models import Location
-    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
     loc_codes = [l['code'] for l in locations_list if l['code']]
     asset_zones = list(Asset.objects.filter(tenant_id=tenant_id).exclude(zone_id='').values_list('zone_id', flat=True).distinct())
     available_zones = sorted(list(set(loc_codes + asset_zones)))
@@ -794,6 +853,15 @@ def portal_roles(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
+
+    # Ensure standard TENANT_ADMIN role exists for tenant
+    ta_role, created = Role.all_objects.get_or_create(
+        tenant_id=tenant_id,
+        name='TENANT_ADMIN',
+        defaults={'description': 'Administrator for Tenant', 'is_system': True}
+    )
+    if created or not ta_role.permissions.exists():
+        ta_role.permissions.set(Permission.objects.exclude(id='system:admin'))
 
     roles = Role.objects.filter(tenant_id=tenant_id)
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
@@ -1576,15 +1644,38 @@ def portal_work_orders(request):
                 coords_x = float(data.get('coords_x') if data.get('coords_x') is not None else (asset_obj.coords_x if asset_obj else 0.0))
                 coords_y = float(data.get('coords_y') if data.get('coords_y') is not None else (asset_obj.coords_y if asset_obj else 0.0))
 
+                priority_val = data.get('priority', 'MEDIUM')
+                raw_deadline = data.get('deadline')
+                deadline_dt = parse_datetime(raw_deadline) if raw_deadline else None
+                if not deadline_dt and raw_deadline:
+                    try:
+                        from datetime import datetime
+                        deadline_dt = timezone.make_aware(datetime.strptime(raw_deadline, '%Y-%m-%d').replace(hour=17, minute=0, second=0))
+                    except Exception:
+                        deadline_dt = None
+                
+                # SLA Deadline Auto-fallback Matrix
+                if not deadline_dt:
+                    now_dt = timezone.now()
+                    from datetime import timedelta
+                    if priority_val == 'URGENT':
+                        deadline_dt = now_dt + timedelta(hours=2)
+                    elif priority_val == 'HIGH':
+                        deadline_dt = now_dt + timedelta(hours=4)
+                    elif priority_val == 'LOW':
+                        deadline_dt = now_dt + timedelta(hours=72)
+                    else:  # MEDIUM
+                        deadline_dt = now_dt + timedelta(hours=24)
+
                 wo = WorkOrder.objects.create(
                     tenant_id=tenant_id,
                     title=data.get('title'),
                     description=data.get('description'),
-                    priority=data.get('priority', 'MEDIUM'),
+                    priority=priority_val,
                     status=data.get('status', 'CREATED'),
                     asset_id=asset_id if asset_id else None,
                     assigned_to_id=assigned_to_id if assigned_to_id else None,
-                    deadline=parse_datetime(data.get('deadline')) if data.get('deadline') else None,
+                    deadline=deadline_dt,
                     created_by=request.user,
                     # Hungarian & Optimization fields
                     required_skill=data.get('required_skill', 'GENERAL') or 'GENERAL',
@@ -1825,13 +1916,27 @@ def portal_work_orders(request):
             'coords_y': wo.coords_y if wo.coords_y is not None else 0.0,
         }
 
-    assets = Asset.objects.filter(tenant_id=tenant_id)
+    prof = getattr(request.user, 'technician_profile', None)
+    user_fp_id = str(prof.floorplan_id) if (prof and prof.floorplan_id) else None
+    user_fp_name = prof.floorplan.name if (prof and prof.floorplan) else ''
+    is_admin = request.user.is_superuser or request.user.roles.filter(permissions__id='system:admin').exists()
+    user_is_restricted_floorplan = bool(user_fp_id) and not is_admin
+
+    assets = Asset.objects.filter(tenant_id=tenant_id).select_related('location')
+    if user_is_restricted_floorplan:
+        from django.db.models import Q
+        assets = assets.filter(Q(location__parent_id=user_fp_id) | Q(location_id=user_fp_id))
+
     assets_dict = {}
     for a in assets:
+        fp_id = ''
+        if a.location:
+            fp_id = str(a.location.parent_id or (a.location.id if a.location.zone_type == 'FLOORPLAN' else ''))
         assets_dict[str(a.id)] = {
             'name': a.name,
             'zone_id': a.zone_id or '',
             'location_id': str(a.location_id) if a.location_id else '',
+            'floorplan_id': fp_id,
             'floor_level': a.floor_level or 1,
             'coords_x': a.coords_x if a.coords_x is not None else 0.0,
             'coords_y': a.coords_y if a.coords_y is not None else 0.0,
@@ -1859,6 +1964,8 @@ def portal_work_orders(request):
         available_zones = ['ZONE_MAIN', 'ZONE_PRESS', 'ZONE_CLEANROOM', 'ZONE_WAREHOUSE']
 
     floorplans_list = [l for l in locations_list if l['zone_type'] == 'FLOORPLAN']
+    if user_is_restricted_floorplan:
+        floorplans_list = [l for l in floorplans_list if str(l['id']) == user_fp_id]
 
     kpis = {
         'total': total_wos,
@@ -1882,7 +1989,10 @@ def portal_work_orders(request):
         'floorplans_list': floorplans_list,
         'floorplans_json': json.dumps(floorplans_list, default=str),
         'wo_metadata_json': json.dumps(wo_metadata),
-        'kpis': kpis
+        'kpis': kpis,
+        'user_floorplan_id': user_fp_id or '',
+        'user_floorplan_name': user_fp_name or '',
+        'user_is_restricted_floorplan': user_is_restricted_floorplan,
     })
 
 @login_required(login_url='portal_login')
@@ -1976,12 +2086,23 @@ def portal_pm_plans(request):
                     suppress_if_pending=data.get('suppress_if_pending', True),
                     lead_time_days=data.get('lead_time_days', 0),
                     estimated_duration_minutes=data.get('estimated_duration_minutes') or None,
-                    assignee_id=data.get('assignee_id') or None
+                    assignee_id=None
                 )
                 
-                from maintenance.models import PmPlanChecklistItem, PmPlanMaterial
+                from maintenance.models import PmPlanChecklistItem, PmPlanMaterial, PmPlanAssignment
                 from assets.models import SparePart
                 
+                # Auto-assign selected assets directly with PM Plan
+                asset_ids = data.get('asset_ids', [])
+                for aid in asset_ids:
+                    if aid:
+                        PmPlanAssignment.objects.get_or_create(
+                            tenant_id=tenant_id,
+                            pm_plan=pm,
+                            asset_id=aid,
+                            defaults={'status': 'ACTIVE'}
+                        )
+
                 if 'checklists' in data:
                     for pc in data['checklists']:
                         PmPlanChecklistItem.objects.create(
@@ -2022,12 +2143,24 @@ def portal_pm_plans(request):
                 pm.suppress_if_pending = data.get('suppress_if_pending', True)
                 pm.lead_time_days = data.get('lead_time_days', 0)
                 pm.estimated_duration_minutes = data.get('estimated_duration_minutes') or None
-                pm.assignee_id = data.get('assignee_id') or None
+                pm.assignee_id = None
                 pm.save()
                 
-                from maintenance.models import PmPlanChecklistItem, PmPlanMaterial
+                from maintenance.models import PmPlanChecklistItem, PmPlanMaterial, PmPlanAssignment
                 from assets.models import SparePart
                 
+                # Sync asset assignments
+                if 'asset_ids' in data:
+                    new_asset_ids = set(str(aid) for aid in data.get('asset_ids', []) if aid)
+                    pm.assignments.exclude(asset_id__in=new_asset_ids).delete()
+                    for aid in new_asset_ids:
+                        PmPlanAssignment.objects.get_or_create(
+                            tenant_id=tenant_id,
+                            pm_plan=pm,
+                            asset_id=aid,
+                            defaults={'status': 'ACTIVE'}
+                        )
+
                 if 'checklists' in data:
                     pm.checklists.all().delete()
                     for pc in data['checklists']:
@@ -2125,10 +2258,30 @@ def portal_pm_plans(request):
         'complianceRate': round(compliance_rate, 1)
     }
 
+    prof = getattr(request.user, 'technician_profile', None)
+    user_fp_id = str(prof.floorplan_id) if (prof and prof.floorplan_id) else None
+    user_fp_name = prof.floorplan.name if (prof and prof.floorplan) else ''
+    is_admin = request.user.is_superuser or request.user.roles.filter(permissions__id='system:admin').exists()
+    user_is_restricted_floorplan = bool(user_fp_id) and not is_admin
+
+    from assets.models import Asset, SparePart, Location
+    from django.db.models import Q
+    assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True).select_related('location')
+    floorplans_list = list(Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True).values('id', 'name', 'code'))
+    if user_is_restricted_floorplan:
+        assets = assets.filter(Q(location__parent_id=user_fp_id) | Q(location_id=user_fp_id))
+        floorplans_list = [fp for fp in floorplans_list if str(fp['id']) == user_fp_id]
+
     pm_plans_data = []
-    for pm in pm_plans:
+    for pm in pm_plans.prefetch_related('checklists', 'materials', 'assignments__asset'):
+        assigned_asset_ids = [str(a.asset_id) for a in pm.assignments.all()]
+        assigned_assets_names = [a.asset.name for a in pm.assignments.all() if a.asset]
         pm_plans_data.append({
             'pm': pm,
+            'assigned_asset_ids': assigned_asset_ids,
+            'assigned_asset_ids_json': json.dumps(assigned_asset_ids),
+            'assigned_assets_names': assigned_assets_names,
+            'assigned_count': len(assigned_asset_ids),
             'checklists_json': json.dumps([
                 {
                     'id': str(c.id),
@@ -2147,18 +2300,17 @@ def portal_pm_plans(request):
             ])
         })
 
-    from assets.models import Asset, SparePart
-    from users.models import User
-    assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True)
-    users = User.objects.filter(tenant_id=tenant_id, status='ACTIVE')
     spare_parts = SparePart.objects.filter(tenant_id=tenant_id)
 
     return render(request, 'pm_plans.html', {
         'pm_plans_data': pm_plans_data,
         'kpis': kpis,
         'assets': assets,
-        'users': users,
+        'floorplans_list': floorplans_list,
         'spare_parts': spare_parts,
+        'user_floorplan_id': user_fp_id or '',
+        'user_floorplan_name': user_fp_name or '',
+        'user_is_restricted_floorplan': user_is_restricted_floorplan,
     })
 
 @login_required(login_url='portal_login')
@@ -2340,7 +2492,7 @@ def portal_workforce_tools(request):
         tenant_id=tenant_id,
         status='ACTIVE',
         technician_profile__isnull=False
-    ).distinct().select_related('technician_profile').order_by('username')
+    ).distinct().select_related('technician_profile__floorplan').prefetch_related('roles__permissions').order_by('username')
     technicians = list(tech_qs)
 
     schedules_qs = TechnicianSchedule.objects.filter(
@@ -2352,9 +2504,31 @@ def portal_workforce_tools(request):
     for sc in schedules_qs:
         schedule_lookup[(str(sc.user_id), sc.work_date.isoformat())] = sc
 
+    # Query master locations for fallback resolution
+    from assets.models import Location
+    all_locs = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'parent_id', 'zone_type'))
+
+    FIELD_WORKFORCE_PERMS = {'work_order:execute', 'work_order:update', 'work_order:reassign', 'workforce:read'}
+
     roster_rows = []
     for tech in technicians:
         profile = getattr(tech, 'technician_profile', None)
+        fp_id_str = ''
+        fp_name_str = ''
+        if profile:
+            if profile.floorplan:
+                fp_id_str = str(profile.floorplan_id)
+                fp_name_str = profile.floorplan.name
+            elif profile.zone_id:
+                matched_z = next((l for l in all_locs if l['code'] == profile.zone_id or str(l['id']) == str(profile.zone_id)), None)
+                if matched_z and matched_z.get('parent_id'):
+                    fp_id_str = str(matched_z['parent_id'])
+                    parent_fp = next((l for l in all_locs if str(l['id']) == fp_id_str), None)
+                    if parent_fp:
+                        fp_name_str = parent_fp['name']
+
+        has_field_permission = any(is_field_workforce_role(r) for r in tech.roles.all())
+
         day_cells = []
         for d in days_of_week:
             d_str = d.isoformat()
@@ -2373,6 +2547,9 @@ def portal_workforce_tools(request):
         roster_rows.append({
             'tech': tech,
             'profile': profile,
+            'assigned_floorplan_id': fp_id_str,
+            'assigned_floorplan_name': fp_name_str,
+            'requires_duty_zone': has_field_permission,
             'days': day_cells
         })
 
@@ -2664,6 +2841,38 @@ def portal_schedules_api(request):
                 shift_template = ShiftTemplate.objects.filter(id=shift_template_id, tenant_id=tenant_id).first()
 
             duty_zone_id = (data.get('duty_zone_id') or '').strip()
+
+            # Validation for field workforce roles:
+            # Check if user has permissions requiring mandatory duty zone within their assigned floorplan
+            has_field_permission = any(is_field_workforce_role(r) for r in user.roles.all())
+
+            if status == 'ON_DUTY' and has_field_permission:
+                prof = getattr(user, 'technician_profile', None)
+                if not duty_zone_id:
+                    tech_display = user.get_full_name() or user.username
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Kỹ thuật viên {tech_display} bắt buộc phải được chỉ định Khu vực trực (Duty Zone) trong ca làm việc.'
+                    }, status=400)
+
+                # Validate duty_zone_id belongs to user's assigned floorplan
+                user_fp_id = str(prof.floorplan_id) if (prof and prof.floorplan_id) else None
+                if not user_fp_id and prof and prof.zone_id:
+                    from assets.models import Location
+                    prev_loc = Location.objects.filter(tenant_id=tenant_id, code=prof.zone_id).first()
+                    if prev_loc and prev_loc.parent_id:
+                        user_fp_id = str(prev_loc.parent_id)
+
+                if user_fp_id:
+                    from assets.models import Location
+                    zone_loc = Location.objects.filter(tenant_id=tenant_id, code=duty_zone_id).first()
+                    if zone_loc and zone_loc.parent_id and str(zone_loc.parent_id) != user_fp_id and zone_loc.zone_type != 'GENERAL':
+                        assigned_fp = Location.objects.filter(tenant_id=tenant_id, id=user_fp_id).first()
+                        fp_name = assigned_fp.name if assigned_fp else 'mặt bằng đã gán'
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Khu vực [{zone_loc.name}] không thuộc {fp_name} đã được gán cho nhân viên này.'
+                        }, status=400)
 
             sched, created = TechnicianSchedule.objects.update_or_create(
                 tenant_id=tenant_id,

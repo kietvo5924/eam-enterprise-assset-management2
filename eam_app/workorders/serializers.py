@@ -148,3 +148,32 @@ class WorkOrderAutoAssignApplyRequestSerializer(serializers.Serializer):
         child=WorkOrderAssignmentPairSerializer(),
         allow_empty=False
     )
+
+
+class WorkOrderGAAutoAssignInitiateRequestSerializer(serializers.Serializer):
+    floorplanId = serializers.UUIDField(required=False, allow_null=True)
+    workOrderIds = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list
+    )
+    maxGenerations = serializers.IntegerField(required=False, default=150, min_value=10, max_value=500)
+    populationSize = serializers.IntegerField(required=False, default=100, min_value=20, max_value=300)
+
+
+class WorkOrderGAApplyRequestSerializer(serializers.Serializer):
+    assignments = serializers.ListField(
+        child=WorkOrderAssignmentPairSerializer(),
+        allow_empty=False
+    )
+
+
+class WorkOrderAlgorithmReadinessRequestSerializer(serializers.Serializer):
+    algorithm = serializers.ChoiceField(choices=['HUNGARIAN', 'GENETIC'], default='HUNGARIAN')
+    workOrderIds = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list
+    )
+    floorplanId = serializers.UUIDField(required=False, allow_null=True)
+

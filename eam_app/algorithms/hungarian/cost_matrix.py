@@ -1,6 +1,7 @@
 import re
 import unicodedata
 import math
+from datetime import datetime
 from typing import Dict, Any, Tuple
 from django.utils import timezone
 from .constants import (
@@ -534,6 +535,16 @@ def evaluate_pair_cost(tech_profile, wo_slot, active_workload: int = 0,
         narrative_parts.append("phạt gần hết ca: +40đ")
     else:
         narrative_parts.append("đủ thời gian ca trực")
+
+    due_date = getattr(wo, 'due_date', None)
+    if isinstance(due_date, datetime):
+        diff_hours = (due_date - now).total_seconds() / 3600.0
+        if diff_hours <= 0:
+            narrative_parts.append("Đã quá hạn SLA")
+        elif diff_hours <= 2.0:
+            narrative_parts.append(f"Hạn chót SLA khẩn cấp ({round(diff_hours, 1)}h)")
+        else:
+            narrative_parts.append(f"còn {round(diff_hours, 1)}h tới hạn chót")
 
     if disrupt_pen > 0:
         narrative_parts.append("đang có việc dở dang: +15đ")

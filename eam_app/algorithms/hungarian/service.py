@@ -49,7 +49,8 @@ class HungarianAssignmentService:
         else:
             wo_qs = wo_qs.filter(status='CREATED')
 
-        all_work_orders = list(wo_qs.select_related('asset', 'depends_on_wo').order_by('created_at'))
+        from django.db.models import F
+        all_work_orders = list(wo_qs.select_related('asset', 'depends_on_wo').order_by(F('deadline').asc(nulls_last=True), 'created_at'))
 
         # Step 2: Rule 4 - Task Dependency Filtering
         eligible_wos, blocked_wos = filter_task_dependencies(all_work_orders)

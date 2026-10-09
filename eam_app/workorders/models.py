@@ -71,6 +71,8 @@ class WorkOrder(BaseTenantModel):
     coords_y = models.FloatField(null=True, blank=True)
     floor_level = models.SmallIntegerField(default=1, null=True, blank=True)
     zone_id = models.CharField(max_length=64, blank=True, default='')
+    # Phase 11.2: Genetic Algorithm Optimization Fields
+    required_spare_parts = models.JSONField(default=list, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -204,3 +206,34 @@ class LaborLog(BaseTenantModel):
 
     def __str__(self):
         return f"{self.work_order.title} - {self.hours_worked}h - {self.work_date}"
+
+
+class GAOptimizationJob(BaseTenantModel):
+    STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
+        ('PROCESSING', 'Processing'),
+        ('COMPLETED', 'Completed'),
+        ('FAILED', 'Failed'),
+    )
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='ga_jobs')
+    floorplan = models.ForeignKey('assets.Location', on_delete=models.SET_NULL, null=True, blank=True, related_name='ga_jobs')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', db_index=True)
+    current_generation = models.IntegerField(default=0)
+    max_generations = models.IntegerField(default=150)
+    best_fitness = models.FloatField(default=0.0)
+    convergence_history = models.JSONField(default=list, blank=True)
+    pareto_solutions = models.JSONField(default=list, blank=True)
+    work_order_ids = models.JSONField(default=list, blank=True)
+    error_message = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'ga_optimization_jobs'
+        indexes = [
+            models.Index(fields=['tenant', 'status', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"GA Job {self.id} [{self.status}] Gen: {self.current_generation}/{self.max_generations}"

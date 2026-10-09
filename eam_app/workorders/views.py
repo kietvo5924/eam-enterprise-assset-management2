@@ -10,9 +10,14 @@ from workorders.serializers import (
     WorkOrderSerializer, WorkOrderCreateSerializer,
     WorkOrderAssignSerializer, WorkOrderStatusUpdateSerializer,
     WorkOrderAutoAssignPreviewRequestSerializer,
-    WorkOrderAutoAssignApplyRequestSerializer
+    WorkOrderAutoAssignApplyRequestSerializer,
+    WorkOrderGAAutoAssignInitiateRequestSerializer,
+    WorkOrderGAApplyRequestSerializer,
+    WorkOrderAlgorithmReadinessRequestSerializer
 )
 from algorithms.hungarian.service import HungarianAssignmentService, ConcurrencyConflictError
+from algorithms.genetic.service import GASchedulingService
+from workorders.models import GAOptimizationJob
 from users.models import User
 from users.permissions import HasPermission
 from rest_framework.permissions import IsAuthenticated
@@ -61,16 +66,42 @@ class WorkOrderListView(APIView):
             raise ValidationError(serializer.errors)
         data = serializer.validated_data
         
+        priority = data['priority']
+        deadline = data.get('deadline')
+        if not deadline:
+            now_dt = timezone.now()
+            from datetime import timedelta
+            if priority == 'URGENT':
+                deadline = now_dt + timedelta(hours=2)
+            elif priority == 'HIGH':
+                deadline = now_dt + timedelta(hours=4)
+            elif priority == 'LOW':
+                deadline = now_dt + timedelta(hours=72)
+            else:  # MEDIUM
+                deadline = now_dt + timedelta(hours=24)
+
+        from assets.models import Asset
+        asset_obj = Asset.objects.filter(id=data['assetId']).first()
+        coords_x = float(asset_obj.coords_x) if (asset_obj and asset_obj.coords_x is not None) else 0.0
+        coords_y = float(asset_obj.coords_y) if (asset_obj and asset_obj.coords_y is not None) else 0.0
+        floor_level = int(asset_obj.floor_level) if (asset_obj and asset_obj.floor_level is not None) else 1
+        zone_id = asset_obj.zone_id if (asset_obj and asset_obj.zone_id) else ''
+
         wo = WorkOrder.objects.create(
             asset_id=data['assetId'],
             title=data['title'],
             description=data.get('description'),
-            priority=data['priority'],
-            deadline=data.get('deadline'),
+            priority=priority,
+            deadline=deadline,
             estimated_duration_minutes=data.get('estimatedDurationMinutes'),
             parent_id_id=data.get('parentId'),
             source_reference=data.get('sourceReference'),
-            status='CREATED'
+            status='CREATED',
+            coords_x=coords_x,
+            coords_y=coords_y,
+            floor_level=floor_level,
+            zone_id=zone_id,
+            required_skill=data.get('requiredSkill', 'GENERAL') or 'GENERAL'
         )
         
         # Save Checklists
@@ -848,4 +879,282 @@ class WorkOrderAutoAssignApplyView(APIView):
                     "message": str(e)
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkOrderGAAutoAssignInitiateView(APIView):
+    """
+    POST /api/v1/work-orders/ga-auto-assign/
+    Initiates asynchronous multi-objective Genetic Algorithm scheduling task.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not HasPermission('work_order:read')().has_permission(request, self):
+            self.permission_denied(request)
+
+        serializer = WorkOrderGAAutoAssignInitiateRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        tenant = getattr(request.user, 'tenant', None)
+        floorplan_id = serializer.validated_data.get('floorplanId')
+        work_order_ids = serializer.validated_data.get('workOrderIds')
+        max_generations = serializer.validated_data.get('maxGenerations', 150)
+        population_size = serializer.validated_data.get('populationSize', 100)
+
+        job = GASchedulingService.initiate_optimization(
+            tenant=tenant,
+            user=request.user,
+            floorplan_id=str(floorplan_id) if floorplan_id else None,
+            work_order_ids=work_order_ids,
+            max_generations=max_generations,
+            population_size=population_size
+        )
+
+        return Response({
+            "success": True,
+            "data": {
+                "taskId": str(job.id),
+                "status": job.status,
+                "message": "Tác vụ tối ưu hóa phân công ca GA đã được khởi tạo và đang xử lý ngầm."
+            }
+        }, status=status.HTTP_202_ACCEPTED)
+
+
+class WorkOrderGAAutoAssignProgressView(APIView):
+    """
+    GET /api/v1/work-orders/ga-auto-assign/<task_id>/progress/
+    Polls evolution progress, generation convergence curve, and Pareto front solutions.
+    Strictly isolated by tenant (anti-IDOR).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        tenant = getattr(request.user, 'tenant', None)
+        try:
+            job = GAOptimizationJob.objects.select_related('floorplan').get(id=task_id, tenant=tenant)
+        except GAOptimizationJob.DoesNotExist:
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "JOB_NOT_FOUND",
+                    "message": "Tác vụ GA không tồn tại hoặc bạn không có quyền truy cập."
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        floorplan_name = job.floorplan.name if job.floorplan else "Tất cả mặt bằng (Toàn nhà máy)"
+
+        return success_response({
+            "taskId": str(job.id),
+            "status": job.status,
+            "floorplanId": str(job.floorplan_id) if job.floorplan_id else None,
+            "floorplanName": floorplan_name,
+            "currentGeneration": job.current_generation,
+            "maxGenerations": job.max_generations,
+            "bestFitness": round(job.best_fitness, 1),
+            "convergenceHistory": job.convergence_history or [],
+            "paretoSolutions": job.pareto_solutions or [],
+            "errorMessage": job.error_message
+        })
+
+
+class WorkOrderGAAutoAssignApplyView(APIView):
+    """
+    POST /api/v1/work-orders/ga-auto-assign/apply/
+    Atomically applies approved Pareto assignment plan to the database.
+    Dispatches real-time notification alerts.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not HasPermission('work_order:update')().has_permission(request, self):
+            self.permission_denied(request)
+
+        serializer = WorkOrderGAApplyRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        assignments_data = serializer.validated_data.get('assignments')
+        tenant = getattr(request.user, 'tenant', None)
+
+        try:
+            apply_result = GASchedulingService.apply_solution(
+                tenant=tenant,
+                assignments_data=assignments_data,
+                current_user=request.user
+            )
+            return success_response(apply_result, message="Phân công công việc bằng giải thuật GA thành công.")
+        except ConcurrencyConflictError as e:
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "CONCURRENT_DISPATCH_CONFLICT",
+                    "message": str(e)
+                }
+            }, status=status.HTTP_409_CONFLICT)
+        except ValidationError as e:
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": str(e)
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkOrderAlgorithmReadinessView(APIView):
+    """
+    POST /api/v1/work-orders/algorithm-readiness/
+    Pre-checks all prerequisites before executing Hungarian or Genetic Algorithm:
+    - Verifies whether technicians exist in the tenant.
+    - Verifies whether any technicians are on-duty and available.
+    - Verifies whether eligible, unblocked work orders exist.
+    - Evaluates floorplan scope constraints if applicable.
+    Returns clear, human-readable explanations and action recommendations if conditions fail.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not HasPermission('work_order:read')().has_permission(request, self):
+            self.permission_denied(request)
+
+        serializer = WorkOrderAlgorithmReadinessRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        algorithm = serializer.validated_data.get('algorithm', 'HUNGARIAN')
+        work_order_ids = serializer.validated_data.get('workOrderIds', [])
+        floorplan_id = serializer.validated_data.get('floorplanId')
+        tenant = getattr(request.user, 'tenant', None)
+        now = timezone.now()
+
+        from users.models import User, TechnicianProfile, TechnicianSchedule
+        from django.db.models import Q
+        from algorithms.hungarian.service import filter_task_dependencies
+
+        issues = []
+
+        # 1. Evaluate Technicians
+        # A. Total active technicians with work_order:execute permission
+        base_tech_users = User.objects.filter(
+            tenant=tenant,
+            status='ACTIVE'
+        ).filter(
+            Q(roles__permissions__id='work_order:execute') | Q(roles__isnull=True)
+        ).distinct()
+        total_techs = base_tech_users.count()
+
+        if total_techs == 0:
+            issues.append("Hệ thống chưa có tài khoản kỹ thuật viên nào được phân quyền thực hiện công việc (work_order:execute).")
+
+        # B. Available & On-duty Technicians
+        available_tech_profiles = TechnicianProfile.objects.filter(
+            tenant=tenant,
+            is_on_duty=True,
+            availability_status='AVAILABLE',
+            user__status='ACTIVE'
+        ).filter(
+            Q(user__roles__permissions__id='work_order:execute') | Q(user__roles__isnull=True)
+        ).distinct().select_related('user')
+
+        # Exclude technicians on OFF or LEAVE today
+        try:
+            off_tech_ids = set(TechnicianSchedule.objects.filter(
+                tenant=tenant,
+                work_date=now.date(),
+                status__in=['OFF', 'LEAVE']
+            ).values_list('user_id', flat=True))
+            if off_tech_ids:
+                available_tech_profiles = available_tech_profiles.exclude(user_id__in=off_tech_ids)
+        except Exception:
+            pass
+
+        available_techs_count = available_tech_profiles.count()
+
+        if total_techs > 0 and available_techs_count == 0:
+            issues.append(f"Không có kỹ thuật viên nào đang rảnh (AVAILABLE) hoặc đang trực ca (ON DUTY) để tiếp nhận công việc (Tổng số thợ: {total_techs}).")
+
+        # 2. Evaluate Work Orders
+        eligible_wos_count = 0
+        blocked_wos_count = 0
+
+        if work_order_ids and len(work_order_ids) > 0:
+            selected_wos = list(
+                WorkOrder.objects.filter(tenant=tenant, id__in=work_order_ids)
+                .select_related('depends_on_wo', 'asset')
+            )
+            # Filter out completed/cancelled
+            active_selected = [w for w in selected_wos if w.status not in ['COMPLETED', 'CANCELED', 'CANCELLED']]
+            if not active_selected:
+                issues.append("Các phiếu công việc bạn tích chọn đều đã hoàn thành hoặc đã bị hủy, không thể phân công.")
+            else:
+                eligible_wos, blocked_wos = filter_task_dependencies(active_selected)
+                eligible_wos_count = len(eligible_wos)
+                blocked_wos_count = len(blocked_wos)
+                if not eligible_wos:
+                    issues.append(f"Tất cả {len(active_selected)} phiếu công việc được chọn đều đang bị khóa do phụ thuộc vào công việc khác chưa hoàn tất.")
+        else:
+            # Automatic candidate selection
+            if algorithm == 'HUNGARIAN':
+                created_wos = list(
+                    WorkOrder.objects.filter(tenant=tenant, status='CREATED')
+                    .select_related('depends_on_wo', 'asset')
+                )
+                if not created_wos:
+                    issues.append("Không có phiếu công việc nào ở trạng thái chờ phân công (CREATED). Hãy tạo phiếu mới hoặc tích chọn cụ thể các phiếu cần gán.")
+                else:
+                    eligible_wos, blocked_wos = filter_task_dependencies(created_wos)
+                    eligible_wos_count = len(eligible_wos)
+                    blocked_wos_count = len(blocked_wos)
+                    if not eligible_wos:
+                        issues.append(f"Tất cả {len(created_wos)} phiếu công việc mới đều đang bị khóa do phụ thuộc vào công việc khác chưa hoàn tất.")
+            else:
+                # GENETIC
+                from datetime import timedelta
+                shift_horizon_cutoff = now + timedelta(hours=24)
+                time_window_q = Q(deadline__isnull=True) | Q(deadline__lte=shift_horizon_cutoff)
+
+                ga_wo_qs = WorkOrder.objects.filter(tenant=tenant).exclude(status__in=['COMPLETED', 'CANCELED', 'CANCELLED'])
+                if floorplan_id:
+                    fp_id_str = str(floorplan_id)
+                    ga_wo_qs = ga_wo_qs.filter(
+                        Q(asset__location__parent_id=fp_id_str) |
+                        Q(asset__location_id=fp_id_str)
+                    )
+
+                pending_qs = ga_wo_qs.filter(status__in=['CREATED', 'PENDING'])
+                pending_in_window = pending_qs.filter(time_window_q)
+                if pending_in_window.exists():
+                    target_wos = list(pending_in_window.select_related('depends_on_wo'))
+                elif pending_qs.exists():
+                    target_wos = list(pending_qs.select_related('depends_on_wo'))
+                else:
+                    assigned_qs = ga_wo_qs.filter(status='ASSIGNED')
+                    target_wos = list(assigned_qs.select_related('depends_on_wo'))
+
+                if not target_wos:
+                    issues.append("Không có phiếu công việc nào cần lập lịch hoặc phân bổ ca trực trong phạm vi đã chọn.")
+                else:
+                    eligible_wos, blocked_wos = filter_task_dependencies(target_wos)
+                    eligible_wos_count = len(eligible_wos)
+                    blocked_wos_count = len(blocked_wos)
+                    if not eligible_wos:
+                        issues.append(f"Tất cả {len(target_wos)} phiếu công việc đều đang bị khóa do phụ thuộc vào công việc khác chưa hoàn tất.")
+
+        can_run = (len(issues) == 0)
+        algo_display_name = "Hungary Kuhn-Munkres" if algorithm == 'HUNGARIAN' else "Di truyền (Genetic Algorithm)"
+
+        return success_response({
+            "canRun": can_run,
+            "algorithm": algorithm,
+            "algorithmName": algo_display_name,
+            "issues": issues,
+            "summary": {
+                "totalTechnicians": total_techs,
+                "availableTechnicians": available_techs_count,
+                "eligibleWorkOrders": eligible_wos_count,
+                "blockedWorkOrders": blocked_wos_count
+            }
+        })
+
 

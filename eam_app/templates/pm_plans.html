@@ -29,14 +29,9 @@
           Plans
         </button>
       </div>
-      {% if 'pm_plan:create' in user_permissions or 'pm_plan:update' in user_permissions %}
-      <button onclick="openAssignModal()" class="bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 rounded-xl h-10 px-4 font-semibold flex items-center gap-2 shadow-sm transition-colors">
-        <i class="ph-bold ph-link"></i> Assign Plan
-      </button>
-      {% endif %}
       {% if 'pm_plan:create' in user_permissions %}
       <button onclick="openPmModal()" class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
-        <i class="ph-bold ph-plus"></i> New Plan
+        <i class="ph-bold ph-plus"></i> Tạo kế hoạch bảo trì
       </button>
       {% endif %}
     </div>
@@ -164,44 +159,57 @@
         <table class="w-full text-sm text-left custom-beautiful-table">
           <thead class="text-xs text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-200 sticky top-0 z-10">
             <tr>
-              <th class="px-6 py-4 font-bold tracking-wider">Plan Name</th>
+            <tr>
+              <th class="px-6 py-4 font-bold tracking-wider">Tên Kế hoạch</th>
+              <th class="px-6 py-4 font-bold tracking-wider">Thiết bị áp dụng</th>
               <th class="px-6 py-4 font-bold tracking-wider relative group">
                   <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'trigger-filter')">
-                      Trigger <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                      Kích hoạt <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
                   </div>
                   <div id="trigger-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-40" onclick="event.stopPropagation()">
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="trigger-cb" value="TIME" checked onchange="filterPlans()"> Time Based</label>
-                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="trigger-cb" value="METER" checked onchange="filterPlans()"> Meter Based</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="trigger-cb" value="TIME" checked onchange="filterPlans()"> Theo thời gian</label>
+                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="trigger-cb" value="METER" checked onchange="filterPlans()"> Theo chỉ số máy</label>
                   </div>
               </th>
-              <th class="px-6 py-4 font-bold tracking-wider">Interval</th>
+              <th class="px-6 py-4 font-bold tracking-wider">Chu kỳ</th>
               <th class="px-6 py-4 font-bold tracking-wider relative group">
                   <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'pm-status-filter')">
-                      Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                      Trạng thái <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
                   </div>
                   <div id="pm-status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="pm-status-cb" value="true" checked onchange="filterPlans()"> Active</label>
-                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="pm-status-cb" value="false" checked onchange="filterPlans()"> Inactive</label>
+                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="pm-status-cb" value="true" checked onchange="filterPlans()"> Hoạt động</label>
+                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="pm-status-cb" value="false" checked onchange="filterPlans()"> Tạm dừng</label>
                   </div>
               </th>
-              <th class="px-6 py-4 font-bold tracking-wider text-right">Actions</th>
+              <th class="px-6 py-4 font-bold tracking-wider text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100" id="plans-tbody">
             {% for plan in pm_plans_data %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer plan-row" data-name="{{ plan.pm.name|lower }}" data-trigger="{{ plan.pm.trigger_type }}" data-status="{{ plan.pm.is_active|yesno:'true,false' }}" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
+            <tr class="hover:bg-neutral-50/50 transition-colors group cursor-pointer plan-row" data-name="{{ plan.pm.name|lower }}" data-trigger="{{ plan.pm.trigger_type }}" data-status="{{ plan.pm.is_active|yesno:'true,false' }}" onclick="openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', {{ plan.assigned_asset_ids_json|safe }}, {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})">
               <td class="px-6 py-4">
                 <p class="font-bold text-neutral-800 m-0 group-hover:text-primary transition-colors">{{ plan.pm.name }}</p>
-                <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.pm.description }}">{{ plan.pm.description|default:"No description" }}</p>
+                <p class="text-xs text-neutral-500 truncate max-w-xs mt-1" title="{{ plan.pm.description }}">{{ plan.pm.description|default:"Chưa có mô tả" }}</p>
+              </td>
+              <td class="px-6 py-4">
+                {% if plan.assigned_count > 0 %}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary-50 text-primary border border-primary-200" title="{{ plan.assigned_assets_names|join:', ' }}">
+                    <i class="ph-bold ph-gear"></i> {{ plan.assigned_count }} thiết bị
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-400">
+                    Chưa gán
+                  </span>
+                {% endif %}
               </td>
               <td class="px-6 py-4">
                 {% if plan.pm.trigger_type == 'TIME' %}
                   <div class="flex items-center gap-1 text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded w-max text-xs border border-blue-200">
-                    <i class="ph-fill ph-clock text-sm"></i> Time
+                    <i class="ph-fill ph-clock text-sm"></i> Theo thời gian
                   </div>
                 {% elif plan.pm.trigger_type == 'METER' %}
                   <div class="flex items-center gap-1 text-purple-600 font-semibold bg-purple-50 px-2 py-1 rounded w-max text-xs border border-purple-200">
-                    <i class="ph-fill ph-gauge text-sm"></i> Meter
+                    <i class="ph-fill ph-gauge text-sm"></i> Theo chỉ số máy
                   </div>
                 {% else %}
                   <span class="text-neutral-600">{{ plan.pm.trigger_type }}</span>
@@ -209,32 +217,32 @@
               </td>
               <td class="px-6 py-4 font-medium text-neutral-700">
                 {% if plan.pm.trigger_type == 'TIME' %}
-                  Every {{ plan.pm.interval_value|floatformat:0 }} {{ plan.pm.interval_unit|lower }}
+                  Mỗi {{ plan.pm.interval_value|floatformat:0 }} {{ plan.pm.interval_unit|lower }}
                 {% elif plan.pm.trigger_type == 'METER' %}
-                  Every {{ plan.pm.interval_value|floatformat:0 }} units
+                  Mỗi {{ plan.pm.interval_value|floatformat:0 }} đơn vị
                 {% endif %}
               </td>
               <td class="px-6 py-4">
                 {% if plan.pm.is_active %}
                   <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border border-green-200 flex items-center gap-1 w-max">
-                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Active
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Hoạt động
                   </span>
                 {% else %}
-                  <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border border-neutral-200">Inactive</span>
+                  <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border border-neutral-200">Tạm dừng</span>
                 {% endif %}
               </td>
               <td class="px-6 py-4 text-right">
                 <div class="flex gap-2 items-center justify-end">
                     {% if 'pm_plan:update' in user_permissions %}
-                    <button onclick="event.stopPropagation(); openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', '{{ plan.pm.assignee_id|default:'' }}', {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})" title="Edit Plan" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button onclick="event.stopPropagation(); openPmModal('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}', '{{ plan.pm.description|escapejs }}', '{{ plan.pm.trigger_type }}', '{{ plan.pm.interval_value|default_if_none:'' }}', '{{ plan.pm.interval_unit|default_if_none:'' }}', {{ plan.pm.is_active|lower }}, {{ plan.pm.is_floating_schedule|lower }}, {{ plan.pm.suppress_if_pending|lower }}, '{{ plan.pm.lead_time_days|default:'0' }}', '{{ plan.pm.estimated_duration_minutes|default:'' }}', {{ plan.assigned_asset_ids_json|safe }}, {{ plan.checklists_json|safe }}, {{ plan.materials_json|safe }})" title="Chỉnh sửa Kế hoạch" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-pencil-simple text-lg"></i>
                     </button>
                     {% endif %}
-                    <button onclick="event.stopPropagation(); openAssignments('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}')" title="View Assignments" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button onclick="event.stopPropagation(); openAssignments('{{ plan.pm.id }}', '{{ plan.pm.name|escapejs }}')" title="Xem chi tiết thiết bị" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-link text-lg"></i>
                     </button>
                     {% if 'pm_plan:delete' in user_permissions %}
-                    <button onclick="event.stopPropagation(); deletePm('{{ plan.pm.id }}')" title="Delete" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
+                    <button onclick="event.stopPropagation(); deletePm('{{ plan.pm.id }}')" title="Xóa Kế hoạch" class="w-8 h-8 flex items-center justify-center text-danger hover:bg-red-50 bg-white rounded-lg transition-colors">
                         <i class="ph-bold ph-trash text-lg"></i>
                     </button>
                     {% endif %}
@@ -246,7 +254,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+              <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-calendar-check text-4xl text-neutral-300 mb-3"></i>
                   <p class="text-base font-semibold text-neutral-700 m-0">No PM Plans found</p>
@@ -256,7 +264,7 @@
             </tr>
             {% endfor %}
             <tr id="empty-state" class="hidden">
-              <td colspan="5" class="px-6 py-12 text-center text-neutral-500">
+              <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-calendar-check text-4xl text-neutral-300 mb-3"></i>
                   <p class="text-base font-semibold text-neutral-700 m-0">No PM Plans found</p>
@@ -346,14 +354,54 @@
           <input type="number" id="pm-est-duration" min="1" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
         </div>
 
-        <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5" title="Optional. The selected technician will be automatically assigned to any work orders generated from this plan.">Default Assignee</label>
-          <select id="pm-assignee" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
-            <option value="">Select a default technician</option>
-            {% for u in users %}
-            <option value="{{ u.id }}">{{ u.username|default:u.email }}</option>
+        <!-- Chọn Thiết bị áp dụng (Gộp chung vào Kế hoạch bảo trì) -->
+        <div class="space-y-2 bg-white p-4 rounded-2xl border border-neutral-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="block text-sm font-bold text-neutral-800 m-0">Thiết bị áp dụng</label>
+              <p class="text-[11px] text-neutral-400 m-0">Chọn các thiết bị sẽ tự động lập phiếu kiểm tra</p>
+            </div>
+            <div class="flex items-center gap-2">
+              {% if user_is_restricted_floorplan %}
+              <span class="text-xs font-semibold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-lg border border-neutral-200 flex items-center gap-1 cursor-not-allowed" title="Mặt bằng cố định theo tài khoản của bạn">
+                <i class="ph-bold ph-lock text-neutral-400"></i> {{ user_floorplan_name }}
+              </span>
+              <input type="hidden" id="pm-filter-floorplan" value="{{ user_floorplan_id }}" />
+              {% else %}
+              <select id="pm-filter-floorplan" onchange="filterPmModalAssets(this.value)" class="text-xs px-2.5 py-1 bg-neutral-50 hover:bg-white border border-neutral-200 rounded-lg font-semibold text-neutral-700 focus:outline-none focus:border-primary cursor-pointer transition-colors">
+                <option value="">Tất cả mặt bằng</option>
+                {% for fp in floorplans_list %}
+                <option value="{{ fp.id }}">{{ fp.name }}</option>
+                {% endfor %}
+              </select>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Quick actions -->
+          <div class="flex items-center justify-between text-xs text-neutral-500 pt-1 pb-0.5 border-b border-neutral-100">
+            <span id="pm-selected-assets-count" class="font-bold text-primary">0 thiết bị được chọn</span>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="toggleSelectAllPmAssets(true)" class="text-primary hover:underline font-semibold">Chọn tất cả</button>
+              <span class="text-neutral-300">|</span>
+              <button type="button" onclick="toggleSelectAllPmAssets(false)" class="text-neutral-500 hover:text-neutral-800">Bỏ chọn</button>
+            </div>
+          </div>
+
+          <!-- Assets Checklist Box -->
+          <div id="pm-assets-checklist" class="max-h-44 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+            {% for a in assets %}
+            <label class="flex items-center justify-between p-2 rounded-xl hover:bg-neutral-50 cursor-pointer border border-neutral-100 transition-colors pm-modal-asset-item" data-asset-id="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}">
+              <div class="flex items-center gap-2.5">
+                <input type="checkbox" value="{{ a.id }}" class="pm-asset-checkbox rounded text-primary focus:ring-primary w-4 h-4 cursor-pointer" onchange="updatePmSelectedAssetsCount()" />
+                <span class="text-xs font-bold text-neutral-800">{{ a.name }}</span>
+              </div>
+              <span class="text-[11px] text-neutral-400 font-medium">{{ a.zone_id|default:a.location.code|default:'' }}</span>
+            </label>
+            {% empty %}
+            <p class="text-xs text-neutral-400 text-center py-4">Chưa có thiết bị nào trong khu vực này</p>
             {% endfor %}
-          </select>
+          </div>
         </div>
 
         <div class="flex flex-wrap gap-6 items-center">
@@ -428,16 +476,34 @@
         <i class="ph-bold ph-x text-lg"></i>
       </button>
     </div>
-    <div class="p-6 bg-neutral-50 border-b border-neutral-100">
-        <label class="block text-sm font-bold text-neutral-700 mb-2">Assign New Asset</label>
+    <div class="p-6 bg-neutral-50 border-b border-neutral-100 space-y-3">
+        <div class="flex items-center justify-between">
+            <label class="block text-sm font-bold text-neutral-700 m-0">Assign New Asset</label>
+            <div class="flex items-center gap-1.5">
+                <span class="text-xs text-neutral-400 font-medium">Mặt bằng:</span>
+                {% if user_is_restricted_floorplan %}
+                <span class="text-xs font-bold text-neutral-700 bg-neutral-100 px-2.5 py-1 rounded-lg border border-neutral-200 flex items-center gap-1 cursor-not-allowed">
+                    <i class="ph-bold ph-lock text-neutral-400"></i> {{ user_floorplan_name }}
+                </span>
+                <input type="hidden" id="assign-asset-filter-floorplan" value="{{ user_floorplan_id }}" />
+                {% else %}
+                <select id="assign-asset-filter-floorplan" onchange="filterPmAssignAssets(this.value)" class="text-xs px-2.5 py-1 bg-white border border-neutral-200 rounded-lg font-semibold text-neutral-700 focus:outline-none focus:border-primary cursor-pointer">
+                    <option value="">Tất cả mặt bằng / xưởng</option>
+                    {% for fp in floorplans_list %}
+                    <option value="{{ fp.id }}">{{ fp.name }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+        </div>
         <div class="flex gap-2">
-            <select id="new-assign-asset" class="flex-1 px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-                <option value="">-- Select Asset --</option>
+            <select id="new-assign-asset" class="flex-1 px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium truncate">
+                <option value="">-- Chọn thiết bị --</option>
                 {% for a in assets %}
-                <option value="{{ a.id }}">{{ a.name }}</option>
+                <option value="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}" data-zone="{{ a.zone_id|default:'' }}">{{ a.name }}{% if a.zone_id %} - {{ a.zone_id }}{% endif %}</option>
                 {% endfor %}
             </select>
-            <button onclick="addAssignment()" class="px-5 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2">
+            <button onclick="addAssignment()" class="px-5 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2 shrink-0">
                 <i class="ph-bold ph-plus"></i> Assign
             </button>
         </div>
@@ -922,10 +988,48 @@
   
   let currentPlanIdForAssign = null;
   
+  function openAssignModal() {
+      {% if pm_plans_data %}
+          openAssignments('{{ pm_plans_data.0.pm.id }}', '{{ pm_plans_data.0.pm.name|escapejs }}');
+      {% else %}
+          alert('Chưa có kế hoạch bảo trì nào. Vui lòng tạo kế hoạch bảo trì trước.');
+      {% endif %}
+  }
+
+  function filterPmAssignAssets(selectedFpId) {
+      const select = document.getElementById('new-assign-asset');
+      if (!select) return;
+      const options = select.querySelectorAll('option');
+      let currentValStillValid = false;
+      const currentVal = select.value;
+
+      options.forEach(opt => {
+          if (!opt.value) {
+              opt.hidden = false;
+              return;
+          }
+          const fpId = opt.getAttribute('data-floorplan-id') || '';
+          if (!selectedFpId || fpId === String(selectedFpId)) {
+              opt.hidden = false;
+              if (opt.value === currentVal) currentValStillValid = true;
+          } else {
+              opt.hidden = true;
+          }
+      });
+
+      if (!currentValStillValid) {
+          select.value = '';
+      }
+  }
+  
   function openAssignments(planId, planName) {
       currentPlanIdForAssign = planId;
       document.getElementById('assign-plan-name').innerText = planName;
       document.getElementById('assign-drawer').classList.remove('hidden');
+      const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
+      const fpFilter = document.getElementById('assign-asset-filter-floorplan');
+      if (fpFilter) fpFilter.value = userRestrictedFp;
+      filterPmAssignAssets(userRestrictedFp);
       document.getElementById('new-assign-asset').value = '';
       fetchAssignments();
   }
@@ -1126,7 +1230,7 @@
   }
 
   // PM Modal JS
-  function openPmModal(id='', name='', desc='', trigger='TIME', interval_value='', interval_unit='MONTHS', is_active=true, is_floating=false, suppress_pending=true, lead_time=0, duration='', assignee='', checklists=[], materials=[]) {
+  function openPmModal(id='', name='', desc='', trigger='TIME', interval_value='', interval_unit='MONTHS', is_active=true, is_floating=false, suppress_pending=true, lead_time=0, duration='', assigned_asset_ids=[], checklists=[], materials=[]) {
       document.getElementById('pm-modal').classList.remove('hidden');
       document.getElementById('pm-id').value = id;
       document.getElementById('pm-name').value = name;
@@ -1141,10 +1245,25 @@
       
       document.getElementById('pm-lead-time').value = lead_time !== 'None' ? lead_time : 0;
       document.getElementById('pm-est-duration').value = duration !== 'None' ? duration : '';
-      document.getElementById('pm-assignee').value = assignee !== 'None' ? assignee : '';
       document.getElementById('pm-is-floating').checked = is_floating;
       document.getElementById('pm-suppress-pending').checked = suppress_pending;
       
+      // Asset checklist filter & selection
+      const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
+      const fpFilter = document.getElementById('pm-filter-floorplan');
+      if (fpFilter) {
+          fpFilter.value = userRestrictedFp;
+          filterPmModalAssets(userRestrictedFp);
+      } else {
+          filterPmModalAssets('');
+      }
+
+      const assignedSet = new Set((assigned_asset_ids || []).map(String));
+      document.querySelectorAll('.pm-asset-checkbox').forEach(cb => {
+          cb.checked = assignedSet.has(String(cb.value));
+      });
+      updatePmSelectedAssetsCount();
+
       document.getElementById('pm-checklists-container').innerHTML = '';
       if(checklists && checklists.length) {
           checklists.forEach(c => renderChecklistRow(c));
@@ -1155,13 +1274,43 @@
           materials.forEach(m => renderMaterialRow(m));
       }
       
-      document.getElementById('pm-modal-title').innerText = id ? 'Edit PM Plan' : 'New PM Plan';
+      document.getElementById('pm-modal-title').innerText = id ? 'Chỉnh sửa Kế hoạch' : 'Tạo Kế hoạch Bảo trì';
       document.getElementById('pm-msg').classList.add('hidden');
+  }
+
+  function filterPmModalAssets(selectedFpId) {
+      document.querySelectorAll('.pm-modal-asset-item').forEach(el => {
+          const fpId = el.getAttribute('data-floorplan-id') || '';
+          if (!selectedFpId || fpId === String(selectedFpId)) {
+              el.style.display = '';
+          } else {
+              el.style.display = 'none';
+          }
+      });
+      updatePmSelectedAssetsCount();
+  }
+
+  function toggleSelectAllPmAssets(checkAll) {
+      document.querySelectorAll('.pm-modal-asset-item').forEach(el => {
+          if (el.style.display !== 'none') {
+              const cb = el.querySelector('.pm-asset-checkbox');
+              if (cb) cb.checked = checkAll;
+          }
+      });
+      updatePmSelectedAssetsCount();
+  }
+
+  function updatePmSelectedAssetsCount() {
+      const checkedBoxes = document.querySelectorAll('.pm-asset-checkbox:checked');
+      const countEl = document.getElementById('pm-selected-assets-count');
+      if (countEl) countEl.innerText = `${checkedBoxes.length} thiết bị được chọn`;
   }
 
   function closePmModal() {
       document.getElementById('pm-modal').classList.add('hidden');
       document.getElementById('pm-form').reset();
+      document.querySelectorAll('.pm-asset-checkbox').forEach(cb => cb.checked = false);
+      updatePmSelectedAssetsCount();
       document.getElementById('pm-checklists-container').innerHTML = '';
       document.getElementById('pm-materials-container').innerHTML = '';
   }
@@ -1196,6 +1345,9 @@
               });
           }
       });
+
+      // Gather selected assets
+      const selectedAssetIds = Array.from(document.querySelectorAll('.pm-asset-checkbox:checked')).map(cb => cb.value);
       
       const data = {
           id: id,
@@ -1207,9 +1359,9 @@
           is_active: document.getElementById('pm-is-active').checked,
           lead_time_days: document.getElementById('pm-lead-time').value || 0,
           estimated_duration_minutes: document.getElementById('pm-est-duration').value || null,
-          assignee_id: document.getElementById('pm-assignee').value || null,
           is_floating_schedule: document.getElementById('pm-is-floating').checked,
           suppress_if_pending: document.getElementById('pm-suppress-pending').checked,
+          asset_ids: selectedAssetIds,
           checklists: checklists,
           materials: materials
       };

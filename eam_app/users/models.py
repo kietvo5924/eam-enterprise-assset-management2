@@ -126,8 +126,17 @@ class TechnicianProfile(BaseTenantModel):
     coords_x = models.FloatField(default=0.0)
     coords_y = models.FloatField(default=0.0)
     floor_level = models.SmallIntegerField(default=1)
+    floorplan = models.ForeignKey(
+        'assets.Location',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='technician_profiles',
+        help_text='Mặt bằng làm việc chính được gán cho nhân viên'
+    )
     zone_id = models.CharField(max_length=64, blank=True, default='')
     shift_end_time = models.DateTimeField(null=True, blank=True)
+    max_shift_minutes = models.IntegerField(default=480, help_text="Thời gian làm việc tối đa trong ca (phút)")
     monthly_accumulated_hours = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
     is_on_duty = models.BooleanField(default=True)
     availability_status = models.CharField(max_length=20, choices=AVAILABILITY_CHOICES, default='AVAILABLE')

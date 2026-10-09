@@ -31,3 +31,8 @@ google-services.json
 *test_chrome*.py
 *_temp*.py
 *_scratch*.py
+scratch/
+eam_app/scratch/
+.settings/
+**/.settings/
+

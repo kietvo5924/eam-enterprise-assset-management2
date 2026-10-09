@@ -105,6 +105,15 @@
             >
               <i class="ph-bold ph-cpu"></i> Phân công tối ưu Hungary
             </button>
+            <button 
+              type="button"
+              id="btn-ga-scheduler"
+              onclick="openGASchedulerDrawer()"
+              class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl h-10 px-4 font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
+              title="Lập lịch phân bổ ca làm việc đa mục tiêu (Genetic Algorithm)"
+            >
+              <i class="ph-bold ph-dna"></i> Lập lịch ca (Genetic Algorithm)
+            </button>
             {% if 'work_order:create' in user_permissions %}
             <button 
               onclick="openWoModal()"
@@ -341,13 +350,35 @@
           <input type="text" id="wo-title" placeholder="Ví dụ: Bảo trì định kỳ máy bơm A" required class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
         </div>
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Asset</label>
-          <select id="wo-asset" onchange="onAssetSelected(this.value)" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-            <option value="">-- Không liên kết tài sản --</option>
-            {% for a in assets %}
-            <option value="{{ a.id }}">{{ a.name }}</option>
-            {% endfor %}
-          </select>
+          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Thiết bị / Tài sản</label>
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+            <div class="sm:col-span-5">
+              <label class="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Phân xưởng / Mặt bằng</label>
+              {% if user_is_restricted_floorplan %}
+              <div class="w-full px-3 py-2.5 bg-neutral-100 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 flex items-center gap-1.5 cursor-not-allowed" title="Mặt bằng cố định theo tài khoản nhân viên">
+                <i class="ph-bold ph-lock text-neutral-400"></i>
+                <span class="truncate">{{ user_floorplan_name }}</span>
+              </div>
+              <input type="hidden" id="wo-asset-filter-floorplan" value="{{ user_floorplan_id }}" />
+              {% else %}
+              <select id="wo-asset-filter-floorplan" onchange="filterWoAssetsByFloorplan(this.value)" class="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                <option value="">Tất cả mặt bằng</option>
+                {% for fp in floorplans_list %}
+                <option value="{{ fp.id }}">{{ fp.name }}</option>
+                {% endfor %}
+              </select>
+              {% endif %}
+            </div>
+            <div class="sm:col-span-7">
+              <label class="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Chọn thiết bị</label>
+              <select id="wo-asset" onchange="onAssetSelected(this.value)" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium truncate">
+                <option value="">-- Không liên kết tài sản --</option>
+                {% for a in assets %}
+                <option value="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}" data-zone="{{ a.zone_id|default:'' }}">{{ a.name }}{% if a.zone_id %} - {{ a.zone_id }}{% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
           <div id="wo-asset-loc-badge" class="hidden mt-2 p-2.5 bg-sky-50 border border-sky-200 rounded-xl flex items-center gap-2 text-xs text-sky-800 font-medium">
             <i class="ph-bold ph-map-pin text-sm shrink-0 text-sky-600"></i>
             <span id="wo-asset-loc-text">📍 Vị trí kế thừa từ thiết bị</span>
@@ -678,6 +709,70 @@
   </div>
 </div>
 
+<!-- Modal Thông Báo Kiểm Tra Điều Kiện Thuật Toán -->
+<div id="algo-condition-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-neutral-200/80 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <!-- Header -->
+    <div class="p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-100 flex items-start gap-4">
+      <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl shrink-0 border border-amber-200 shadow-sm">
+        <i class="ph-fill ph-warning-circle"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-200" id="algo-condition-badge">Kiểm tra điều kiện</span>
+          <span class="text-xs font-bold text-neutral-500" id="algo-condition-name">Kuhn-Munkres</span>
+        </div>
+        <h3 class="text-lg font-black text-neutral-900 leading-snug m-0">Chưa Đủ Điều Kiện Thực Hiện Giải Thuật</h3>
+        <p class="text-xs text-neutral-500 mt-1 m-0">Hệ thống đã rà soát tài nguyên nhân sự và phiếu bảo trì trước khi khởi chạy:</p>
+      </div>
+      <button onclick="closeAlgoConditionModal()" class="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer shrink-0">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+      <!-- Issues List -->
+      <div class="space-y-2.5" id="algo-condition-issues-list">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Resource Summary Stats -->
+      <div class="bg-neutral-50 rounded-2xl p-4 border border-neutral-100">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2.5">Tổng quan tài nguyên hiện tại</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white p-3 rounded-xl border border-neutral-200/60 shadow-xs">
+            <div class="text-[11px] text-neutral-500 font-medium">Kỹ thuật viên rảnh / trực:</div>
+            <div class="text-base font-black text-neutral-900 mt-0.5" id="algo-condition-tech-stat">0 / 0</div>
+          </div>
+          <div class="bg-white p-3 rounded-xl border border-neutral-200/60 shadow-xs">
+            <div class="text-[11px] text-neutral-500 font-medium">Phiếu hợp lệ / Bị khóa:</div>
+            <div class="text-base font-black text-neutral-900 mt-0.5" id="algo-condition-wo-stat">0 / 0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actionable Tips -->
+      <div class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-3">
+        <i class="ph-fill ph-lightbulb text-indigo-600 text-lg shrink-0 mt-0.5"></i>
+        <div class="leading-relaxed" id="algo-condition-guidance">
+          <b>Gợi ý xử lý:</b> Hãy tạo thêm phiếu bảo trì mới (nút <i>+ Tạo Work Order</i>) hoặc cập nhật trạng thái trực ca của kỹ thuật viên sang <b>Sẵn sàng (Available)</b> để giải thuật có thể tối ưu phân công.
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between gap-3">
+      <span class="text-xs text-neutral-400">Kiểm tra tự động theo thời gian thực</span>
+      <div class="flex items-center gap-2">
+        <button onclick="closeAlgoConditionModal()" class="px-5 py-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-bold rounded-xl text-sm transition-colors cursor-pointer">
+          Đã hiểu
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Hungarian Assignment Modal -->
 <div id="hungarian-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
   <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
@@ -814,6 +909,203 @@
     </div>
   </div>
 </div>
+
+<!-- GA Scheduler Drawer Backdrop -->
+<div id="ga-drawer-backdrop" onclick="closeGASchedulerDrawer()" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[110] hidden transition-opacity"></div>
+
+<!-- GA Scheduler Drawer Container -->
+<div id="ga-scheduler-drawer" class="fixed inset-y-0 right-0 w-full max-w-4xl bg-white shadow-2xl z-[115] flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out border-l border-neutral-200">
+  <!-- Drawer Header -->
+  <div class="p-5 bg-gradient-to-r from-neutral-900 via-neutral-800 to-emerald-950 text-white flex justify-between items-center relative overflow-hidden shrink-0">
+    <div class="flex items-center gap-3 relative z-10">
+      <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 text-xl font-bold">
+        <i class="ph-bold ph-dna"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h3 class="text-lg font-black text-white m-0">Lập Lịch Ca Trực Đa Mục Tiêu (Genetic Algorithm)</h3>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/30 text-emerald-200 border border-emerald-400/30">Phase 11.2 Engine</span>
+        </div>
+        <p class="text-[11px] text-neutral-300 mt-0.5 mb-0">Tối ưu hóa đa mục tiêu: Kỹ năng • Cân bằng tải ca • Quãng đường • Hạn chót SLA • Kho phụ tùng • Khóa khu vực</p>
+      </div>
+    </div>
+    <button onclick="closeGASchedulerDrawer()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors relative z-10 cursor-pointer">
+      <i class="ph-bold ph-x text-base"></i>
+    </button>
+  </div>
+
+  <!-- Drawer Body -->
+  <div class="flex-1 overflow-y-auto p-5 space-y-5 bg-neutral-50" id="ga-drawer-body">
+    <!-- Controls Bar -->
+    <div class="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1">Mặt bằng áp dụng (Floorplan Scope)</label>
+          <select id="ga-floorplan-select" onchange="onGAFloorplanScopeChanged()" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-600">
+            <option value="">-- Tất cả mặt bằng (Toàn nhà máy) --</option>
+            {% for fp in floorplans_list %}
+            <option value="{{ fp.id }}">{{ fp.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="w-28">
+          <label class="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1">Số thế hệ</label>
+          <input type="number" id="ga-input-max-gen" value="50" min="20" max="300" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-600 text-center">
+        </div>
+        <div class="w-28">
+          <label class="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1">Quần thể</label>
+          <input type="number" id="ga-input-pop-size" value="50" min="20" max="200" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-emerald-600 text-center">
+        </div>
+        <div class="flex items-end">
+          <button id="btn-ga-run" onclick="startGAEvolution()" class="h-9 px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer">
+            <i class="ph-bold ph-play"></i> Bắt đầu tiến hóa GA
+          </button>
+        </div>
+      </div>
+      <div id="ga-scope-info" class="text-xs text-neutral-500 flex items-center gap-2 pt-1 border-t border-neutral-100">
+        <i class="ph-bold ph-info text-emerald-600"></i>
+        <span>Chọn phạm vi mặt bằng và nhấn nút để bắt đầu lập lịch phân ca tối ưu.</span>
+      </div>
+    </div>
+
+    <!-- Evolution Progress & Convergence Chart Panel (Hidden initially) -->
+    <div id="ga-evolution-panel" class="hidden bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div id="ga-spinner" class="w-5 h-5 border-2 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+          <div>
+            <h4 class="font-bold text-sm text-neutral-800" id="ga-progress-title">Đang tiến hóa qua các thế hệ...</h4>
+            <p class="text-[11px] text-neutral-500" id="ga-progress-subtitle">Theo dõi điểm thích nghi và quá trình hội tụ Pareto</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <span class="text-[10px] uppercase font-bold text-neutral-400 block">Thế hệ</span>
+            <span class="text-sm font-extrabold text-neutral-800 font-mono" id="ga-gen-counter">0 / 50</span>
+          </div>
+          <div class="text-right pl-3 border-l border-neutral-200">
+            <span class="text-[10px] uppercase font-bold text-neutral-400 block">Best Fitness</span>
+            <span class="text-sm font-extrabold text-emerald-600 font-mono" id="ga-best-fitness">0.0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="w-full bg-neutral-100 rounded-full h-2 overflow-hidden">
+        <div id="ga-progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+
+      <!-- Real-time SVG Convergence Chart Canvas -->
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-xs text-neutral-500">
+          <span class="font-semibold text-neutral-700 flex items-center gap-1.5">
+            <i class="ph-bold ph-chart-line-up text-emerald-600"></i> Đường Cong Hội Tụ Thích Nghi (Convergence Curve)
+          </span>
+          <div class="flex items-center gap-3 text-[11px]">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Best Fitness</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-sky-500 inline-block border-t border-dashed border-sky-500"></span> Avg Fitness</span>
+          </div>
+        </div>
+        <div class="relative w-full h-44 bg-neutral-900 rounded-xl p-3 border border-neutral-800 overflow-hidden" id="ga-chart-container">
+          <svg id="ga-convergence-svg" viewBox="0 0 760 140" class="w-full h-full overflow-visible"></svg>
+          <div id="ga-chart-empty" class="absolute inset-0 flex items-center justify-center text-xs text-neutral-500 font-mono">Đang chờ dữ liệu thế hệ đầu tiên...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pareto Strategies & Detailed Schedules Workspace (Hidden until results available) -->
+    <div id="ga-results-workspace" class="hidden space-y-5">
+      <!-- 3 Strategy Cards -->
+      <div>
+        <h4 class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Chọn Phương Án Mặt Biên Pareto</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="ga-pareto-cards-container">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Active Strategy KPI Summary -->
+      <div class="bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div class="p-2 rounded-xl bg-neutral-50">
+          <span class="text-[10px] uppercase font-bold text-neutral-400 block">Độ Khớp Kỹ Năng</span>
+          <span class="text-base font-extrabold text-neutral-800" id="kpi-skill-score">0.0%</span>
+        </div>
+        <div class="p-2 rounded-xl bg-neutral-50">
+          <span class="text-[10px] uppercase font-bold text-neutral-400 block">Cân Bằng Tải Ca</span>
+          <span class="text-base font-extrabold text-neutral-800" id="kpi-workload-score">0.0%</span>
+        </div>
+        <div class="p-2 rounded-xl bg-neutral-50">
+          <span class="text-[10px] uppercase font-bold text-neutral-400 block">Tối Ưu Di Chuyển</span>
+          <span class="text-base font-extrabold text-neutral-800" id="kpi-travel-score">0.0%</span>
+        </div>
+        <div class="p-2 rounded-xl bg-neutral-50">
+          <span class="text-[10px] uppercase font-bold text-neutral-400 block">Tồn Đọng (Backlog)</span>
+          <span class="text-base font-extrabold text-amber-600" id="kpi-backlog-count">0 phiếu</span>
+        </div>
+      </div>
+
+      <!-- Blocked Work Orders Notification (Hidden if none) -->
+      <div id="ga-blocked-wos-alert" class="hidden bg-rose-50/80 border border-rose-200 rounded-2xl p-4 space-y-2">
+        <div class="flex items-center gap-2 text-rose-900 font-bold text-xs">
+          <i class="ph-bold ph-lock-key text-base text-rose-600"></i>
+          <span>Phiếu Công Việc Tạm Khóa (Chưa Hoàn Tất Điều Kiện Tiền Đề)</span>
+        </div>
+        <p class="text-[11px] text-rose-700 m-0">Các phiếu dưới đây có liên kết phụ thuộc vào một phiếu công việc khác chưa hoàn tất, do đó GA tạm loại trừ khỏi ca này để tránh vi phạm thứ tự công nghệ.</p>
+        <div id="ga-blocked-wos-list" class="space-y-1.5 pt-1"></div>
+      </div>
+
+      <!-- Technician Route & Timeline Schedule -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-xs font-bold text-neutral-500 uppercase tracking-wider m-0">Lịch Trình Chi Tiết Từng Kỹ Thuật Viên</h4>
+            <p class="text-[11px] text-neutral-400 mt-0.5 mb-0">Lộ trình theo ca 8h: Phân bổ thứ tự việc, dự tính thời gian sửa chữa và đi bộ di chuyển giữa các máy.</p>
+          </div>
+          <span class="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shrink-0">
+            <i class="ph-bold ph-clock"></i> Định mức ca 8h (480 phút)
+          </span>
+        </div>
+        <!-- Legend bar -->
+        <div class="flex flex-wrap items-center gap-3 px-3.5 py-2 bg-neutral-100/90 rounded-xl text-[11px] text-neutral-600 border border-neutral-200/60">
+          <span class="font-bold text-neutral-700"><i class="ph-bold ph-info text-emerald-600"></i> Chú thích thông số:</span>
+          <span class="flex items-center gap-1" title="Thời gian thao tác sửa chữa, bảo dưỡng thực tế tại thiết bị"><i class="ph-bold ph-wrench text-emerald-600"></i> <b>Sửa:</b> Thời gian sửa máy</span>
+          <span class="flex items-center gap-1" title="Thời gian đi bộ di chuyển giữa các phân xưởng/khu vực"><i class="ph-bold ph-person-simple-walk text-blue-600"></i> <b>Đi bộ:</b> Di chuyển</span>
+          <span class="flex items-center gap-1" title="Thời gian ghé kho vật tư để nhận linh kiện phụ tùng thay thế"><i class="ph-bold ph-package text-purple-600"></i> <b>Kho VT:</b> Lấy phụ tùng</span>
+          <span class="flex items-center gap-1" title="Khung giờ bắt đầu làm và dự kiến hoàn thành theo giờ ca trực"><i class="ph-bold ph-clock text-neutral-500"></i> <b>Khung giờ:</b> Bắt đầu → Kết thúc</span>
+        </div>
+        <div id="ga-technicians-schedules" class="space-y-3">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Virtual Technician / Backlog Card -->
+      <div id="ga-backlog-card" class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-amber-900 font-bold text-xs">
+            <i class="ph-bold ph-clock-countdown text-base text-amber-600"></i>
+            <span>Công Việc Hoãn Lại (Backlog / Kỹ Thuật Viên Ảo)</span>
+          </div>
+          <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900" id="ga-backlog-badge">0 phiếu</span>
+        </div>
+        <p class="text-[11px] text-amber-700">Các phiếu công việc được GA đề xuất hoãn sang ca tiếp theo do vượt tổng năng lực ca hoặc ưu tiên thấp.</p>
+        <div id="ga-backlog-list" class="space-y-1.5 pt-1">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drawer Footer -->
+  <div class="p-4 bg-white border-t border-neutral-200 flex justify-between items-center shrink-0">
+    <span class="text-xs text-neutral-500" id="ga-drawer-status">Sẵn sàng lập lịch phân bổ ca.</span>
+    <div class="flex gap-2">
+      <button onclick="closeGASchedulerDrawer()" class="px-4 py-2 rounded-xl border border-neutral-300 text-neutral-700 font-bold text-xs hover:bg-neutral-100 transition-colors cursor-pointer">Đóng</button>
+      <button id="btn-ga-apply" onclick="applyGASchedule()" disabled class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+        <i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng Lịch Ca
+      </button>
+    </div>
+  </div>
+</div>
+
 
 <!-- Modal Trình Ghim Vị Trí Mặt Bằng Trực Quan Cho Work Order -->
 <div id="modal-floorplan-picker" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-md hidden z-[120] flex items-center justify-center p-2 sm:p-4">
@@ -1012,6 +1304,38 @@
       zoneSelect.value = selectedZoneCode;
       onWoZoneChanged(selectedZoneCode);
     }
+  }
+
+  function filterWoAssetsByFloorplan(selectedFpId) {
+      const select = document.getElementById('wo-asset');
+      if (!select) return;
+      const options = select.querySelectorAll('option');
+      options.forEach(opt => {
+          if (!opt.value) {
+              opt.hidden = false;
+              return;
+          }
+          let fpId = opt.dataset.floorplanId || '';
+          if (!fpId && window.ASSETS_MAP && window.ASSETS_MAP[opt.value]) {
+              const a = window.ASSETS_MAP[opt.value];
+              fpId = a.floorplan_id || '';
+              if (!fpId) {
+                  let locObj = null;
+                  if (a.zone_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[a.zone_id]) locObj = window.LOCATIONS_MAP[a.zone_id];
+                  else if (a.location_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[String(a.location_id)]) locObj = window.LOCATIONS_MAP[String(a.location_id)];
+                  if (locObj) fpId = String(locObj.parent_id || (locObj.zone_type === 'FLOORPLAN' ? locObj.id : ''));
+              }
+          }
+          if (!selectedFpId || fpId === String(selectedFpId)) {
+              opt.hidden = false;
+          } else {
+              opt.hidden = true;
+          }
+      });
+      if (select.selectedOptions.length > 0 && select.selectedOptions[0].hidden) {
+          select.value = '';
+          onAssetSelected('');
+      }
   }
 
   function onAssetSelected(assetId) {
@@ -1480,9 +1804,30 @@
           });
       }
 
-      if (asset_id) {
+      if (asset_id && window.ASSETS_MAP && window.ASSETS_MAP[asset_id]) {
+          const a = window.ASSETS_MAP[asset_id];
+          let parentFp = a.floorplan_id || '';
+          if (!parentFp) {
+              let locObj = (a.zone_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[a.zone_id]) || (a.location_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[String(a.location_id)]);
+              if (locObj) parentFp = String(locObj.parent_id || (locObj.zone_type === 'FLOORPLAN' ? locObj.id : ''));
+          }
+          const fpFilter = document.getElementById('wo-asset-filter-floorplan');
+          if (fpFilter && parentFp) {
+              fpFilter.value = parentFp;
+              filterWoAssetsByFloorplan(parentFp);
+          } else if (fpFilter) {
+              fpFilter.value = '';
+              filterWoAssetsByFloorplan('');
+          }
+          document.getElementById('wo-asset').value = asset_id;
           onAssetSelected(asset_id);
       } else {
+          const fpFilter = document.getElementById('wo-asset-filter-floorplan');
+          const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
+          if (fpFilter) {
+              fpFilter.value = userRestrictedFp;
+              filterWoAssetsByFloorplan(userRestrictedFp);
+          }
           const badge = document.getElementById('wo-asset-loc-badge');
           if (badge) badge.classList.add('hidden');
       }
@@ -1491,6 +1836,12 @@
   function closeWoModal() {
       document.getElementById('wo-modal').classList.add('hidden');
       document.getElementById('wo-form').reset();
+      const fpFilter = document.getElementById('wo-asset-filter-floorplan');
+      const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
+      if (fpFilter) {
+          fpFilter.value = userRestrictedFp;
+          filterWoAssetsByFloorplan(userRestrictedFp);
+      }
       const fpSelect = document.getElementById('wo-floorplan');
       if (fpSelect) fpSelect.value = '';
       onWoFloorplanChanged('', '');
@@ -1853,7 +2204,111 @@
       });
   }
 
+  // ==========================================
+  // ALGORITHM PREREQUISITE CONDITION VALIDATION
+  // ==========================================
+  function checkAlgorithmReadiness(algorithm, workOrderIds = [], floorplanId = null) {
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      return fetch('/api/v1/work-orders/algorithm-readiness/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken
+          },
+          body: JSON.stringify({
+              algorithm: algorithm,
+              workOrderIds: workOrderIds,
+              floorplanId: floorplanId
+          })
+      })
+      .then(res => res.json())
+      .then(body => {
+          if (!body.success) {
+              throw new Error((body.error && body.error.message) || body.message || 'Lỗi kiểm tra điều kiện.');
+          }
+          return body.data;
+      });
+  }
+
+  function showAlgoConditionModal(data) {
+      const modal = document.getElementById('algo-condition-modal');
+      const nameEl = document.getElementById('algo-condition-name');
+      const badgeEl = document.getElementById('algo-condition-badge');
+      const issuesList = document.getElementById('algo-condition-issues-list');
+      const techStat = document.getElementById('algo-condition-tech-stat');
+      const woStat = document.getElementById('algo-condition-wo-stat');
+
+      if (nameEl) nameEl.innerText = data.algorithmName || data.algorithm;
+      if (badgeEl) badgeEl.innerText = (data.algorithm === 'HUNGARIAN') ? 'Kuhn-Munkres' : 'Genetic Algorithm';
+
+      const s = data.summary || {};
+      if (techStat) techStat.innerText = `${s.availableTechnicians || 0} / ${s.totalTechnicians || 0} thợ khả dụng`;
+      if (woStat) woStat.innerText = `${s.eligibleWorkOrders || 0} hợp lệ (${s.blockedWorkOrders || 0} bị khóa)`;
+
+      if (issuesList) {
+          if (!data.issues || data.issues.length === 0) {
+              issuesList.innerHTML = `
+                  <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                      <i class="ph-bold ph-check-circle text-emerald-600 text-base"></i>
+                      <span>Tất cả điều kiện tiên quyết đều thỏa mãn.</span>
+                  </div>
+              `;
+          } else {
+              issuesList.innerHTML = data.issues.map(iss => `
+                  <div class="p-3.5 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs text-rose-900 flex items-start gap-2.5">
+                      <div class="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs">✕</div>
+                      <span class="leading-relaxed font-semibold">${iss}</span>
+                  </div>
+              `).join('');
+          }
+      }
+
+      if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeAlgoConditionModal() {
+      const modal = document.getElementById('algo-condition-modal');
+      if (modal) modal.classList.add('hidden');
+  }
+
   function openHungarianModal() {
+      const btn = document.getElementById('btn-hungarian-optimize');
+      const originalHtml = btn ? btn.innerHTML : '';
+      const selectedIds = Array.from(document.querySelectorAll('.wo-select-cb:checked'))
+                               .map(cb => cb.value);
+
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Kiểm tra...';
+      }
+
+      checkAlgorithmReadiness('HUNGARIAN', selectedIds, null)
+          .then(res => {
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = originalHtml;
+              }
+              if (!res.canRun) {
+                  showAlgoConditionModal(res);
+                  if (typeof showToast === 'function' && res.issues.length > 0) {
+                      showToast(res.issues[0], 'warning');
+                  }
+                  return;
+              }
+              proceedOpenHungarianModal(selectedIds);
+          })
+          .catch(err => {
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = originalHtml;
+              }
+              if (typeof showToast === 'function') {
+                  showToast('Lỗi kiểm tra điều kiện: ' + err.message, 'error');
+              }
+          });
+  }
+
+  function proceedOpenHungarianModal(selectedIds) {
       const modal = document.getElementById('hungarian-modal');
       const loading = document.getElementById('hungarian-loading');
       const errBox = document.getElementById('hungarian-error');
@@ -1865,10 +2320,6 @@
       errBox.classList.add('hidden');
       content.classList.add('hidden');
       btnApply.disabled = true;
-
-      // Collect selected WO IDs if any
-      const selectedIds = Array.from(document.querySelectorAll('.wo-select-cb:checked'))
-                               .map(cb => cb.value);
 
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
@@ -2224,6 +2675,676 @@
           errBox.classList.remove('hidden');
           document.getElementById('hungarian-error-title').innerText = 'Lỗi mạng hoặc hệ thống';
           document.getElementById('hungarian-error-message').innerText = err.message;
+      });
+  }
+
+  // =========================================================================
+  // TASK 11.2: GENETIC ALGORITHM (GA) SCHEDULING DRAWER & VISUALIZER
+  // =========================================================================
+  let gaTaskId = null;
+  let gaPollingInterval = null;
+  let gaResultData = null;
+  let gaActiveStrategy = 'BALANCED';
+  let gaCurrentParetoSolutions = [];
+  let gaActiveScheduleData = null;
+
+  function openGASchedulerDrawer() {
+      const btn = document.getElementById('btn-ga-scheduler');
+      const originalHtml = btn ? btn.innerHTML : '';
+      const selectedWos = Array.from(document.querySelectorAll('.wo-select-cb:checked')).map(cb => cb.value);
+
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Kiểm tra...';
+      }
+
+      checkAlgorithmReadiness('GENETIC', selectedWos, null)
+          .then(res => {
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = originalHtml;
+              }
+              if (!res.canRun) {
+                  showAlgoConditionModal(res);
+                  if (typeof showToast === 'function' && res.issues.length > 0) {
+                      showToast(res.issues[0], 'warning');
+                  }
+                  return;
+              }
+              proceedOpenGASchedulerDrawer();
+          })
+          .catch(err => {
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = originalHtml;
+              }
+              if (typeof showToast === 'function') {
+                  showToast('Lỗi kiểm tra điều kiện: ' + err.message, 'error');
+              }
+          });
+  }
+
+  function proceedOpenGASchedulerDrawer() {
+      const backdrop = document.getElementById('ga-drawer-backdrop');
+      const drawer = document.getElementById('ga-scheduler-drawer');
+      if (backdrop && drawer) {
+          backdrop.classList.remove('hidden');
+          setTimeout(() => {
+              drawer.classList.remove('translate-x-full');
+          }, 10);
+      }
+      onGAFloorplanScopeChanged();
+  }
+
+  function closeGASchedulerDrawer() {
+      const backdrop = document.getElementById('ga-drawer-backdrop');
+      const drawer = document.getElementById('ga-scheduler-drawer');
+      if (backdrop && drawer) {
+          drawer.classList.add('translate-x-full');
+          setTimeout(() => {
+              backdrop.classList.add('hidden');
+          }, 300);
+      }
+      if (gaPollingInterval) {
+          clearInterval(gaPollingInterval);
+          gaPollingInterval = null;
+      }
+  }
+
+  function onGAFloorplanScopeChanged() {
+      const select = document.getElementById('ga-floorplan-select');
+      const info = document.getElementById('ga-scope-info');
+      if (!select || !info) return;
+
+      const fpId = select.value;
+      if (fpId) {
+          const fpName = select.options[select.selectedIndex].text;
+          info.innerHTML = `<i class="ph-bold ph-check-circle text-emerald-600"></i> Đang chọn phạm vi <b>${fpName}</b>. GA sẽ tối ưu hóa lộ trình và khóa các kỹ thuật viên trực tại mặt bằng này.`;
+      } else {
+          info.innerHTML = `<i class="ph-bold ph-globe text-emerald-600"></i> Đang chọn <b>Toàn nhà máy (Tất cả mặt bằng)</b>. GA sẽ áp dụng phân vùng đa cơ sở ISA-95 và điều động thợ cơ động.`;
+      }
+  }
+
+  function startGAEvolution() {
+      const fpSelect = document.getElementById('ga-floorplan-select');
+      const maxGenInput = document.getElementById('ga-input-max-gen');
+      const popSizeInput = document.getElementById('ga-input-pop-size');
+      const btnRun = document.getElementById('btn-ga-run');
+      const evoPanel = document.getElementById('ga-evolution-panel');
+      const resultsWorkspace = document.getElementById('ga-results-workspace');
+      const btnApply = document.getElementById('btn-ga-apply');
+
+      const floorplanId = fpSelect ? fpSelect.value : null;
+      const maxGen = maxGenInput ? parseInt(maxGenInput.value) || 50 : 50;
+      const popSize = popSizeInput ? parseInt(popSizeInput.value) || 50 : 50;
+
+      // Check if user selected specific work orders via checkboxes on table
+      const selectedWos = Array.from(document.querySelectorAll('.wo-select-cb:checked')).map(cb => cb.value);
+
+      btnRun.disabled = true;
+      btnRun.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Kiểm tra điều kiện...';
+
+      checkAlgorithmReadiness('GENETIC', selectedWos, floorplanId)
+          .then(res => {
+              if (!res.canRun) {
+                  btnRun.disabled = false;
+                  btnRun.innerHTML = '<i class="ph-bold ph-play"></i> Bắt đầu tiến hóa GA';
+                  showAlgoConditionModal(res);
+                  if (typeof showToast === 'function' && res.issues.length > 0) {
+                      showToast(res.issues[0], 'warning');
+                  }
+                  return;
+              }
+
+              // Reset UI states
+              btnRun.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Đang khởi tạo...';
+              evoPanel.classList.remove('hidden');
+              resultsWorkspace.classList.add('hidden');
+              btnApply.disabled = true;
+
+              document.getElementById('ga-progress-title').innerText = 'Đang khởi chạy tác vụ giải thuật di truyền...';
+              document.getElementById('ga-gen-counter').innerText = `0 / ${maxGen}`;
+              document.getElementById('ga-best-fitness').innerText = '0.0';
+              document.getElementById('ga-progress-bar').style.width = '0%';
+              document.getElementById('ga-drawer-status').innerText = 'Đang tiến hóa ngầm...';
+
+              fetch('/api/v1/work-orders/ga-auto-assign/', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'X-CSRFToken': getCsrfToken()
+                  },
+                  body: JSON.stringify({
+                      floorplanId: floorplanId || null,
+                      workOrderIds: selectedWos.length > 0 ? selectedWos : [],
+                      maxGenerations: maxGen,
+                      populationSize: popSize
+                  })
+              })
+              .then(res => res.json())
+              .then(body => {
+                  if (!body.success) {
+                      throw new Error((body.error && body.error.message) || body.message || 'Không thể khởi tạo GA.');
+                  }
+                  gaTaskId = body.data.taskId;
+                  document.getElementById('ga-progress-title').innerText = 'Thuật toán đang tiến hóa qua các thế hệ...';
+                  document.getElementById('ga-drawer-status').innerText = `Tác vụ GA: ${gaTaskId.substring(0, 8)}...`;
+
+                  if (gaPollingInterval) clearInterval(gaPollingInterval);
+                  gaPollingInterval = setInterval(() => {
+                      pollGAProgress(gaTaskId);
+                  }, 1000);
+                  pollGAProgress(gaTaskId);
+              })
+              .catch(err => {
+                  btnRun.disabled = false;
+                  btnRun.innerHTML = '<i class="ph-bold ph-play"></i> Bắt đầu tiến hóa GA';
+                  document.getElementById('ga-progress-title').innerText = 'Lỗi khởi chạy tác vụ';
+                  document.getElementById('ga-progress-subtitle').innerText = err.message;
+                  document.getElementById('ga-spinner').classList.add('hidden');
+              });
+          })
+          .catch(err => {
+              btnRun.disabled = false;
+              btnRun.innerHTML = '<i class="ph-bold ph-play"></i> Bắt đầu tiến hóa GA';
+              if (typeof showToast === 'function') {
+                  showToast('Lỗi kiểm tra điều kiện thuật toán: ' + err.message, 'error');
+              }
+          });
+  }
+
+  function renderGAEmptyNotice(msg) {
+      const workspace = document.getElementById('ga-results-workspace');
+      const cardsContainer = document.getElementById('ga-pareto-cards-container');
+      const schedContainer = document.getElementById('ga-technicians-schedules');
+      const btnApply = document.getElementById('btn-ga-apply');
+
+      if (workspace) workspace.classList.remove('hidden');
+      if (btnApply) btnApply.disabled = true;
+      if (schedContainer) schedContainer.innerHTML = '';
+
+      if (cardsContainer) {
+          cardsContainer.innerHTML = `
+            <div class="col-span-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-800">
+              <i class="ph-bold ph-warning-circle text-2xl text-amber-600 shrink-0 mt-0.5"></i>
+              <div>
+                <h5 class="font-bold text-sm text-amber-900 m-0">Không có phiếu công việc cần phân công</h5>
+                <p class="text-xs text-amber-700 mt-1 mb-0">${msg || 'Tất cả phiếu công việc hiện tại đã được phân công hoặc hoàn tất. Bạn có thể tích chọn ô vuông đầu dòng của các phiếu trên bảng để phân bổ lại.'}</p>
+              </div>
+            </div>
+          `;
+      }
+  }
+
+  function pollGAProgress(taskId) {
+      fetch(`/api/v1/work-orders/ga-auto-assign/${taskId}/progress/`, {
+          headers: { 'X-CSRFToken': getCsrfToken() }
+      })
+      .then(res => res.json())
+      .then(body => {
+          if (!body.success) return;
+          const data = body.data;
+          const currentGen = data.currentGeneration || 0;
+          const maxGen = data.maxGenerations || 150;
+          const bestFit = data.bestFitness || 0.0;
+          const history = data.convergenceHistory || [];
+
+          // Update header counters
+          document.getElementById('ga-gen-counter').innerText = `${currentGen} / ${maxGen}`;
+          document.getElementById('ga-best-fitness').innerText = bestFit.toFixed(1);
+          const pct = Math.min(100, Math.round((currentGen / maxGen) * 100));
+          document.getElementById('ga-progress-bar').style.width = `${pct}%`;
+
+          // Draw real-time convergence curve SVG
+          renderGAConvergenceChart(history, maxGen);
+
+          if (data.status === 'COMPLETED') {
+              if (gaPollingInterval) {
+                  clearInterval(gaPollingInterval);
+                  gaPollingInterval = null;
+              }
+              const btnRun = document.getElementById('btn-ga-run');
+              btnRun.disabled = false;
+              btnRun.innerHTML = '<i class="ph-bold ph-arrow-counter-clockwise"></i> Chạy lại tiến hóa';
+              document.getElementById('ga-spinner').classList.add('hidden');
+
+              if (data.paretoSolutions && data.paretoSolutions.length > 0) {
+                  document.getElementById('ga-progress-title').innerText = 'Quá trình tiến hóa đã hoàn tất!';
+                  document.getElementById('ga-progress-subtitle').innerText = `Hội tụ tối ưu ở thế hệ ${currentGen} với Best Fitness = ${bestFit.toFixed(1)}`;
+                  document.getElementById('ga-drawer-status').innerText = 'Đã trích xuất 3 phương án mặt biên Pareto.';
+                  gaResultData = data;
+                  renderGAParetoWorkspace(data);
+              } else {
+                  document.getElementById('ga-progress-title').innerText = 'Không có phiếu công việc cần phân công';
+                  document.getElementById('ga-progress-subtitle').innerText = data.errorMessage || 'Không tìm thấy phiếu công việc phù hợp trong phạm vi đã chọn.';
+                  document.getElementById('ga-drawer-status').innerText = data.errorMessage || 'Không có dữ liệu phân công.';
+                  renderGAEmptyNotice(data.errorMessage);
+              }
+          } else if (data.status === 'FAILED') {
+              if (gaPollingInterval) {
+                  clearInterval(gaPollingInterval);
+                  gaPollingInterval = null;
+              }
+              const btnRun = document.getElementById('btn-ga-run');
+              btnRun.disabled = false;
+              btnRun.innerHTML = '<i class="ph-bold ph-play"></i> Bắt đầu tiến hóa GA';
+              document.getElementById('ga-progress-title').innerText = 'Tiến hóa thất bại';
+              document.getElementById('ga-progress-subtitle').innerText = data.errorMessage || 'Lỗi không xác định.';
+              document.getElementById('ga-spinner').classList.add('hidden');
+          }
+      })
+      .catch(err => {
+          console.error("GA Polling error:", err);
+      });
+  }
+
+  function renderGAConvergenceChart(history, maxGen) {
+      const svg = document.getElementById('ga-convergence-svg');
+      const emptyNotice = document.getElementById('ga-chart-empty');
+      if (!svg) return;
+
+      if (!history || history.length === 0) {
+          if (emptyNotice) emptyNotice.classList.remove('hidden');
+          return;
+      }
+      if (emptyNotice) emptyNotice.classList.add('hidden');
+
+      const width = 760;
+      const height = 140;
+      const padLeft = 45;
+      const padRight = 20;
+      const padTop = 15;
+      const padBottom = 25;
+
+      const chartW = width - padLeft - padRight;
+      const chartH = height - padTop - padBottom;
+
+      const maxG = Math.max(maxGen, history[history.length - 1].generation || 1);
+
+      // Adaptive Y-axis scaling for dynamic visibility of the convergence curve
+      const allVals = history.flatMap(pt => [pt.bestFitness, pt.avgFitness || pt.bestFitness]);
+      const minVal = Math.min(...allVals);
+      const maxVal = Math.max(...allVals);
+      const yMin = Math.max(0, Math.floor(minVal / 10) * 10 - 10);
+      const yMax = Math.min(100, Math.ceil(maxVal / 10) * 10 + 5);
+      const yMid = Math.round((yMin + yMax) / 2);
+
+      const getX = (gen) => padLeft + (gen / maxG) * chartW;
+      const getY = (fitness) => padTop + chartH - (((Math.min(yMax, Math.max(yMin, fitness)) - yMin) / (yMax - yMin || 1)) * chartH);
+
+      // Generate paths
+      let bestPath = '';
+      let avgPath = '';
+      let areaPath = '';
+
+      history.forEach((pt, i) => {
+          const x = getX(pt.generation);
+          const yBest = getY(pt.bestFitness);
+          const yAvg = getY(pt.avgFitness || 0);
+
+          if (i === 0) {
+              bestPath = `M ${x} ${yBest}`;
+              avgPath = `M ${x} ${yAvg}`;
+              areaPath = `M ${x} ${getY(yMin)} L ${x} ${yBest}`;
+          } else {
+              bestPath += ` L ${x} ${yBest}`;
+              avgPath += ` L ${x} ${yAvg}`;
+              areaPath += ` L ${x} ${yBest}`;
+          }
+
+          if (i === history.length - 1) {
+              areaPath += ` L ${x} ${getY(yMin)} Z`;
+          }
+      });
+
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="ga-gradient-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+        <!-- Grid lines -->
+        <line x1="${padLeft}" y1="${getY(yMin)}" x2="${width - padRight}" y2="${getY(yMin)}" stroke="#334155" stroke-width="1"/>
+        <line x1="${padLeft}" y1="${getY(yMid)}" x2="${width - padRight}" y2="${getY(yMid)}" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>
+        <line x1="${padLeft}" y1="${getY(yMax)}" x2="${width - padRight}" y2="${getY(yMax)}" stroke="#1e293b" stroke-width="1" stroke-dasharray="2,2"/>
+        
+        <!-- Y-axis labels -->
+        <text x="${padLeft - 6}" y="${getY(yMin) + 3}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${yMin}</text>
+        <text x="${padLeft - 6}" y="${getY(yMid) + 3}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${yMid}</text>
+        <text x="${padLeft - 6}" y="${getY(yMax) + 3}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">${yMax}</text>
+        
+        <!-- Area gradient under Best Fitness -->
+        <path d="${areaPath}" fill="url(#ga-gradient-area)"/>
+
+        <!-- Avg Fitness (Sky dashed) -->
+        <path d="${avgPath}" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-dasharray="4,4"/>
+
+        <!-- Best Fitness (Emerald solid) -->
+        <path d="${bestPath}" fill="none" stroke="#10b981" stroke-width="2.5"/>
+
+        <!-- Data Point Circles and Value Labels -->
+        ${history.map(pt => {
+            const px = getX(pt.generation);
+            const py = getY(pt.bestFitness);
+            return `
+              <circle cx="${px}" cy="${py}" r="3" fill="#10b981" stroke="#064e3b" stroke-width="1.5">
+                <title>Thế hệ ${pt.generation}: Tốt nhất=${pt.bestFitness}, Trung bình=${pt.avgFitness || 0}</title>
+              </circle>
+              <text x="${px}" y="${Math.max(12, py - 5)}" fill="#a7f3d0" font-size="8" font-weight="bold" text-anchor="middle" font-family="monospace">${pt.bestFitness}</text>
+            `;
+        }).join('')}
+
+        <!-- X-axis start & end labels -->
+        <text x="${padLeft}" y="${height - 6}" fill="#64748b" font-size="9" text-anchor="start" font-family="monospace">Gen 1</text>
+        <text x="${width - padRight}" y="${height - 6}" fill="#64748b" font-size="9" text-anchor="end" font-family="monospace">Gen ${maxG}</text>
+      `;
+  }
+
+  function renderGAParetoWorkspace(data) {
+      const workspace = document.getElementById('ga-results-workspace');
+      const cardsContainer = document.getElementById('ga-pareto-cards-container');
+      const btnApply = document.getElementById('btn-ga-apply');
+      if (!workspace || !cardsContainer) return;
+
+      workspace.classList.remove('hidden');
+      gaCurrentParetoSolutions = data.paretoSolutions || [];
+
+      if (gaCurrentParetoSolutions.length === 0) {
+          cardsContainer.innerHTML = '<p class="text-xs text-neutral-400 col-span-3">Không có phương án nào được sinh ra.</p>';
+          return;
+      }
+
+      // Render 3 strategy cards with customized hero metric for clear differentiation
+      cardsContainer.innerHTML = gaCurrentParetoSolutions.map(sol => {
+          const isSelected = sol.strategy === gaActiveStrategy;
+          const borderClass = isSelected ? 'border-emerald-600 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/20' : 'border-neutral-200 bg-white hover:border-neutral-300';
+          const icon = sol.strategy === 'BALANCED' ? 'ph-scales' : (sol.strategy === 'SKILL_FOCUSED' ? 'ph-medal' : 'ph-path');
+
+          let heroScore = sol.fitnessScore;
+          let heroLabel = 'Điểm Hài Hòa (Chuẩn)';
+          let heroDesc = 'Cân đối hài hòa giữa trình độ thợ, tải trọng ca và quãng đường di chuyển.';
+          if (sol.strategy === 'SKILL_FOCUSED') {
+              heroScore = `${sol.skillScore}%`;
+              heroLabel = 'Khớp Kỹ Năng & Bậc Thợ';
+              heroDesc = 'Ưu tiên thợ bậc cao, chứng chỉ sát nhất yêu cầu an toàn kỹ thuật.';
+          } else if (sol.strategy === 'MIN_TRAVEL') {
+              heroScore = `${sol.travelScore}%`;
+              heroLabel = 'Tiết Kiệm Đi Bộ';
+              heroDesc = 'Gom cụm thiết bị gần nhau, giảm tối đa thời gian di chuyển giữa các phân xưởng.';
+          }
+
+          return `
+            <div id="pareto-card-${sol.strategy}" onclick="switchGAStrategy('${sol.strategy}')" class="p-3.5 rounded-2xl border ${borderClass} transition-all cursor-pointer flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                    <i class="ph-bold ${icon} text-emerald-600"></i> ${sol.label}
+                  </span>
+                  ${sol.strategy === 'BALANCED' ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">Khuyến nghị</span>' : ''}
+                </div>
+                <p class="text-[10px] text-neutral-500 mb-2 leading-tight">
+                  ${heroDesc}
+                </p>
+                <div class="flex items-baseline gap-2 mb-2">
+                  <span id="pareto-score-${sol.strategy}" class="text-2xl font-black text-emerald-700">${heroScore}</span>
+                  <span class="text-[10px] text-neutral-500 uppercase font-semibold">${heroLabel}</span>
+                </div>
+              </div>
+              <div class="text-[11px] text-neutral-500 pt-2 border-t border-neutral-100 space-y-1">
+                <div class="flex justify-between items-center">
+                  <span>Khớp kỹ năng:</span>
+                  <b class="${sol.strategy === 'SKILL_FOCUSED' ? 'text-emerald-700 font-extrabold' : 'text-neutral-700'}">${sol.skillScore}%</b>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>Cân bằng tải:</span>
+                  <b class="${sol.strategy === 'BALANCED' ? 'text-emerald-700 font-extrabold' : 'text-neutral-700'}">${sol.workloadScore}%</b>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>Tối ưu đường:</span>
+                  <b class="${sol.strategy === 'MIN_TRAVEL' ? 'text-emerald-700 font-extrabold' : 'text-neutral-700'}">${sol.travelScore}%</b>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span>Hoãn ca sau:</span>
+                  <b class="${sol.backlogCount > 0 ? 'text-amber-600' : 'text-neutral-600'}">${sol.backlogCount} việc</b>
+                </div>
+              </div>
+            </div>
+          `;
+      }).join('');
+
+      // Render active strategy details
+      const activeSolution = gaCurrentParetoSolutions.find(s => s.strategy === gaActiveStrategy) || gaCurrentParetoSolutions[0];
+      if (activeSolution) {
+          gaActiveScheduleData = JSON.parse(JSON.stringify(activeSolution)); // deep copy
+          renderActiveGASolutionDetails(gaActiveScheduleData);
+      }
+
+      if (btnApply) btnApply.disabled = false;
+  }
+
+  function switchGAStrategy(strategyCode) {
+      gaActiveStrategy = strategyCode;
+      renderGAParetoWorkspace(gaResultData);
+  }
+
+  function renderActiveGASolutionDetails(sol) {
+      // Update top KPIs
+      document.getElementById('kpi-skill-score').innerText = `${sol.skillScore}%`;
+      document.getElementById('kpi-workload-score').innerText = `${sol.workloadScore}%`;
+      document.getElementById('kpi-travel-score').innerText = `${sol.travelScore}%`;
+      document.getElementById('kpi-backlog-count').innerText = `${sol.backlogCount} phiếu`;
+
+      // Render Blocked Work Orders if present
+      const blockedAlert = document.getElementById('ga-blocked-wos-alert');
+      const blockedList = document.getElementById('ga-blocked-wos-list');
+      if (blockedAlert && blockedList) {
+          const blockedItems = sol.blockedWorkOrders || [];
+          if (blockedItems.length > 0) {
+              blockedAlert.classList.remove('hidden');
+              blockedList.innerHTML = blockedItems.map(b => `
+                <div class="p-2 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs text-rose-900">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold">[${b.workOrderCode || 'Phiếu'}]</span>
+                    <span>${b.workOrderTitle}</span>
+                  </div>
+                  <span class="text-[11px] text-rose-700">Chờ hoàn tất: <b>${b.blockingWorkOrderCode || 'Phiếu tiền đề'}</b></span>
+                </div>
+              `).join('');
+          } else {
+              blockedAlert.classList.add('hidden');
+          }
+      }
+
+      // Render Technician schedules with explicit, clear metric descriptions
+      const schedContainer = document.getElementById('ga-technicians-schedules');
+      if (schedContainer) {
+          const schedules = sol.schedules || [];
+          if (schedules.length === 0) {
+              schedContainer.innerHTML = '<p class="text-xs text-neutral-400">Không có thợ nào được phân công.</p>';
+          } else {
+              schedContainer.innerHTML = schedules.map(techSched => {
+                  const tasks = techSched.orderedTasks || [];
+                  const overloadBadge = techSched.overloadMinutes > 0 
+                      ? `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="Thời lượng vượt quá thời gian ca chuẩn">Quá tải ca +${techSched.overloadMinutes}p</span>`
+                      : `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Khối lượng việc nằm trong định mức ca chuẩn">Trong định mức ca</span>`;
+
+                  return `
+                    <div class="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
+                      <div class="p-3.5 bg-neutral-50/80 border-b border-neutral-100 flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shadow-sm">
+                            ${techSched.technicianName.charAt(0)}
+                          </div>
+                          <div>
+                            <h5 class="text-xs font-bold text-neutral-800 m-0">${techSched.technicianName}</h5>
+                            <span class="text-[10px] text-neutral-500">Tổng thời gian: <b>${techSched.totalMinutes} phút</b> (${(techSched.totalMinutes/60).toFixed(1)}h) • <b>${techSched.taskCount}</b> việc trong ca</span>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs flex-wrap">
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-neutral-100 text-neutral-700 text-[11px]" title="Tổng thời gian thao tác sửa chữa thực tế tại thiết bị">
+                            <i class="ph-bold ph-wrench text-emerald-600"></i> Sửa máy: <b>${techSched.repairMinutes} phút</b>
+                          </span>
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-neutral-100 text-neutral-700 text-[11px]" title="Tổng thời gian đi bộ di chuyển giữa các máy và phân xưởng">
+                            <i class="ph-bold ph-person-simple-walk text-blue-600"></i> Đi bộ: <b>${techSched.travelMinutes} phút</b>
+                          </span>
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-neutral-100 text-neutral-700 text-[11px]" title="Thời gian ghé kho vật tư để nhận linh kiện phụ tùng">
+                            <i class="ph-bold ph-package text-purple-600"></i> Lấy kho: <b>${techSched.warehouseMinutes} phút</b>
+                          </span>
+                          ${overloadBadge}
+                        </div>
+                      </div>
+                      <div class="p-3 divide-y divide-neutral-100">
+                        ${tasks.length === 0 ? '<p class="text-xs text-neutral-400 py-1">Nghỉ ca / Không được gán việc.</p>' : tasks.map((t, idx) => {
+                            let lateTag = '';
+                            if (t.isBacklogPastDue) {
+                                lateTag = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200" title="Phiếu tồn đọng từ trước ca - Được xếp lịch ưu tiên xử lý đầu ca">Tồn đọng ưu tiên</span>`;
+                            } else if (t.isLate) {
+                                lateTag = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title="Hoàn thành sau hạn chót SLA">Trễ ${t.latenessMinutes}p (Hạn: ${t.dueTime})</span>`;
+                            } else if (t.dueTime && t.dueTime !== 'N/A') {
+                                lateTag = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Hoàn thành trước hạn SLA">Kịp SLA (${t.dueTime})</span>`;
+                            } else {
+                                lateTag = `<span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-neutral-100 text-neutral-600">Không gắn SLA</span>`;
+                            }
+
+                            const partsTag = t.hasSpareParts 
+                                ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 shrink-0" title="Cần ghé kho lấy phụ tùng thay thế"><i class="ph-bold ph-package"></i> Cần phụ tùng kho</span>`
+                                : '';
+
+                            return `
+                              <div class="py-2.5 flex items-center justify-between gap-2 text-xs">
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                  <span class="w-5 h-5 rounded-full bg-neutral-100 font-bold text-[10px] text-neutral-600 flex items-center justify-center shrink-0">${idx + 1}</span>
+                                  <b class="text-neutral-800 font-mono text-[11px] shrink-0">${t.taskCode}</b>
+                                  <span class="truncate text-neutral-700 font-medium" title="${t.taskTitle}">${t.taskTitle}</span>
+                                  ${partsTag}
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                  <span class="text-[11px] font-semibold text-neutral-600 font-mono bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200" title="Khung giờ thực hiện dự kiến trong ca">
+                                    <i class="ph-bold ph-clock text-neutral-400"></i> ${t.startTime} → ${t.finishTime}
+                                  </span>
+                                  ${lateTag}
+                                </div>
+                              </div>
+                            `;
+                        }).join('')}
+                      </div>
+                    </div>
+                  `;
+              }).join('');
+          }
+      }
+
+      // Render Backlog Card
+      const backlogList = document.getElementById('ga-backlog-list');
+      const backlogBadge = document.getElementById('ga-backlog-badge');
+      if (backlogList && backlogBadge) {
+          const backlogTasks = sol.backlogTasks || [];
+          backlogBadge.innerText = `${backlogTasks.length} phiếu`;
+          if (backlogTasks.length === 0) {
+              backlogList.innerHTML = '<p class="text-xs text-neutral-400 py-1">Toàn bộ phiếu đều được phân công trong ca, không có việc tồn đọng!</p>';
+          } else {
+              backlogList.innerHTML = backlogTasks.map(bt => `
+                <div class="p-2 bg-white rounded-xl border border-amber-200 flex items-center justify-between text-xs">
+                  <div class="flex items-center gap-2">
+                    <b class="font-mono text-amber-900">${bt.code}</b>
+                    <span class="text-neutral-800 font-medium">${bt.title}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-neutral-100 text-neutral-600">${bt.priority}</span>
+                    <span class="text-[11px] text-amber-700 font-medium">${bt.estimatedMinutes} phút</span>
+                  </div>
+                </div>
+              `).join('');
+          }
+      }
+  }
+
+  function applyGASchedule() {
+      if (!gaActiveScheduleData) return;
+
+      const btnApply = document.getElementById('btn-ga-apply');
+      const statusText = document.getElementById('ga-drawer-status');
+
+      // Extract assignments
+      const assignments = [];
+      (gaActiveScheduleData.schedules || []).forEach(techSched => {
+          (techSched.orderedTasks || []).forEach(t => {
+              assignments.push({
+                  workOrderId: t.taskId,
+                  technicianId: techSched.technicianId,
+                  slotRole: 'SOLO'
+              });
+          });
+      });
+
+      if (assignments.length === 0) {
+          if (typeof showToast === 'function') {
+              showToast("Không có phiếu công việc nào để áp dụng.", "warning");
+          } else {
+              alert("Không có phiếu công việc nào để áp dụng.");
+          }
+          return;
+      }
+
+      btnApply.disabled = true;
+      btnApply.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></div> Đang lưu & áp dụng...';
+      if (statusText) statusText.innerText = 'Đang khóa dữ liệu và áp dụng phân bổ ca...';
+
+      fetch('/api/v1/work-orders/ga-auto-assign/apply/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({ assignments: assignments })
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(({ status, body }) => {
+          if (status === 409) {
+              const msg = `Xung đột: ${(body.error && body.error.message) || 'Một số phiếu hoặc thợ đã bị thay đổi bởi điều phối viên khác.'}`;
+              if (typeof showToast === 'function') showToast(msg, 'warning');
+              else alert(msg);
+              btnApply.disabled = false;
+              btnApply.innerHTML = '<i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng Lịch Ca';
+              return;
+          }
+          if (status >= 400 || !body.success) {
+              const msg = `Lỗi áp dụng: ${(body.error && body.error.message) || body.message || 'Lỗi không xác định.'}`;
+              if (typeof showToast === 'function') showToast(msg, 'error');
+              else alert(msg);
+              btnApply.disabled = false;
+              btnApply.innerHTML = '<i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng Lịch Ca';
+              return;
+          }
+
+          // Visual confirmation success state
+          btnApply.innerHTML = '<i class="ph-bold ph-check-circle"></i> Đã áp dụng thành công!';
+          btnApply.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+          btnApply.classList.add('bg-emerald-700');
+          if (statusText) statusText.innerText = `Đã phân bổ thành công ${body.data.appliedCount} việc cho ca trực!`;
+
+          const successMsg = `Đã áp dụng thành công ${body.data.appliedCount} phân bổ công việc theo giải thuật GA!`;
+          if (typeof showToast === 'function') {
+              showToast(successMsg, 'success');
+          } else {
+              alert(successMsg);
+          }
+
+          // Smoothly close drawer and reload page
+          setTimeout(() => {
+              closeGASchedulerDrawer();
+          }, 700);
+
+          setTimeout(() => {
+              window.location.reload();
+          }, 1400);
+      })
+      .catch(err => {
+          btnApply.disabled = false;
+          btnApply.innerHTML = '<i class="ph-bold ph-check"></i> Xác Nhận & Áp Dụng Lịch Ca';
+          if (typeof showToast === 'function') showToast(`Lỗi kết nối máy chủ: ${err.message}`, 'error');
+          else alert(`Lỗi kết nối máy chủ: ${err.message}`);
       });
   }
 </script>
