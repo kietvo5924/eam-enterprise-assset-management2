@@ -71,7 +71,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Tạo Work Order thành công!'),
+            content: Text('Tạo Phiếu Bảo Trì thành công!'),
             backgroundColor: AppTheme.successColor,
           ),
         );
@@ -79,7 +79,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Lỗi khi tạo Work Order'),
+            content: Text('Lỗi khi tạo Phiếu Bảo Trì'),
             backgroundColor: AppTheme.dangerColor,
           ),
         );
@@ -260,7 +260,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
     return Scaffold(
       backgroundColor: AppTheme.neutral50,
       appBar: AppBar(
-        title: const Text('Tạo Work Order', style: TextStyle(color: AppTheme.neutral900, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('Tạo Phiếu Bảo Trì', style: TextStyle(color: AppTheme.neutral900, fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.neutral900),
@@ -466,7 +466,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                   ),
                   child: _isLoading 
                     ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('TẠO WORK ORDER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.0)),
+                    : const Text('TẠO PHIẾU BẢO TRÌ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.0)),
                 ),
               ),
               const SizedBox(height: 32), // Add padding so it's not hidden by system nav bar

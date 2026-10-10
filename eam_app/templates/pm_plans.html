@@ -1,113 +1,113 @@
 {% extends "base.html" %}
 
-{% block title %}PM Plans - EAM System{% endblock %}
-{% block breadcrumb %}Workspace / Preventive Maintenance{% endblock %}
+{% block title %}Kế hoạch Bảo trì PM - EAM System{% endblock %}
+{% block breadcrumb %}Kế hoạch bảo trì phòng ngừa{% endblock %}
 
 {% block content %}
 <div class="flex-1 flex flex-col h-full overflow-hidden">
   
-  <!-- Page Header -->
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+  <!-- Page Header (Compact) -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
     <div>
-      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1">PLANNING</p>
-      <h2 class="text-[26px] leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-3">
-        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-2xl shrink-0">
+      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-0.5">KẾ HOẠCH BẢO TRÌ</p>
+      <h2 class="text-xl sm:text-2xl leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-2.5">
+        <div class="w-9 h-9 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-xl shrink-0">
           <i class="ph-fill ph-calendar-check"></i>
         </div>
-        Preventive Maintenance
+        Kế Hoạch Bảo Trì Định Kỳ
       </h2>
     </div>
-    <div class="flex flex-wrap items-center gap-2 opacity-90">
-      <div class="flex bg-white border border-neutral-200 rounded-lg p-1 shadow-sm">
-        <button onclick="switchView('calendar')" id="btn-view-calendar" class="px-3 py-1.5 rounded-md text-sm font-bold shadow-sm bg-primary-50 text-primary transition-colors">
-          Calendar
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex bg-white border border-neutral-200 rounded-lg p-0.5 shadow-xs">
+        <button onclick="switchView('calendar')" id="btn-view-calendar" class="px-3 py-1 rounded-md text-xs font-bold shadow-xs bg-primary-50 text-primary transition-colors">
+          Lịch biểu
         </button>
-        <button onclick="switchView('list')" id="btn-view-list" class="px-3 py-1.5 rounded-md text-sm font-bold text-neutral-500 hover:bg-neutral-50 transition-colors">
-          List
+        <button onclick="switchView('list')" id="btn-view-list" class="px-3 py-1 rounded-md text-xs font-bold text-neutral-500 hover:bg-neutral-50 transition-colors">
+          Danh sách sự kiện
         </button>
-        <button onclick="switchView('plans')" id="btn-view-plans" class="px-3 py-1.5 rounded-md text-sm font-bold text-neutral-500 hover:bg-neutral-50 transition-colors">
-          Plans
+        <button onclick="switchView('plans')" id="btn-view-plans" class="px-3 py-1 rounded-md text-xs font-bold text-neutral-500 hover:bg-neutral-50 transition-colors">
+          Kế hoạch PM
         </button>
       </div>
       {% if 'pm_plan:create' in user_permissions %}
-      <button onclick="openPmModal()" class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors">
-        <i class="ph-bold ph-plus"></i> Tạo kế hoạch bảo trì
+      <button onclick="openPmModal()" class="bg-primary hover:bg-primary-600 text-white rounded-lg h-8 sm:h-9 px-3.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors">
+        <i class="ph-bold ph-plus text-sm"></i> Tạo Kế Hoạch Mới
       </button>
       {% endif %}
     </div>
   </div>
 
-  <!-- KPI Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary">
+  <!-- KPI Grid (Compact) -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+    <div class="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200/90 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-2 relative z-10">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg bg-primary-50 text-primary">
           <i class="ph-fill ph-calendar-check"></i>
         </div>
       </div>
       <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total Plans</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.totalPlans }}</h3>
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Tổng kế hoạch</p>
+        <h3 class="text-2xl font-black text-neutral-900 tracking-tight">{{ kpis.totalPlans }}</h3>
       </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      <div class="absolute -bottom-6 -right-6 w-20 h-20 rounded-full border-[10px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
     
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-orange-50 text-warning">
+    <div class="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200/90 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-2 relative z-10">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg bg-orange-50 text-warning">
           <i class="ph-fill ph-clock-countdown"></i>
         </div>
       </div>
       <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Upcoming (7d)</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.upcomingIn7Days }}</h3>
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Sắp đến hạn (7 ngày)</p>
+        <h3 class="text-2xl font-black text-neutral-900 tracking-tight">{{ kpis.upcomingIn7Days }}</h3>
       </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      <div class="absolute -bottom-6 -right-6 w-20 h-20 rounded-full border-[10px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
 
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-red-50 text-danger">
+    <div class="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200/90 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-2 relative z-10">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg bg-red-50 text-danger">
           <i class="ph-fill ph-warning-circle"></i>
         </div>
       </div>
       <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Missed PMs</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.missedPms }}</h3>
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Quá hạn xử lý</p>
+        <h3 class="text-2xl font-black text-neutral-900 tracking-tight">{{ kpis.missedPms }}</h3>
       </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-red-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      <div class="absolute -bottom-6 -right-6 w-20 h-20 rounded-full border-[10px] opacity-20 border-red-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
 
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-green-50 text-success">
+    <div class="bg-white p-3.5 sm:p-4 rounded-xl border border-neutral-200/90 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex justify-between items-start mb-2 relative z-10">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg bg-green-50 text-success">
           <i class="ph-fill ph-check-circle"></i>
         </div>
       </div>
       <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Compliance Rate</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.complianceRate }}%</h3>
+        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Tỷ lệ tuân thủ</p>
+        <h3 class="text-2xl font-black text-neutral-900 tracking-tight">{{ kpis.complianceRate }}%</h3>
       </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
+      <div class="absolute -bottom-6 -right-6 w-20 h-20 rounded-full border-[10px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
   </div>
 
   <!-- Views Container -->
-  <div class="flex-1 flex flex-col bg-white border border-neutral-200 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-h-[650px] relative">
+  <div class="flex-1 flex flex-col bg-white border border-neutral-200 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] min-h-[550px] relative">
     
     <!-- View: Calendar -->
     <div id="view-calendar" class="w-full h-full flex flex-col absolute inset-0">
-      <div class="p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0 rounded-t-3xl">
-        <h3 class="font-bold text-lg text-neutral-800 m-0">Maintenance Schedule</h3>
+      <div class="p-3 sm:p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-3 bg-white shrink-0 rounded-t-2xl">
+        <h3 class="font-bold text-base text-neutral-800 m-0">Lịch Trình Bảo Trì Định Kỳ</h3>
         <div class="flex flex-wrap gap-2">
-            <input type="text" id="cal-asset-id" placeholder="Asset ID" onkeyup="if(event.key === 'Enter') refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors w-32">
-            <input type="text" id="cal-category-id" placeholder="Category ID" onkeyup="if(event.key === 'Enter') refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors w-32">
-            <select id="cal-status" onchange="refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:border-primary focus:border-primary outline-none transition-colors w-40">
-                <option value="">Filter by Status</option>
-                <option value="CREATED">Created</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="SCHEDULED">Scheduled (PM)</option>
+            <input type="text" id="cal-asset-id" placeholder="Mã thiết bị..." onkeyup="if(event.key === 'Enter') refreshEvents()" class="px-2.5 py-1 border border-neutral-200 rounded-lg text-xs bg-white hover:border-primary focus:border-primary outline-none transition-colors w-28">
+            <input type="text" id="cal-category-id" placeholder="Mã danh mục..." onkeyup="if(event.key === 'Enter') refreshEvents()" class="px-2.5 py-1 border border-neutral-200 rounded-lg text-xs bg-white hover:border-primary focus:border-primary outline-none transition-colors w-28">
+            <select id="cal-status" onchange="refreshEvents()" class="px-2.5 py-1 border border-neutral-200 rounded-lg text-xs bg-white hover:border-primary focus:border-primary outline-none transition-colors w-36">
+                <option value="">Lọc theo trạng thái</option>
+                <option value="CREATED">Đã tạo</option>
+                <option value="IN_PROGRESS">Đang xử lý</option>
+                <option value="COMPLETED">Đã hoàn tất</option>
+                <option value="SCHEDULED">Lên lịch (PM)</option>
             </select>
         </div>
       </div>
@@ -117,42 +117,42 @@
     </div>
 
     <!-- View: List -->
-    <div id="view-list" class="w-full h-full flex flex-col hidden bg-white rounded-3xl overflow-hidden absolute inset-0">
-      <div class="p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0">
-        <div class="flex items-center gap-4">
-          <h3 class="font-bold text-lg text-neutral-800 m-0" id="list-month-title">Events</h3>
+    <div id="view-list" class="w-full h-full flex flex-col hidden bg-white rounded-2xl overflow-hidden absolute inset-0">
+      <div class="p-3 sm:p-4 border-b border-neutral-200 flex flex-wrap justify-between items-center gap-3 bg-white shrink-0">
+        <div class="flex items-center gap-3">
+          <h3 class="font-bold text-base text-neutral-800 m-0" id="list-month-title">Danh Sách Sự Kiện</h3>
         </div>
         <div class="flex flex-wrap gap-2">
-            <button onclick="refreshEvents()" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-sm bg-white hover:bg-neutral-50 font-semibold"><i class="ph-bold ph-arrows-clockwise"></i> Refresh</button>
+            <button onclick="refreshEvents()" class="px-2.5 py-1 border border-neutral-200 rounded-lg text-xs bg-white hover:bg-neutral-50 font-semibold"><i class="ph-bold ph-arrows-clockwise"></i> Làm mới</button>
         </div>
       </div>
-      <div class="flex-1 overflow-auto p-4 custom-scrollbar">
-        <table class="w-full text-sm text-left custom-beautiful-table" id="eventsTable">
+      <div class="flex-1 overflow-auto p-3 sm:p-4 custom-scrollbar">
+        <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table" id="eventsTable">
           <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
             <tr>
-              <th class="px-4 py-3 font-semibold">Title</th>
-              <th class="px-4 py-3 font-semibold">Asset</th>
-              <th class="px-4 py-3 font-semibold">Target Date</th>
-              <th class="px-4 py-3 font-semibold">Type</th>
-              <th class="px-4 py-3 font-semibold">Status</th>
+              <th class="px-3.5 py-2.5 font-semibold">Tên công việc</th>
+              <th class="px-3.5 py-2.5 font-semibold">Thiết bị</th>
+              <th class="px-3.5 py-2.5 font-semibold">Ngày dự kiến</th>
+              <th class="px-3.5 py-2.5 font-semibold">Loại hình</th>
+              <th class="px-3.5 py-2.5 font-semibold">Trạng thái</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-100" id="eventsListBody">
-            <tr><td colspan="5" class="text-center py-12 text-neutral-500"><i class="ph-bold ph-spinner animate-spin text-2xl"></i> Loading events...</td></tr>
+            <tr><td colspan="5" class="text-center py-10 text-neutral-500"><i class="ph-bold ph-spinner animate-spin text-xl"></i> Đang tải sự kiện...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
     <!-- View: Plans -->
-    <div id="view-plans" class="w-full h-full flex flex-col hidden bg-white rounded-3xl overflow-hidden absolute inset-0">
-      <div class="p-4 border-b border-neutral-100 flex flex-wrap justify-between items-center gap-4 bg-white shrink-0">
+    <div id="view-plans" class="w-full h-full flex flex-col hidden bg-white rounded-2xl overflow-hidden absolute inset-0">
+      <div class="p-3 sm:p-4 border-b border-neutral-100 flex flex-wrap justify-between items-center gap-3 bg-white shrink-0">
         <div>
-          <h2 class="text-lg font-bold text-neutral-800 m-0">Preventive Maintenance Plans</h2>
-          <p class="text-sm text-neutral-500 mt-1 mb-0">Configure time-based and meter-based automated maintenance schedules.</p>
+          <h2 class="text-base font-bold text-neutral-800 m-0">Kế Hoạch Bảo Trì Phòng Ngừa (PM)</h2>
+          <p class="text-xs text-neutral-500 mt-0.5 mb-0">Thiết lập chu kỳ bảo trì tự động định kỳ theo thời gian hoặc chỉ số đo lường.</p>
         </div>
         <div class="flex items-center gap-2">
-           <input type="text" id="search-plan" onkeyup="filterPlans()" placeholder="Search plans..." class="w-[200px] px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm text-neutral-700 focus:outline-none focus:border-primary">
+           <input type="text" id="search-plan" onkeyup="filterPlans()" placeholder="Tìm kiếm kế hoạch..." class="w-48 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs text-neutral-700 focus:outline-none focus:border-primary">
         </div>
       </div>
       <div class="flex-1 overflow-x-auto custom-scrollbar">
@@ -257,8 +257,8 @@
               <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-calendar-check text-4xl text-neutral-300 mb-3"></i>
-                  <p class="text-base font-semibold text-neutral-700 m-0">No PM Plans found</p>
-                  <p class="text-sm mt-1">Create automated schedules to prevent asset breakdowns.</p>
+                  <p class="text-base font-semibold text-neutral-700 m-0">Chưa có kế hoạch PM nào</p>
+                  <p class="text-xs mt-1">Tạo lịch bảo trì định kỳ tự động để phòng ngừa sự cố hỏng hóc thiết bị.</p>
                 </div>
               </td>
             </tr>
@@ -267,8 +267,8 @@
               <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
                 <div class="flex flex-col items-center justify-center">
                   <i class="ph ph-calendar-check text-4xl text-neutral-300 mb-3"></i>
-                  <p class="text-base font-semibold text-neutral-700 m-0">No PM Plans found</p>
-                  <p class="text-sm mt-1">Try adjusting your filters or search query.</p>
+                  <p class="text-base font-semibold text-neutral-700 m-0">Không tìm thấy kế hoạch PM phù hợp</p>
+                  <p class="text-xs mt-1">Vui lòng thử điều chỉnh bộ lọc hoặc từ khóa tìm kiếm.</p>
                 </div>
               </td>
             </tr>
@@ -277,13 +277,13 @@
       </div>
 
       <!-- Pagination UI -->
-      <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
-        <div class="text-sm text-neutral-500 font-medium" id="page-info">
-          Page 1 of 1
+      <div class="p-3 sm:p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-2xl">
+        <div class="text-xs text-neutral-500 font-medium" id="page-info">
+          Trang 1 / 1
         </div>
         <div class="flex gap-2">
-          <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
-          <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+          <button id="btn-prev" onclick="changePage(-1)" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Trước</button>
+          <button id="btn-next" onclick="changePage(1)" class="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Sau</button>
         </div>
       </div>
     </div>
@@ -295,63 +295,63 @@
 <div id="pm-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closePmModal()"></div>
   <div class="absolute right-0 top-0 bottom-0 w-[550px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
+    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-white">
       <div>
-          <h3 class="font-black text-2xl text-neutral-800" id="pm-modal-title">New PM Plan</h3>
-          <p class="text-neutral-500 text-sm mt-1">Configure automated maintenance</p>
+          <h3 class="font-black text-xl text-neutral-800" id="pm-modal-title">Kế Hoạch Bảo Trì PM</h3>
+          <p class="text-neutral-500 text-xs mt-0.5">Thiết lập chu kỳ bảo trì tự động định kỳ</p>
       </div>
-      <button onclick="closePmModal()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
-        <i class="ph-bold ph-x text-lg"></i>
+      <button onclick="closePmModal()" class="w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="flex-1 overflow-y-auto p-6 bg-neutral-50/50">
-      <form id="pm-form" class="space-y-5">
+    <div class="flex-1 overflow-y-auto p-5 bg-neutral-50/50">
+      <form id="pm-form" class="space-y-4">
         <input type="hidden" id="pm-id" />
         <div id="pm-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
 
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Name <span class="text-danger">*</span></label>
-          <input type="text" id="pm-name" placeholder="Enter PM Plan name" required class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Tên kế hoạch <span class="text-danger">*</span></label>
+          <input type="text" id="pm-name" placeholder="Nhập tên kế hoạch PM" required class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all">
         </div>
         
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Description</label>
-          <textarea id="pm-desc" rows="3" placeholder="Enter description" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all"></textarea>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Mô tả chi tiết</label>
+          <textarea id="pm-desc" rows="3" placeholder="Nhập mô tả nội dung công việc" class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all"></textarea>
         </div>
         
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Trigger Type <span class="text-danger">*</span></label>
-          <select id="pm-trigger" onchange="toggleIntervalUnit()" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
-            <option value="TIME">Time-based</option>
-            <option value="USAGE">Usage-based</option>
-            <option value="METER">Meter-based</option>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Hình thức kích hoạt <span class="text-danger">*</span></label>
+          <select id="pm-trigger" onchange="toggleIntervalUnit()" class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all">
+            <option value="TIME">Theo chu kỳ thời gian (Time-based)</option>
+            <option value="USAGE">Theo mức sử dụng (Usage-based)</option>
+            <option value="METER">Theo chỉ số máy đo (Meter-based)</option>
           </select>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-3">
           <div class="col-span-2 sm:col-span-1" id="interval-value-container">
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5" id="interval-value-label">Interval Value <span class="text-danger">*</span></label>
-            <input type="number" id="pm-interval-value" min="1" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+            <label class="block text-xs font-bold text-neutral-700 mb-1" id="interval-value-label">Giá trị chu kỳ <span class="text-danger">*</span></label>
+            <input type="number" id="pm-interval-value" min="1" class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all">
           </div>
           <div class="col-span-2 sm:col-span-1" id="interval-unit-container">
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Interval Unit <span class="text-danger">*</span></label>
-            <select id="pm-interval-unit" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
-              <option value="DAYS">Days</option>
-              <option value="WEEKS">Weeks</option>
-              <option value="MONTHS">Months</option>
-              <option value="YEARS">Years</option>
+            <label class="block text-xs font-bold text-neutral-700 mb-1">Đơn vị chu kỳ <span class="text-danger">*</span></label>
+            <select id="pm-interval-unit" class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all">
+              <option value="DAYS">Ngày</option>
+              <option value="WEEKS">Tuần</option>
+              <option value="MONTHS">Tháng</option>
+              <option value="YEARS">Năm</option>
             </select>
           </div>
         </div>
         
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5" title="Number of days before the actual due date to generate the Work Order">Lead Time (Days) <span class="text-danger">*</span></label>
-          <input type="number" id="pm-lead-time" min="0" value="0" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+          <label class="block text-xs font-bold text-neutral-700 mb-1" title="Số ngày tạo phiếu trước ngày đến hạn thực tế">Tạo trước (Số ngày) <span class="text-danger">*</span></label>
+          <input type="number" id="pm-lead-time" min="0" value="0" class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all">
         </div>
         
         <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Estimated Duration (Minutes) <span class="text-danger">*</span></label>
-          <input type="number" id="pm-est-duration" min="1" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all">
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Thời lượng dự kiến (Phút) <span class="text-danger">*</span></label>
+          <input type="number" id="pm-est-duration" min="1" class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all">
         </div>
 
         <!-- Chọn Thiết bị áp dụng (Gộp chung vào Kế hoạch bảo trì) -->
@@ -404,59 +404,59 @@
           </div>
         </div>
 
-        <div class="flex flex-wrap gap-6 items-center">
+        <div class="flex flex-wrap gap-4 items-center">
           <div class="flex items-center gap-3 w-full sm:w-auto">
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="pm-is-floating" class="sr-only peer">
-              <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-              <span class="ml-3 text-sm font-bold text-neutral-700" title="Calculate next due date from actual completion">Floating Schedule</span>
+              <div class="w-8 h-4.5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary"></div>
+              <span class="ml-2.5 text-xs font-bold text-neutral-700" title="Tính ngày đến hạn tiếp theo dựa trên ngày hoàn tất thực tế">Lịch linh hoạt (Floating)</span>
             </label>
           </div>
           <div class="flex items-center gap-3 w-full sm:w-auto">
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="pm-suppress-pending" class="sr-only peer" checked>
-              <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-              <span class="ml-3 text-sm font-bold text-neutral-700" title="Skip generation if previous WO is pending">Suppress If Pending</span>
+              <div class="w-8 h-4.5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary"></div>
+              <span class="ml-2.5 text-xs font-bold text-neutral-700" title="Bỏ qua không tạo phiếu nếu phiếu bảo trì trước vẫn đang mở">Bỏ qua nếu phiếu trước chưa xong</span>
             </label>
           </div>
           <div class="flex items-center gap-3 w-full sm:w-auto">
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="pm-is-active" class="sr-only peer" checked>
-              <div class="w-9 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-              <span class="ml-3 text-sm font-bold text-neutral-700">Status</span>
+              <div class="w-8 h-4.5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-primary"></div>
+              <span class="ml-2.5 text-xs font-bold text-neutral-700">Kích hoạt kế hoạch</span>
             </label>
           </div>
         </div>
 
         <div>
-          <div class="flex justify-between items-center mt-4 mb-2">
-              <label class="block text-sm font-bold text-neutral-700 m-0">SOP Checklist</label>
+          <div class="flex justify-between items-center mt-3 mb-1.5">
+              <label class="block text-xs font-bold text-neutral-700 m-0">Quy trình kiểm tra (SOP Checklist)</label>
           </div>
-          <div id="pm-checklists-container" class="space-y-3">
+          <div id="pm-checklists-container" class="space-y-2.5">
             <!-- Dynamic checklist rows -->
           </div>
-          <button type="button" onclick="addChecklistRow()" class="mt-2 w-full py-2 border border-dashed border-primary text-primary hover:bg-primary-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
-              <i class="ph-bold ph-plus"></i> Add Checklist Item
+          <button type="button" onclick="addChecklistRow()" class="mt-2 w-full py-1.5 border border-dashed border-primary text-primary hover:bg-primary-50 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5">
+              <i class="ph-bold ph-plus"></i> Thêm mục kiểm tra
           </button>
         </div>
 
         <div>
-          <div class="flex justify-between items-center mt-4 mb-2">
-              <label class="block text-sm font-bold text-neutral-700 m-0">Estimated Materials (Spare Parts)</label>
+          <div class="flex justify-between items-center mt-3 mb-1.5">
+              <label class="block text-xs font-bold text-neutral-700 m-0">Vật tư dự trù (Phụ tùng)</label>
           </div>
-          <div id="pm-materials-container" class="space-y-3">
+          <div id="pm-materials-container" class="space-y-2.5">
             <!-- Dynamic material rows -->
           </div>
-          <button type="button" onclick="addMaterialRow()" class="mt-2 w-full py-2 border border-dashed border-primary text-primary hover:bg-primary-50 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
-              <i class="ph-bold ph-plus"></i> Add Material
+          <button type="button" onclick="addMaterialRow()" class="mt-2 w-full py-1.5 border border-dashed border-primary text-primary hover:bg-primary-50 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5">
+              <i class="ph-bold ph-plus"></i> Thêm vật tư dự trù
           </button>
         </div>
       </form>
     </div>
-    <div class="p-6 border-t border-neutral-100 flex justify-end gap-3 bg-white">
-      <button onclick="closePmModal()" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy bỏ</button>
-      <button onclick="savePm()" id="btn-save-pm" class="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2">
-        <i class="ph-bold ph-floppy-disk"></i> Save PM Plan
+    <div class="p-4 sm:p-5 border-t border-neutral-100 flex justify-end gap-2.5 bg-white">
+      <button onclick="closePmModal()" class="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-lg text-xs font-bold transition-colors">Hủy</button>
+      <button onclick="savePm()" id="btn-save-pm" class="px-5 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-bold shadow-sm shadow-primary/20 transition-all flex items-center gap-1.5">
+        <i class="ph-bold ph-floppy-disk"></i> Lưu Kế Hoạch PM
       </button>
     </div>
   </div>
@@ -466,28 +466,28 @@
 <div id="assign-drawer" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignments()"></div>
   <div class="absolute right-0 top-0 bottom-0 w-[550px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-white relative">
       <div class="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
       <div class="flex flex-col">
-          <h3 class="font-black text-2xl text-neutral-800 m-0">Asset Assignments</h3>
-          <p class="text-neutral-500 text-sm mt-1" id="assign-plan-name">Plan Name</p>
+          <h3 class="font-black text-xl text-neutral-800 m-0">Thiết Bị Áp Dụng</h3>
+          <p class="text-neutral-500 text-xs mt-0.5" id="assign-plan-name">Plan Name</p>
       </div>
-      <button onclick="closeAssignments()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
-        <i class="ph-bold ph-x text-lg"></i>
+      <button onclick="closeAssignments()" class="w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-6 bg-neutral-50 border-b border-neutral-100 space-y-3">
+    <div class="p-5 bg-neutral-50 border-b border-neutral-100 space-y-2.5">
         <div class="flex items-center justify-between">
-            <label class="block text-sm font-bold text-neutral-700 m-0">Assign New Asset</label>
+            <label class="block text-xs font-bold text-neutral-700 m-0">Gán thêm thiết bị</label>
             <div class="flex items-center gap-1.5">
                 <span class="text-xs text-neutral-400 font-medium">Mặt bằng:</span>
                 {% if user_is_restricted_floorplan %}
-                <span class="text-xs font-bold text-neutral-700 bg-neutral-100 px-2.5 py-1 rounded-lg border border-neutral-200 flex items-center gap-1 cursor-not-allowed">
+                <span class="text-xs font-bold text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded-lg border border-neutral-200 flex items-center gap-1 cursor-not-allowed">
                     <i class="ph-bold ph-lock text-neutral-400"></i> {{ user_floorplan_name }}
                 </span>
                 <input type="hidden" id="assign-asset-filter-floorplan" value="{{ user_floorplan_id }}" />
                 {% else %}
-                <select id="assign-asset-filter-floorplan" onchange="filterPmAssignAssets(this.value)" class="text-xs px-2.5 py-1 bg-white border border-neutral-200 rounded-lg font-semibold text-neutral-700 focus:outline-none focus:border-primary cursor-pointer">
+                <select id="assign-asset-filter-floorplan" onchange="filterPmAssignAssets(this.value)" class="text-xs px-2 py-0.5 bg-white border border-neutral-200 rounded-lg font-semibold text-neutral-700 focus:outline-none focus:border-primary cursor-pointer">
                     <option value="">Tất cả mặt bằng / xưởng</option>
                     {% for fp in floorplans_list %}
                     <option value="{{ fp.id }}">{{ fp.name }}</option>
@@ -497,18 +497,18 @@
             </div>
         </div>
         <div class="flex gap-2">
-            <select id="new-assign-asset" class="flex-1 px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium truncate">
+            <select id="new-assign-asset" class="flex-1 px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all font-medium truncate">
                 <option value="">-- Chọn thiết bị --</option>
                 {% for a in assets %}
                 <option value="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}" data-zone="{{ a.zone_id|default:'' }}">{{ a.name }}{% if a.zone_id %} - {{ a.zone_id }}{% endif %}</option>
                 {% endfor %}
             </select>
-            <button onclick="addAssignment()" class="px-5 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2 shrink-0">
-                <i class="ph-bold ph-plus"></i> Assign
+            <button onclick="addAssignment()" class="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-bold shadow-sm shadow-primary/20 transition-all flex items-center gap-1.5 shrink-0">
+                <i class="ph-bold ph-plus"></i> Gán
             </button>
         </div>
     </div>
-    <div class="flex-1 overflow-y-auto p-6 bg-white" id="assignments-list-container">
+    <div class="flex-1 overflow-y-auto p-5 bg-white" id="assignments-list-container">
         <!-- List of assignments injected via JS -->
     </div>
   </div>
@@ -518,16 +518,16 @@
 <div id="event-detail-drawer" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeEventDetail()"></div>
   <div class="absolute right-0 top-0 bottom-0 w-[450px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-white relative">
       <div class="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
       <div class="flex items-center gap-3">
-          <h3 class="font-black text-2xl text-neutral-800 m-0">Event Details</h3>
+          <h3 class="font-black text-xl text-neutral-800 m-0">Chi Tiết Sự Kiện Bảo Trì</h3>
       </div>
-      <button onclick="closeEventDetail()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
-        <i class="ph-bold ph-x text-lg"></i>
+      <button onclick="closeEventDetail()" class="w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="flex-1 overflow-y-auto p-6 bg-neutral-50/50" id="event-detail-content">
+    <div class="flex-1 overflow-y-auto p-5 bg-neutral-50/50" id="event-detail-content">
         <!-- content injected here -->
     </div>
   </div>

@@ -150,11 +150,11 @@
                   <i class="ph ph-buildings text-primary"></i> <span class="truncate">{{ current_tenant.name|default:"EAM System" }}</span>
                 </p>
               </div>
-              <button onclick="document.getElementById('change-password-modal').classList.remove('hidden')" class="w-full text-left block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 flex items-center gap-2"><i class="ph ph-gear"></i> Change Password</button>
+              <button onclick="document.getElementById('change-password-modal').classList.remove('hidden')" class="w-full text-left block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 flex items-center gap-2"><i class="ph ph-gear"></i> Đổi mật khẩu</button>
               <hr class="border-neutral-100 my-1">
               <form action="{% url 'portal_logout' %}" method="post" class="m-0">
                   {% csrf_token %}
-                  <button type="submit" class="w-full text-left px-4 py-2 text-sm text-danger hover:bg-red-50 flex items-center gap-2"><i class="ph ph-sign-out"></i> Logout</button>
+                  <button type="submit" class="w-full text-left px-4 py-2 text-sm text-danger hover:bg-red-50 flex items-center gap-2" title="Logout"><i class="ph ph-sign-out"></i> <span>Đăng xuất</span><span class="sr-only">Logout</span></button>
               </form>
             </div>
           </div>
@@ -167,25 +167,25 @@
         <nav id="sidebar" class="w-64 bg-white border-r border-neutral-200 flex flex-col transition-all duration-300 z-40 shrink-0 shadow-sm overflow-hidden relative">
           <div class="flex-1 overflow-y-auto overflow-x-hidden pb-4 scrollbar-hide">
             <div class="px-4 pt-4 pb-2">
-              <p class="sidebar-text text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-2 whitespace-nowrap transition-opacity duration-300 opacity-100">WORKSPACE</p>
+              <p class="sidebar-text text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-2 whitespace-nowrap transition-opacity duration-300 opacity-100">KHÔNG GIAN LÀM VIỆC</p>
             </div>
             <div class="flex flex-col gap-0.5 px-3">
               <!-- Dashboard (Everyone) -->
               <a href="{% url 'portal_dashboard' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_dashboard' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_dashboard' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-squares-four text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Dashboard</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Tổng quan</span>
               </a>
 
               <!-- Asset Registry -->
               {% if 'asset:read' in user_permissions %}
               <a href="{% url 'portal_asset_registry' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_registry' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_asset_registry' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-cube text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Registry</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Cây tài sản</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Asset Registry', 'asset:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: asset:read">
+              <div onclick="showPermissionNotice('Cây tài sản', 'asset:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: asset:read">
                 <i class="ph ph-cube text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Registry</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Cây tài sản</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -194,12 +194,12 @@
               {% if 'work_order:read' in user_permissions %}
               <a href="{% url 'portal_work_orders' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_work_orders' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_work_orders' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-clipboard-text text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Work Orders</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Phiếu bảo trì</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Work Orders', 'work_order:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: work_order:read">
+              <div onclick="showPermissionNotice('Phiếu bảo trì', 'work_order:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: work_order:read">
                 <i class="ph ph-clipboard-text text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Work Orders</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Phiếu bảo trì</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -208,12 +208,12 @@
               {% if 'workforce:read' in user_permissions or 'work_order:read' in user_permissions or 'user:read' in user_permissions %}
               <a href="{% url 'portal_workforce_tools' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_workforce_tools' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_workforce_tools' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-toolbox text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Workforce & Tools</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Nhân lực & Công cụ</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Workforce & Tools', 'workforce:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: workforce:read hoặc work_order:read">
+              <div onclick="showPermissionNotice('Nhân lực & Công cụ', 'workforce:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: workforce:read hoặc work_order:read">
                 <i class="ph ph-toolbox text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Workforce & Tools</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Nhân lực & Công cụ</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -222,12 +222,12 @@
               {% if 'pm_plan:read' in user_permissions %}
               <a href="{% url 'portal_pm_plans' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_pm_plans' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_pm_plans' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-calendar-check text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Maintenance</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Kế hoạch PM</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Maintenance (PM Plans)', 'pm_plan:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: pm_plan:read">
+              <div onclick="showPermissionNotice('Kế hoạch PM', 'pm_plan:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: pm_plan:read">
                 <i class="ph ph-calendar-check text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Maintenance</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Kế hoạch PM</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -236,12 +236,12 @@
               {% if 'reports:read' in user_permissions or is_system_admin %}
               <a href="{% url 'portal_reports' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_reports' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_reports' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-chart-line-up text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Reports</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Báo cáo</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Reports', 'reports:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: reports:read">
+              <div onclick="showPermissionNotice('Báo cáo', 'reports:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: reports:read">
                 <i class="ph ph-chart-line-up text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Reports</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Báo cáo</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -250,31 +250,31 @@
               {% if 'inventory:read' in user_permissions %}
               <a href="{% url 'portal_inventory' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_inventory' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_inventory' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-package text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Inventory</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Kho vật tư</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Inventory', 'inventory:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: inventory:read">
+              <div onclick="showPermissionNotice('Kho vật tư', 'inventory:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: inventory:read">
                 <i class="ph ph-package text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Inventory</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Kho vật tư</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
             </div>
             
             <div class="px-4 pt-6 pb-2">
-              <p class="sidebar-text text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-2 whitespace-nowrap transition-opacity duration-300 opacity-100">ADMIN</p>
+              <p class="sidebar-text text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-2 whitespace-nowrap transition-opacity duration-300 opacity-100">HỆ THỐNG & QUẢN TRỊ</p>
             </div>
             <div class="flex flex-col gap-0.5 px-3">
               <!-- Users -->
               {% if 'user:read' in user_permissions %}
               <a href="{% url 'portal_users' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_users' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_users' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-users text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Users</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Người dùng</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Users Management', 'user:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: user:read">
+              <div onclick="showPermissionNotice('Quản lý người dùng', 'user:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: user:read">
                 <i class="ph ph-users text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Users</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Người dùng</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -283,12 +283,12 @@
               {% if 'role:read' in user_permissions %}
               <a href="{% url 'portal_roles' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_roles' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_roles' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-shield-check text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Roles</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Phân quyền</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Roles Management', 'role:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: role:read">
+              <div onclick="showPermissionNotice('Quản lý phân quyền', 'role:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: role:read">
                 <i class="ph ph-shield-check text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Roles</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Phân quyền</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -297,12 +297,12 @@
               {% if 'asset_category:read' in user_permissions or 'asset:read' in user_permissions %}
               <a href="{% url 'portal_asset_categories' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_asset_categories' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_asset_categories' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-tag text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Config</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Cấu hình tài sản</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Asset Config', 'asset_category:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: asset_category:read">
+              <div onclick="showPermissionNotice('Cấu hình tài sản', 'asset_category:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: asset_category:read">
                 <i class="ph ph-tag text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Asset Config</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Cấu hình tài sản</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -311,12 +311,12 @@
               {% if 'tenant:read' in user_permissions %}
               <a href="{% url 'portal_settings' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_settings' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_settings' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-gear text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Settings</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Cài đặt</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Tenant Settings', 'tenant:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: tenant:read">
+              <div onclick="showPermissionNotice('Cài đặt đơn vị', 'tenant:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: tenant:read">
                 <i class="ph ph-gear text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Settings</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Cài đặt</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -325,12 +325,12 @@
               {% if 'audit_logs:read' in user_permissions %}
               <a href="{% url 'portal_audit_logs' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_audit_logs' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_audit_logs' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-file-text text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Audit Logs</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Nhật ký hệ thống</span>
               </a>
               {% else %}
-              <div onclick="showPermissionNotice('Audit Logs', 'audit_logs:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: audit_logs:read">
+              <div onclick="showPermissionNotice('Nhật ký hệ thống', 'audit_logs:read')" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden text-neutral-400 opacity-50 hover:bg-neutral-100/60 cursor-not-allowed select-none" title="Yêu cầu quyền: audit_logs:read">
                 <i class="ph ph-file-text text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Audit Logs</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Nhật ký hệ thống</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
               {% endif %}
@@ -339,7 +339,7 @@
               {% if user.tenant.tenant_code == 'SYSTEM' and is_system_admin %}
               <a href="{% url 'portal_tenants' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_tenants' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
                 <i class="{% if request.resolver_match.url_name == 'portal_tenants' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-buildings text-lg shrink-0"></i>
-                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Tenants (Super Admin)</span>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Đơn vị (Tenant)</span>
               </a>
               {% endif %}
             </div>
@@ -368,10 +368,10 @@
 
         <!-- Content Router -->
         <div class="flex-1 flex flex-col min-w-0 bg-neutral-50 overflow-y-auto relative">
-          <!-- Topbar (CRM-style: search + actions + notifications) -->
-          <header class="h-16 bg-white/80 backdrop-blur-md border-b border-neutral-200 flex items-center justify-between px-6 shrink-0 z-40 sticky top-0">
+          <!-- Topbar (Compact CRM-style: search + breadcrumb) -->
+          <header class="h-11 bg-white/90 backdrop-blur-md border-b border-neutral-200 flex items-center justify-between px-5 shrink-0 z-40 sticky top-0 shadow-xs">
             <div class="flex items-center text-xs text-neutral-500 font-semibold overflow-hidden whitespace-nowrap shrink">
-              <span class="hover:text-primary cursor-pointer transition-colors flex items-center gap-1"><i class="ph ph-house text-sm"></i> Workspace</span>
+              <span class="hover:text-primary cursor-pointer transition-colors flex items-center gap-1"><i class="ph ph-house text-sm"></i> Không gian</span>
               <i class="ph ph-caret-right text-[10px] mx-2 text-neutral-300"></i>
               <span class="text-neutral-900 font-bold capitalize">{% block breadcrumb %}{{ request.resolver_match.url_name|slice:"7:" }}{% endblock %}</span>
             </div>
@@ -379,13 +379,13 @@
             <div class="flex items-center gap-3 shrink-0 pl-4">
               <!-- Search -->
               <div class="relative hidden md:block">
-                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-base"></i>
-                <input type="text" placeholder="Search resources..." class="w-72 pl-9 pr-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all" />
+                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm"></i>
+                <input type="text" placeholder="Tìm kiếm tài nguyên..." class="w-64 pl-8 pr-3 py-1 bg-neutral-50 border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20 transition-all" />
               </div>
             </div>
           </header>
 
-          <div class="p-6 flex-1 flex flex-col">
+          <div class="p-4 sm:p-5 flex-1 flex flex-col">
             {% if messages %}
               {% for message in messages %}
                 <div class="mb-4 p-4 rounded-lg {% if message.tags == 'error' %}bg-red-50 text-red-600 border border-red-200{% elif message.tags == 'success' %}bg-green-50 text-green-600 border border-green-200{% else %}bg-blue-50 text-blue-600 border border-blue-200{% endif %}">
@@ -405,7 +405,7 @@
     <div id="change-password-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
         <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
-          <h3 class="text-lg font-bold text-neutral-800 m-0">Change Password</h3>
+          <h3 class="text-lg font-bold text-neutral-800 m-0">Đổi mật khẩu</h3>
           <button onclick="document.getElementById('change-password-modal').classList.add('hidden')" class="text-neutral-400 hover:text-neutral-600 transition-colors">
             <i class="ph ph-x text-xl"></i>
           </button>
@@ -414,16 +414,16 @@
           {% csrf_token %}
           <div id="pwd-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
           <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Current Password</label>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mật khẩu hiện tại</label>
             <input type="password" id="oldPassword" required class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
           </div>
           <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">New Password</label>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mật khẩu mới</label>
             <input type="password" id="newPassword" required minlength="6" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
           </div>
           <div class="pt-4 flex justify-end gap-3">
-            <button type="button" onclick="document.getElementById('change-password-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Cancel</button>
-            <button type="submit" id="btn-change-pwd" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Change Password</button>
+            <button type="button" onclick="document.getElementById('change-password-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
+            <button type="submit" id="btn-change-pwd" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Đổi mật khẩu</button>
           </div>
         </form>
       </div>
@@ -1191,7 +1191,7 @@
               const btn = document.getElementById('btn-change-pwd');
               const msg = document.getElementById('pwd-msg');
               btn.disabled = true;
-              btn.innerText = 'Saving...';
+              btn.innerText = 'Đang lưu...';
               msg.classList.add('hidden');
               
               const data = {
@@ -1211,7 +1211,7 @@
               .then(data => {
                   if(data.success) {
                       msg.className = 'mb-4 p-3 rounded-lg text-sm bg-green-50 text-green-600 border border-green-200';
-                      msg.innerText = 'Password changed successfully.';
+                      msg.innerText = 'Đổi mật khẩu thành công.';
                       msg.classList.remove('hidden');
                       cpForm.reset();
                       setTimeout(() => {
@@ -1226,12 +1226,12 @@
               })
               .catch(err => {
                   msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
-                  msg.innerText = 'An error occurred';
+                  msg.innerText = 'Có lỗi xảy ra, vui lòng thử lại.';
                   msg.classList.remove('hidden');
               })
               .finally(() => {
                   btn.disabled = false;
-                  btn.innerText = 'Change Password';
+                  btn.innerText = 'Đổi mật khẩu';
               });
           });
       }

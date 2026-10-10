@@ -1,153 +1,153 @@
 {% extends "base.html" %}
 
-{% block title %}Audit Logs - EAM System{% endblock %}
-{% block breadcrumb %}System Admin / Audit Logs{% endblock %}
+{% block title %}Nhật Ký Hoạt Động (Audit Logs) - EAM System{% endblock %}
+{% block breadcrumb %}Quản Trị Hệ Thống / Nhật Ký Hoạt Động{% endblock %}
 
 {% block content %}
-<div class="space-y-6 h-full flex flex-col relative z-0">
-  <!-- Page Header -->
-  <div class="bg-white p-6 md:p-8 rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden shrink-0 group">
-    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
+<div class="space-y-4 sm:space-y-5 h-full flex flex-col relative z-0">
+  <!-- Page Header (Compact) -->
+  <div class="bg-white p-4 sm:p-5 rounded-2xl border border-neutral-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[400px] h-[400px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
     
-    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
-      <div class="flex items-center gap-5">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.2)] border border-primary/20 transform -rotate-12 group-hover:rotate-12 group-hover:scale-110 transition duration-500">
-          <i class="ph-fill ph-file-text text-3xl drop-shadow-sm"></i>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-sm border border-primary/20 transform -rotate-6 group-hover:rotate-0 transition duration-300">
+          <i class="ph-fill ph-file-text text-2xl drop-shadow-sm"></i>
         </div>
         <div>
-          <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
-            Audit Logs
+          <h1 class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
+            Nhật Ký Hoạt Động <span class="sr-only">Audit Logs</span>
           </h1>
-          <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+          <p class="text-neutral-500 text-xs sm:text-sm font-medium mt-0.5 mb-0 flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-            Monitor system activities, operations, and data changes securely.
+            Giám sát thao tác hệ thống, bảo mật truy vết và thay đổi dữ liệu thời gian thực.
           </p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Metrics Dashboard -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6 shrink-0">
-    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-24 h-24 bg-primary-50/50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+  <!-- Metrics Dashboard (Compact) -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
+    <div class="bg-white rounded-xl p-3.5 sm:p-4 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-20 h-20 bg-primary-50/50 rounded-bl-full -mr-3 -mt-3 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-start relative z-10">
         <div>
-          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Total Loaded</p>
-          <h3 class="text-3xl font-black text-neutral-900 m-0">{{ logs|length }}</h3>
+          <p class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Tổng Số Bản Ghi</p>
+          <h3 class="text-2xl font-black text-neutral-900 m-0">{{ logs|length }}</h3>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center shadow-inner">
-          <i class="ph-fill ph-list-numbers text-xl"></i>
+        <div class="w-9 h-9 rounded-lg bg-primary-50 text-primary flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-list-numbers text-lg"></i>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-24 h-24 bg-success/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+    <div class="bg-white rounded-xl p-3.5 sm:p-4 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-20 h-20 bg-success/10 rounded-bl-full -mr-3 -mt-3 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-start relative z-10">
         <div>
-          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Creates</p>
-          <h3 class="text-3xl font-black text-success m-0">{{ creates }}</h3>
+          <p class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Tạo Mới (Create)</p>
+          <h3 class="text-2xl font-black text-success m-0">{{ creates }}</h3>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shadow-inner">
-          <i class="ph-fill ph-plus-circle text-xl"></i>
+        <div class="w-9 h-9 rounded-lg bg-success/10 text-success flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-plus-circle text-lg"></i>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-24 h-24 bg-info/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+    <div class="bg-white rounded-xl p-3.5 sm:p-4 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-20 h-20 bg-info/10 rounded-bl-full -mr-3 -mt-3 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-start relative z-10">
         <div>
-          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Updates</p>
-          <h3 class="text-3xl font-black text-info m-0">{{ updates }}</h3>
+          <p class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Cập Nhật (Update)</p>
+          <h3 class="text-2xl font-black text-info m-0">{{ updates }}</h3>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-info/10 text-info flex items-center justify-center shadow-inner">
-          <i class="ph-fill ph-pencil-circle text-xl"></i>
+        <div class="w-9 h-9 rounded-lg bg-info/10 text-info flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-pencil-circle text-lg"></i>
         </div>
       </div>
     </div>
 
-    <div class="bg-white rounded-2xl p-5 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-24 h-24 bg-danger/10 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+    <div class="bg-white rounded-xl p-3.5 sm:p-4 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-20 h-20 bg-danger/10 rounded-bl-full -mr-3 -mt-3 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-start relative z-10">
         <div>
-          <p class="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-1">Deletes</p>
-          <h3 class="text-3xl font-black text-danger m-0">{{ deletes }}</h3>
+          <p class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Xóa Bỏ (Delete)</p>
+          <h3 class="text-2xl font-black text-danger m-0">{{ deletes }}</h3>
         </div>
-        <div class="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center shadow-inner">
-          <i class="ph-fill ph-trash text-xl"></i>
+        <div class="w-9 h-9 rounded-lg bg-danger/10 text-danger flex items-center justify-center shadow-inner">
+          <i class="ph-fill ph-trash text-lg"></i>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+  <div class="bg-white rounded-2xl border border-neutral-200/60 shadow-[0_4px_25px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
     
-    <!-- Filter Bar -->
-    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md shrink-0 relative z-10 flex flex-wrap gap-3 items-center">
-      <select id="filter-action" onchange="applyFilters()" class="w-[160px] h-10 px-3 rounded-lg border border-neutral-300 bg-white text-sm focus:outline-none focus:border-primary">
-        <option value="">Filter by Action</option>
-        <option value="CREATE">CREATE</option>
-        <option value="UPDATE">UPDATE</option>
-        <option value="DELETE">DELETE</option>
+    <!-- Filter Bar (Compact) -->
+    <div class="p-3 sm:p-4 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md shrink-0 relative z-10 flex flex-wrap gap-2.5 items-center">
+      <select id="filter-action" onchange="applyFilters()" class="w-[170px] h-9 px-3 rounded-lg border border-neutral-300 bg-white text-xs font-medium focus:outline-none focus:border-primary">
+        <option value="">Tất cả thao tác</option>
+        <option value="CREATE">CREATE (Tạo mới)</option>
+        <option value="UPDATE">UPDATE (Cập nhật)</option>
+        <option value="DELETE">DELETE (Xóa bỏ)</option>
       </select>
       
-      <input type="text" id="filter-entity" onkeyup="applyFilters()" placeholder="Entity Type (e.g., User)" class="w-[200px] h-10 px-3 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:border-primary">
+      <input type="text" id="filter-entity" onkeyup="applyFilters()" placeholder="Loại đối tượng (VD: User)" class="w-[190px] h-9 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-primary">
       
-      <input type="text" id="filter-user" onkeyup="applyFilters()" placeholder="User ID" class="w-[200px] h-10 px-3 rounded-lg border border-neutral-300 text-sm focus:outline-none focus:border-primary">
-      <div class="ml-auto flex gap-3">
-        <button onclick="resetFilters()" class="h-10 px-5 rounded-lg font-semibold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-colors">Reset</button>
-        <button onclick="applyFilters()" class="h-10 px-6 rounded-lg bg-primary text-white font-bold shadow-md shadow-primary/30 hover:bg-primary-600 transition-colors">
-          Filter
+      <input type="text" id="filter-user" onkeyup="applyFilters()" placeholder="Mã người dùng (User ID)" class="w-[190px] h-9 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-primary">
+      <div class="ml-auto flex gap-2">
+        <button onclick="resetFilters()" class="h-9 px-4 rounded-lg font-semibold text-xs text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-colors">Đặt lại</button>
+        <button onclick="applyFilters()" class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-bold shadow-sm shadow-primary/30 hover:bg-primary-600 transition-colors">
+          Lọc dữ liệu
         </button>
       </div>
     </div>
 
     <!-- Data Table -->
     <div class="flex-1 flex flex-col p-2 overflow-auto relative">
-      <table class="w-full text-sm text-left whitespace-nowrap" id="auditTable">
-        <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/80 backdrop-blur-sm border-b border-neutral-200 sticky top-0 z-10">
+      <table class="w-full text-xs text-left whitespace-nowrap" id="auditTable">
+        <thead class="text-[11px] text-neutral-500 uppercase bg-neutral-50/80 backdrop-blur-sm border-b border-neutral-200 sticky top-0 z-10">
           <tr>
-            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(0)">Time <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(1)">User <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(2)">Action <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(3)">Entity <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-6 py-4 font-bold tracking-wider cursor-pointer" onclick="sortTable(4)">Entity ID <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-6 py-4 font-bold tracking-wider text-right">Action</th>
+            <th class="px-5 py-3 font-bold tracking-wider cursor-pointer" onclick="sortTable(0)">Thời gian <span class="sr-only">Time</span> <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-3 font-bold tracking-wider cursor-pointer" onclick="sortTable(1)">Người dùng <span class="sr-only">User</span> <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-3 font-bold tracking-wider cursor-pointer" onclick="sortTable(2)">Thao tác <span class="sr-only">Action</span> <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-3 font-bold tracking-wider cursor-pointer" onclick="sortTable(3)">Loại đối tượng <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-3 font-bold tracking-wider cursor-pointer" onclick="sortTable(4)">Mã đối tượng <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-5 py-3 font-bold tracking-wider text-right">Chi tiết</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100" id="auditTbody">
           {% for log in logs %}
           <tr class="hover:bg-neutral-50/80 transition-colors">
-            <td class="px-6 py-4 text-neutral-800 text-sm">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
-            <td class="px-6 py-4">
+            <td class="px-5 py-3 text-neutral-800">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+            <td class="px-5 py-3">
               <span class="font-medium text-neutral-800">{{ log.user_id }}</span>
             </td>
-            <td class="px-6 py-4">
+            <td class="px-5 py-3">
               {% if log.action_type == 'CREATE' %}
-                <span class="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold border-0">CREATE</span>
+                <span class="px-2 py-0.5 bg-green-50 text-green-600 rounded text-xs font-bold border-0">CREATE</span>
               {% elif log.action_type == 'UPDATE' %}
-                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-bold border-0">UPDATE</span>
+                <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-bold border-0">UPDATE</span>
               {% elif log.action_type == 'DELETE' %}
-                <span class="px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold border-0">DELETE</span>
+                <span class="px-2 py-0.5 bg-red-50 text-red-600 rounded text-xs font-bold border-0">DELETE</span>
               {% else %}
-                <span class="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border-0">{{ log.action_type }}</span>
+                <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded text-xs font-bold border-0">{{ log.action_type }}</span>
               {% endif %}
             </td>
-            <td class="px-6 py-4 font-semibold text-neutral-600">{{ log.entity_type }}</td>
-            <td class="px-6 py-4 text-neutral-500"><span class="text-xs text-neutral-500 font-mono bg-neutral-100 px-1.5 py-0.5 rounded">{{ log.entity_id }}</span></td>
-            <td class="px-6 py-4 text-right">
-              <button onclick="showDetails('{{ log.id }}', '{{ log.action_type }}', '{{ log.timestamp|date:"d/m/Y H:i:s" }}', '{{ log.user_id }}', '{{ log.entity_type }}', '{{ log.entity_id }}')" class="text-primary hover:text-primary-600 font-medium text-sm transition-colors">Chi tiết</button>
+            <td class="px-5 py-3 font-semibold text-neutral-600">{{ log.entity_type }}</td>
+            <td class="px-5 py-3 text-neutral-500"><span class="text-xs text-neutral-500 font-mono bg-neutral-100 px-1.5 py-0.5 rounded">{{ log.entity_id }}</span></td>
+            <td class="px-5 py-3 text-right">
+              <button onclick="showDetails('{{ log.id }}', '{{ log.action_type }}', '{{ log.timestamp|date:"d/m/Y H:i:s" }}', '{{ log.user_id }}', '{{ log.entity_type }}', '{{ log.entity_id }}')" class="text-primary hover:text-primary-600 font-medium text-xs transition-colors">Chi tiết</button>
             </td>
           </tr>
           {% empty %}
           <tr id="empty-row">
-            <td colspan="6" class="px-6 py-12 text-center text-neutral-500">
+            <td colspan="6" class="px-6 py-10 text-center text-neutral-500">
               <div class="flex flex-col items-center justify-center">
-                <i class="ph-fill ph-file-search text-4xl text-neutral-200 mb-3"></i>
-                <p class="text-base font-semibold text-neutral-700 m-0">No audit logs found</p>
+                <i class="ph-fill ph-file-search text-3xl text-neutral-300 mb-2"></i>
+                <p class="text-sm font-semibold text-neutral-600 m-0">Không tìm thấy nhật ký hoạt động nào</p>
               </div>
             </td>
           </tr>
@@ -157,13 +157,13 @@
     </div>
 
     <!-- Pagination UI -->
-    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-3xl">
-      <div class="text-sm text-neutral-500 font-medium" id="page-info">
-        Page 1 of 1
+    <div class="p-3 sm:p-4 border-t border-neutral-100 flex items-center justify-between bg-white shrink-0 rounded-b-2xl">
+      <div class="text-xs text-neutral-500 font-medium" id="page-info">
+        Trang 1 / 1
       </div>
       <div class="flex gap-2">
-        <button id="btn-prev" onclick="changePage(-1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Previous</button>
-        <button id="btn-next" onclick="changePage(1)" class="px-4 py-2 border border-neutral-200 rounded-lg text-sm font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next</button>
+        <button id="btn-prev" onclick="changePage(-1)" class="px-3.5 py-1.5 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Trước</button>
+        <button id="btn-next" onclick="changePage(1)" class="px-3.5 py-1.5 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Sau</button>
       </div>
     </div>
   </div>
@@ -297,7 +297,7 @@
     paged.forEach(row => row.style.display = '');
     
     // Update pagination UI
-    document.getElementById('page-info').innerText = `Page ${currentPage} of ${totalPages} (${filtered.length} logs)`;
+    document.getElementById('page-info').innerText = `Trang ${currentPage} / ${totalPages} (${filtered.length} bản ghi)`;
     document.getElementById('btn-prev').disabled = currentPage === 1;
     document.getElementById('btn-next').disabled = currentPage === totalPages;
     

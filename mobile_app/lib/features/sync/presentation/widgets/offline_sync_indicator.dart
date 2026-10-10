@@ -23,11 +23,11 @@ class OfflineSyncIndicator extends StatelessWidget {
 
         if (!isOnline) {
           bgColor = Colors.red.shade600;
-          text = hasPending ? 'Offline - ${pendingSyncs.length} pending' : 'Offline';
+          text = hasPending ? 'Ngoại tuyến - Đang chờ đồng bộ ${pendingSyncs.length} mục' : 'Ngoại tuyến';
           icon = Icons.wifi_off;
         } else if (hasPending) {
           bgColor = Colors.orange.shade600;
-          text = 'Syncing ${pendingSyncs.length} items...';
+          text = 'Đang đồng bộ ${pendingSyncs.length} mục...';
           icon = Icons.sync;
         } else {
           return const SizedBox.shrink();

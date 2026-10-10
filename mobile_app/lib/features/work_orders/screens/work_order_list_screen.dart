@@ -67,9 +67,9 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
     final userProvider = context.watch<UserProvider>();
     final woProvider = context.watch<WorkOrderProvider>();
     
-    final bool _canCreate = userProvider.canCreateWorkOrder;
-    final bool _isLoading = woProvider.isLoadingList;
-    final List<WorkOrder> _filteredWorkOrders = _getFilteredWorkOrders(woProvider.myWorkOrders);
+    final bool canCreate = userProvider.canCreateWorkOrder;
+    final bool isLoading = woProvider.isLoadingList;
+    final List<WorkOrder> filteredWorkOrders = _getFilteredWorkOrders(woProvider.myWorkOrders);
 
     return Scaffold(
       backgroundColor: AppTheme.neutral50,
@@ -79,7 +79,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.neutral900),
       ),
-      floatingActionButton: _canCreate
+      floatingActionButton: canCreate
           ? FloatingActionButton(
               onPressed: () async {
                 final result = await context.push('/create-work-order');
@@ -91,7 +91,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
               child: Icon(PhosphorIcons.plus(), color: Colors.white),
             )
           : null,
-      body: _isLoading  
+      body: isLoading  
         ? const Center(child: CircularProgressIndicator())
         : Column(
             children: [
@@ -160,7 +160,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
               ),
               // List
               Expanded(
-                child: _filteredWorkOrders.isEmpty
+                child: filteredWorkOrders.isEmpty
                   ? const Center(
                       child: Text('Không tìm thấy công việc phù hợp', style: TextStyle(color: AppTheme.neutral500))
                     )
@@ -172,15 +172,15 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
                         controller: _scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                        itemCount: _filteredWorkOrders.length + (woProvider.isFetchingMore ? 1 : 0),
+                        itemCount: filteredWorkOrders.length + (woProvider.isFetchingMore ? 1 : 0),
                         itemBuilder: (context, index) {
-                          if (index == _filteredWorkOrders.length) {
+                          if (index == filteredWorkOrders.length) {
                             return const Padding(
                               padding: EdgeInsets.symmetric(vertical: 16),
                               child: Center(child: CircularProgressIndicator()),
                             );
                           }
-                          final wo = _filteredWorkOrders[index];
+                          final wo = filteredWorkOrders[index];
                           final statusUI = wo.getStatusUI();
                           return _buildWOCard(
                             context: context,

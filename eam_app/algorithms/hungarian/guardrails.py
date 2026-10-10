@@ -47,13 +47,17 @@ def filter_task_dependencies(work_orders) -> Tuple[List[Any], List[Dict[str, Any
     for wo in work_orders:
         dep = getattr(wo, 'depends_on_wo', None)
         if dep and getattr(dep, 'status', 'COMPLETED') != 'COMPLETED':
+            wo_code = getattr(wo, 'source_reference', None) or f"WO-{str(wo.id)[:8].upper()}"
+            dep_code = getattr(dep, 'source_reference', None) or f"WO-{str(dep.id)[:8].upper()}"
             blocked.append({
                 "workOrderId": str(wo.id),
+                "workOrderCode": wo_code,
                 "workOrderTitle": wo.title,
+                "blockingWorkOrderCode": dep_code,
                 "prerequisiteId": str(dep.id),
                 "prerequisiteTitle": dep.title,
                 "prerequisiteStatus": dep.status,
-                "reason": f"Phụ thuộc vào phiếu '{dep.title}' đang ở trạng thái {dep.status} (chưa hoàn thành)."
+                "reason": f"Phụ thuộc vào phiếu [{dep_code}] '{dep.title}' đang ở trạng thái {dep.status} (chưa hoàn thành)."
             })
         else:
             eligible.append(wo)

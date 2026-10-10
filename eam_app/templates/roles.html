@@ -1,112 +1,112 @@
 {% extends "base.html" %}
 
-{% block title %}Roles - EAM System{% endblock %}
-{% block breadcrumb %}System Admin / Roles{% endblock %}
+{% block title %}Quản Lý Vai Trò & Phân Quyền - EAM System{% endblock %}
+{% block breadcrumb %}Vai trò & Phân quyền{% endblock %}
 
 {% block content %}
-<div class="bg-transparent h-full flex flex-col space-y-6">
-  <!-- Massive Beautiful Header -->
-  <div class="bg-white backdrop-blur-2xl p-6 md:p-8 rounded-3xl border border-neutral-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden shrink-0 group">
-    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
-    <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
+<div class="bg-transparent h-full flex flex-col space-y-4">
+  <!-- Header Banner (Compact) -->
+  <div class="bg-white backdrop-blur-2xl p-4 sm:p-5 rounded-2xl border border-neutral-200/80 shadow-xs relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
+    <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-80 h-80 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
     
-    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
-      <div class="flex items-center gap-5">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-info/10 to-info/20 flex items-center justify-center text-info shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(22,119,255,0.2)] border border-info/20 transform rotate-12 group-hover:-rotate-12 group-hover:scale-110 transition duration-500">
-          <i class="ph-fill ph-shield-check text-3xl drop-shadow-sm"></i>
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 relative z-10">
+      <div class="flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-info/10 to-info/20 flex items-center justify-center text-info shadow-xs border border-info/20 transform rotate-6 group-hover:-rotate-6 group-hover:scale-105 transition duration-500 shrink-0">
+          <i class="ph-fill ph-shield-check text-2xl drop-shadow-xs"></i>
         </div>
         <div>
-          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 tracking-tight m-0 drop-shadow-sm">
-            Role Management
+          <h2 class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 tracking-tight m-0">
+            Quản Lý Vai Trò & Phân Quyền
           </h2>
-          <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+          <p class="text-neutral-500 text-xs font-medium mt-0.5 mb-0 flex items-center gap-1.5">
             <i class="ph-fill ph-lock-key text-neutral-400"></i>
-            Define and manage security roles and permissions.
+            Định nghĩa và quản lý các vai trò bảo mật cùng quyền hạn thao tác hệ thống.
           </p>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2">
         {% if 'role:create' in user_permissions %}
-        <button onclick="openRoleModal()" class="rounded-xl h-11 px-8 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-1 transform-gpu hover:scale-105 font-bold text-white flex items-center justify-center gap-2 text-base">
-          <i class="ph-bold ph-plus text-lg"></i> Create Role
+        <button onclick="openRoleModal()" class="rounded-lg h-8 sm:h-9 px-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-xs border-0 transition font-bold text-white flex items-center justify-center gap-1.5 text-xs hover:scale-102">
+          <i class="ph-bold ph-plus text-sm"></i> Tạo Vai Trò <span class="sr-only">Create Role</span>
         </button>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- KPI Header -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 shrink-0">
+  <!-- KPI Header (Compact) -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 shrink-0">
     <!-- Total Roles -->
-    <div class="bg-gradient-to-br from-white to-neutral-50/80 rounded-2xl p-6 border border-neutral-200/80 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+    <div class="bg-gradient-to-br from-white to-neutral-50/80 rounded-xl p-3.5 sm:p-4 border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-full -mr-6 -mt-6 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-center relative z-10">
         <div>
-          <p class="text-sm font-extrabold text-neutral-400 uppercase tracking-widest mb-2">Total Roles</p>
-          <h3 class="text-4xl font-black text-neutral-900 m-0" id="kpi-total">{{ roles|length }}</h3>
+          <p class="text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider mb-1">Tổng số vai trò</p>
+          <h3 class="text-2xl font-black text-neutral-900 m-0" id="kpi-total">{{ roles|length }}</h3>
         </div>
-        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] border border-neutral-100 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-          <i class="ph-fill ph-circles-three-plus text-2xl"></i>
+        <div class="w-10 h-10 rounded-full bg-white shadow-xs border border-neutral-100 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+          <i class="ph-fill ph-circles-three-plus text-xl"></i>
         </div>
       </div>
     </div>
 
     <!-- System Roles -->
-    <div class="bg-gradient-to-br from-white to-info/5 rounded-2xl p-6 border border-info/20 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-info/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+    <div class="bg-gradient-to-br from-white to-info/5 rounded-xl p-3.5 sm:p-4 border border-info/20 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-info/10 rounded-bl-full -mr-6 -mt-6 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-center relative z-10">
         <div>
-          <p class="text-sm font-extrabold text-info/70 uppercase tracking-widest mb-2">System Roles</p>
-          <h3 class="text-4xl font-black text-info m-0" id="kpi-system">0</h3>
+          <p class="text-[10px] font-extrabold text-info/70 uppercase tracking-wider mb-1">Vai trò hệ thống</p>
+          <h3 class="text-2xl font-black text-info m-0" id="kpi-system">0</h3>
         </div>
-        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(22,119,255,0.1)] border border-info/20 flex items-center justify-center text-info group-hover:scale-110 transition-transform">
-          <i class="ph-fill ph-cpu text-2xl"></i>
+        <div class="w-10 h-10 rounded-full bg-white shadow-xs border border-info/20 flex items-center justify-center text-info group-hover:scale-105 transition-transform">
+          <i class="ph-fill ph-cpu text-xl"></i>
         </div>
       </div>
     </div>
 
     <!-- Custom Roles -->
-    <div class="bg-gradient-to-br from-white to-success/5 rounded-2xl p-6 border border-success/20 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-success/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+    <div class="bg-gradient-to-br from-white to-success/5 rounded-xl p-3.5 sm:p-4 border border-success/20 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="absolute top-0 right-0 w-24 h-24 bg-success/10 rounded-bl-full -mr-6 -mt-6 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-center relative z-10">
         <div>
-          <p class="text-sm font-extrabold text-success/70 uppercase tracking-widest mb-2">Custom Roles</p>
-          <h3 class="text-4xl font-black text-success m-0" id="kpi-custom">0</h3>
+          <p class="text-[10px] font-extrabold text-success/70 uppercase tracking-wider mb-1">Vai trò tùy chỉnh</p>
+          <h3 class="text-2xl font-black text-success m-0" id="kpi-custom">0</h3>
         </div>
-        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(82,196,26,0.1)] border border-success/20 flex items-center justify-center text-success group-hover:scale-110 transition-transform">
-          <i class="ph-fill ph-users-three text-2xl"></i>
+        <div class="w-10 h-10 rounded-full bg-white shadow-xs border border-success/20 flex items-center justify-center text-success group-hover:scale-105 transition-transform">
+          <i class="ph-fill ph-users-three text-xl"></i>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Main Table Container -->
-  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+  <div class="bg-white rounded-2xl border border-neutral-200/60 shadow-xs flex-1 flex flex-col overflow-hidden relative">
     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
     
-    <!-- Search Bar -->
-    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+    <!-- Search Bar (Compact) -->
+    <div class="p-3 sm:p-4 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 relative z-10">
       <div class="relative w-full sm:max-w-md">
-        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
-        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search roles by name or description..." class="w-full pl-11 pr-4 h-12 bg-neutral-50/50 hover:bg-white focus-within:bg-white border border-neutral-200/80 hover:border-primary rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition-all font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+        <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-base"></i>
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Tìm kiếm vai trò theo tên hoặc mô tả..." class="w-full pl-10 pr-3.5 h-9 bg-neutral-50/50 hover:bg-white focus-within:bg-white border border-neutral-200/80 hover:border-primary rounded-lg text-xs focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.15)] transition-all font-medium shadow-xs">
       </div>
       
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 h-12 rounded-xl border border-neutral-100">
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-neutral-500 bg-neutral-50/80 px-3 h-9 rounded-lg border border-neutral-100">
            <i class="ph-fill ph-shield-check text-primary"></i>
-           <span id="roles-count">{{ roles|length }} Roles Found</span>
+           <span id="roles-count">{{ roles|length }} Vai trò</span>
         </div>
       </div>
     </div>
 
-    <div class="flex-1 overflow-auto p-4 custom-scrollbar">
-      <table class="w-full text-sm text-left custom-beautiful-table" id="rolesTable">
+    <div class="flex-1 overflow-auto p-3 sm:p-4 custom-scrollbar">
+      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table" id="rolesTable">
         <thead class="text-xs text-neutral-500 bg-neutral-50/50 border-b border-neutral-200/80">
           <tr>
-            <th class="px-5 py-4 font-bold cursor-pointer" onclick="sortTable(0)">Name <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-5 py-4 font-bold cursor-pointer" onclick="sortTable(1)">Description <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-            <th class="px-5 py-4 font-bold">Permissions</th>
-            <th class="px-5 py-4 font-bold w-24">Action</th>
+            <th class="px-4 py-2.5 font-bold cursor-pointer" onclick="sortTable(0)">Tên vai trò <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-4 py-2.5 font-bold cursor-pointer" onclick="sortTable(1)">Mô tả <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+            <th class="px-4 py-2.5 font-bold">Danh sách quyền hạn</th>
+            <th class="px-4 py-2.5 font-bold w-24">Thao tác</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100" id="rolesTbody">
@@ -164,52 +164,52 @@
           <i class="ph-fill ph-shield-plus text-2xl" id="role-modal-icon"></i>
         </div>
         <div>
-          <h3 class="text-xl font-black text-neutral-900 m-0" id="role-modal-title">Create New Role</h3>
-          <p class="text-sm font-medium text-neutral-500 m-0 mt-0.5" id="role-modal-subtitle">Define a new security role.</p>
+          <h3 class="text-lg font-black text-neutral-900 m-0" id="role-modal-title">Tạo Vai Trò Mới</h3>
+          <p class="text-xs font-medium text-neutral-500 m-0 mt-0.5" id="role-modal-subtitle">Thiết lập vai trò phân quyền bảo mật mới.</p>
         </div>
       </div>
-      <button onclick="closeRoleModal()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors">
-        <i class="ph-bold ph-x text-lg"></i>
+      <button onclick="closeRoleModal()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors">
+        <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
     
-    <div class="p-6 overflow-y-auto flex-1 bg-white">
-      <form id="role-form" class="space-y-6">
+    <div class="p-5 overflow-y-auto flex-1 bg-white">
+      <form id="role-form" class="space-y-4">
         <input type="hidden" id="role-id" />
-        <div id="role-msg" class="hidden p-4 rounded-xl text-sm font-semibold"></div>
+        <div id="role-msg" class="hidden p-3 rounded-lg text-xs font-semibold"></div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Role Name <span class="text-danger">*</span></label>
-            <input type="text" id="role-name" required placeholder="e.g. Regional Manager" class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900">
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase tracking-wide mb-1.5">Tên vai trò <span class="text-danger">*</span></label>
+            <input type="text" id="role-name" required placeholder="Ví dụ: Quản lý khu vực, Kỹ thuật viên chính..." class="w-full px-4 h-10 bg-neutral-50/50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900">
           </div>
           <div>
-            <label class="block text-sm font-extrabold text-neutral-700 uppercase tracking-wide mb-2">Description</label>
-            <input type="text" id="role-desc" placeholder="Describe the purpose..." class="w-full px-5 h-14 bg-neutral-50/50 border border-neutral-300 rounded-xl text-base focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-medium text-neutral-900">
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase tracking-wide mb-1.5">Mô tả vai trò</label>
+            <input type="text" id="role-desc" placeholder="Mô tả phạm vi trách nhiệm của vai trò..." class="w-full px-4 h-10 bg-neutral-50/50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:bg-white focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.15)] transition font-medium text-neutral-900">
           </div>
         </div>
 
-        <div class="pt-6">
-          <h4 class="font-extrabold text-neutral-900 text-lg m-0 flex items-center gap-2">
-            <i class="ph-fill ph-key text-warning text-xl"></i> Permissions Assignment
+        <div class="pt-3">
+          <h4 class="font-extrabold text-neutral-900 text-base m-0 flex items-center gap-2">
+            <i class="ph-fill ph-key text-warning text-lg"></i> Phân Quyền Chi Tiết
           </h4>
-          <p class="text-neutral-500 text-sm font-medium mt-1 mb-4">Select the capabilities granted to this role.</p>
+          <p class="text-neutral-500 text-xs font-medium mt-0.5 mb-3">Chọn các quyền hạn được cấp cho vai trò này.</p>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="permissions-grid">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="permissions-grid">
             {% for p in permissions %}
             <label class="relative group cursor-pointer h-full">
               <input type="checkbox" name="permissions" value="{{ p.id }}" class="peer sr-only">
-              <div class="border border-neutral-200/80 rounded-2xl p-4 bg-white peer-checked:bg-primary-50/50 peer-checked:border-primary/40 peer-checked:shadow-primary/10 peer-checked:[&_.check-circle]:border-primary peer-checked:[&_.check-dot]:opacity-100 peer-checked:[&_.icon-box]:bg-primary/10 peer-checked:[&_.icon-box]:text-primary transition shadow-sm hover:shadow-md h-full flex flex-col group-hover:-translate-y-1 transform-gpu duration-300 relative overflow-hidden">
-                <div class="check-circle absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-neutral-300 flex items-center justify-center transition-colors bg-white">
-                  <div class="check-dot w-2.5 h-2.5 rounded-full bg-primary opacity-0 transition-opacity"></div>
+              <div class="border border-neutral-200/80 rounded-xl p-3 bg-white peer-checked:bg-primary-50/50 peer-checked:border-primary/40 peer-checked:shadow-primary/10 peer-checked:[&_.check-circle]:border-primary peer-checked:[&_.check-dot]:opacity-100 peer-checked:[&_.icon-box]:bg-primary/10 peer-checked:[&_.icon-box]:text-primary transition shadow-xs hover:shadow-sm h-full flex flex-col group-hover:-translate-y-0.5 transform-gpu duration-200 relative overflow-hidden">
+                <div class="check-circle absolute top-2 right-2 w-4 h-4 rounded-full border-2 border-neutral-300 flex items-center justify-center transition-colors bg-white">
+                  <div class="check-dot w-2 h-2 rounded-full bg-primary opacity-0 transition-opacity"></div>
                 </div>
-                <div class="flex items-center gap-2 mb-2 pr-6">
-                  <div class="icon-box w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-600 group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
-                    <i class="ph-fill ph-shield text-lg"></i>
+                <div class="flex items-center gap-2 mb-1.5 pr-5">
+                  <div class="icon-box w-7 h-7 rounded-md bg-neutral-100 flex items-center justify-center text-neutral-600 group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
+                    <i class="ph-fill ph-shield text-base"></i>
                   </div>
-                  <span class="font-bold text-neutral-800 text-sm leading-tight">{{ p.name }}</span>
+                  <span class="font-bold text-neutral-800 text-xs leading-tight">{{ p.name }}</span>
                 </div>
-                <p class="text-xs text-neutral-500 m-0 mt-auto font-medium leading-relaxed">{{ p.description }}</p>
+                <p class="text-[11px] text-neutral-500 m-0 mt-auto font-medium leading-relaxed">{{ p.description }}</p>
               </div>
             </label>
             {% endfor %}
@@ -218,9 +218,9 @@
       </form>
     </div>
     
-    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white shrink-0">
-      <button onclick="closeRoleModal()" class="px-6 h-12 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-base font-bold transition-colors">Cancel</button>
-      <button onclick="saveRole()" id="btn-save-role" class="px-8 h-12 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-xl text-base font-bold shadow-lg shadow-primary/40 transition-transform active:scale-[0.98]">Save</button>
+    <div class="p-4 sm:p-5 border-t border-neutral-100 flex justify-end gap-2.5 bg-white shrink-0">
+      <button onclick="closeRoleModal()" class="px-4 h-9 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg text-xs font-bold transition-colors">Hủy</button>
+      <button onclick="saveRole()" id="btn-save-role" class="px-5 h-9 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-lg text-xs font-bold shadow-xs shadow-primary/40 transition-transform active:scale-[0.98]">Lưu Vai Trò</button>
     </div>
   </div>
 </div>
@@ -228,36 +228,36 @@
 <!-- Reassign Modal (Delete Fallback) -->
 <div id="reassign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
   <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" onclick="closeReassignModal()"></div>
-  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="reassign-modal-content">
-    <div class="p-6 border-b border-neutral-100 flex items-center gap-3 bg-white">
-      <div class="w-12 h-12 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger">
-        <i class="ph-fill ph-warning-circle text-2xl"></i>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="reassign-modal-content">
+    <div class="p-5 border-b border-neutral-100 flex items-center gap-3 bg-white">
+      <div class="w-10 h-10 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger shrink-0">
+        <i class="ph-fill ph-warning-circle text-xl"></i>
       </div>
       <div>
-        <h3 class="text-xl font-black text-neutral-900 m-0">Role is Currently Assigned</h3>
-        <p class="text-sm font-medium text-neutral-500 m-0 mt-0.5">Please reassign users to continue.</p>
+        <h3 class="text-base font-black text-neutral-900 m-0">Vai Trò Đang Được Sử Dụng</h3>
+        <p class="text-xs font-medium text-neutral-500 m-0 mt-0.5">Vui lòng chuyển người dùng sang vai trò khác trước khi xóa.</p>
       </div>
-      <button onclick="closeReassignModal()" class="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors ml-auto">
-        <i class="ph-bold ph-x text-lg"></i>
+      <button onclick="closeReassignModal()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-danger hover:text-white transition-colors ml-auto">
+        <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-6">
-      <div class="mb-6 p-4 bg-warning/10 rounded-xl border border-warning/20 text-neutral-700 font-medium text-[15px] leading-relaxed">
-        The role <strong class="text-neutral-900" id="delete-role-name"></strong> is currently assigned to one or more users. 
-        Please select a replacement role to assign to these users before this role can be deleted safely.
+    <div class="p-5">
+      <div class="mb-4 p-3 bg-warning/10 rounded-xl border border-warning/20 text-neutral-700 font-medium text-xs leading-relaxed">
+        Vai trò <strong class="text-neutral-900" id="delete-role-name"></strong> hiện đang được gán cho một hoặc nhiều người dùng. 
+        Vui lòng chọn một vai trò thay thế để chuyển giao cho các người dùng này trước khi xóa vai trò.
       </div>
       <input type="hidden" id="delete-role-id" />
-      <label class="block font-extrabold text-neutral-700 text-sm uppercase tracking-wide mb-2">Replacement Role</label>
-      <select id="fallback-role-id" class="w-full px-5 h-14 bg-white border border-neutral-300 rounded-xl text-base focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900 appearance-none">
-        <option value="">Select replacement role...</option>
+      <label class="block font-bold text-neutral-700 text-xs uppercase tracking-wide mb-1.5">Vai Trò Thay Thế</label>
+      <select id="fallback-role-id" class="w-full px-3.5 h-10 bg-white border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(0,160,226,0.15)] transition font-semibold text-neutral-900">
+        <option value="">-- Chọn vai trò thay thế --</option>
         {% for role in roles %}
         <option value="{{ role.id }}">{{ role.name }}</option>
         {% endfor %}
       </select>
     </div>
-    <div class="p-5 border-t border-neutral-100 flex justify-end gap-3 bg-white">
-      <button onclick="closeReassignModal()" class="px-6 h-11 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-xl text-base font-bold transition-colors">Cancel</button>
-      <button onclick="confirmDeleteRole()" id="btn-confirm-delete" class="px-6 h-11 bg-danger hover:bg-red-600 text-white rounded-xl text-base font-bold shadow-lg shadow-danger/30 transition-transform active:scale-[0.98]">Reassign and Delete</button>
+    <div class="p-4 sm:p-5 border-t border-neutral-100 flex justify-end gap-2.5 bg-white">
+      <button onclick="closeReassignModal()" class="px-4 h-9 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg text-xs font-bold transition-colors">Hủy</button>
+      <button onclick="confirmDeleteRole()" id="btn-confirm-delete" class="px-4 h-9 bg-danger hover:bg-red-600 text-white rounded-lg text-xs font-bold shadow-xs shadow-danger/30 transition-transform active:scale-[0.98]">Chuyển Vai Trò & Xóa</button>
     </div>
   </div>
 </div>

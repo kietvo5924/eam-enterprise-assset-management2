@@ -1,186 +1,161 @@
 {% extends "base.html" %}
 
-{% block title %}Work Orders - EAM System{% endblock %}
-{% block breadcrumb %}Workspace / Work Orders{% endblock %}
+{% block title %}Phiếu Bảo Trì - EAM System{% endblock %}
+{% block breadcrumb %}Vận hành / Phiếu bảo trì{% endblock %}
 
 {% block content %}
 <div class="flex-1 flex flex-col h-full overflow-hidden">
   
-  <!-- Page Header -->
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-    <div>
-      <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1">OPERATIONS</p>
-      <h2 class="text-[26px] leading-tight font-black text-neutral-900 tracking-tight flex items-center gap-3">
-        <div class="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-2xl shrink-0">
-          <i class="ph-fill ph-clipboard-text"></i>
-        </div>
-        Work Orders
-      </h2>
+  <!-- Page Header (Compact & Streamlined) -->
+  <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4 shrink-0 bg-white p-4 rounded-2xl border border-neutral-200/80 shadow-xs">
+    <div class="flex items-center gap-3.5">
+      <div class="w-10 h-10 bg-primary-50 text-primary rounded-xl flex items-center justify-center text-xl shrink-0 shadow-inner">
+        <i class="ph-fill ph-clipboard-text"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-black text-neutral-900 tracking-tight m-0 flex items-center gap-2">
+          Phiếu Bảo Trì & Sửa Chữa
+          <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary-50 text-primary uppercase">Operations</span>
+        </h2>
+        <p class="text-xs text-neutral-500 font-medium m-0 mt-0.5">Quản lý, phân công và theo dõi tiến độ các yêu cầu bảo trì tài sản.</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+      <button 
+        type="button"
+        id="btn-hungarian-optimize"
+        onclick="openHungarianModal()"
+        class="flex-1 sm:flex-none bg-gradient-to-r from-indigo-600 to-primary-600 hover:from-indigo-700 hover:to-primary-700 text-white rounded-xl h-9 px-3.5 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
+        title="Phân công công việc tự động bằng giải thuật Hungary Kuhn-Munkres"
+      >
+        <i class="ph-bold ph-cpu"></i> <span>Phân công Hungary</span>
+      </button>
+      <button 
+        type="button"
+        id="btn-ga-scheduler"
+        onclick="openGASchedulerDrawer()"
+        class="flex-1 sm:flex-none bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl h-9 px-3.5 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
+        title="Lập lịch phân bổ ca làm việc đa mục tiêu (Genetic Algorithm)"
+      >
+        <i class="ph-bold ph-dna"></i> <span>Lập lịch ca (GA)</span>
+      </button>
+      {% if 'work_order:create' in user_permissions %}
+      <button 
+        onclick="openWoModal()"
+        class="flex-1 sm:flex-none bg-primary hover:bg-primary-600 text-white rounded-xl h-9 px-4 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+      >
+        <i class="ph-bold ph-plus"></i> <span>Tạo Phiếu Mới</span>
+      </button>
+      {% endif %}
     </div>
   </div>
 
-  <!-- KPI Grid -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-primary-50 text-primary">
+  <!-- KPI Grid (Compact) -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 shrink-0">
+    <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Tổng phiếu bảo trì</p>
+          <h3 class="text-2xl font-black text-neutral-900 tracking-tight m-0">{{ kpis.total|default:"0" }}</h3>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-primary-50 text-primary flex items-center justify-center text-lg shrink-0">
           <i class="ph-fill ph-clipboard-text"></i>
         </div>
       </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Total WOs</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.total|default:"0" }}</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-primary-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
     
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-orange-50 text-warning">
+    <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-warning/80 uppercase tracking-wider mb-0.5">Đang xử lý</p>
+          <h3 class="text-2xl font-black text-neutral-900 tracking-tight m-0">{{ kpis.in_progress|default:"0" }}</h3>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-orange-50 text-warning flex items-center justify-center text-lg shrink-0">
           <i class="ph-fill ph-wrench"></i>
         </div>
       </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">In Progress</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.in_progress|default:"0" }}</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-orange-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
 
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-red-50 text-danger">
+    <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-danger/80 uppercase tracking-wider mb-0.5">Quá hạn</p>
+          <h3 class="text-2xl font-black text-neutral-900 tracking-tight m-0">{{ kpis.overdue|default:"0" }}</h3>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-red-50 text-danger flex items-center justify-center text-lg shrink-0">
           <i class="ph-fill ph-warning-circle"></i>
         </div>
       </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Overdue</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.overdue|default:"0" }}</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-red-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
 
-    <div class="bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md transition relative overflow-hidden group">
-      <div class="flex justify-between items-start mb-4 relative z-10">
-        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-green-50 text-success">
+    <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-[10px] font-bold text-success/80 uppercase tracking-wider mb-0.5">Đã hoàn tất</p>
+          <h3 class="text-2xl font-black text-neutral-900 tracking-tight m-0">{{ kpis.completed|default:"0" }}</h3>
+        </div>
+        <div class="w-9 h-9 rounded-lg bg-green-50 text-success flex items-center justify-center text-lg shrink-0">
           <i class="ph-fill ph-check-circle"></i>
         </div>
       </div>
-      <div class="relative z-10">
-        <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Completed YTD</p>
-        <h3 class="text-3xl font-black text-neutral-900 tracking-tight">{{ kpis.completed|default:"0" }}</h3>
-      </div>
-      <div class="absolute -bottom-6 -right-6 w-24 h-24 rounded-full border-[12px] opacity-20 border-green-100 group-hover:scale-150 transition-transform duration-500 pointer-events-none"></div>
     </div>
   </div>
 
-  <div class="bg-transparent h-full flex flex-col space-y-6">
-    <!-- Massive Beautiful Header -->
-    <div class="bg-white p-6 md:p-8 rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden shrink-0 group">
-      <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-primary-200/40 via-primary-50/20 to-transparent blur-3xl opacity-60 pointer-events-none group-hover:scale-110 transition-transform duration-1000"></div>
-      <div class="absolute bottom-0 left-0 -ml-32 -mb-32 w-80 h-80 rounded-full bg-gradient-to-tr from-info/10 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
-      
-      <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
-        <div class="flex items-center gap-5">
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.2)] border border-primary/20 transform -rotate-12 group-hover:rotate-12 group-hover:scale-110 transition duration-500">
-            <i class="ph-fill ph-clipboard-text text-3xl drop-shadow-sm"></i>
-          </div>
-          <div>
-            <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-600 tracking-tight m-0 drop-shadow-sm">
-              Work Orders
-            </h2>
-            <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              Quản lý, phân công và theo dõi các yêu cầu bảo trì tài sản.
-            </p>
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-            <button 
-              type="button"
-              id="btn-hungarian-optimize"
-              onclick="openHungarianModal()"
-              class="bg-gradient-to-r from-indigo-600 to-primary-600 hover:from-indigo-700 hover:to-primary-700 text-white rounded-xl h-10 px-4 font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
-              title="Phân công công việc tự động bằng giải thuật Hungary Kuhn-Munkres"
-            >
-              <i class="ph-bold ph-cpu"></i> Phân công tối ưu Hungary
-            </button>
-            <button 
-              type="button"
-              id="btn-ga-scheduler"
-              onclick="openGASchedulerDrawer()"
-              class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl h-10 px-4 font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
-              title="Lập lịch phân bổ ca làm việc đa mục tiêu (Genetic Algorithm)"
-            >
-              <i class="ph-bold ph-dna"></i> Lập lịch ca (Genetic Algorithm)
-            </button>
-            {% if 'work_order:create' in user_permissions %}
-            <button 
-              onclick="openWoModal()"
-              class="bg-primary hover:bg-primary-600 text-white rounded-xl h-10 px-5 font-bold flex items-center justify-center gap-2 shadow-sm transition-colors"
-            >
-              <i class="ph-bold ph-plus"></i> Tạo Work Order
-            </button>
-            {% endif %}
-        </div>
+  <!-- Main Table Container -->
+  <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-xs flex-1 flex flex-col overflow-hidden relative min-h-0">
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
+    
+    <!-- Search Bar -->
+    <div class="p-3 sm:p-3.5 border-b border-neutral-100 bg-white/60 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 relative z-10">
+      <div class="relative w-full sm:max-w-md">
+          <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-base"></i>
+          <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Tìm kiếm phiếu bảo trì theo tiêu đề..." class="w-full pl-9 pr-4 h-9 rounded-lg border border-neutral-200 hover:border-primary focus:border-primary bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-xs font-medium outline-none">
+      </div>
+      <div class="flex items-center gap-2 text-xs font-bold text-neutral-500 bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-100">
+         <i class="ph-fill ph-clipboard-text text-primary"></i>
+         <span id="wo-count">{{ work_orders_data|length }} Phiếu bảo trì</span>
       </div>
     </div>
 
-    <!-- Main Table Container -->
-    <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
-      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
-      
-      <!-- Search Bar -->
-      <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
-        <div class="relative w-full sm:max-w-md">
-            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-lg"></i>
-            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Tìm kiếm Work Order theo tiêu đề..." class="w-full pl-10 pr-4 h-12 rounded-xl border border-neutral-200/80 hover:border-primary focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus-within:bg-white transition-all text-base font-medium">
-        </div>
-        <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100">
-           <i class="ph-fill ph-clipboard-text text-primary"></i>
-           <span id="wo-count">{{ work_orders_data|length }} Work Orders</span>
-        </div>
-      </div>
-
-      <div class="p-2 flex-1 flex flex-col overflow-x-auto">
-        <table class="w-full text-sm text-left min-w-max custom-beautiful-table" id="woTable">
-          <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
-            <tr>
-              <th class="px-3 py-3 w-10 text-center">
-                <input type="checkbox" id="selectAllWo" onchange="toggleSelectAllWo(this)" class="rounded text-primary focus:ring-primary cursor-pointer" title="Chọn tất cả phiếu CREATED">
-              </th>
-              <th class="px-4 py-3 font-semibold">Title</th>
-              <th class="px-4 py-3 font-semibold">Asset</th>
-              <th class="px-4 py-3 font-semibold relative group">
-                  <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'priority-filter')">
-                      Priority <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
-                  </div>
-                  <div id="priority-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-32" onclick="event.stopPropagation()">
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="LOW" checked onchange="filterTable()"> Low</label>
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="MEDIUM" checked onchange="filterTable()"> Medium</label>
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="HIGH" checked onchange="filterTable()"> High</label>
-                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="CRITICAL" checked onchange="filterTable()"> Critical</label>
-                  </div>
-              </th>
-              <th class="px-4 py-3 font-semibold relative group">
-                  <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'status-filter')">
-                      Status <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
-                  </div>
-                  <div id="status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-36" onclick="event.stopPropagation()">
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CREATED" checked onchange="filterTable()"> Created</label>
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ASSIGNED" checked onchange="filterTable()"> Assigned</label>
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="IN_PROGRESS" checked onchange="filterTable()"> In Progress</label>
-                      <label class="flex items-center gap-2 mb-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="COMPLETED" checked onchange="filterTable()"> Completed</label>
-                      <label class="flex items-center gap-2 text-sm font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CANCELED" checked onchange="filterTable()"> Canceled</label>
-                  </div>
-              </th>
-              <th class="px-4 py-3 font-semibold">Assignee</th>
-              <th class="px-4 py-3 font-semibold">Requested By</th>
-              <th class="px-4 py-3 font-semibold">Deadline</th>
-              <th class="px-4 py-3 font-semibold">Created At</th>
-              <th class="px-4 py-3 font-semibold text-right">Actions</th>
-            </tr>
-          </thead>
+    <div class="p-2 flex-1 flex flex-col overflow-x-auto min-h-0">
+      <table class="w-full text-sm text-left min-w-max custom-beautiful-table" id="woTable">
+        <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
+          <tr>
+            <th class="px-3 py-3 w-10 text-center">
+              <input type="checkbox" id="selectAllWo" onchange="toggleSelectAllWo(this)" class="rounded text-primary focus:ring-primary cursor-pointer" title="Chọn tất cả phiếu CREATED">
+            </th>
+            <th class="px-4 py-3 font-semibold">Tiêu đề</th>
+            <th class="px-4 py-3 font-semibold">Thiết bị / Tài sản</th>
+            <th class="px-4 py-3 font-semibold relative group">
+                <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'priority-filter')">
+                    Độ ưu tiên <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                </div>
+                <div id="priority-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-36" onclick="event.stopPropagation()">
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="LOW" checked onchange="filterTable()"> Thấp (Low)</label>
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="MEDIUM" checked onchange="filterTable()"> Trung bình</label>
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="HIGH" checked onchange="filterTable()"> Cao (High)</label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="priority-cb" value="CRITICAL" checked onchange="filterTable()"> Khẩn cấp</label>
+                </div>
+            </th>
+            <th class="px-4 py-3 font-semibold relative group">
+                <div class="flex items-center cursor-pointer select-none" onclick="toggleFilterDropdown(event, 'status-filter')">
+                    Trạng thái <i class="ph-bold ph-funnel text-[10px] ml-1 opacity-50 group-hover:opacity-100 transition-opacity"></i>
+                </div>
+                <div id="status-filter" class="hidden absolute top-full left-0 mt-1 bg-white border border-neutral-200 shadow-xl rounded-lg p-3 z-50 w-44" onclick="event.stopPropagation()">
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CREATED" checked onchange="filterTable()"> Mới tạo (Created)</label>
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ASSIGNED" checked onchange="filterTable()"> Đã giao (Assigned)</label>
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="IN_PROGRESS" checked onchange="filterTable()"> Đang xử lý</label>
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="COMPLETED" checked onchange="filterTable()"> Hoàn tất</label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CANCELED" checked onchange="filterTable()"> Đã hủy</label>
+                </div>
+            </th>
+            <th class="px-4 py-3 font-semibold">Người thực hiện</th>
+            <th class="px-4 py-3 font-semibold">Người yêu cầu</th>
+            <th class="px-4 py-3 font-semibold">Hạn chót</th>
+            <th class="px-4 py-3 font-semibold">Ngày tạo</th>
+            <th class="px-4 py-3 font-semibold text-right">Thao tác</th>
+          </tr>
+        </thead>
           <tbody class="divide-y divide-neutral-100" id="wo-tbody">
             {% for item in work_orders_data %}
             {% with wo=item.wo checklists_json=item.checklists_json follow_ups_count=item.follow_ups_count %}
@@ -775,7 +750,7 @@
 
 <!-- Hungarian Assignment Modal -->
 <div id="hungarian-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+  <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
     <!-- Modal Header -->
     <div class="p-6 bg-gradient-to-r from-neutral-900 via-neutral-800 to-indigo-950 text-white flex justify-between items-center relative overflow-hidden shrink-0">
       <div class="absolute right-0 top-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
@@ -861,16 +836,16 @@
 
         <!-- Tab 1: Proposed Assignments -->
         <div id="tab-content-pairs" class="space-y-4">
-          <div class="border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
+          <div class="border border-neutral-200 rounded-2xl overflow-x-auto shadow-sm max-h-[460px]">
+            <table class="min-w-[980px] w-full text-left text-xs border-collapse">
+              <thead class="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200 sticky top-0 z-10 shadow-sm">
                 <tr>
-                  <th class="p-3">Phiếu Công Việc</th>
-                  <th class="p-3">Ưu Tiên</th>
-                  <th class="p-3">Vai Trò</th>
-                  <th class="p-3">Kỹ Thuật Viên Chỉ Định</th>
-                  <th class="p-3 text-right">Chi Phí Z</th>
-                  <th class="p-3">Giải Trình Quyết Định</th>
+                  <th class="p-3 min-w-[200px]">Phiếu Công Việc</th>
+                  <th class="p-3 whitespace-nowrap">Ưu Tiên</th>
+                  <th class="p-3 whitespace-nowrap">Vai Trò</th>
+                  <th class="p-3 min-w-[220px]">Kỹ Thuật Viên Chỉ Định</th>
+                  <th class="p-3 text-right whitespace-nowrap min-w-[110px]" title="Điểm chi phí đánh giá độ phù hợp (điểm càng thấp càng tối ưu)">Điểm Chi Phí</th>
+                  <th class="p-3 min-w-[340px]">Giải Trình Lựa Chọn</th>
                 </tr>
               </thead>
               <tbody id="hungarian-assignments-tbody" class="divide-y divide-neutral-100"></tbody>
@@ -878,19 +853,43 @@
           </div>
 
           <!-- Unassigned & Blocked Section -->
-          <div id="hungarian-unassigned-section" class="hidden space-y-2">
-            <h5 class="text-xs font-bold text-neutral-500 uppercase tracking-wider">Phiếu Chưa Thể Phân Công Đợt Này</h5>
-            <div id="hungarian-unassigned-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
+          <div id="hungarian-unassigned-section" class="hidden space-y-3">
+            <h5 class="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Phiếu Chưa Thể Phân Công Đợt Này</h5>
+            <div id="hungarian-unassigned-list" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs"></div>
           </div>
         </div>
 
         <!-- Tab 2: Full 2D Cost Matrix Table -->
         <div id="tab-content-matrix" class="hidden space-y-4">
-          <p class="text-xs text-neutral-500">Bảng thể hiện tổng chi phí giữa từng Kỹ thuật viên theo hàng và từng Phiếu công việc theo cột. Ô được tô <strong class="text-indigo-600 font-semibold">xanh lam viền đậm</strong> là nghiệm tối ưu Kuhn-Munkres được chọn. Ô đỏ hiển thị vi phạm an toàn Big-M.</p>
+          <div class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 text-xs text-indigo-950 space-y-2">
+            <div class="font-bold flex items-center gap-2 text-indigo-900">
+              <i class="ph-bold ph-info text-base text-indigo-600"></i>
+              <span>Hướng Dẫn Đọc Ma Trận Đánh Giá Tối Ưu:</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-[11px]">
+              <div class="flex items-center gap-2 bg-white/90 p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                <span class="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0"></span>
+                <span><b>★ Ô xanh lam:</b> Phương án tối ưu nhất được thuật toán chọn gán cho thợ.</span>
+              </div>
+              <div class="flex items-center gap-2 bg-white/90 p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
+                <span><b>⛔ Không đạt:</b> Thợ không đủ điều kiện (thiếu kỹ năng hoặc chứng chỉ an toàn).</span>
+              </div>
+              <div class="flex items-center gap-2 bg-white/90 p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0"></span>
+                <span><b>🔒 Chờ tiền đề:</b> Phiếu tạm khóa do cần chờ công việc tiền đề hoàn thành.</span>
+              </div>
+              <div class="flex items-center gap-2 bg-white/90 p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                <span class="w-2.5 h-2.5 rounded-full bg-neutral-400 shrink-0"></span>
+                <span><b>Điểm số:</b> Điểm chi phí (<b>càng thấp càng tốt</b> = thợ càng gần, đúng tay nghề).</span>
+              </div>
+            </div>
+          </div>
+
           <div class="border border-neutral-200 rounded-2xl overflow-x-auto shadow-sm max-h-[380px]">
-            <table class="w-full text-center text-xs border-collapse" id="hungarian-matrix-table">
-              <thead id="hungarian-matrix-thead" class="sticky top-0 bg-neutral-100 z-10 border-b border-neutral-200"></thead>
-              <tbody id="hungarian-matrix-tbody" class="divide-y divide-neutral-100"></tbody>
+            <table class="w-full text-center text-xs border-separate border-spacing-0" id="hungarian-matrix-table">
+              <thead id="hungarian-matrix-thead" class="sticky top-0 bg-neutral-100 z-20"></thead>
+              <tbody id="hungarian-matrix-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -2209,6 +2208,7 @@
   // ==========================================
   function checkAlgorithmReadiness(algorithm, workOrderIds = [], floorplanId = null) {
       const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      const cleanFloorplanId = (floorplanId && typeof floorplanId === 'string' && floorplanId.trim() !== '') ? floorplanId.trim() : (floorplanId || null);
       return fetch('/api/v1/work-orders/algorithm-readiness/', {
           method: 'POST',
           headers: {
@@ -2218,7 +2218,7 @@
           body: JSON.stringify({
               algorithm: algorithm,
               workOrderIds: workOrderIds,
-              floorplanId: floorplanId
+              floorplanId: cleanFloorplanId
           })
       })
       .then(res => res.json())
@@ -2456,30 +2456,10 @@
                       : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">SOLO</span>');
 
               const costDisplay = item.isSafetyViolation 
-                  ? '<span class="px-2 py-0.5 rounded bg-red-100 text-red-700 font-black text-[11px] animate-pulse">BIG-M Vi phạm</span>'
-                  : `<span class="font-black text-indigo-700 text-sm">${Number(item.cost).toFixed(2)}</span>`;
+                  ? '<span class="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 font-bold text-[11px]">⛔ Không đạt</span>'
+                  : `<span class="font-black text-indigo-700 text-sm">${Number(item.cost).toFixed(1)}</span>`;
 
-              const breakdown = item.breakdown || {};
-              const distVal = breakdown.distanceScore !== undefined ? breakdown.distanceScore : (breakdown.distance_cost !== undefined ? breakdown.distance_cost : 0);
-              const skillVal = breakdown.skillScore !== undefined ? breakdown.skillScore : (breakdown.skill_cost !== undefined ? breakdown.skill_cost : 0);
-              const workloadVal = breakdown.workloadScore !== undefined ? breakdown.workloadScore : (breakdown.workload_cost !== undefined ? breakdown.workload_cost : 0);
-              const multVal = breakdown.priorityMultiplier !== undefined ? breakdown.priorityMultiplier : (breakdown.priority_multiplier !== undefined ? breakdown.priority_multiplier : 1.0);
-              const zoneVal = breakdown.zonePenalty !== undefined ? breakdown.zonePenalty : (breakdown.zone_penalty !== undefined ? breakdown.zone_penalty : 0);
-              const shiftVal = breakdown.shiftPenalty !== undefined ? breakdown.shiftPenalty : (breakdown.shift_penalty !== undefined ? breakdown.shift_penalty : 0);
-
-              const breakdownTooltip = `
-                  <div class="space-y-1 text-[11px]">
-                      <div class="font-semibold text-neutral-800">${item.explanation || 'Chi phí phân công tối ưu'}</div>
-                      <div class="grid grid-cols-2 gap-x-2 text-neutral-500 pt-1 border-t border-neutral-100">
-                          <span>Khoảng cách: <b>${Number(distVal).toFixed(2)}</b></span>
-                          <span>Độ lệch kỹ năng: <b>${Number(skillVal).toFixed(2)}</b></span>
-                          <span>Tải trọng tích lũy: <b>${Number(workloadVal).toFixed(2)}</b></span>
-                          <span>Hệ số ưu tiên: <b>${multVal}x</b></span>
-                          <span>Phạt khu vực: <b>+${zoneVal}</b></span>
-                          <span>Phạt giao ca: <b>+${shiftVal}</b></span>
-                      </div>
-                  </div>
-              `;
+              const explanationHtml = renderHumanExplanation(item);
 
               const techOptions = (data.availableTechnicians && data.availableTechnicians.length > 0)
                   ? data.availableTechnicians.map(t => `<option value="${t.id}" ${t.id === item.technicianId ? 'selected' : ''}>${t.name} (Bậc ${t.skillLevel || 1})</option>`).join('')
@@ -2487,15 +2467,15 @@
 
               tbody.innerHTML += `
                   <tr class="hover:bg-neutral-50/80 transition-colors">
-                      <td class="p-3">
+                      <td class="p-3 min-w-[200px]">
                           <div class="font-bold text-neutral-900">${item.workOrderCode || ''}</div>
                           <div class="text-neutral-500 truncate max-w-xs" title="${item.workOrderTitle}">${item.workOrderTitle}</div>
                       </td>
-                      <td class="p-3">
+                      <td class="p-3 whitespace-nowrap">
                           <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${priorityClass}">${item.priority}</span>
                       </td>
-                      <td class="p-3">${roleBadge}</td>
-                      <td class="p-3">
+                      <td class="p-3 whitespace-nowrap">${roleBadge}</td>
+                      <td class="p-3 min-w-[220px]">
                           <div class="flex items-center gap-2">
                               <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0" id="tech-avatar-${idx}">
                                   ${item.technicianName.charAt(0)}
@@ -2506,11 +2486,9 @@
                               <span id="override-badge-${idx}" class="hidden px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">Đã đổi</span>
                           </div>
                       </td>
-                      <td class="p-3 text-right">${costDisplay}</td>
-                      <td class="p-3">
-                          <div class="bg-neutral-50 border border-neutral-200/80 p-2 rounded-xl text-neutral-700">
-                              ${breakdownTooltip}
-                          </div>
+                      <td class="p-3 text-right whitespace-nowrap">${costDisplay}</td>
+                      <td class="p-3 min-w-[340px]">
+                          ${explanationHtml}
                       </td>
                   </tr>
               `;
@@ -2527,23 +2505,36 @@
           unassignedList.innerHTML = '';
           (data.unassignedSlots || []).forEach(slot => {
               unassignedList.innerHTML += `
-                  <div class="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 flex items-center justify-between">
-                      <div class="truncate mr-2">
-                          <span class="font-bold text-amber-900">${slot.title}</span>
-                          <span class="text-amber-600 text-[10px] block">Tồn đọng: Chưa đủ kỹ thuật viên trực khả dụng</span>
+                  <div class="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 flex items-start justify-between gap-3">
+                      <div>
+                          <div class="font-bold text-amber-900 text-xs">${slot.title}</div>
+                          <div class="text-amber-700 text-[11px] mt-1 leading-relaxed">
+                            ⚠️ <b>Chưa đủ nhân sự:</b> Các kỹ thuật viên đạt chuẩn đều đã kín lịch hoặc đã được gán các phiếu có độ ưu tiên cao hơn.
+                          </div>
                       </div>
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 shrink-0">Hàng đợi</span>
+                      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">Đang chờ ca</span>
                   </div>
               `;
           });
           (data.blockedWorkOrders || []).forEach(b => {
               unassignedList.innerHTML += `
-                  <div class="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/80 flex items-center justify-between">
-                      <div class="truncate mr-2">
-                          <span class="font-bold text-rose-900">${b.workOrderTitle}</span>
-                          <span class="text-rose-600 text-[10px] block">Khóa tiền đề: Phụ thuộc vào [${b.blockingWorkOrderCode || 'Phiếu'}] ${b.blockingWorkOrderTitle}</span>
+                  <div class="p-3.5 rounded-2xl bg-rose-50/80 border border-rose-200 space-y-2">
+                      <div class="flex items-center justify-between gap-2">
+                          <div class="font-bold text-rose-900 text-xs flex items-center gap-1.5">
+                              <i class="ph-fill ph-lock-key text-rose-600 text-sm"></i>
+                              <span>[${b.workOrderCode || 'Phiếu'}] ${b.workOrderTitle}</span>
+                          </div>
+                          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-200/70 text-rose-800 border border-rose-300 shrink-0">Bị khóa tiền đề</span>
                       </div>
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 shrink-0">Bị khóa</span>
+                      <div class="text-[11px] text-rose-800 bg-white/80 p-2.5 rounded-xl border border-rose-100/80 leading-relaxed space-y-1">
+                          <div>
+                            ⚠️ <b>Tại sao phiếu này bị khóa?</b> Công việc này bắt buộc phải chờ phiếu tiền đề 
+                            <b class="text-rose-900 underline">[${b.blockingWorkOrderCode || 'Phiếu'}] ${b.blockingWorkOrderTitle}</b> hoàn thành trước mới được phép thi công.
+                          </div>
+                          <div class="text-neutral-500 text-[10px] pt-1 border-t border-rose-100">
+                            💡 <b>Cách xử lý:</b> Khi kỹ thuật viên hoàn tất phiếu tiền đề, hệ thống sẽ tự động mở khóa phiếu này để phân công làm tiếp.
+                          </div>
+                      </div>
                   </div>
               `;
           });
@@ -2553,6 +2544,83 @@
 
       // 5. 2D Cost Matrix Table
       renderCostMatrixTable(data);
+  }
+
+  function renderHumanExplanation(item) {
+      if (item.isSafetyViolation) {
+          const breakdown = item.breakdown || {};
+          let rawReason = breakdown.violationReason || item.explanation || 'Không đáp ứng điều kiện an toàn';
+          rawReason = rawReason.replace(/^VI PHẠM RÀNG BUỘC CỨNG Big-M:\s*/i, '').replace(/\.$/, '').trim();
+          const reasonItems = rawReason.split(';').map(s => s.trim()).filter(Boolean);
+
+          const listHtml = reasonItems.map(r => `
+              <div class="flex items-start gap-1.5 text-rose-700">
+                  <span class="text-rose-500 font-bold">•</span>
+                  <span>${r}</span>
+              </div>
+          `).join('');
+
+          return `
+              <div class="p-2.5 rounded-xl bg-rose-50/90 border border-rose-200 space-y-1">
+                  <div class="font-bold text-rose-800 text-xs flex items-center gap-1.5">
+                      <i class="ph-fill ph-warning-octagon text-rose-600 text-sm"></i>
+                      <span>Không đủ điều kiện giao việc</span>
+                  </div>
+                  <div class="space-y-0.5 pt-0.5 text-[11px]">
+                      ${listHtml}
+                  </div>
+              </div>
+          `;
+      }
+
+      // Normal optimal assignment
+      const b = item.breakdown || {};
+      const tags = [];
+
+      // 1. Chuyên môn & bậc thợ
+      const skillScore = b.skillScore !== undefined ? b.skillScore : (b.skill_cost !== undefined ? b.skill_cost : 0);
+      if (skillScore === 0) {
+          tags.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold"><i class="ph-bold ph-check"></i> Đúng bậc thợ</span>');
+      } else if (skillScore < 10) {
+          tags.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-medium"><i class="ph-bold ph-trend-up"></i> Bậc thợ cao hơn</span>');
+      } else {
+          tags.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium"><i class="ph-bold ph-info"></i> Lệch bậc thợ</span>');
+      }
+
+      // 2. Vị trí & Khoảng cách
+      const zonePen = b.zonePenalty !== undefined ? b.zonePenalty : (b.zone_penalty !== undefined ? b.zone_penalty : 0);
+      const dist = b.distanceScore !== undefined ? b.distanceScore : (b.distance_cost !== undefined ? b.distance_cost : 0);
+      if (zonePen === 0) {
+          tags.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold"><i class="ph-bold ph-map-pin"></i> Cùng phân xưởng</span>');
+      } else {
+          tags.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium"><i class="ph-bold ph-navigation-arrow"></i> Khác khu vực (~${Number(dist).toFixed(1)}km)</span>`);
+      }
+
+      // 3. Mức ưu tiên
+      const mult = b.priorityMultiplier !== undefined ? b.priorityMultiplier : 1.0;
+      if (mult > 1.2 || item.priority === 'CRITICAL' || item.priority === 'HIGH') {
+          tags.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-semibold"><i class="ph-bold ph-lightning"></i> Ưu tiên xử lý sớm</span>');
+      }
+
+      // 4. Lưu ý ca trực
+      const shiftPen = b.shiftPenalty !== undefined ? b.shiftPenalty : 0;
+      if (shiftPen > 0 && shiftPen < 1000) {
+          tags.push('<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium"><i class="ph-bold ph-clock"></i> Cần chú ý giờ giao ca</span>');
+      }
+
+      return `
+          <div class="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 space-y-1.5">
+              <div class="font-bold text-neutral-800 text-xs flex items-center justify-between">
+                  <span class="flex items-center gap-1.5 text-emerald-700">
+                      <i class="ph-bold ph-check-circle text-emerald-600 text-sm"></i> Phù hợp phân công
+                  </span>
+                  <span class="text-[10px] text-neutral-400 font-medium">Độ lệch chi phí: <b>${Number(item.cost).toFixed(1)}</b></span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 text-[11px]">
+                  ${tags.join('')}
+              </div>
+          </div>
+      `;
   }
 
   function renderCostMatrixTable(data) {
@@ -2571,43 +2639,53 @@
       }
 
       // Build Thead
-      let headHtml = '<tr><th class="p-2.5 bg-neutral-200 text-neutral-700 font-bold text-xs sticky left-0 z-20">Kỹ Thuật Viên</th>';
-      woNames.forEach(name => {
-          headHtml += `<th class="p-2.5 text-neutral-700 font-bold text-xs whitespace-nowrap px-4 border-l border-neutral-200">${name}</th>`;
+      let headHtml = '<tr><th class="p-2.5 bg-neutral-200 text-neutral-800 font-bold text-xs sticky left-0 z-30 border-b border-r border-neutral-300 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.15)] whitespace-nowrap">Kỹ Thuật Viên</th>';
+      woNames.forEach((name, idx) => {
+          const isBlockedCol = idx >= (matrix[0] ? matrix[0].length : 9999);
+          const thClass = isBlockedCol 
+              ? 'p-2.5 bg-rose-50/90 text-rose-800 font-bold text-xs whitespace-nowrap px-4 border-b border-r border-rose-200' 
+              : 'p-2.5 bg-neutral-100 text-neutral-700 font-bold text-xs whitespace-nowrap px-4 border-b border-r border-neutral-200';
+          headHtml += `<th class="${thClass}" title="${name}">${name}</th>`;
       });
       headHtml += '</tr>';
       thead.innerHTML = headHtml;
 
-      // Identify optimal pairs for highlighting
-      const assignedTechNames = new Set((data.assignments || []).map(a => a.technicianName));
-
       // Build Tbody
       matrix.forEach((row, rIdx) => {
           const tName = techNames[rIdx] || `Tech ${rIdx + 1}`;
-          let rowHtml = `<tr class="hover:bg-neutral-50"><td class="p-2.5 text-left font-bold text-neutral-800 bg-neutral-100 sticky left-0 z-10 whitespace-nowrap border-r border-neutral-200">${tName}</td>`;
+          let rowHtml = `<tr class="hover:bg-neutral-50/80">
+              <td class="p-2.5 text-left font-bold text-neutral-800 bg-neutral-100 sticky left-0 z-10 whitespace-nowrap border-b border-r border-neutral-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">${tName}</td>`;
 
-          row.forEach((cost, cIdx) => {
-              const isAssigned = (data.assignments || []).some(a => 
-                  a.technicianName === tName && 
-                  woNames[cIdx] && 
-                  (woNames[cIdx].includes(a.workOrderCode) || woNames[cIdx].includes(a.workOrderTitle))
-              );
+          woNames.forEach((woName, cIdx) => {
+              if (cIdx < row.length) {
+                  const cost = row[cIdx];
+                  const isAssigned = (data.assignments || []).some(a => 
+                      a.technicianName === tName && 
+                      woName && 
+                      (woName.includes(a.workOrderCode) || woName.includes(a.workOrderTitle))
+                  );
 
-              let cellClass = 'p-2.5 text-center border-b border-l border-neutral-100 font-medium ';
-              let cellContent = '';
+                  let cellClass = 'p-2.5 text-center border-b border-r border-neutral-100 font-medium whitespace-nowrap ';
+                  let cellContent = '';
 
-              if (cost >= 5000000) {
-                  cellClass += 'bg-red-50 text-red-600 font-bold';
-                  cellContent = 'BIG-M';
-              } else if (isAssigned) {
-                  cellClass += 'bg-indigo-100 text-indigo-900 font-black border-2 border-indigo-500 shadow-sm';
-                  cellContent = `★ ${Number(cost).toFixed(2)}`;
+                  if (cost >= 5000000) {
+                      cellClass += 'bg-red-50 text-red-600 font-bold';
+                      cellContent = '<span class="text-rose-600 text-[11px] font-bold" title="Không đủ điều kiện: Thiếu kỹ năng chuyên môn hoặc chứng chỉ an toàn">⛔ Không đạt</span>';
+                  } else if (isAssigned) {
+                      cellClass += 'bg-indigo-50 text-indigo-900 font-black ring-2 ring-inset ring-indigo-600 shadow-sm';
+                      cellContent = `★ ${Number(cost).toFixed(1)}`;
+                  } else {
+                      cellClass += 'text-neutral-600 bg-white';
+                      cellContent = Number(cost).toFixed(1);
+                  }
+
+                  rowHtml += `<td class="${cellClass}" title="Điểm chi phí: ${cost}">${cellContent}</td>`;
               } else {
-                  cellClass += 'text-neutral-600';
-                  cellContent = Number(cost).toFixed(2);
+                  // Blocked work order column
+                  rowHtml += `<td class="p-2.5 text-center border-b border-r border-neutral-100 bg-neutral-50/70 text-neutral-400 whitespace-nowrap" title="Chưa thể giao việc vì đang chờ hoàn thành phiếu tiền đề trước">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">🔒 Chờ tiền đề</span>
+                  </td>`;
               }
-
-              rowHtml += `<td class="${cellClass}" title="Chi phí C[${rIdx}][${cIdx}] = ${cost}">${cellContent}</td>`;
           });
 
           rowHtml += '</tr>';
@@ -2774,7 +2852,7 @@
       const resultsWorkspace = document.getElementById('ga-results-workspace');
       const btnApply = document.getElementById('btn-ga-apply');
 
-      const floorplanId = fpSelect ? fpSelect.value : null;
+      const floorplanId = (fpSelect && fpSelect.value && fpSelect.value.trim() !== '') ? fpSelect.value.trim() : null;
       const maxGen = maxGenInput ? parseInt(maxGenInput.value) || 50 : 50;
       const popSize = popSizeInput ? parseInt(popSizeInput.value) || 50 : 50;
 

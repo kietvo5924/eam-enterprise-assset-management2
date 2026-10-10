@@ -1,45 +1,45 @@
 {% extends "base.html" %}
 
-{% block title %}Workforce & Tools - EAM System{% endblock %}
-{% block breadcrumb %}Workspace / Workforce & Tools{% endblock %}
+{% block title %}Nhân Lực & Thiết Bị Đo Kiểm - EAM System{% endblock %}
+{% block breadcrumb %}Nhân lực & Công cụ đo kiểm{% endblock %}
 
 {% block content %}
-<div class="bg-transparent h-full flex flex-col space-y-6">
+<div class="bg-transparent h-full flex flex-col space-y-4">
 
-  <!-- Header Banner -->
-  <div class="bg-white backdrop-blur-2xl p-6 md:p-8 rounded-3xl border border-neutral-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden shrink-0 group">
-    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
-    <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
+  <!-- Header Banner (Compact) -->
+  <div class="bg-white backdrop-blur-2xl p-4 sm:p-5 rounded-2xl border border-neutral-200/80 shadow-xs relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
+    <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-80 h-80 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
 
-    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
-      <div class="flex items-center gap-5">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500/10 to-primary-600/20 flex items-center justify-center text-primary shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(0,160,226,0.25)] border border-primary-200 transform rotate-6 group-hover:-rotate-6 group-hover:scale-110 transition duration-500">
-          <i class="ph-fill ph-toolbox text-3xl drop-shadow-sm"></i>
+    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 relative z-10">
+      <div class="flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500/10 to-primary-600/20 flex items-center justify-center text-primary shadow-xs border border-primary-200 transform rotate-3 group-hover:-rotate-3 group-hover:scale-105 transition duration-500 shrink-0">
+          <i class="ph-fill ph-toolbox text-2xl drop-shadow-xs"></i>
         </div>
         <div>
-          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 tracking-tight m-0 drop-shadow-sm">
-            Tài nguyên & Công cụ Bảo trì
+          <h2 class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 tracking-tight m-0">
+            Tài Nguyên & Công Cụ Bảo Trì
           </h2>
-          <p class="text-neutral-500 text-sm md:text-base font-medium mt-1 mb-0 flex items-center gap-2">
+          <p class="text-neutral-500 text-xs font-medium mt-0.5 mb-0 flex items-center gap-1.5">
             <i class="ph-fill ph-check-circle text-emerald-500"></i>
-            Quản lý kỹ năng KTV, lịch phân ca trực ngày, định danh serial & theo dõi kiểm định thiết bị đo kiểm.
+            Quản lý kỹ năng KTV, lịch phân ca trực, định danh serial & theo dõi kiểm định thiết bị đo kiểm.
           </p>
         </div>
       </div>
 
       <!-- Quick Action Buttons -->
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2">
         {% if can_manage_workforce %}
-        <button onclick="openSkillModal()" class="rounded-xl h-10 px-4 bg-white hover:bg-neutral-50 border border-neutral-300 font-bold text-neutral-700 flex items-center gap-2 text-sm shadow-sm transition hover:scale-105">
-          <i class="ph ph-plus-circle text-primary text-base"></i> Thêm Kỹ năng
+        <button onclick="openSkillModal()" class="rounded-lg h-8 sm:h-9 px-3 bg-white hover:bg-neutral-50 border border-neutral-300 font-bold text-neutral-700 flex items-center gap-1.5 text-xs shadow-xs transition hover:scale-102">
+          <i class="ph ph-plus-circle text-primary text-sm"></i> Thêm Kỹ Năng
         </button>
-        <button onclick="openShiftModal()" class="rounded-xl h-10 px-4 bg-white hover:bg-neutral-50 border border-neutral-300 font-bold text-neutral-700 flex items-center gap-2 text-sm shadow-sm transition hover:scale-105">
-          <i class="ph ph-clock text-amber-600 text-base"></i> Thêm Mẫu ca
+        <button onclick="openShiftModal()" class="rounded-lg h-8 sm:h-9 px-3 bg-white hover:bg-neutral-50 border border-neutral-300 font-bold text-neutral-700 flex items-center gap-1.5 text-xs shadow-xs transition hover:scale-102">
+          <i class="ph ph-clock text-amber-600 text-sm"></i> Thêm Mẫu Ca
         </button>
         {% endif %}
         {% if can_manage_tools %}
-        <button onclick="openToolInstanceModal()" class="rounded-xl h-10 px-5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-0.5 font-bold text-white flex items-center gap-2 text-sm hover:scale-105">
-          <i class="ph ph-wrench font-bold"></i> Thêm Thiết bị Serial
+        <button onclick="openToolInstanceModal()" class="rounded-lg h-8 sm:h-9 px-3.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-xs border-0 transition font-bold text-white flex items-center gap-1.5 text-xs hover:scale-102">
+          <i class="ph ph-wrench font-bold text-sm"></i> Thêm Thiết Bị Serial
         </button>
         {% endif %}
       </div>

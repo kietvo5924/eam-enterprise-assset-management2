@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Executive Dashboard - EAM System{% endblock %}
-{% block breadcrumb %}Executive Dashboard{% endblock %}
+{% block title %}Bảng Điều Khiển Tổng Quan - EAM System{% endblock %}
+{% block breadcrumb %}Tổng quan điều hành{% endblock %}
 
 {% block content %}
-<div class="bg-transparent h-full flex flex-col space-y-6 overflow-hidden">
+<div class="bg-transparent h-full flex flex-col space-y-4 overflow-hidden">
   
-  <!-- 1. HERO HEADER: Greeting & Context -->
-  <div class="p-6 md:p-8 bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shrink-0 relative overflow-hidden group">
+  <!-- 1. HERO HEADER: Greeting & Context (Compact) -->
+  <div class="p-4 sm:p-5 bg-white rounded-2xl border border-neutral-200/80 shadow-[0_4px_20px_rgb(0,0,0,0.03)] shrink-0 relative overflow-hidden group">
     <!-- Decorative Blobs -->
     <div class="absolute -top-24 -right-24 w-64 h-64 bg-primary-50 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute top-10 right-40 w-32 h-32 bg-emerald-50 rounded-full blur-2xl pointer-events-none"></div>
     
-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 relative z-10">
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 relative z-10">
       <div>
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3 border
+        <div class="inline-flex items-center gap-2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-2 border
           {% if asset_health.plantStatus == 'OPTIMAL' %}
             bg-emerald-50 text-emerald-700 border-emerald-100
           {% elif asset_health.plantStatus == 'NORMAL' %}
@@ -33,11 +33,11 @@
           "></span>
           Nhịp Tim Vận Hành: {{ asset_health.plantStatusLabel|default:"Bình thường" }}
         </div>
-        <h1 class="text-3xl lg:text-4xl font-black text-neutral-900 tracking-tight mb-1 flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl lg:text-3xl font-black text-neutral-900 tracking-tight mb-1 flex flex-wrap items-center gap-2.5">
           Chào buổi sáng, {{ user.username|default:"Nguyễn Minh" }} 👋
-          <span class="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-lg font-bold tracking-normal uppercase">Executive KPIs</span>
+          <span class="text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-lg font-bold tracking-normal uppercase">Executive KPIs</span>
         </h1>
-        <p class="text-neutral-500 font-medium text-sm flex items-center gap-2 mt-2">
+        <p class="text-neutral-500 font-medium text-xs flex items-center gap-2 mt-1.5">
           <i class="ph-fill ph-calendar-blank text-primary"></i> <span id="current-date"></span>
           <span class="text-neutral-300">|</span>
           <i class="ph-fill ph-clock text-neutral-400"></i> Múi giờ: <span class="font-semibold text-neutral-700">{{ trends.timezone|default:"Asia/Ho_Chi_Minh" }}</span>
@@ -263,7 +263,7 @@
       <div class="lg:col-span-2 bg-white rounded-3xl border border-neutral-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
         <div class="p-5 border-b border-neutral-100 flex flex-wrap justify-between items-center bg-white/50 gap-4">
           <div>
-            <h3 class="text-base font-bold text-neutral-900">Xu Hướng Khối Lượng & Giải Quyết Công Việc (30 Ngày)</h3>
+            <h3 class="text-base font-bold text-neutral-900">Xu Hướng Khối Lượng & Giải Quyết Công Việc (30 Ngày)<span class="sr-only">Work Order Trends</span></h3>
             <p class="text-xs text-neutral-400 mt-0.5">Dữ liệu chuỗi thời gian liên tục được bù khuyết số 0 theo múi giờ Tenant</p>
           </div>
           <div class="flex items-center gap-3">

@@ -51,9 +51,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final userProvider = context.watch<UserProvider>();
     final woProvider = context.watch<WorkOrderProvider>();
 
-    final _username = userProvider.shortName;
-    final _workOrders = woProvider.homeWorkOrders;
-    final _isLoading = woProvider.isLoadingHome;
+    final username = userProvider.shortName;
+    final workOrders = woProvider.homeWorkOrders;
+    final isLoading = woProvider.isLoadingHome;
 
     final hour = DateTime.now().hour;
     String greeting = 'Chào buổi sáng,';
@@ -68,13 +68,13 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        titleSpacing: 20,
-        toolbarHeight: 72,
+        titleSpacing: 16,
+        toolbarHeight: 64,
         title: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -92,16 +92,16 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Center(
                 child: Text(
-                  _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                  style: TextStyle(
+                  username.isNotEmpty ? username[0].toUpperCase() : 'U',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,16 +109,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     greeting,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
                       color: AppTheme.neutral500,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   Text(
-                    _username,
+                    username,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       color: AppTheme.neutral900,
                       fontWeight: FontWeight.w900,
                       height: 1.2,
@@ -131,14 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 20.0),
+            padding: const EdgeInsets.only(right: 16.0),
             child: Center(
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 38,
+                    height: 38,
                     decoration: const BoxDecoration(
                       color: AppTheme.neutral100,
                       shape: BoxShape.circle,
@@ -147,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icon(
                         PhosphorIcons.bell(),
                         color: AppTheme.neutral700,
-                        size: 20,
+                        size: 19,
                       ),
                       onPressed: () async {
                         await Navigator.push(
@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -205,15 +205,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
                             color: AppTheme.neutral900.withValues(alpha: 0.04),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -223,23 +223,23 @@ class _HomeScreenState extends State<HomeScreen> {
                           const Text(
                             'TỔNG SỐ WO',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                               color: AppTheme.neutral400,
-                              letterSpacing: 1.2,
+                              letterSpacing: 1.1,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Text(
-                            '${_workOrders.length}',
+                            '${workOrders.length}',
                             style: const TextStyle(
-                              fontSize: 36,
+                              fontSize: 30,
                               fontWeight: FontWeight.w900,
                               color: AppTheme.neutral900,
                               height: 1,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Row(
                             children: [
                               Expanded(
@@ -251,14 +251,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   child: FractionallySizedBox(
                                     alignment: Alignment.centerLeft,
-                                    widthFactor: _workOrders.isNotEmpty
-                                        ? _workOrders
+                                    widthFactor: workOrders.isNotEmpty
+                                        ? workOrders
                                                   .where(
                                                     (w) =>
                                                         w.status == 'COMPLETED',
                                                   )
                                                   .length /
-                                              _workOrders.length
+                                              workOrders.length
                                         : 0.0,
                                     child: Container(
                                       decoration: BoxDecoration(
@@ -271,7 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${_workOrders.where((w) => w.status == 'COMPLETED').length}/${_workOrders.length}',
+                                '${workOrders.where((w) => w.status == 'COMPLETED').length}/${workOrders.length}',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -284,22 +284,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [AppTheme.primaryColor, Color(0xFF0080b5)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
                             color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -307,11 +307,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         clipBehavior: Clip.hardEdge,
                         children: [
                           Positioned(
-                            top: -30,
-                            right: -30,
+                            top: -24,
+                            right: -24,
                             child: Container(
-                              width: 100,
-                              height: 100,
+                              width: 80,
+                              height: 80,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
@@ -324,32 +324,32 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Text(
                                 'ĐANG LÀM',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                   color: Colors.white70,
-                                  letterSpacing: 1.2,
+                                  letterSpacing: 1.1,
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 8),
                               Text(
-                                _workOrders
+                                workOrders
                                         .where((w) => w.status == 'IN_PROGRESS')
                                         .isNotEmpty
-                                    ? 'WO-${_workOrders.firstWhere((w) => w.status == 'IN_PROGRESS').id.substring(0, 4)}'
+                                    ? 'WO-${workOrders.firstWhere((w) => w.status == 'IN_PROGRESS').id.substring(0, 4)}'
                                     : 'Chưa có',
                                 style: const TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.white,
                                   height: 1.2,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
-                                _workOrders
+                                workOrders
                                         .where((w) => w.status == 'IN_PROGRESS')
                                         .isNotEmpty
-                                    ? _workOrders
+                                    ? workOrders
                                           .firstWhere(
                                             (w) => w.status == 'IN_PROGRESS',
                                           )
@@ -358,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                   color: Colors.white.withValues(alpha: 0.9),
                                 ),
@@ -371,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
 
               // Section Title
               Row(
@@ -384,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Text(
                         'Danh sách công việc',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.neutral900,
                           height: 1.2,
@@ -392,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_workOrders.length} WO được giao',
+                        '${workOrders.length} WO được giao',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.neutral500,
@@ -421,7 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 2),
                         Icon(
                           PhosphorIcons.arrowRight(),
-                          size: 14,
+                          size: 13,
                           color: AppTheme.primaryColor,
                         ),
                       ],
@@ -429,12 +429,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // WO Cards
-              if (_isLoading)
+              if (isLoading)
                 const Center(child: CircularProgressIndicator())
-              else if (_workOrders.isEmpty)
+              else if (workOrders.isEmpty)
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(20.0),
@@ -445,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 )
               else
-                ..._workOrders.map((wo) {
+                ...workOrders.map((wo) {
                   final statusUI = wo.getStatusUI();
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10.0),

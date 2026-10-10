@@ -125,7 +125,7 @@ class HungarianAssignmentService:
                 "sharedToolConflicts": [],
                 "matrixHeader": {
                     "technicians": [get_user_display_name(t.user) for t in sorted_techs],
-                    "workOrders": [s.display_name for s in all_slots] + [f"{b['workOrderTitle']} (Blocked)" for b in blocked_wos]
+                    "workOrders": [s.display_name for s in all_slots] + [f"{b.get('workOrderCode') or b.get('workOrderTitle', '')} (Bị khóa)" for b in blocked_wos]
                 },
                 "costMatrix": []
             }
@@ -296,7 +296,7 @@ class HungarianAssignmentService:
         # Step 11: Format Response
         matrix_header = {
             "technicians": [get_user_display_name(t.user) for t in sorted_techs],
-            "workOrders": [s.display_name for s in active_slots] + [f"{b['workOrderTitle']} (Blocked)" for b in blocked_wos]
+            "workOrders": [s.display_name for s in active_slots] + [f"{b.get('workOrderCode') or b.get('workOrderTitle', '')} (Bị khóa)" for b in blocked_wos]
         }
 
         available_techs = [

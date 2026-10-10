@@ -297,7 +297,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 border: Border(bottom: BorderSide(color: AppTheme.neutral100)),
               ),
               child: const Text(
-                'Thao tác Work Order',
+                'Thao tác Phiếu Bảo Trì',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -467,7 +467,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
     if (_workOrder == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text('Không tải được Work Order')),
+        body: const Center(child: Text('Không tải được Phiếu Bảo Trì')),
       );
     }
 

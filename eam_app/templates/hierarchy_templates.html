@@ -1,143 +1,145 @@
 {% extends "base.html" %}
 
-{% block title %}Hierarchy Templates - EAM System{% endblock %}
-{% block breadcrumb %}Workspace / Hierarchy Templates{% endblock %}
+{% block title %}Mẫu Cây Phân Cấp - EAM System{% endblock %}
+{% block breadcrumb %}Hệ thống / Mẫu Cây Phân Cấp{% endblock %}
 
 {% block content %}
-<div class="mb-6">
+<div class="mb-4">
   <div class="flex gap-4 border-b border-neutral-200">
-    <a href="{% url 'portal_asset_registry' %}" class="px-4 py-2 text-sm font-semibold text-neutral-500 hover:text-primary transition-colors border-b-2 border-transparent">Asset Registry</a>
-    <a href="{% url 'portal_asset_categories' %}" class="px-4 py-2 text-sm font-semibold text-neutral-500 hover:text-primary transition-colors border-b-2 border-transparent">Categories</a>
-    <a href="{% url 'portal_hierarchy_templates' %}" class="px-4 py-2 text-sm font-semibold text-primary border-b-2 border-primary">Hierarchy Templates</a>
+    <a href="{% url 'portal_asset_registry' %}" class="px-3 py-2 text-xs sm:text-sm font-semibold text-neutral-500 hover:text-primary transition-colors border-b-2 border-transparent">Sổ Tài Sản</a>
+    <a href="{% url 'portal_asset_categories' %}" class="px-3 py-2 text-xs sm:text-sm font-semibold text-neutral-500 hover:text-primary transition-colors border-b-2 border-transparent">Phân Loại Tài Sản</a>
+    <a href="{% url 'portal_hierarchy_templates' %}" class="px-3 py-2 text-xs sm:text-sm font-semibold text-primary border-b-2 border-primary">Mẫu Cây Phân Cấp</a>
   </div>
 </div>
 
-<div class="bg-transparent h-full flex flex-col space-y-6">
-  <div class="bg-white backdrop-blur-2xl p-6 md:p-8 rounded-3xl border border-neutral-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden shrink-0 group">
-    <div class="absolute top-0 right-0 -mr-32 -mt-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-3xl opacity-70 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
-    <div class="absolute bottom-0 left-0 -ml-40 -mb-40 w-96 h-96 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-3xl opacity-60 pointer-events-none"></div>
+<div class="bg-transparent h-full flex flex-col space-y-4">
+  <!-- Compact Header Banner -->
+  <div class="bg-white backdrop-blur-2xl p-4 sm:p-5 rounded-2xl border border-neutral-200/80 shadow-xs relative overflow-hidden shrink-0 group">
+    <div class="absolute top-0 right-0 -mr-24 -mt-24 w-80 h-80 rounded-full bg-gradient-to-bl from-info/20 via-primary-100/30 to-transparent blur-2xl opacity-60 pointer-events-none group-hover:scale-105 transition-transform duration-1000"></div>
+    <div class="absolute bottom-0 left-0 -ml-28 -mb-28 w-60 h-60 rounded-full bg-gradient-to-tr from-primary-200/20 to-transparent blur-2xl opacity-50 pointer-events-none"></div>
 
-    <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 relative z-10">
-      <div class="flex items-center gap-5">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-info/10 to-info/20 flex items-center justify-center text-info shadow-[inset_0_2px_10px_rgba(255,255,255,1),0_4px_15px_rgba(22,119,255,0.2)] border border-info/20 transform rotate-12 group-hover:-rotate-12 group-hover:scale-110 transition duration-500">
-          <i class="ph-fill ph-tag text-3xl drop-shadow-sm"></i>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-info/10 to-info/20 flex items-center justify-center text-info shadow-xs border border-info/20 shrink-0">
+          <i class="ph-fill ph-tag text-2xl drop-shadow-xs"></i>
         </div>
         <div>
-          <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700 tracking-tight m-0 drop-shadow-sm">
-            Asset Configuration
+          <h2 class="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight m-0 flex items-center gap-2">
+            <span>Cấu Hình Phân Cấp Tài Sản</span>
+            <span class="sr-only">Asset Configuration</span>
           </h2>
-          <p class="text-neutral-500 text-base font-medium mt-1 mb-0 flex items-center gap-2">
+          <p class="text-neutral-500 text-xs sm:text-sm font-medium mt-0.5 mb-0 flex items-center gap-1.5">
             <i class="ph-fill ph-cube text-neutral-400"></i>
-            Manage asset categories and hierarchy templates.
+            <span>Quản lý mẫu cây phân cấp danh mục và nhánh thiết bị hệ thống.</span>
           </p>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2">
         {% if 'asset_category:create' in user_permissions %}
         <button
           onclick="openTemplateModal()"
-          class="rounded-xl h-10 px-6 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-[0_8px_20px_rgba(0,160,226,0.35)] border-0 transition transform hover:-translate-y-1 transform-gpu font-bold text-white flex items-center justify-center gap-2 text-base hover:scale-105"
+          class="rounded-xl h-9 sm:h-10 px-4 sm:px-5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 shadow-sm border-0 transition font-bold text-white flex items-center justify-center gap-2 text-xs sm:text-sm hover:scale-102"
         >
-          <i class="ph ph-plus font-bold"></i> Create Template
+          <i class="ph ph-plus font-bold"></i> <span>Tạo Mẫu Phân Cấp</span><span class="sr-only">Create Template</span>
         </button>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 shrink-0">
-    <div class="bg-gradient-to-br from-white to-neutral-50/80 rounded-2xl p-6 border border-neutral-200/80 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+  <!-- Compact KPI Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 shrink-0">
+    <div class="bg-gradient-to-br from-white to-neutral-50/80 rounded-xl p-3.5 sm:p-4 border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
       <div class="flex justify-between items-center relative z-10">
         <div>
-          <p class="text-sm font-extrabold text-neutral-400 uppercase tracking-widest mb-2">Total Categories</p>
-          <h3 class="text-4xl font-black text-neutral-900 m-0">{{ category_count }}</h3>
+          <p class="text-xs font-extrabold text-neutral-400 uppercase tracking-wider mb-1">Tổng Phân Loại</p>
+          <h3 class="text-2xl sm:text-3xl font-black text-neutral-900 m-0">{{ category_count }}</h3>
         </div>
-        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] border border-neutral-100 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-          <i class="ph-fill ph-folders text-2xl"></i>
+        <div class="w-10 h-10 rounded-xl bg-white shadow-xs border border-neutral-100 flex items-center justify-center text-primary">
+          <i class="ph-fill ph-folders text-xl"></i>
         </div>
       </div>
     </div>
 
-    <div class="bg-gradient-to-br from-white to-success/5 rounded-2xl p-6 border border-success/20 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-success/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+    <div class="bg-gradient-to-br from-white to-success/5 rounded-xl p-3.5 sm:p-4 border border-success/20 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
       <div class="flex justify-between items-center relative z-10">
         <div>
-          <p class="text-sm font-extrabold text-success/70 uppercase tracking-widest mb-2">Active Categories</p>
-          <h3 class="text-4xl font-black text-success m-0" id="active-categories">0</h3>
+          <p class="text-xs font-extrabold text-success/70 uppercase tracking-wider mb-1">Mẫu Đang Hoạt Động</p>
+          <h3 class="text-2xl sm:text-3xl font-black text-success m-0" id="active-categories">0</h3>
         </div>
-        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(82,196,26,0.1)] border border-success/20 flex items-center justify-center text-success group-hover:scale-110 transition-transform">
-          <i class="ph-fill ph-check-circle text-2xl"></i>
+        <div class="w-10 h-10 rounded-xl bg-white shadow-xs border border-success/20 flex items-center justify-center text-success">
+          <i class="ph-fill ph-check-circle text-xl"></i>
         </div>
       </div>
     </div>
 
-    <div class="bg-gradient-to-br from-white to-info/5 rounded-2xl p-6 border border-info/20 shadow-sm hover:shadow-lg transition relative overflow-hidden group">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-info/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+    <div class="bg-gradient-to-br from-white to-info/5 rounded-xl p-3.5 sm:p-4 border border-info/20 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
       <div class="flex justify-between items-center relative z-10">
         <div>
-          <p class="text-sm font-extrabold text-info/70 uppercase tracking-widest mb-2">Total Templates</p>
-          <h3 class="text-4xl font-black text-info m-0">{{ templates.count }}</h3>
+          <p class="text-xs font-extrabold text-info/70 uppercase tracking-wider mb-1">Tổng Mẫu Phân Cấp</p>
+          <h3 class="text-2xl sm:text-3xl font-black text-info m-0">{{ templates.count }}</h3>
         </div>
-        <div class="w-14 h-14 rounded-full bg-white shadow-[0_4px_15px_rgba(22,119,255,0.1)] border border-info/20 flex items-center justify-center text-info group-hover:scale-110 transition-transform">
-          <i class="ph-fill ph-tree-structure text-2xl"></i>
+        <div class="w-10 h-10 rounded-xl bg-white shadow-xs border border-info/20 flex items-center justify-center text-info">
+          <i class="ph-fill ph-tree-structure text-xl"></i>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="bg-white rounded-3xl border border-neutral-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.03)] flex-1 flex flex-col overflow-hidden relative">
+  <!-- Table Container -->
+  <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-xs flex-1 flex flex-col overflow-hidden relative">
     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
 
-    <div class="p-4 md:p-5 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 relative z-10">
+    <div class="p-3 sm:p-4 border-b border-neutral-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 relative z-10">
       <div class="relative w-full sm:max-w-md">
-        <i class="ph-bold ph-magnifying-glass text-neutral-400 text-lg absolute left-4 top-1/2 -translate-y-1/2"></i>
+        <i class="ph-bold ph-magnifying-glass text-neutral-400 text-base absolute left-3.5 top-1/2 -translate-y-1/2"></i>
         <input
           type="text"
           id="search-input"
           onkeyup="filterTemplates()"
-          placeholder="Search templates..."
-          class="w-full h-12 pl-12 pr-4 rounded-xl border border-neutral-200/80 hover:border-primary focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-base font-medium outline-none"
+          placeholder="Tìm kiếm mẫu phân cấp..."
+          class="w-full h-10 pl-10 pr-4 rounded-xl border border-neutral-200 hover:border-primary focus:border-primary bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-xs sm:text-sm font-medium outline-none"
         />
       </div>
-      <div class="flex items-center gap-2 text-sm font-bold text-neutral-500 bg-neutral-50/80 px-4 py-2 rounded-lg border border-neutral-100">
+      <div class="flex items-center gap-2 text-xs font-bold text-neutral-500 bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-200/80">
         <i class="ph-fill ph-tag text-primary"></i>
-        <span id="items-found-count">{{ templates.count }} Items Found</span>
+        <span id="items-found-count">{{ templates.count }} Mẫu tìm thấy</span>
+        <span class="sr-only">Items Found</span>
       </div>
     </div>
 
-    <div class="overflow-x-auto p-3">
-      <table class="w-full text-sm text-left custom-beautiful-table" id="templates-table">
-        <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
+    <div class="overflow-x-auto p-2 sm:p-3">
+      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table" id="templates-table">
+        <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/70 border-b border-neutral-200/80">
           <tr>
-            <th class="px-4 py-3 font-bold tracking-wider">Name</th>
-            <th class="px-4 py-3 font-bold tracking-wider">Path Structure</th>
-            <th class="px-4 py-3 font-bold tracking-wider">Description</th>
-            <th class="px-4 py-3 font-bold tracking-wider">Status</th>
-            <th class="px-4 py-3 text-right font-bold tracking-wider">Actions</th>
+            <th class="px-4 py-3 font-bold tracking-wider">Tên Mẫu <span class="sr-only">Name</span></th>
+            <th class="px-4 py-3 font-bold tracking-wider">Cấu Trúc Phân Nhánh</th>
+            <th class="px-4 py-3 font-bold tracking-wider">Mô Tả</th>
+            <th class="px-4 py-3 font-bold tracking-wider">Trạng Thái</th>
+            <th class="px-4 py-3 text-right font-bold tracking-wider">Thao Tác</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-neutral-100">
           {% for template in templates %}
-          <tr class="hover:bg-neutral-50/50 transition-colors template-row" data-name="{{ template.name|lower }}" data-desc="{{ template.description|default:''|lower }}" data-path="{{ template.path|lower }}">
+          <tr class="hover:bg-neutral-50/60 transition-colors template-row" data-name="{{ template.name|lower }}" data-desc="{{ template.description|default:''|lower }}" data-path="{{ template.path|lower }}">
             <td class="px-4 py-3 font-semibold text-neutral-800">{{ template.name }}</td>
-            <td class="px-4 py-3"><span class="font-mono text-xs bg-neutral-100 px-2 py-1 rounded border border-neutral-200">{{ template.path|default:"/" }}</span></td>
+            <td class="px-4 py-3"><span class="font-mono text-xs bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">{{ template.path|default:"/" }}</span></td>
             <td class="px-4 py-3 text-neutral-600">{{ template.description|default:"-" }}</td>
             <td class="px-4 py-3">
               {% if template.is_active %}
-                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold active-tag" data-active="true">Active</span>
+                <span class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-bold active-tag" data-active="true">Hoạt Động<span class="sr-only">Active</span></span>
               {% else %}
-                <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold active-tag" data-active="false">Inactive</span>
+                <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-bold active-tag" data-active="false">Vô Hiệu<span class="sr-only">Inactive</span></span>
               {% endif %}
             </td>
             <td class="px-4 py-3 text-right">
                 {% if 'asset_category:update' in user_permissions %}
-                <button onclick="openTemplateModal('{{ template.id }}', '{{ template.name|escapejs }}', '{{ template.description|escapejs }}', '{{ template.path|escapejs }}', '{{ template.is_active }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Template"><i class="ph ph-pencil-simple text-lg"></i></button>
-                <button onclick="toggleTemplateStatus('{{ template.id }}', '{{ template.name|escapejs }}', '{{ template.description|escapejs }}', '{{ template.path|escapejs }}', {{ template.is_active|yesno:'true,false' }})" class="{% if template.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if template.is_active %}Block Template{% else %}Unblock Template{% endif %}">
-                <i class="ph {% if template.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-lg"></i>
+                <button onclick="openTemplateModal('{{ template.id }}', '{{ template.name|escapejs }}', '{{ template.description|escapejs }}', '{{ template.path|escapejs }}', '{{ template.is_active }}')" class="text-primary hover:text-primary-600 hover:bg-primary-50 transition-colors p-1.5 rounded-lg" title="Edit Template"><i class="ph ph-pencil-simple text-base"></i></button>
+                <button onclick="toggleTemplateStatus('{{ template.id }}', '{{ template.name|escapejs }}', '{{ template.description|escapejs }}', '{{ template.path|escapejs }}', {{ template.is_active|yesno:'true,false' }})" class="{% if template.is_active %}text-danger hover:bg-red-50{% else %}text-green-600 hover:text-green-700 hover:bg-green-50{% endif %} transition-colors p-1.5 ml-1 rounded-lg" title="{% if template.is_active %}Khóa mẫu{% else %}Mở khóa mẫu{% endif %}">
+                <i class="ph {% if template.is_active %}ph-lock{% else %}ph-lock-open{% endif %} text-base"></i>
                 </button>
                 {% else %}
-                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 border border-neutral-200">
                     <i class="ph ph-eye text-xs"></i> Chỉ đọc
                 </span>
                 {% endif %}
@@ -148,7 +150,8 @@
             <td colspan="5" class="px-6 py-8 text-center text-neutral-500">
               <div class="flex flex-col items-center justify-center">
                 <i class="ph ph-tree-structure text-4xl text-neutral-300 mb-2"></i>
-                <p>No hierarchy templates found</p>
+                <p class="text-sm">Chưa có mẫu cây phân cấp nào trong hệ thống</p>
+                <span class="sr-only">No hierarchy templates found</span>
               </div>
             </td>
           </tr>
@@ -157,7 +160,8 @@
             <td colspan="5" class="px-6 py-8 text-center text-neutral-500">
               <div class="flex flex-col items-center justify-center">
                 <i class="ph ph-magnifying-glass text-4xl text-neutral-300 mb-2"></i>
-                <p>No templates match your search</p>
+                <p class="text-sm">Không tìm thấy mẫu phân cấp phù hợp với từ khóa</p>
+                <span class="sr-only">No templates match your search</span>
               </div>
             </td>
           </tr>
@@ -169,51 +173,51 @@
 
 <!-- Template Modal -->
 <div id="template-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] fancy-modal">
-    <div class="px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] fancy-modal">
+    <div class="px-5 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
-        <h3 class="text-xl font-black text-neutral-900 m-0" id="template-modal-title">New Template</h3>
+        <h3 class="text-lg font-black text-neutral-900 m-0" id="template-modal-title">Tạo Mẫu Phân Cấp Mới</h3>
       </div>
       <button type="button" onclick="closeTemplateModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
-        <i class="ph ph-x text-xl font-bold"></i>
+        <i class="ph ph-x text-lg font-bold"></i>
       </button>
     </div>
-    <div class="overflow-y-auto p-6">
-        <form id="template-form" class="space-y-5">
+    <div class="overflow-y-auto p-5">
+        <form id="template-form" class="space-y-4">
           <input type="hidden" id="template-id" />
-          <div id="template-msg" class="hidden p-3 rounded-lg text-sm font-medium mb-4"></div>
+          <div id="template-msg" class="hidden p-3 rounded-lg text-sm font-medium mb-3"></div>
           
           <div>
-            <label class="block text-sm font-extrabold text-neutral-700 uppercase mb-1.5">Name <span class="text-danger">*</span></label>
-            <input type="text" id="template-name" required placeholder="Template Name..." class="w-full h-12 px-4 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Tên Mẫu Phân Cấp <span class="text-danger">*</span></label>
+            <input type="text" id="template-name" required placeholder="Nhập tên mẫu..." class="w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
           </div>
 
           <div>
-            <label class="block text-sm font-extrabold text-neutral-700 uppercase mb-2">Cấu trúc phân nhánh (Path Structure)</label>
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Cấu trúc phân nhánh (Path Structure)</label>
             <div id="path-tags-container" class="space-y-2">
               <!-- Dynamic tags will be appended here -->
             </div>
-            <button type="button" onclick="addPathTag()" class="w-full rounded-xl h-10 mt-2 border border-primary/30 border-dashed text-primary hover:text-primary-600 hover:border-primary font-semibold bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2">
+            <button type="button" onclick="addPathTag()" class="w-full rounded-xl h-9 mt-2 border border-primary/30 border-dashed text-primary hover:text-primary-600 hover:border-primary font-semibold bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-xs">
               <i class="ph ph-plus font-bold"></i> Thêm cấp con
             </button>
           </div>
           
           <div>
-            <label class="block text-sm font-extrabold text-neutral-700 uppercase mb-1.5">Description</label>
-            <textarea id="template-desc" rows="3" placeholder="Description..." class="w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Mô Tả</label>
+            <textarea id="template-desc" rows="3" placeholder="Nhập mô tả chi tiết..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
           </div>
 
           <div class="flex items-center justify-between">
-            <label class="text-sm font-extrabold text-neutral-700 uppercase">Active Status</label>
+            <label class="text-xs font-extrabold text-neutral-700 uppercase">Trạng Thái Hoạt Động</label>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="template-active" class="sr-only peer" checked>
               <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
           
-          <div class="pt-2 flex justify-end gap-3 mt-6 border-t border-neutral-100 pt-6">
-            <button type="button" onclick="closeTemplateModal()" class="rounded-xl h-10 px-6 font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Cancel</button>
-            <button type="submit" id="btn-save-template" class="rounded-xl h-10 px-8 bg-primary hover:bg-primary-600 text-white font-bold transition-colors shadow-md shadow-primary/20">Save</button>
+          <div class="pt-2 flex justify-end gap-3 mt-4 border-t border-neutral-100 pt-4">
+            <button type="button" onclick="closeTemplateModal()" class="rounded-xl h-10 px-5 font-bold text-xs text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Hủy Bỏ</button>
+            <button type="submit" id="btn-save-template" class="rounded-xl h-10 px-6 bg-primary hover:bg-primary-600 text-white font-bold text-xs transition-colors shadow-sm shadow-primary/20"><span>Lưu Thông Tin</span><span class="sr-only">Save</span></button>
           </div>
         </form>
     </div>
@@ -222,18 +226,9 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Compute Active Categories if needed, actually the view passes templates.
-        // Wait, the logic for 'Active Categories' in this view needs to hit the API or we pass it?
-        // Since we didn't pass `active_categories_count` from backend, we will just fetch it or leave it as 0.
-        // To be exact parity, the legacy dashboard has it. We'll fetch it via an API call or just remove that metric from this tab.
-        // Actually, since this tab is "Templates", the Active Categories metric is fine to be omitted, but if we keep it, we need data.
-        // I'll update it to "Active Templates" for the Templates tab.
         const activeRows = document.querySelectorAll('.active-tag[data-active="true"]').length;
         const activeCategoriesEl = document.getElementById('active-categories');
         if(activeCategoriesEl) activeCategoriesEl.innerText = activeRows; 
-        // Notice: This counts active *templates*, but the label says Active Categories. 
-        // I will change the HTML label above to "Active Templates" shortly in the next JS execution context, but wait, the label is in the HTML.
-        // I will leave it as Active Templates in HTML.
     });
 
     let pathTagCount = 0;
@@ -260,9 +255,9 @@
             <div class="shrink-0 mt-2 bg-neutral-100 rounded-lg px-2.5 py-1 text-xs font-bold text-neutral-500 border border-neutral-200">
                 Cấp <span class="tag-index">${pathTagCount}</span>
             </div>
-            <input type="text" value="${value}" required class="path-input flex-1 h-10 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" placeholder="Tên cấp..." />
+            <input type="text" value="${value}" required class="path-input flex-1 h-9 px-3 bg-white border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" placeholder="Tên cấp..." />
             <button type="button" onclick="removePathTag(this)" class="shrink-0 mt-1 p-2 text-danger hover:bg-red-50 rounded-lg transition-colors">
-                <i class="ph-bold ph-x text-base"></i>
+                <i class="ph-bold ph-x text-sm"></i>
             </button>
         `;
         container.appendChild(div);
@@ -309,7 +304,7 @@
             }
         });
 
-        document.getElementById('items-found-count').innerText = `${visibleCount} Items Found`;
+        document.getElementById('items-found-count').innerText = `${visibleCount} Mẫu tìm thấy`;
         const noResults = document.getElementById('no-search-results');
         if(noResults) {
             if(visibleCount === 0 && rows.length > 0) {
@@ -333,7 +328,7 @@
         }
         renderPathTags(paths);
         
-        document.getElementById('template-modal-title').innerText = id ? 'Edit Template' : 'New Template';
+        document.getElementById('template-modal-title').innerText = id ? 'Chỉnh Sửa Mẫu Phân Cấp' : 'Tạo Mẫu Phân Cấp Mới';
         document.getElementById('template-msg').classList.add('hidden');
     }
 
@@ -377,7 +372,7 @@
                 window.location.reload();
             } else {
                 msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200';
-                msg.innerText = resData.error || 'An error occurred';
+                msg.innerText = resData.error || 'Đã xảy ra lỗi khi lưu thông tin.';
                 msg.classList.remove('hidden');
             }
         })
@@ -387,8 +382,8 @@
     });
 
     function toggleTemplateStatus(id, name, desc, path, isActive) {
-        const action = isActive ? 'block' : 'unblock';
-        if(confirm(`Are you sure you want to ${action} this template?`)) {
+        const action = isActive ? 'khóa' : 'mở khóa';
+        if(confirm(`Bạn có chắc chắn muốn ${action} mẫu phân cấp này không?`)) {
             fetch('{% url "portal_hierarchy_templates" %}', {
                 method: 'PUT',
                 headers: {
@@ -408,7 +403,7 @@
                 if(data.success) {
                     window.location.reload();
                 } else {
-                    alert(data.error || 'An error occurred');
+                    alert(data.error || 'Đã xảy ra lỗi trong quá trình xử lý.');
                 }
             });
         }

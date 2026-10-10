@@ -3,6 +3,16 @@ from workorders.models import WorkOrder, WorkOrderChecklistItem, WorkOrderAttach
 from assets.serializers import AssetSerializer, SparePartSerializer
 from users.serializers import UserSerializer
 
+class NullableUUIDField(serializers.UUIDField):
+    """
+    UUIDField treats empty string or whitespace-only string as None.
+    Prevents HTML form selects sending "" for optional UUID from causing validation errors.
+    """
+    def to_internal_value(self, data):
+        if data == '' or data is None or (isinstance(data, str) and not data.strip()):
+            return None
+        return super().to_internal_value(data)
+
 class WorkOrderChecklistItemSerializer(serializers.ModelSerializer):
     itemName = serializers.CharField(source='item_name')
     isCompleted = serializers.BooleanField(source='is_completed')
@@ -79,8 +89,8 @@ class WorkOrderCreateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     priority = serializers.ChoiceField(choices=WorkOrder.PRIORITY_CHOICES)
     deadline = serializers.DateTimeField(required=False, allow_null=True)
-    assignedTo = serializers.UUIDField(required=False, allow_null=True)
-    parentId = serializers.UUIDField(required=False, allow_null=True)
+    assignedTo = NullableUUIDField(required=False, allow_null=True)
+    parentId = NullableUUIDField(required=False, allow_null=True)
     sourceReference = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     estimatedDurationMinutes = serializers.IntegerField(required=False, allow_null=True)
     checklists = serializers.ListField(
@@ -151,7 +161,7 @@ class WorkOrderAutoAssignApplyRequestSerializer(serializers.Serializer):
 
 
 class WorkOrderGAAutoAssignInitiateRequestSerializer(serializers.Serializer):
-    floorplanId = serializers.UUIDField(required=False, allow_null=True)
+    floorplanId = NullableUUIDField(required=False, allow_null=True)
     workOrderIds = serializers.ListField(
         child=serializers.UUIDField(),
         required=False,
@@ -175,5 +185,5 @@ class WorkOrderAlgorithmReadinessRequestSerializer(serializers.Serializer):
         required=False,
         default=list
     )
-    floorplanId = serializers.UUIDField(required=False, allow_null=True)
+    floorplanId = NullableUUIDField(required=False, allow_null=True)
 
