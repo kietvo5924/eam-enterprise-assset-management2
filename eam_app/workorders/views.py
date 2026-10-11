@@ -1142,7 +1142,7 @@ class WorkOrderAlgorithmReadinessView(APIView):
                         issues.append(f"Tất cả {len(target_wos)} phiếu công việc đều đang bị khóa do phụ thuộc vào công việc khác chưa hoàn tất.")
 
         can_run = (len(issues) == 0)
-        algo_display_name = "Hungary Kuhn-Munkres" if algorithm == 'HUNGARIAN' else "Di truyền (Genetic Algorithm)"
+        algo_display_name = "Điều phối tức thời 1-1" if algorithm == 'HUNGARIAN' else "Lập lịch cả ca nhiều việc"
 
         return success_response({
             "canRun": can_run,
