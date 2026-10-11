@@ -39,6 +39,7 @@
       >
         <i class="ph-bold ph-calendar-check"></i> <span>Lập lịch cả ca nhiều việc</span>
       </button>
+      {% if 'work_order:execute' in user_permissions %}
       <button 
         type="button"
         id="btn-tsp-routing"
@@ -48,6 +49,7 @@
       >
         <i class="ph-bold ph-path"></i> <span>Tối ưu lộ trình di chuyển</span>
       </button>
+      {% endif %}
       {% if 'work_order:create' in user_permissions %}
       <button 
         onclick="openWoModal()"
@@ -1289,13 +1291,24 @@
       <div class="flex flex-wrap items-center gap-3">
         <div class="flex items-center gap-1.5">
           <label class="text-xs font-bold text-neutral-600">Kỹ thuật viên:</label>
-          <select id="tsp-select-technician" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
-            <option value="">-- Tất cả phiếu đã chọn / Đầu ca --</option>
-            {% for tech in technicians_list %}
-            <option value="{{ tech.id }}">{{ tech.username }} ({{ tech.first_name }} {{ tech.last_name }})</option>
+          <select id="tsp-select-technician" onchange="calculateTSPRoute()" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
+            <option value="">-- Tất cả công việc trong ca / Mặc định --</option>
+            {% for tech in technicians %}
+            <option value="{{ tech.id }}" {% if tech.id == request.user.id %}selected{% endif %}>{{ tech.username }} ({{ tech.first_name }} {{ tech.last_name }})</option>
             {% endfor %}
           </select>
         </div>
+
+        {% if floorplans_list %}
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-bold text-neutral-600">Mặt bằng:</label>
+          <select id="tsp-select-floorplan" onchange="onTSPFloorplanChange(this.value)" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
+            {% for fp in floorplans_list %}
+            <option value="{{ fp.id }}">🏢 {{ fp.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
 
         <div class="flex items-center gap-1.5">
           <label class="text-xs font-bold text-neutral-600">Giờ bắt đầu:</label>
@@ -1425,6 +1438,8 @@
             <rect width="100%" height="100%" fill="url(#tsp-fp-grid-major)" />
             <rect x="50" y="40" width="910" height="620" rx="8" stroke="#334155" stroke-width="2" fill="#0f172a" fill-opacity="0.2"/>
             <!-- Dynamic route layers -->
+            <g id="tsp-svg-floorplan-layer"></g>
+            <g id="tsp-svg-corridors-layer"></g>
             <g id="tsp-svg-routes-layer"></g>
             <g id="tsp-svg-stops-layer"></g>
           </svg>
@@ -1468,7 +1483,18 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+  @keyframes tspDashFlow {
+    from { stroke-dashoffset: 40; }
+    to { stroke-dashoffset: 0; }
+  }
+  .tsp-flow-dash {
+    animation: tspDashFlow 1.2s linear infinite;
+  }
+</style>
 <script>
+  window.CURRENT_USER_ID = '{{ current_user_id|default:request.user.id }}';
+  window.CURRENT_USER_NAME = '{{ request.user.username }}';
   let currentWo = null;
   const ASSETS_MAP = {{ assets_json|default:'{}'|safe }};
   const WO_METADATA = {{ wo_metadata_json|default:'{}'|safe }};
@@ -4041,35 +4067,278 @@
       container.innerHTML = html;
   }
 
+  function getParsedBuildingPoints(fp) {
+      if (!fp) return [{x: 0, y: 0}, {x: 220, y: 0}, {x: 220, y: 130}, {x: 0, y: 130}];
+      if (fp.description) {
+          try {
+              const descObj = typeof fp.description === 'string' ? JSON.parse(fp.description) : fp.description;
+              if (descObj && descObj.polygon_points && Array.isArray(descObj.polygon_points) && descObj.polygon_points.length >= 3) {
+                  return descObj.polygon_points;
+              }
+              if (descObj && descObj.width_m && descObj.height_m) {
+                  const w = parseFloat(descObj.width_m) || 220;
+                  const h = parseFloat(descObj.height_m) || 130;
+                  return [{x: 0, y: 0}, {x: w, y: 0}, {x: w, y: h}, {x: 0, y: h}];
+              }
+          } catch (_) {}
+      }
+      return [{x: 0, y: 0}, {x: 220, y: 0}, {x: 220, y: 130}, {x: 0, y: 130}];
+  }
+
+  function getParsedZonePoints(zone) {
+      if (zone.polygon_points && Array.isArray(zone.polygon_points) && zone.polygon_points.length >= 3) {
+          return zone.polygon_points;
+      }
+      if (zone.description) {
+          const match = zone.description.match(/\[POLYGON:(\[.*?\])\]/);
+          if (match) {
+              try {
+                  const parsed = JSON.parse(match[1]);
+                  if (Array.isArray(parsed) && parsed.length >= 3) {
+                      return parsed;
+                  }
+              } catch (_) {}
+          }
+      }
+      // Check DIM
+      let w = 45.0, h = 35.0;
+      if (zone.description) {
+          const dimMatch = zone.description.match(/\[DIM:(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)\]/);
+          if (dimMatch) {
+              w = parseFloat(dimMatch[1]);
+              h = parseFloat(dimMatch[2]);
+          }
+      }
+      const cx = (zone.center_x !== null && zone.center_x !== undefined) ? parseFloat(zone.center_x) : 50.0;
+      const cy = (zone.center_y !== null && zone.center_y !== undefined) ? parseFloat(zone.center_y) : 50.0;
+      return [
+          { x: cx - w/2, y: cy - h/2 },
+          { x: cx + w/2, y: cy - h/2 },
+          { x: cx + w/2, y: cy + h/2 },
+          { x: cx - w/2, y: cy + h/2 }
+      ];
+  }
+
+  function getFloorplanCoordinateMapper(fp, zones) {
+      const bPts = getParsedBuildingPoints(fp);
+      let minX = Infinity, minY = Infinity;
+      let maxX = -Infinity, maxY = -Infinity;
+      bPts.forEach(p => {
+          if (p.x < minX) minX = p.x;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.y > maxY) maxY = p.y;
+      });
+      zones.forEach(z => {
+          const pts = getParsedZonePoints(z);
+          pts.forEach(p => {
+              if (p.x < minX) minX = p.x;
+              if (p.x > maxX) maxX = p.x;
+              if (p.y < minY) minY = p.y;
+              if (p.y > maxY) maxY = p.y;
+          });
+      });
+
+      if (!isFinite(minX)) { minX = 0; maxX = 220; minY = 0; maxY = 130; }
+
+      const padM = 6;
+      minX -= padM; minY -= padM;
+      maxX += padM; maxY += padM;
+
+      const spanX = Math.max(30, maxX - minX);
+      const spanY = Math.max(30, maxY - minY);
+
+      const canvasW = 900;
+      const canvasH = 610;
+      const leftOffset = 50;
+      const topOffset = 45;
+
+      const scaleX = canvasW / spanX;
+      const scaleY = canvasH / spanY;
+      const scale = Math.min(scaleX, scaleY);
+
+      const renderedW = spanX * scale;
+      const renderedH = spanY * scale;
+      const originX = leftOffset + (canvasW - renderedW) / 2;
+      const originY = topOffset + (canvasH - renderedH) / 2;
+
+      return {
+          mToPx: function(mx, my) {
+              return {
+                  x: originX + (mx - minX) * scale,
+                  y: originY + (my - minY) * scale
+              };
+          },
+          bPts,
+          minX, maxX, minY, maxY,
+          scale
+      };
+  }
+
+  function onTSPFloorplanChange(fpId) {
+      window.tspActiveFloorplanId = fpId;
+      if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+          renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+      }
+  }
+
   function renderTSPSvgRoute(stops) {
+      const floorplanLayer = document.getElementById('tsp-svg-floorplan-layer');
+      const corridorsLayer = document.getElementById('tsp-svg-corridors-layer');
       const routesLayer = document.getElementById('tsp-svg-routes-layer');
       const stopsLayer = document.getElementById('tsp-svg-stops-layer');
+      const viewInfo = document.getElementById('tsp-view-info');
       if (!routesLayer || !stopsLayer) return;
 
+      if (floorplanLayer) floorplanLayer.innerHTML = '';
+      if (corridorsLayer) corridorsLayer.innerHTML = '';
       routesLayer.innerHTML = '';
       stopsLayer.innerHTML = '';
 
       if (!stops || stops.length === 0) return;
 
-      // Coordinate scaling and synthetic placement
+      // 1. Resolve Active Floorplan
+      let activeFpId = window.tspActiveFloorplanId || document.getElementById('tsp-select-floorplan')?.value;
+      let activeFp = null;
+      if (activeFpId && Array.isArray(FLOORPLANS_LIST)) {
+          activeFp = FLOORPLANS_LIST.find(f => String(f.id) === String(activeFpId));
+      }
+      if (!activeFp && Array.isArray(FLOORPLANS_LIST) && FLOORPLANS_LIST.length > 0) {
+          // Attempt auto-detecting floorplan from stops' locations
+          for (const s of stops) {
+              if (s.locationId && Array.isArray(LOCATIONS_LIST)) {
+                  const loc = LOCATIONS_LIST.find(l => String(l.id) === String(s.locationId));
+                  if (loc && loc.parent_id) {
+                      const candidate = FLOORPLANS_LIST.find(f => String(f.id) === String(loc.parent_id));
+                      if (candidate) {
+                          activeFp = candidate;
+                          activeFpId = candidate.id;
+                          const fpSel = document.getElementById('tsp-select-floorplan');
+                          if (fpSel) fpSel.value = candidate.id;
+                          break;
+                      }
+                  }
+              }
+          }
+          if (!activeFp) {
+              activeFp = FLOORPLANS_LIST[0];
+              activeFpId = activeFp.id;
+          }
+      }
+
+      // Check if this tenant has a real floorplan
+      const hasFloorplan = !!activeFp;
+      const childZones = hasFloorplan
+          ? (Array.isArray(LOCATIONS_LIST) ? LOCATIONS_LIST : []).filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(activeFp.id))
+          : [];
+
+      let mapper = null;
+      let midHallY = 350;
+      if (hasFloorplan) {
+          mapper = getFloorplanCoordinateMapper(activeFp, childZones);
+          midHallY = mapper.mToPx(0, 62).y;
+          if (viewInfo) viewInfo.innerText = `🏢 ${activeFp.name} (Tỉ lệ chuẩn CAD - 1:${Math.round(10/mapper.scale)})`;
+
+          // A. Draw Outer Building Wall (Read-only blueprint)
+          const bPxPts = mapper.bPts.map(p => mapper.mToPx(p.x, p.y));
+          const bPtsStr = bPxPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+          if (floorplanLayer) {
+              floorplanLayer.innerHTML += `
+                  <polygon points="${bPtsStr}" fill="#0a1020" fill-opacity="0.94" stroke="#0284c7" stroke-width="2.5" pointer-events="none" filter="drop-shadow(0 0 10px rgba(2,132,199,0.3))"/>
+                  <text x="${(bPxPts[0].x + bPxPts[1].x)/2}" y="${Math.max(65, bPxPts[0].y + 20)}" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="900" text-anchor="middle" pointer-events="none" letter-spacing="1">🏢 ${activeFp.name.toUpperCase()}</text>
+              `;
+
+              // B. Draw Child Zones / Rooms with Location theme styling (Read-only view)
+              const themeMap = {
+                  'PRODUCTION': { stroke: '#0284c7', fill: 'rgba(14, 165, 233, 0.16)', label: '#38bdf8', bgBadge: '#0369a1' },
+                  'CLEANROOM':  { stroke: '#0d9488', fill: 'rgba(20, 184, 166, 0.16)', label: '#2dd4bf', bgBadge: '#0f766e' },
+                  'CONTROLLED': { stroke: '#0d9488', fill: 'rgba(20, 184, 166, 0.16)', label: '#2dd4bf', bgBadge: '#0f766e' },
+                  'WAREHOUSE':  { stroke: '#d97706', fill: 'rgba(245, 158, 11, 0.16)', label: '#fbbf24', bgBadge: '#b45309' },
+                  'OFFICE':     { stroke: '#9333ea', fill: 'rgba(168, 85, 247, 0.16)', label: '#c084fc', bgBadge: '#7e22ce' },
+                  'OUTDOOR':    { stroke: '#0891b2', fill: 'rgba(6, 182, 212, 0.16)', label: '#22d3ee', bgBadge: '#0e7490' },
+                  'RESTRICTED': { stroke: '#e11d48', fill: 'rgba(244, 63, 94, 0.18)', label: '#fb7185', bgBadge: '#be123c' },
+                  'STANDARD':   { stroke: '#64748b', fill: 'rgba(100, 116, 139, 0.16)', label: '#94a3b8', bgBadge: '#475569' },
+              };
+
+              childZones.forEach(zone => {
+                  const zPts = getParsedZonePoints(zone);
+                  const zPxPts = zPts.map(p => mapper.mToPx(p.x, p.y));
+                  const zPtsStr = zPxPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                  const theme = themeMap[zone.zone_type] || themeMap['PRODUCTION'];
+
+                  let cPx = { x: 0, y: 0 };
+                  zPxPts.forEach(p => { cPx.x += p.x; cPx.y += p.y; });
+                  cPx.x /= zPxPts.length;
+                  cPx.y /= zPxPts.length;
+
+                  floorplanLayer.innerHTML += `
+                      <g pointer-events="none">
+                          <polygon points="${zPtsStr}" fill="${theme.fill}" stroke="${theme.stroke}" stroke-width="1.8"/>
+                          <rect x="${cPx.x - 55}" y="${cPx.y - 18}" width="110" height="15" rx="3" fill="${theme.bgBadge}" fill-opacity="0.5"/>
+                          <text x="${cPx.x}" y="${cPx.y - 7}" fill="#f8fafc" font-size="10" font-weight="bold" font-family="sans-serif" text-anchor="middle">${zone.name}</text>
+                          <text x="${cPx.x}" y="${cPx.y + 11}" fill="${theme.label}" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">[${zone.code || 'ZONE'}]</text>
+                      </g>
+                  `;
+              });
+          }
+
+          // C. Draw Hallway / Open Space guides ("những khoảng trống ấy đều là đường hết")
+          if (corridorsLayer) {
+              const leftHallX = mapper.mToPx(10, 62).x;
+              const rightHallX = mapper.mToPx(210, 62).x;
+              corridorsLayer.innerHTML += `
+                  <g pointer-events="none" opacity="0.65">
+                      <line x1="${leftHallX}" y1="${midHallY}" x2="${rightHallX}" y2="${midHallY}" stroke="#38bdf8" stroke-width="2" stroke-dasharray="8 6" stroke-opacity="0.35" />
+                      <rect x="${(leftHallX + rightHallX)/2 - 130}" y="${midHallY - 9}" width="260" height="18" rx="4" fill="#0f172a" fill-opacity="0.85" stroke="#38bdf8" stroke-width="1" />
+                      <text x="${(leftHallX + rightHallX)/2}" y="${midHallY + 4}" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle" letter-spacing="1">HÀNH LANG VẬN CHUYỂN & LỐI ĐI BỘ (MAIN AISLE)</text>
+                  </g>
+              `;
+          }
+      } else {
+          if (viewInfo) viewInfo.innerText = 'Tỉ lệ chuẩn 100m x 70m';
+      }
+
+      // 2. Map Stops to Canvas Coordinates
       const points = stops.map((stop, i) => {
           let x = 100 + ((i % 5) * 180);
           let y = 120 + (Math.floor(i / 5) * 200);
 
-          if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined) {
-              // Standard 100m x 70m mapped to 1000px x 700px
-              x = Math.max(60, Math.min(940, stop.coords.x * 10));
-              y = Math.max(60, Math.min(640, stop.coords.y * 10));
-          } else if (stop.floorNumber) {
-              // Spread logically across floors if no explicit 2D coords
-              const floorOffset = ((stop.floorNumber - 1) % 4) * 120;
-              x = 120 + ((i * 140) % 760);
-              y = 100 + floorOffset + ((i * 30) % 150);
+          if (mapper) {
+              // Priority 1: Stop has explicit coords
+              if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined) {
+                  const pt = mapper.mToPx(stop.coords.x, stop.coords.y);
+                  x = pt.x; y = pt.y;
+              }
+              // Priority 2: Stop matches a zone in LOCATIONS_LIST
+              else if (stop.locationId && Array.isArray(LOCATIONS_LIST)) {
+                  const loc = LOCATIONS_LIST.find(l => String(l.id) === String(stop.locationId));
+                  if (loc && loc.center_x !== null && loc.center_x !== undefined) {
+                      const pt = mapper.mToPx(loc.center_x, loc.center_y);
+                      x = pt.x; y = pt.y;
+                  }
+              }
+              // Priority 3: Stop matches an asset in ASSETS_MAP
+              else if (stop.assetName && window.ASSETS_MAP) {
+                  const ast = Object.values(window.ASSETS_MAP).find(a => a.name === stop.assetName);
+                  if (ast && ast.coords_x !== null && ast.coords_x !== undefined) {
+                      const pt = mapper.mToPx(ast.coords_x, ast.coords_y);
+                      x = pt.x; y = pt.y;
+                  }
+              }
+          } else {
+              if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined) {
+                  x = Math.max(60, Math.min(940, stop.coords.x * 10));
+                  y = Math.max(60, Math.min(640, stop.coords.y * 10));
+              } else if (stop.floorNumber) {
+                  const floorOffset = ((stop.floorNumber - 1) % 4) * 120;
+                  x = 120 + ((i * 140) % 760);
+                  y = 100 + floorOffset + ((i * 30) % 150);
+              }
           }
           return { x, y, stop, index: i };
       });
 
-      // 1. Draw Connecting Paths
+      // 3. Draw Connecting Paths Along Open Corridors / Hallways
       for (let i = 0; i < points.length - 1; i++) {
           const p1 = points[i];
           const p2 = points[i + 1];
@@ -4077,30 +4346,62 @@
           const strokeColor = isUrgentEdge ? '#ef4444' : '#f59e0b';
           const markerUrl = isUrgentEdge ? 'url(#tsp-arrow-urgent)' : 'url(#tsp-arrow)';
 
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          path.setAttribute('x1', p1.x);
-          path.setAttribute('y1', p1.y);
-          path.setAttribute('x2', p2.x);
-          path.setAttribute('y2', p2.y);
-          path.setAttribute('stroke', strokeColor);
-          path.setAttribute('stroke-width', isUrgentEdge ? '3.5' : '2.5');
-          path.setAttribute('stroke-dasharray', isUrgentEdge ? 'none' : '6 4');
-          path.setAttribute('marker-end', markerUrl);
-          path.setAttribute('opacity', '0.9');
-          routesLayer.appendChild(path);
+          // Path routing through corridors:
+          // Leave p1 room, enter hallway (midHallY), walk along hallway, turn into p2 room
+          let pathD = '';
+          if (mapper && Math.abs(p1.y - p2.y) > 25) {
+              pathD = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L ${p1.x.toFixed(1)} ${midHallY.toFixed(1)} L ${p2.x.toFixed(1)} ${midHallY.toFixed(1)} L ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+          } else {
+              pathD = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+          }
+
+          // A. Glow Underlay
+          const glow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          glow.setAttribute('d', pathD);
+          glow.setAttribute('fill', 'none');
+          glow.setAttribute('stroke', strokeColor);
+          glow.setAttribute('stroke-width', isUrgentEdge ? '6.5' : '5');
+          glow.setAttribute('stroke-opacity', '0.28');
+          glow.setAttribute('stroke-linejoin', 'round');
+          glow.setAttribute('stroke-linecap', 'round');
+          routesLayer.appendChild(glow);
+
+          // B. Main Route Line
+          const mainLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          mainLine.setAttribute('d', pathD);
+          mainLine.setAttribute('fill', 'none');
+          mainLine.setAttribute('stroke', strokeColor);
+          mainLine.setAttribute('stroke-width', isUrgentEdge ? '3.5' : '2.5');
+          mainLine.setAttribute('stroke-linejoin', 'round');
+          mainLine.setAttribute('stroke-linecap', 'round');
+          mainLine.setAttribute('marker-end', markerUrl);
+          routesLayer.appendChild(mainLine);
+
+          // C. Animated Flowing Dash Overlay (Walking direction stream)
+          const dashFlow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          dashFlow.setAttribute('d', pathD);
+          dashFlow.setAttribute('fill', 'none');
+          dashFlow.setAttribute('stroke', '#ffffff');
+          dashFlow.setAttribute('stroke-width', '1.5');
+          dashFlow.setAttribute('stroke-dasharray', '6 8');
+          dashFlow.setAttribute('stroke-linejoin', 'round');
+          dashFlow.setAttribute('stroke-linecap', 'round');
+          dashFlow.setAttribute('class', 'tsp-flow-dash');
+          dashFlow.setAttribute('opacity', '0.8');
+          routesLayer.appendChild(dashFlow);
       }
 
-      // 2. Draw Stop Markers
+      // 4. Draw Stop Markers
       points.forEach(p => {
           const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-          g.setAttribute('transform', `translate(${p.x}, ${p.y})`);
+          g.setAttribute('transform', `translate(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`);
 
           const isUrgent = p.stop.priority === 'URGENT';
           const isStart = p.stop.type === 'DEPOT' || p.stop.type === 'CURRENT_LOCATION';
           const isWh = p.stop.type === 'WAREHOUSE';
 
           let fillColor = '#f59e0b';
-          let radius = 16;
+          let radius = 15;
           if (isUrgent) fillColor = '#ef4444';
           else if (isStart) fillColor = '#10b981';
           else if (isWh) fillColor = '#f97316';
@@ -4109,7 +4410,7 @@
           const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
           halo.setAttribute('r', radius + 5);
           halo.setAttribute('fill', fillColor);
-          halo.setAttribute('opacity', '0.25');
+          halo.setAttribute('opacity', '0.28');
           g.appendChild(halo);
 
           // Inner circle
@@ -4132,16 +4433,31 @@
           g.appendChild(text);
 
           // Name label under marker
+          const shortName = p.stop.workOrderCode || p.stop.name.substring(0, 14);
+          const labelText = `${shortName} (${p.stop.estimatedArrival || ''})`;
+          const textWidth = Math.min(170, labelText.length * 6.5 + 16);
+
+          const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          labelBg.setAttribute('x', (-textWidth / 2).toFixed(1));
+          labelBg.setAttribute('y', (radius + 4).toFixed(1));
+          labelBg.setAttribute('width', textWidth.toFixed(1));
+          labelBg.setAttribute('height', '18');
+          labelBg.setAttribute('rx', '4');
+          labelBg.setAttribute('fill', '#0f172a');
+          labelBg.setAttribute('fill-opacity', '0.88');
+          labelBg.setAttribute('stroke', '#334155');
+          labelBg.setAttribute('stroke-width', '1');
+          g.appendChild(labelBg);
+
           const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           label.setAttribute('x', '0');
-          label.setAttribute('y', radius + 15);
+          label.setAttribute('y', (radius + 16).toFixed(1));
           label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('fill', '#e2e8f0');
-          label.setAttribute('font-size', '10');
+          label.setAttribute('fill', '#f8fafc');
+          label.setAttribute('font-size', '9.5');
           label.setAttribute('font-weight', 'bold');
           label.setAttribute('font-family', 'sans-serif');
-          const shortName = p.stop.workOrderCode || p.stop.name.substring(0, 14);
-          label.textContent = `${shortName} (${p.stop.estimatedArrival || ''})`;
+          label.textContent = labelText;
           g.appendChild(label);
 
           stopsLayer.appendChild(g);

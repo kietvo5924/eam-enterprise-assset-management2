@@ -2000,7 +2000,7 @@ def portal_work_orders(request):
 
     # Available Zones & Locations Master Data
     from assets.models import Location
-    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
+    locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id', 'description'))
     loc_codes = [l['code'] for l in locations_list if l['code']]
     asset_zones = list(Asset.objects.filter(tenant_id=tenant_id).exclude(zone_id='').values_list('zone_id', flat=True).distinct())
     available_zones = sorted(list(set(loc_codes + asset_zones)))
@@ -2024,6 +2024,7 @@ def portal_work_orders(request):
         'assets_json': json.dumps(assets_dict),
         'users': technicians,
         'technicians': technicians,
+        'technicians_list': technicians,
         'tools': tools,
         'skills': skills,
         'cert_types': cert_types,
@@ -2037,6 +2038,7 @@ def portal_work_orders(request):
         'user_floorplan_id': user_fp_id or '',
         'user_floorplan_name': user_fp_name or '',
         'user_is_restricted_floorplan': user_is_restricted_floorplan,
+        'current_user_id': str(request.user.id),
     })
 
 @login_required(login_url='portal_login')

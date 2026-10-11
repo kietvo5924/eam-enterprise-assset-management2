@@ -80,8 +80,14 @@ class OptimizeRouteView(APIView):
                 assigned_to=technician,
                 status__in=['OPEN', 'IN_PROGRESS', 'ASSIGNED', 'PENDING']
             ))
+            if not work_orders:
+                work_orders = list(qs.filter(
+                    status__in=['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'OPEN', 'CREATED']
+                ).order_by('-priority', 'created_at')[:10])
         else:
-            work_orders = []
+            work_orders = list(qs.filter(
+                status__in=['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'OPEN', 'CREATED']
+            ).order_by('-priority', 'created_at')[:10])
 
         start_time_mins = parse_start_time_str(data.get('startTime'))
         service = TSPRoutingService(tenant=tenant)
