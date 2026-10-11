@@ -101,7 +101,10 @@ class WorkOrderListView(APIView):
             coords_y=coords_y,
             floor_level=floor_level,
             zone_id=zone_id,
-            required_skill=data.get('requiredSkill', 'GENERAL') or 'GENERAL'
+            required_skill=data.get('requiredSkill', 'GENERAL') or 'GENERAL',
+            incident_location_id=data.get('incidentLocationId'),
+            maintenance_window_start=data.get('maintenanceWindowStart'),
+            maintenance_window_end=data.get('maintenanceWindowEnd'),
         )
         
         # Save Checklists

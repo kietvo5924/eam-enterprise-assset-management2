@@ -10,6 +10,7 @@ class Tenant(models.Model):
     tenant_code = models.CharField(max_length=100, unique=True, null=True, blank=True)
     service_plan = models.CharField(max_length=50, default='FREE')
     status = models.CharField(max_length=50, default='ACTIVE')
+    enable_tsp_routing = models.BooleanField(default=True, help_text='Bật/tắt tính năng tối ưu hóa lộ trình di chuyển TSP')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

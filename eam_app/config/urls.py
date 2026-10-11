@@ -50,6 +50,7 @@ urlpatterns = [
     path('api/v1/', include('notifications.urls')),
     path('api/v1/dashboard/', include('analytics.urls')),
     path('api/v1/reports/', include('analytics.report_urls')),
+    path('api/v1/routing/', include('algorithms.tsp_routing.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 

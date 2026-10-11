@@ -271,57 +271,57 @@ Dưới đây là bảng ma trận kiểm thử chi tiết hóa toàn bộ 12 k�
 
 ### 9.1. Ma Trận Kịch Bản Nghiệp Vụ & Thuật Toán Định Tuyến
 
-- [ ] **TC-TSP-01: Định tuyến tô-pô phân cấp khi không có bản đồ (No-Map Hierarchical)**
+- [x] **TC-TSP-01: Định tuyến tô-pô phân cấp khi không có bản đồ (No-Map Hierarchical)**
   - *Mô tả*: Trường học không có bản đồ số. Có 5 phiếu: 2 phiếu ở Phòng 301, 1 phiếu ở Phòng 302, 2 phiếu ở Tầng 1.
   - *Kỳ vọng*: Thuật toán tự động gom việc: Sửa xong toàn bộ các phòng ở Tầng 3 trước rồi mới xuống Tầng 1; không chạy đi chạy lại giữa các tầng.
 
-- [ ] **TC-TSP-02: Định tuyến tài sản di động theo vị trí sự cố (Movable Asset Context)**
+- [x] **TC-TSP-02: Định tuyến tài sản di động theo vị trí sự cố (Movable Asset Context)**
   - *Mô tả*: Cái bàn `TB-01` có vị trí gốc ở Phòng 101, nhưng phiếu báo hỏng ghi tại Phòng 204.
   - *Kỳ vọng*: Chặng di chuyển được tính toán dẫn tới Phòng 204, không dẫn tới Phòng 101.
 
-- [ ] **TC-TSP-03: Phân lớp khẩn cấp cho cụm nhiều việc URGENT (Tiered TSP)**
+- [x] **TC-TSP-03: Phân lớp khẩn cấp cho cụm nhiều việc URGENT (Tiered TSP)**
   - *Mô tả*: Có 3 việc `URGENT` ở 3 vị trí khác nhau và 4 việc bình thường.
   - *Kỳ vọng*: Thuật toán giải TSP tối ưu đường đi qua riêng 3 việc URGENT trước; sau khi giải quyết xong mới tiếp tục đi qua 4 việc bình thường.
 
-- [ ] **TC-TSP-04: Ràng buộc khung thời gian cho phép bảo trì (TSPTW)**
+- [x] **TC-TSP-04: Ràng buộc khung thời gian cho phép bảo trì (TSPTW)**
   - *Mô tả*: Máy nén khí chỉ cho dừng máy từ 11:30 đến 12:30.
   - *Kỳ vọng*: Lộ trình tự động xếp máy nén khí vào khung giờ từ 11:30 đến 12:30; không đến sớm lúc 9:00 sáng.
 
-- [ ] **TC-TSP-05: Ma trận bất đối xứng do lối đi 1 chiều (Asymmetric ATSP)**
+- [x] **TC-TSP-05: Ma trận bất đối xứng do lối đi 1 chiều (Asymmetric ATSP)**
   - *Mô tả*: Đi từ A đến B qua cửa 1 chiều mất 20m, nhưng từ B về A phải đi đường vòng mất 120m.
   - *Kỳ vọng*: Thuật toán tính toán đúng ma trận có hướng $D(A,B) \ne D(B,A)$, không áp dụng phép đảo ngược làm vi phạm đường 1 chiều.
 
-- [ ] **TC-TSP-06: Trạm dừng trung gian về kho nhận vật tư (Intermediate Pit-stop)**
+- [x] **TC-TSP-06: Trạm dừng trung gian về kho nhận vật tư (Intermediate Pit-stop)**
   - *Mô tả*: Thợ đang sửa ở máy 3 bấm "Về kho lấy vật tư".
   - *Kỳ vọng*: Lộ trình chèn trạm dừng Kho vật tư ngay sau máy 3 và tái định tuyến từ Kho tới các máy 4, 5.
 
-- [ ] **TC-TSP-07: Tái định tuyến động giữa ca từ vị trí hiện tại (Dynamic Mid-shift Re-routing)**
+- [x] **TC-TSP-07: Tái định tuyến động giữa ca từ vị trí hiện tại (Dynamic Mid-shift Re-routing)**
   - *Mô tả*: Thợ đang ở trạm 2 thì phát sinh việc khẩn cấp mới.
   - *Kỳ vọng*: Lộ trình tái tính toán lấy vị trí trạm 2 làm điểm xuất phát mới $v_0$, không tính lại từ Kho ban đầu.
 
-- [ ] **TC-TSP-08: Phạt chi phí di chuyển thẳng đứng giữa các tầng (Multi-Floor Penalty)**
+- [x] **TC-TSP-08: Phạt chi phí di chuyển thẳng đứng giữa các tầng (Multi-Floor Penalty)**
   - *Mô tả*: Đi cùng Tầng 1 cách nhau 40m vs leo lên Tầng 3 cách 10m theo phương thẳng đứng.
   - *Kỳ vọng*: Hệ thống ưu tiên giải quyết các máy cùng Tầng 1 trước, hạn chế việc leo cầu thang liên tục.
 
 ### 9.2. Ma Trận Kịch Bản Kỹ Thuật, Ngoại Tuyến & An Toàn
 
-- [ ] **TC-TSP-09: Hoạt động ngoại tuyến trên Mobile (Offline Route Cache)**
+- [x] **TC-TSP-09: Hoạt động ngoại tuyến trên Mobile (Offline Route Cache)**
   - *Mô tả*: Thiết bị di động bị ngắt kết nối mạng Internet dưới tầng hầm.
   - *Kỳ vọng*: Ứng dụng vẫn hiển thị đầy đủ danh sách thứ tự trạm dừng và chỉ dẫn phòng ban từ bộ đệm SQLite nội bộ.
 
-- [ ] **TC-TSP-10: Tự động Fallback khi dữ liệu tọa độ rỗng (Graceful No-Map Degradation)**
+- [x] **TC-TSP-10: Tự động Fallback khi dữ liệu tọa độ rỗng (Graceful No-Map Degradation)**
   - *Mô tả*: Dữ liệu hoàn toàn không có tọa độ $X, Y$ và không có tên phòng (chỉ có danh sách việc).
   - *Kỳ vọng*: Hệ thống tự động chuyển sang sắp xếp theo thứ tự ưu tiên khẩn cấp và hạn chót (`priority` + `due_date`), không phát sinh lỗi HTTP 500.
 
-- [ ] **TC-TSP-11: Quét mã QR cập nhật vị trí tài sản di động (Scan-to-Relocate)**
+- [x] **TC-TSP-11: Quét mã QR cập nhật vị trí tài sản di động (Scan-to-Relocate)**
   - *Mô tả*: Quét QR của bàn học tại Phòng 204.
   - *Kỳ vọng*: Ứng dụng di động cập nhật `current_location_id` của bàn về Phòng 204 thành công.
 
-- [ ] **TC-TSP-12: Cách ly dữ liệu vị trí đa khách hàng (Multi-Tenant Isolation)**
+- [x] **TC-TSP-12: Cách ly dữ liệu vị trí đa khách hàng (Multi-Tenant Isolation)**
   - *Mô tả*: Tenant A và Tenant B cùng tối ưu lộ trình.
   - *Kỳ vọng*: Cây vị trí và lộ trình của Tenant A hoàn toàn không thể bị truy xuất bởi người dùng Tenant B.
 
-- [ ] **TC-TSP-13: Cờ bật/tắt tính năng theo gói Tenant & Sắp xếp ưu tiên không vị trí (Zero-Location Fallback)**
+- [x] **TC-TSP-13: Cờ bật/tắt tính năng theo gói Tenant & Sắp xếp ưu tiên không vị trí (Zero-Location Fallback)**
   - *Mô tả*: Cấu hình Tenant có `ENABLE_TSP_ROUTING = False`. Kỹ thuật viên gọi API lấy danh sách việc trong ngày.
   - *Kỳ vọng*: Hệ thống không chạy thuật toán ma trận TSP; trả về danh sách công việc thuần túy được sắp xếp theo `priority` và `due_date` kèm cờ `routingEnabled: false`; Web/Mobile ẩn hoàn toàn bản đồ và nút tối ưu; không phát sinh lỗi hệ thống.
 
@@ -387,20 +387,20 @@ def solve_tiered_tsp(start_node, work_orders, distance_matrix):
 
 ## 11. Kế Hoạch Triển Khai & Nghiệm Thu (Implementation Checklist)
 
-- [ ] **Task 11.3.1 — Multi-Tier Distance Engine with Topological Hierarchy**
-  - [ ] Cài đặt thuật toán tính khoảng cách bậc thang tô-pô không cần bản đồ (Cơ sở $\rightarrow$ Tòa nhà $\rightarrow$ Tầng $\rightarrow$ Phòng).
-  - [ ] Hỗ trợ khoảng cách lưới Manhattan 2D và GPS Haversine.
-  - [ ] Tích hợp xử lý tài sản di động theo vị trí sự cố trên Work Order.
-- [ ] **Task 11.3.2 — Core Tiered ATSP & Time Window Solver**
-  - [ ] Cài đặt thuật toán phân lớp khẩn cấp (Tiered TSP).
-  - [ ] Cài đặt thuật toán TSP with Time Windows (TSPTW) xử lý khung giờ cho phép dừng máy.
-  - [ ] Cài đặt thuật toán Or-opt / Relocate Move cho ma trận bất đối xứng (ATSP).
-- [ ] **Task 11.3.3 — Dynamic Mid-Shift Re-routing & Pit-Stop APIs**
-  - [ ] Endpoint tối ưu lộ trình ban đầu: `POST /api/v1/routing/optimize-route/`.
-  - [ ] Endpoint tái định tuyến giữa ca: `POST /api/v1/routing/re-route-mid-shift/` hỗ trợ trạm dừng kho và vị trí hiện tại.
-- [ ] **Task 11.3.4 — Mobile & Web UI Integration**
-  - [ ] Giao diện Mobile hiển thị thứ tự trạm dừng và nút bấm "Về kho lấy vật tư".
-  - [ ] Tích hợp quét mã QR cập nhật vị trí tài sản di động (Scan-to-Relocate).
-  - [ ] Bộ đệm ngoại tuyến lưu lộ trình trên thiết bị di động.
-- [ ] **Task 11.3.5 — Verification & Testing Suite**
-  - [ ] Viết test cases kiểm thử đầy đủ 12 kịch bản chấp nhận (`TC-TSP-01` đến `TC-TSP-12`).
+- [x] **Task 11.3.1 — Multi-Tier Distance Engine with Topological Hierarchy**
+  - [x] Cài đặt thuật toán tính khoảng cách bậc thang tô-pô không cần bản đồ (Cơ sở $\rightarrow$ Tòa nhà $\rightarrow$ Tầng $\rightarrow$ Phòng).
+  - [x] Hỗ trợ khoảng cách lưới Manhattan 2D và GPS Haversine.
+  - [x] Tích hợp xử lý tài sản di động theo vị trí sự cố trên Work Order.
+- [x] **Task 11.3.2 — Core Tiered ATSP & Time Window Solver**
+  - [x] Cài đặt thuật toán phân lớp khẩn cấp (Tiered TSP).
+  - [x] Cài đặt thuật toán TSP with Time Windows (TSPTW) xử lý khung giờ cho phép dừng máy.
+  - [x] Cài đặt thuật toán Or-opt / Relocate Move cho ma trận bất đối xứng (ATSP).
+- [x] **Task 11.3.3 — Dynamic Mid-Shift Re-routing & Pit-Stop APIs**
+  - [x] Endpoint tối ưu lộ trình ban đầu: `POST /api/v1/routing/optimize-route/`.
+  - [x] Endpoint tái định tuyến giữa ca: `POST /api/v1/routing/re-route-mid-shift/` hỗ trợ trạm dừng kho và vị trí hiện tại.
+- [x] **Task 11.3.4 — Mobile & Web UI Integration**
+  - [x] Giao diện Mobile hiển thị thứ tự trạm dừng và nút bấm "Về kho lấy vật tư".
+  - [x] Tích hợp quét mã QR cập nhật vị trí tài sản di động (Scan-to-Relocate).
+  - [x] Bộ đệm ngoại tuyến lưu lộ trình trên thiết bị di động.
+- [x] **Task 11.3.5 — Verification & Testing Suite**
+  - [x] Viết test cases kiểm thử đầy đủ 13 kịch bản chấp nhận (`TC-TSP-01` đến `TC-TSP-13`).

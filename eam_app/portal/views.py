@@ -1667,6 +1667,25 @@ def portal_work_orders(request):
                     else:  # MEDIUM
                         deadline_dt = now_dt + timedelta(hours=24)
 
+                # Phase 11.3 TSP routing fields
+                incident_loc_id = data.get('incident_location_id')
+                if not incident_loc_id and zone_id:
+                    from assets.models import Location
+                    loc_match = Location.objects.filter(tenant_id=tenant_id, id=zone_id).first()
+                    if not loc_match:
+                        loc_match = Location.objects.filter(tenant_id=tenant_id, code=zone_id).first()
+                    if loc_match:
+                        incident_loc_id = loc_match.id
+
+                def parse_time_val(t_val):
+                    if not t_val:
+                        return None
+                    try:
+                        from datetime import datetime
+                        return datetime.strptime(str(t_val).strip()[:5], '%H:%M').time()
+                    except Exception:
+                        return None
+
                 wo = WorkOrder.objects.create(
                     tenant_id=tenant_id,
                     title=data.get('title'),
@@ -1687,7 +1706,10 @@ def portal_work_orders(request):
                     zone_id=zone_id or '',
                     floor_level=floor_level,
                     coords_x=coords_x,
-                    coords_y=coords_y
+                    coords_y=coords_y,
+                    incident_location_id=incident_loc_id,
+                    maintenance_window_start=parse_time_val(data.get('maintenance_window_start')),
+                    maintenance_window_end=parse_time_val(data.get('maintenance_window_end')),
                 )
                 return JsonResponse({'success': True, 'id': str(wo.id)})
         except Exception as e:
@@ -1852,6 +1874,28 @@ def portal_work_orders(request):
                     wo.coords_x = float(data.get('coords_x'))
                 if 'coords_y' in data and data.get('coords_y') is not None:
                     wo.coords_y = float(data.get('coords_y'))
+                if 'incident_location_id' in data:
+                    wo.incident_location_id = data.get('incident_location_id') or None
+                if 'maintenance_window_start' in data:
+                    raw_s = data.get('maintenance_window_start')
+                    if raw_s:
+                        try:
+                            from datetime import datetime
+                            wo.maintenance_window_start = datetime.strptime(str(raw_s).strip()[:5], '%H:%M').time()
+                        except Exception:
+                            pass
+                    else:
+                        wo.maintenance_window_start = None
+                if 'maintenance_window_end' in data:
+                    raw_e = data.get('maintenance_window_end')
+                    if raw_e:
+                        try:
+                            from datetime import datetime
+                            wo.maintenance_window_end = datetime.strptime(str(raw_e).strip()[:5], '%H:%M').time()
+                        except Exception:
+                            pass
+                    else:
+                        wo.maintenance_window_end = None
 
                 wo.save()
                 return JsonResponse({'success': True})

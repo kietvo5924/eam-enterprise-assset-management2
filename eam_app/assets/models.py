@@ -10,27 +10,52 @@ class Location(BaseTenantModel):
         ('GENERAL', 'Chung / Toàn nhà máy'),
     )
 
+    LOCATION_TYPE_CHOICES = (
+        ('SITE', 'Cơ sở'),
+        ('BUILDING', 'Tòa nhà'),
+        ('FLOOR', 'Tầng'),
+        ('ROOM', 'Phòng / Phân khu'),
+        ('WAREHOUSE', 'Kho vật tư'),
+    )
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     parent_id = models.CharField(max_length=255, null=True, blank=True)
     code = models.CharField(max_length=64, blank=True, default='')
     name = models.CharField(max_length=255)
     zone_type = models.CharField(max_length=32, choices=ZONE_TYPE_CHOICES, default='STANDARD')
+    location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='ROOM', blank=True, help_text='Phân loại theo cây tô-pô phân cấp')
     description = models.TextField(null=True, blank=True)
     floorplan_image = models.TextField(blank=True, default='', help_text='URL hoặc Data URI ảnh sơ đồ mặt bằng')
     center_x = models.FloatField(default=0.0, null=True, blank=True)
     center_y = models.FloatField(default=0.0, null=True, blank=True)
     floor_level = models.SmallIntegerField(default=1)
+    pixel_to_meter_ratio = models.FloatField(default=10.0, null=True, blank=True, help_text='Tỷ lệ quy đổi pixel sang mét trên sơ đồ mặt bằng (mặc định 10px = 1m)')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
     updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
     
+    @property
+    def floor_number(self):
+        return self.floor_level
+
+    @floor_number.setter
+    def floor_number(self, value):
+        self.floor_level = value
+
+    def get_parent_location(self):
+        """Trả về thực thể Location cha một cách an toàn."""
+        if not self.parent_id:
+            return None
+        return Location.objects.filter(tenant=self.tenant, id=self.parent_id).first()
+
     class Meta:
         db_table = 'locations'
         indexes = [
             models.Index(fields=['tenant', 'code']),
             models.Index(fields=['tenant', 'zone_type']),
+            models.Index(fields=['tenant', 'location_type']),
         ]
 
     def __str__(self):

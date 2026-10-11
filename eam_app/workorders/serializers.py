@@ -64,6 +64,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     coordsY = serializers.FloatField(source='coords_y', read_only=True)
     floorLevel = serializers.IntegerField(source='floor_level', read_only=True)
     zoneId = serializers.CharField(source='zone_id', read_only=True)
+    incidentLocationId = serializers.UUIDField(source='incident_location.id', read_only=True, default=None)
+    maintenanceWindowStart = serializers.TimeField(source='maintenance_window_start', read_only=True, default=None)
+    maintenanceWindowEnd = serializers.TimeField(source='maintenance_window_end', read_only=True, default=None)
 
     asset = AssetSerializer(read_only=True)
     checklists = WorkOrderChecklistItemSerializer(many=True, read_only=True)
@@ -79,7 +82,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'estimatedDurationMinutes', 'actualDurationMinutes',
             'sourceReference', 'actualStartTime', 'assignedAt',
             'completedAt', 'resolutionNotes', 'coordsX', 'coordsY',
-            'floorLevel', 'zoneId', 'created_at', 'updated_at',
+            'floorLevel', 'zoneId', 'incidentLocationId',
+            'maintenanceWindowStart', 'maintenanceWindowEnd',
+            'created_at', 'updated_at',
             'asset', 'checklists', 'attachments', 'materials'
         ]
 
@@ -91,6 +96,9 @@ class WorkOrderCreateSerializer(serializers.Serializer):
     deadline = serializers.DateTimeField(required=False, allow_null=True)
     assignedTo = NullableUUIDField(required=False, allow_null=True)
     parentId = NullableUUIDField(required=False, allow_null=True)
+    incidentLocationId = NullableUUIDField(required=False, allow_null=True)
+    maintenanceWindowStart = serializers.TimeField(required=False, allow_null=True)
+    maintenanceWindowEnd = serializers.TimeField(required=False, allow_null=True)
     sourceReference = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     estimatedDurationMinutes = serializers.IntegerField(required=False, allow_null=True)
     checklists = serializers.ListField(

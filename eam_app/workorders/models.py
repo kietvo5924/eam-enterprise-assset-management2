@@ -73,6 +73,25 @@ class WorkOrder(BaseTenantModel):
     zone_id = models.CharField(max_length=64, blank=True, default='')
     # Phase 11.2: Genetic Algorithm Optimization Fields
     required_spare_parts = models.JSONField(default=list, blank=True)
+    # Phase 11.3: Technician Routing Optimization (TSP) Fields
+    incident_location = models.ForeignKey(
+        'assets.Location',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incident_work_orders',
+        help_text='Vị trí thực tế nơi phát sinh sự cố (ưu tiên trên lộ trình TSP)'
+    )
+    maintenance_window_start = models.TimeField(
+        null=True,
+        blank=True,
+        help_text='Khung giờ bắt đầu cho phép dừng máy để bảo trì'
+    )
+    maintenance_window_end = models.TimeField(
+        null=True,
+        blank=True,
+        help_text='Khung giờ kết thúc cho phép dừng máy để bảo trì'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

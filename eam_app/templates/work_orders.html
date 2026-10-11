@@ -39,6 +39,15 @@
       >
         <i class="ph-bold ph-calendar-check"></i> <span>Lập lịch cả ca nhiều việc</span>
       </button>
+      <button 
+        type="button"
+        id="btn-tsp-routing"
+        onclick="openTSPRoutingModal()"
+        class="flex-1 sm:flex-none bg-gradient-to-r from-amber-500 via-orange-600 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl h-9 px-3.5 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all hover:shadow-md cursor-pointer"
+        title="Tối ưu lộ trình di chuyển: Sắp xếp thứ tự các điểm dừng theo sơ đồ hoặc cây tô-pô phòng ban (Giải thuật TSP / TSPTW)"
+      >
+        <i class="ph-bold ph-path"></i> <span>Tối ưu lộ trình di chuyển</span>
+      </button>
       {% if 'work_order:create' in user_permissions %}
       <button 
         onclick="openWoModal()"
@@ -1242,6 +1251,214 @@
         <button type="button" onclick="confirmFloorplanForWo()" class="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary-600 text-white text-sm font-bold shadow-md shadow-primary/25 transition flex items-center gap-2">
           <i class="ph ph-check-circle text-base"></i>
           <span>Xác nhận Tọa độ này</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Tối Ưu Hóa Lộ Trình Di Chuyển (TSP / TSPTW Route Visualizer) -->
+<div id="modal-tsp-routing" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-md hidden z-[120] flex items-center justify-center p-2 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+    <!-- Modal Header -->
+    <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-neutral-900 to-amber-950 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0 border-b border-slate-800">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 text-xl font-bold">
+          <i class="ph-bold ph-path"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-base font-black text-white m-0">Tối Ưu Hóa Lộ Trình Di Chuyển Kỹ Thuật Viên</h3>
+            <span id="tsp-badge-mode" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+              Đang tải...
+            </span>
+          </div>
+          <p class="text-xs text-slate-300 m-0 mt-0.5">Sắp xếp chặng di chuyển ngắn nhất, gom tầng/phòng, tôn trọng khung giờ dừng máy TSPTW</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="closeTSPRoutingModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer">
+          <i class="ph ph-x text-base"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Controls & Filter Toolbar -->
+    <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-bold text-neutral-600">Kỹ thuật viên:</label>
+          <select id="tsp-select-technician" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
+            <option value="">-- Tất cả phiếu đã chọn / Đầu ca --</option>
+            {% for tech in technicians_list %}
+            <option value="{{ tech.id }}">{{ tech.username }} ({{ tech.first_name }} {{ tech.last_name }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-bold text-neutral-600">Giờ bắt đầu:</label>
+          <input type="time" id="tsp-start-time" value="08:00" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-amber-500">
+        </div>
+
+        <label class="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 cursor-pointer select-none">
+          <input type="checkbox" id="tsp-return-depot" checked class="rounded text-amber-600 focus:ring-amber-500">
+          <span>Quay về kho cuối ca</span>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="requestTSPPitstop()" id="btn-tsp-pitstop" class="px-3 py-1.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Quy tắc 6: Chèn trạm dừng Kho vật tư ngay sau trạm hiện tại">
+          <i class="ph-bold ph-package"></i>
+          <span>Về kho lấy vật tư</span>
+        </button>
+        <button type="button" onclick="requestTSPRerouteMidshift()" id="btn-tsp-reroute" class="px-3 py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Quy tắc 7: Tái định tuyến từ vị trí hiện tại">
+          <i class="ph-bold ph-arrows-clockwise"></i>
+          <span>Tái định tuyến từ vị trí này</span>
+        </button>
+        <button type="button" onclick="calculateTSPRoute()" id="btn-tsp-calculate" class="px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+          <i class="ph-bold ph-lightning"></i>
+          <span>Tính toán lộ trình</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI Metric Cards Bar -->
+    <div class="px-6 py-2.5 bg-white border-b border-neutral-200 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg">
+          <i class="ph-bold ph-clock"></i>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Tổng thời gian</span>
+          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-time">-- phút</span>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-lg">
+          <i class="ph-bold ph-footprints"></i>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Tổng quãng đường</span>
+          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-distance">-- m</span>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center text-lg">
+          <i class="ph-bold ph-map-pin"></i>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Số trạm dừng</span>
+          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-stops">0 trạm</span>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-lg">
+          <i class="ph-bold ph-hourglass-simple"></i>
+        </div>
+        <div>
+          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Ràng buộc khung giờ</span>
+          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-tw">Tối ưu</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dual Panel View -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-100">
+      <!-- Left Panel: Stops Timeline -->
+      <div class="w-full md:w-5/12 bg-white border-r border-neutral-200 flex flex-col overflow-hidden">
+        <div class="p-3 bg-neutral-50/80 border-b border-neutral-200 flex items-center justify-between">
+          <span class="text-xs font-black text-neutral-800 uppercase tracking-wide flex items-center gap-1.5">
+            <i class="ph-bold ph-list-numbers text-amber-600"></i> Danh Sách Thứ Tự Chặng
+          </span>
+          <span class="text-[11px] text-neutral-500 font-medium" id="tsp-stops-count-sub">0 chặng</span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="tsp-stops-timeline">
+          <div class="py-12 text-center text-neutral-400 text-xs">
+            <i class="ph-bold ph-circle-notch animate-spin text-2xl text-amber-500 mb-2 block"></i>
+            Đang tải dữ liệu lộ trình tối ưu...
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Dual Visualizer (Map / Stepper Tree) -->
+      <div class="w-full md:w-7/12 flex flex-col overflow-hidden bg-slate-950">
+        <!-- Tab Bar -->
+        <div class="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div class="flex items-center gap-2">
+            <button type="button" id="tab-btn-tsp-map" onclick="switchTSPTab('map')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-map-trifold"></i> <span>Sơ Đồ Mặt Bằng 2D</span>
+            </button>
+            <button type="button" id="tab-btn-tsp-tree" onclick="switchTSPTab('tree')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-tree-structure"></i> <span>Cây Lộ Trình Phân Cấp (No-Map)</span>
+            </button>
+          </div>
+          <div class="text-[11px] text-slate-400 font-mono" id="tsp-view-info">
+            Tỉ lệ chuẩn 100m x 70m
+          </div>
+        </div>
+
+        <!-- Tab 1: Map View -->
+        <div id="tsp-tab-content-map" class="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center p-3 select-none">
+          <svg id="tsp-route-svg" class="w-full h-full rounded-2xl border border-slate-800 shadow-2xl" viewBox="0 0 1000 700" preserveAspectRatio="none">
+            <defs>
+              <pattern id="tsp-fp-grid-major" width="200" height="175" patternUnits="userSpaceOnUse">
+                <path d="M 200 0 L 0 0 0 175" fill="none" stroke="#1e293b" stroke-width="1.2"/>
+              </pattern>
+              <pattern id="tsp-fp-grid-minor" width="50" height="43.75" patternUnits="userSpaceOnUse">
+                <path d="M 50 0 L 0 0 0 43.75" fill="none" stroke="#0f172a" stroke-width="0.6"/>
+              </pattern>
+              <!-- Arrow marker for directed edges -->
+              <marker id="tsp-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b"/>
+              </marker>
+              <marker id="tsp-arrow-urgent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444"/>
+              </marker>
+            </defs>
+            <rect width="100%" height="100%" fill="#070b13" />
+            <rect width="100%" height="100%" fill="url(#tsp-fp-grid-minor)" />
+            <rect width="100%" height="100%" fill="url(#tsp-fp-grid-major)" />
+            <rect x="50" y="40" width="910" height="620" rx="8" stroke="#334155" stroke-width="2" fill="#0f172a" fill-opacity="0.2"/>
+            <!-- Dynamic route layers -->
+            <g id="tsp-svg-routes-layer"></g>
+            <g id="tsp-svg-stops-layer"></g>
+          </svg>
+        </div>
+
+        <!-- Tab 2: Hierarchical Stepper Tree View (No-Map) -->
+        <div id="tsp-tab-content-tree" class="hidden flex-1 overflow-y-auto p-5 space-y-4 bg-slate-900/60">
+          <div class="p-3 bg-slate-800/80 rounded-xl border border-slate-700 text-xs text-slate-300 flex items-start gap-2.5">
+            <i class="ph-bold ph-info text-amber-400 text-base mt-0.5"></i>
+            <div>
+              <span class="font-bold text-slate-100 block mb-0.5">Mô hình Định tuyến Tô-pô Phân cấp (Topological Hierarchy)</span>
+              Hệ thống tự động gom các việc cùng phòng, cùng tầng, và cùng tòa nhà. Tránh tối đa việc kỹ thuật viên phải leo cầu thang hay di chuyển giữa các tầng nhiều lần.
+            </div>
+          </div>
+          <div id="tsp-tree-group-container" class="space-y-3">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="px-6 py-3.5 bg-white border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+      <div class="flex items-center gap-2 text-xs text-neutral-600 font-medium" id="tsp-footer-status">
+        <i class="ph-fill ph-check-circle text-emerald-500 text-base"></i>
+        <span>Đã tối ưu hóa lộ trình thành công theo giải thuật TSP.</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="syncTSPMobileCache()" class="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Quy tắc 9: Lưu đệm lộ trình trên SQLite/Local Storage để xem offline khi mất sóng">
+          <i class="ph-bold ph-device-mobile"></i>
+          <span>Lưu đệm ngoại tuyến (Mobile)</span>
+        </button>
+        <button type="button" onclick="closeTSPRoutingModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer">
+          Đóng
         </button>
       </div>
     </div>
@@ -3424,6 +3641,571 @@
           if (typeof showToast === 'function') showToast(`Lỗi kết nối máy chủ: ${err.message}`, 'error');
           else alert(`Lỗi kết nối máy chủ: ${err.message}`);
       });
+  }
+
+  // =========================================================================
+  // TASK 11.3: TECHNICIAN ROUTING OPTIMIZATION (TSP / TSPTW VISUALIZER)
+  // =========================================================================
+  let tspCurrentRouteData = null;
+  let tspActiveTab = 'map';
+
+  function openTSPRoutingModal() {
+      const modal = document.getElementById('modal-tsp-routing');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      // Check if any work orders are checked in the main table
+      const checkedBoxes = document.querySelectorAll('.wo-row-cb:checked');
+      const selectedIds = Array.from(checkedBoxes).map(cb => cb.value).filter(Boolean);
+
+      // Pre-select technician if available
+      const techSelect = document.getElementById('tsp-select-technician');
+      if (techSelect && !techSelect.value && window.CURRENT_USER_ID) {
+          techSelect.value = window.CURRENT_USER_ID;
+      }
+
+      calculateTSPRoute(selectedIds);
+  }
+
+  function closeTSPRoutingModal() {
+      const modal = document.getElementById('modal-tsp-routing');
+      if (modal) modal.classList.add('hidden');
+  }
+
+  function switchTSPTab(tabName) {
+      tspActiveTab = tabName;
+      const btnMap = document.getElementById('tab-btn-tsp-map');
+      const btnTree = document.getElementById('tab-btn-tsp-tree');
+      const contentMap = document.getElementById('tsp-tab-content-map');
+      const contentTree = document.getElementById('tsp-tab-content-tree');
+      const viewInfo = document.getElementById('tsp-view-info');
+
+      if (tabName === 'map') {
+          if (btnMap) {
+              btnMap.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
+          }
+          if (btnTree) {
+              btnTree.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
+          }
+          if (contentMap) contentMap.classList.remove('hidden');
+          if (contentTree) contentTree.classList.add('hidden');
+          if (viewInfo) viewInfo.innerText = 'Tỉ lệ chuẩn 100m x 70m';
+      } else {
+          if (btnTree) {
+              btnTree.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
+          }
+          if (btnMap) {
+              btnMap.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
+          }
+          if (contentTree) contentTree.classList.remove('hidden');
+          if (contentMap) contentMap.classList.add('hidden');
+          if (viewInfo) viewInfo.innerText = 'Cây Tô-pô: Tòa nhà > Tầng > Phòng';
+      }
+  }
+
+  function calculateTSPRoute(preferredIds = null) {
+      const timelineEl = document.getElementById('tsp-stops-timeline');
+      const statusEl = document.getElementById('tsp-footer-status');
+      const badgeMode = document.getElementById('tsp-badge-mode');
+      const btnCalc = document.getElementById('btn-tsp-calculate');
+
+      if (timelineEl) {
+          timelineEl.innerHTML = `
+              <div class="py-12 text-center text-neutral-400 text-xs">
+                  <i class="ph-bold ph-circle-notch animate-spin text-2xl text-amber-500 mb-2 block"></i>
+                  Đang tối ưu hóa thứ tự chặng theo giải thuật TSP / TSPTW...
+              </div>
+          `;
+      }
+      if (btnCalc) btnCalc.disabled = true;
+
+      const techId = document.getElementById('tsp-select-technician')?.value || null;
+      const returnToDepot = document.getElementById('tsp-return-depot')?.checked ?? true;
+      const startTime = document.getElementById('tsp-start-time')?.value || '08:00';
+
+      let workOrderIds = preferredIds;
+      if (!workOrderIds || workOrderIds.length === 0) {
+          const checkedBoxes = document.querySelectorAll('.wo-row-cb:checked');
+          workOrderIds = Array.from(checkedBoxes).map(cb => cb.value).filter(Boolean);
+      }
+
+      const payload = {
+          technicianId: techId || null,
+          workOrderIds: workOrderIds,
+          returnToDepot: returnToDepot,
+          startTime: startTime
+      };
+
+      fetch('/api/v1/routing/optimize-route/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+          },
+          body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if (btnCalc) btnCalc.disabled = false;
+          if (!resData.success) {
+              if (timelineEl) {
+                  timelineEl.innerHTML = `<div class="p-4 rounded-xl bg-red-50 text-red-700 text-xs">${resData.message || 'Không thể tối ưu lộ trình.'}</div>`;
+              }
+              return;
+          }
+          tspCurrentRouteData = resData.data;
+          renderTSPResult(resData.data);
+      })
+      .catch(err => {
+          if (btnCalc) btnCalc.disabled = false;
+          if (timelineEl) {
+              timelineEl.innerHTML = `<div class="p-4 rounded-xl bg-red-50 text-red-700 text-xs">Lỗi kết nối máy chủ: ${err.message}</div>`;
+          }
+      });
+  }
+
+  function requestTSPPitstop() {
+      if (!tspCurrentRouteData || !tspCurrentRouteData.orderedStops || tspCurrentRouteData.orderedStops.length === 0) {
+          if (typeof showToast === 'function') showToast('Vui lòng tính toán lộ trình trước khi yêu cầu trạm dừng.', 'warning');
+          else alert('Vui lòng tính toán lộ trình trước khi yêu cầu trạm dừng.');
+          return;
+      }
+
+      const btn = document.getElementById('btn-tsp-pitstop');
+      if (btn) btn.disabled = true;
+
+      const techId = document.getElementById('tsp-select-technician')?.value || null;
+      const stops = tspCurrentRouteData.orderedStops;
+      const currentStop = stops.find(s => s.type === 'WORK_ORDER' || s.type === 'CURRENT_LOCATION') || stops[0];
+
+      const remainingIds = stops
+          .filter(s => s.type === 'WORK_ORDER' && s.workOrderId)
+          .map(s => s.workOrderId);
+
+      const payload = {
+          technicianId: techId,
+          currentLocationId: currentStop.locationId || null,
+          currentCoords: currentStop.coords || null,
+          actionTrigger: 'PIT_STOP',
+          includeWarehousePitstop: true,
+          remainingWorkOrderIds: remainingIds,
+          returnToDepot: document.getElementById('tsp-return-depot')?.checked ?? true,
+          startTime: currentStop.departureTime || '10:00'
+      };
+
+      fetch('/api/v1/routing/re-route-mid-shift/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+          },
+          body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if (btn) btn.disabled = false;
+          if (resData.success) {
+              tspCurrentRouteData = resData.data;
+              renderTSPResult(resData.data);
+              if (typeof showToast === 'function') {
+                  showToast('Đã chèn trạm dừng Kho vật tư và tái định tuyến các điểm tiếp theo!', 'success');
+              }
+          }
+      })
+      .catch(err => {
+          if (btn) btn.disabled = false;
+          alert(`Lỗi: ${err.message}`);
+      });
+  }
+
+  function requestTSPRerouteMidshift() {
+      if (!tspCurrentRouteData || !tspCurrentRouteData.orderedStops) {
+          calculateTSPRoute();
+          return;
+      }
+
+      const btn = document.getElementById('btn-tsp-reroute');
+      if (btn) btn.disabled = true;
+
+      const techId = document.getElementById('tsp-select-technician')?.value || null;
+      const stops = tspCurrentRouteData.orderedStops;
+      const currentStop = stops[1] || stops[0];
+
+      const remainingIds = stops
+          .filter(s => s.type === 'WORK_ORDER' && s.workOrderId)
+          .map(s => s.workOrderId);
+
+      const payload = {
+          technicianId: techId,
+          currentLocationId: currentStop.locationId || null,
+          currentCoords: currentStop.coords || null,
+          actionTrigger: 'DYNAMIC_RE_ROUTE',
+          includeWarehousePitstop: false,
+          remainingWorkOrderIds: remainingIds,
+          returnToDepot: document.getElementById('tsp-return-depot')?.checked ?? true,
+          startTime: currentStop.departureTime || '09:30'
+      };
+
+      fetch('/api/v1/routing/re-route-mid-shift/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+          },
+          body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(resData => {
+          if (btn) btn.disabled = false;
+          if (resData.success) {
+              tspCurrentRouteData = resData.data;
+              renderTSPResult(resData.data);
+              if (typeof showToast === 'function') {
+                  showToast('Đã tái định tuyến động thành công từ vị trí hiện trường!', 'success');
+              }
+          }
+      })
+      .catch(err => {
+          if (btn) btn.disabled = false;
+          alert(`Lỗi: ${err.message}`);
+      });
+  }
+
+  function syncTSPMobileCache() {
+      if (!tspCurrentRouteData) {
+          alert('Chưa có lộ trình để lưu đệm ngoại tuyến.');
+          return;
+      }
+      try {
+          localStorage.setItem('eam_technician_offline_tsp_route', JSON.stringify({
+              savedAt: new Date().toISOString(),
+              data: tspCurrentRouteData
+          }));
+          const msg = 'Đã lưu đệm lộ trình thành công! Kỹ thuật viên có thể xem offline dưới tầng hầm hoặc khi mất sóng.';
+          if (typeof showToast === 'function') showToast(msg, 'success');
+          else alert(msg);
+      } catch (e) {
+          alert(`Không thể lưu bộ nhớ đệm: ${e.message}`);
+      }
+  }
+
+  function renderTSPResult(data) {
+      // Update KPIs
+      const kpiTime = document.getElementById('tsp-kpi-time');
+      const kpiDistance = document.getElementById('tsp-kpi-distance');
+      const kpiStops = document.getElementById('tsp-kpi-stops');
+      const kpiTw = document.getElementById('tsp-kpi-tw');
+      const badgeMode = document.getElementById('tsp-badge-mode');
+      const stopsSub = document.getElementById('tsp-stops-count-sub');
+      const footerStatus = document.getElementById('tsp-footer-status');
+
+      if (kpiTime) kpiTime.innerText = `${data.totalEstimatedMinutes || 0} phút`;
+      if (kpiDistance) kpiDistance.innerText = `${data.totalDistanceMeters || 0} m`;
+      if (kpiStops) kpiStops.innerText = `${(data.orderedStops || []).length} trạm`;
+      if (stopsSub) stopsSub.innerText = `${(data.orderedStops || []).length} chặng`;
+
+      const modeLabels = {
+          'MANHATTAN_2D': 'Bản đồ 2D (Manhattan)',
+          'HIERARCHICAL_TOPOLOGICAL': 'Tô-pô Phân Cấp (No-Map)',
+          'GPS_HAVERSINE': 'Tọa độ GPS Trắc Địa',
+          'PURE_BUSINESS': 'Sắp xếp Nghiệp vụ (Gói Tiết kiệm)'
+      };
+      if (badgeMode) {
+          badgeMode.innerText = modeLabels[data.routingMode] || data.routingMode || 'Tối ưu';
+          if (data.routingMode === 'HIERARCHICAL_TOPOLOGICAL') {
+              badgeMode.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30';
+          } else if (data.routingMode === 'MANHATTAN_2D') {
+              badgeMode.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30';
+          } else {
+              badgeMode.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-500/20 text-neutral-300 border border-neutral-400/30';
+          }
+      }
+
+      // Time Window check
+      const twStops = (data.orderedStops || []).filter(s => s.timeWindow);
+      if (kpiTw) {
+          if (twStops.length > 0) {
+              kpiTw.innerText = `${twStops.length} khung giờ máy (Khớp 100%)`;
+              kpiTw.className = 'text-sm font-black text-emerald-600';
+          } else {
+              kpiTw.innerText = 'Linh hoạt ca làm';
+              kpiTw.className = 'text-sm font-black text-neutral-900';
+          }
+      }
+
+      if (footerStatus) {
+          footerStatus.innerHTML = `
+              <i class="ph-fill ph-check-circle text-emerald-500 text-base"></i>
+              <span>Lộ trình tối ưu hóa hoàn tất (${modeLabels[data.routingMode] || data.routingMode}).</span>
+          `;
+      }
+
+      // Render Timeline & Views
+      renderTSPTimeline(data.orderedStops || []);
+      renderTSPSvgRoute(data.orderedStops || []);
+      renderTSPTree(data.orderedStops || []);
+  }
+
+  function renderTSPTimeline(stops) {
+      const container = document.getElementById('tsp-stops-timeline');
+      if (!container) return;
+
+      if (!stops || stops.length === 0) {
+          container.innerHTML = `<div class="py-12 text-center text-neutral-400 text-xs">Không có trạm dừng nào trong lộ trình.</div>`;
+          return;
+      }
+
+      let html = '';
+      stops.forEach((stop, index) => {
+          const isStart = stop.type === 'DEPOT' || stop.type === 'CURRENT_LOCATION';
+          const isWh = stop.type === 'WAREHOUSE';
+          const isUrgent = stop.priority === 'URGENT' || stop.priority === 'EMERGENCY';
+          
+          let badgeBg = 'bg-slate-100 text-slate-700';
+          let priorityPill = '';
+          if (isUrgent) {
+              badgeBg = 'bg-red-500 text-white';
+              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 uppercase tracking-wider animate-pulse">Khẩn cấp</span>';
+          } else if (stop.priority === 'HIGH') {
+              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">Cao</span>';
+          } else if (isWh) {
+              badgeBg = 'bg-orange-500 text-white';
+              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wider">Kho Vật Tư</span>';
+          } else if (isStart) {
+              badgeBg = 'bg-emerald-600 text-white';
+              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Xuất Phát</span>';
+          }
+
+          let timeWindowHtml = '';
+          if (stop.timeWindow) {
+              timeWindowHtml = `
+                  <div class="mt-1 flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-lg w-fit">
+                      <i class="ph-bold ph-hourglass text-indigo-600"></i>
+                      <span>Khung dừng máy: ${stop.timeWindow.start || '--'} - ${stop.timeWindow.end || '--'}</span>
+                  </div>
+              `;
+          }
+
+          let transitInfo = '';
+          if (index > 0 && stop.travelDistanceMeters !== undefined) {
+              transitInfo = `
+                  <div class="text-[10px] text-neutral-400 font-mono flex items-center gap-2 mb-1">
+                      <span>↓ Di chuyển: <b>${stop.travelDistanceMeters}m</b> (~${stop.travelTimeMinutes || 0} phút đi bộ)</span>
+                      ${stop.waitingMinutes > 0 ? `<span class="text-amber-600">| Chờ máy: ${stop.waitingMinutes} phút</span>` : ''}
+                  </div>
+              `;
+          }
+
+          html += `
+              <div class="relative pl-6 pb-2 border-l-2 ${index === stops.length - 1 ? 'border-transparent' : 'border-neutral-200'}">
+                  <!-- Step Marker -->
+                  <div class="absolute -left-3.5 top-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-xs ${badgeBg}">
+                      ${index}
+                  </div>
+
+                  ${transitInfo}
+
+                  <div class="p-3 rounded-2xl border ${isUrgent ? 'border-red-200 bg-red-50/40' : (isWh ? 'border-orange-200 bg-orange-50/40' : 'border-neutral-200/80 bg-white')} shadow-xs hover:shadow-sm transition">
+                      <div class="flex items-start justify-between gap-2">
+                          <div>
+                              <div class="flex items-center gap-1.5 flex-wrap">
+                                  <h4 class="text-xs font-black text-neutral-900 m-0">${stop.name}</h4>
+                                  ${priorityPill}
+                              </div>
+                              <p class="text-[11px] text-neutral-500 m-0 mt-0.5 flex items-center gap-1">
+                                  <i class="ph-bold ph-map-pin text-amber-600"></i>
+                                  <span>${stop.locationName || 'Chưa định vị cụ thể'}</span>
+                                  ${stop.floorNumber ? `<span class="text-slate-400">| Tầng ${stop.floorNumber}</span>` : ''}
+                              </p>
+                          </div>
+                          <div class="text-right shrink-0">
+                              <span class="text-xs font-black text-neutral-900 font-mono block">${stop.estimatedArrival || '--'}</span>
+                              <span class="text-[10px] text-neutral-400 font-mono">Đến</span>
+                          </div>
+                      </div>
+
+                      ${stop.assetName ? `
+                          <div class="mt-2 text-[11px] text-neutral-600 flex items-center gap-1">
+                              <i class="ph-bold ph-wrench text-neutral-400"></i>
+                              <span>Thiết bị: <b>${stop.assetName}</b></span>
+                              ${stop.workOrderCode ? `<span class="text-neutral-400">(${stop.workOrderCode})</span>` : ''}
+                          </div>
+                      ` : ''}
+
+                      ${timeWindowHtml}
+                  </div>
+              </div>
+          `;
+      });
+
+      container.innerHTML = html;
+  }
+
+  function renderTSPSvgRoute(stops) {
+      const routesLayer = document.getElementById('tsp-svg-routes-layer');
+      const stopsLayer = document.getElementById('tsp-svg-stops-layer');
+      if (!routesLayer || !stopsLayer) return;
+
+      routesLayer.innerHTML = '';
+      stopsLayer.innerHTML = '';
+
+      if (!stops || stops.length === 0) return;
+
+      // Coordinate scaling and synthetic placement
+      const points = stops.map((stop, i) => {
+          let x = 100 + ((i % 5) * 180);
+          let y = 120 + (Math.floor(i / 5) * 200);
+
+          if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined) {
+              // Standard 100m x 70m mapped to 1000px x 700px
+              x = Math.max(60, Math.min(940, stop.coords.x * 10));
+              y = Math.max(60, Math.min(640, stop.coords.y * 10));
+          } else if (stop.floorNumber) {
+              // Spread logically across floors if no explicit 2D coords
+              const floorOffset = ((stop.floorNumber - 1) % 4) * 120;
+              x = 120 + ((i * 140) % 760);
+              y = 100 + floorOffset + ((i * 30) % 150);
+          }
+          return { x, y, stop, index: i };
+      });
+
+      // 1. Draw Connecting Paths
+      for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const isUrgentEdge = p2.stop.priority === 'URGENT';
+          const strokeColor = isUrgentEdge ? '#ef4444' : '#f59e0b';
+          const markerUrl = isUrgentEdge ? 'url(#tsp-arrow-urgent)' : 'url(#tsp-arrow)';
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          path.setAttribute('x1', p1.x);
+          path.setAttribute('y1', p1.y);
+          path.setAttribute('x2', p2.x);
+          path.setAttribute('y2', p2.y);
+          path.setAttribute('stroke', strokeColor);
+          path.setAttribute('stroke-width', isUrgentEdge ? '3.5' : '2.5');
+          path.setAttribute('stroke-dasharray', isUrgentEdge ? 'none' : '6 4');
+          path.setAttribute('marker-end', markerUrl);
+          path.setAttribute('opacity', '0.9');
+          routesLayer.appendChild(path);
+      }
+
+      // 2. Draw Stop Markers
+      points.forEach(p => {
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          g.setAttribute('transform', `translate(${p.x}, ${p.y})`);
+
+          const isUrgent = p.stop.priority === 'URGENT';
+          const isStart = p.stop.type === 'DEPOT' || p.stop.type === 'CURRENT_LOCATION';
+          const isWh = p.stop.type === 'WAREHOUSE';
+
+          let fillColor = '#f59e0b';
+          let radius = 16;
+          if (isUrgent) fillColor = '#ef4444';
+          else if (isStart) fillColor = '#10b981';
+          else if (isWh) fillColor = '#f97316';
+
+          // Outer halo
+          const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          halo.setAttribute('r', radius + 5);
+          halo.setAttribute('fill', fillColor);
+          halo.setAttribute('opacity', '0.25');
+          g.appendChild(halo);
+
+          // Inner circle
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('r', radius);
+          circle.setAttribute('fill', fillColor);
+          circle.setAttribute('stroke', '#ffffff');
+          circle.setAttribute('stroke-width', '2');
+          g.appendChild(circle);
+
+          // Step label
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('dominant-baseline', 'central');
+          text.setAttribute('fill', '#ffffff');
+          text.setAttribute('font-size', '11');
+          text.setAttribute('font-weight', 'bold');
+          text.setAttribute('font-family', 'sans-serif');
+          text.textContent = String(p.index);
+          g.appendChild(text);
+
+          // Name label under marker
+          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          label.setAttribute('x', '0');
+          label.setAttribute('y', radius + 15);
+          label.setAttribute('text-anchor', 'middle');
+          label.setAttribute('fill', '#e2e8f0');
+          label.setAttribute('font-size', '10');
+          label.setAttribute('font-weight', 'bold');
+          label.setAttribute('font-family', 'sans-serif');
+          const shortName = p.stop.workOrderCode || p.stop.name.substring(0, 14);
+          label.textContent = `${shortName} (${p.stop.estimatedArrival || ''})`;
+          g.appendChild(label);
+
+          stopsLayer.appendChild(g);
+      });
+  }
+
+  function renderTSPTree(stops) {
+      const container = document.getElementById('tsp-tree-group-container');
+      if (!container) return;
+
+      if (!stops || stops.length === 0) {
+          container.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs">Không có dữ liệu phân cấp.</div>`;
+          return;
+      }
+
+      // Group stops by Floor / Hierarchy
+      const floorGroups = {};
+      stops.forEach((stop, idx) => {
+          const floorKey = `Tầng ${stop.floorNumber || 1}`;
+          if (!floorGroups[floorKey]) floorGroups[floorKey] = [];
+          floorGroups[floorKey].push({ stop, step: idx });
+      });
+
+      let html = '';
+      Object.keys(floorGroups).forEach(floorKey => {
+          const items = floorGroups[floorKey];
+          html += `
+              <div class="rounded-2xl border border-slate-700 bg-slate-800/80 p-4 shadow-sm">
+                  <div class="flex items-center justify-between pb-2 border-b border-slate-700/80 mb-3">
+                      <div class="flex items-center gap-2">
+                          <span class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-xs">
+                              <i class="ph-bold ph-stairs"></i>
+                          </span>
+                          <h4 class="text-xs font-black text-white m-0">${floorKey}</h4>
+                      </div>
+                      <span class="text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+                          ${items.length} công việc đã gom
+                      </span>
+                  </div>
+
+                  <div class="space-y-2">
+                      ${items.map(item => `
+                          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/50 flex items-center justify-between gap-3 text-xs">
+                              <div class="flex items-center gap-2.5">
+                                  <span class="w-5 h-5 rounded-full bg-slate-700 text-slate-200 text-[10px] font-bold flex items-center justify-center">
+                                      ${item.step}
+                                  </span>
+                                  <div>
+                                      <span class="font-bold text-slate-100 block">${item.stop.name}</span>
+                                      <span class="text-[10px] text-slate-400">${item.stop.locationName || 'Phòng trực'}</span>
+                                  </div>
+                              </div>
+                              <div class="text-right shrink-0">
+                                  <span class="text-amber-400 font-mono font-bold">${item.stop.estimatedArrival || '--'}</span>
+                                  <span class="text-[10px] text-slate-400 block">${item.stop.departureTime ? `-> ${item.stop.departureTime}` : ''}</span>
+                              </div>
+                          </div>
+                      `).join('')}
+                  </div>
+              </div>
+          `;
+      });
+
+      container.innerHTML = html;
   }
 </script>
 {% endblock %}
