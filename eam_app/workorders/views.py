@@ -31,6 +31,13 @@ class WorkOrderListView(APIView):
             self.permission_denied(request)
             
         wos = WorkOrder.objects.all().order_by('-created_at')
+        tenant = getattr(request.user, 'tenant', None)
+        if tenant:
+            wos = wos.filter(tenant=tenant)
+            
+        can_view_all = request.user.is_superuser or HasPermission('work_order:reassign')().has_permission(request, self) or HasPermission('system:admin')().has_permission(request, self)
+        if not can_view_all:
+            wos = wos.filter(models.Q(assigned_to=request.user) | models.Q(created_by=request.user))
         
         try:
             page = int(request.query_params.get('page', 0))

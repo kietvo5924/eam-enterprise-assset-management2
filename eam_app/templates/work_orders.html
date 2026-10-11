@@ -21,6 +21,7 @@
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+      {% if 'work_order:reassign' in user_permissions %}
       <button 
         type="button"
         id="btn-hungarian-optimize"
@@ -39,7 +40,8 @@
       >
         <i class="ph-bold ph-calendar-check"></i> <span>Lập lịch cả ca nhiều việc</span>
       </button>
-      {% if 'work_order:execute' in user_permissions %}
+      {% endif %}
+      {% if 'work_order:execute' in user_permissions or 'system:admin' in user_permissions or is_system_admin %}
       <button 
         type="button"
         id="btn-tsp-routing"
@@ -172,7 +174,7 @@
             {% with wo=item.wo checklists_json=item.checklists_json follow_ups_count=item.follow_ups_count %}
             <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-id="{{ wo.id }}" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
               <td class="px-3 py-3 text-center">
-                <input type="checkbox" class="wo-select-cb rounded text-primary focus:ring-primary cursor-pointer" value="{{ wo.id }}" data-status="{{ wo.status }}" data-title="{{ wo.title|escapejs }}" {% if wo.status != 'CREATED' %}disabled title="Chỉ phiếu CREATED mới có thể phân công tự động"{% endif %}>
+                <input type="checkbox" class="wo-select-cb rounded text-primary focus:ring-primary cursor-pointer" value="{{ wo.id }}" data-status="{{ wo.status }}" data-title="{{ wo.title|escapejs }}" {% if 'work_order:reassign' in user_permissions and wo.status != 'CREATED' %}disabled title="Chỉ phiếu CREATED mới có thể phân công tự động"{% endif %}>
               </td>
               <td class="px-4 py-3 w-[250px] max-w-[250px]">
                 <div class="flex flex-col items-start">
@@ -265,11 +267,7 @@
                     </button>
                     {% endif %}
 
-                    {% if 'work_order:execute' in user_permissions and wo.status == 'IN_PROGRESS' and wo.assigned_to == request.user %}
-                    <button onclick="updateStatus('{{ wo.id }}', 'COMPLETED')" title="Hoàn thành" class="w-8 h-8 flex items-center justify-center text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors shadow-sm">
-                        <i class="ph-fill ph-check-circle text-lg"></i>
-                    </button>
-                    {% endif %}
+
                 </div>
               </td>
             </tr>
@@ -335,39 +333,84 @@
           <label class="block text-sm font-bold text-neutral-700 mb-1.5">Title <span class="text-danger">*</span></label>
           <input type="text" id="wo-title" placeholder="Ví dụ: Bảo trì định kỳ máy bơm A" required class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
         </div>
-        <div>
-          <label class="block text-sm font-bold text-neutral-700 mb-1.5">Thiết bị / Tài sản</label>
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            <div class="sm:col-span-5">
-              <label class="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Phân xưởng / Mặt bằng</label>
+        <!-- Unified Block: Mặt bằng -> Khu vực -> Thiết bị bảo trì (Bắt buộc) -->
+        <div class="p-4 bg-white rounded-2xl border border-neutral-200 shadow-xs space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="ph-fill ph-map-pin text-primary text-base"></i> Vị trí & Thiết bị bảo trì
+            </span>
+            <span class="text-[11px] font-bold text-rose-500">* Bắt buộc chọn thiết bị</span>
+          </div>
+
+          <!-- Các trường liên kết theo thứ tự (xếp theo hàng dọc thoáng đẹp, không dồn nén) -->
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1">
+                <span>1. Mặt bằng / Phân xưởng</span> <span class="text-danger">*</span>
+              </label>
               {% if user_is_restricted_floorplan %}
-              <div class="w-full px-3 py-2.5 bg-neutral-100 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 flex items-center gap-1.5 cursor-not-allowed" title="Mặt bằng cố định theo tài khoản nhân viên">
+              <div class="w-full px-3.5 py-2.5 bg-neutral-100 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 flex items-center gap-1.5 cursor-not-allowed" title="Mặt bằng cố định theo tài khoản nhân viên">
                 <i class="ph-bold ph-lock text-neutral-400"></i>
                 <span class="truncate">{{ user_floorplan_name }}</span>
               </div>
-              <input type="hidden" id="wo-asset-filter-floorplan" value="{{ user_floorplan_id }}" />
+              <input type="hidden" id="wo-floorplan" value="{{ user_floorplan_id }}" />
               {% else %}
-              <select id="wo-asset-filter-floorplan" onchange="filterWoAssetsByFloorplan(this.value)" class="w-full px-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
-                <option value="">Tất cả mặt bằng</option>
+              <select id="wo-floorplan" onchange="onWoFloorplanChanged(this.value)" class="w-full px-3.5 py-2.5 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 focus:outline-none focus:border-primary focus:bg-white transition-all cursor-pointer">
+                <option value="">-- Chọn mặt bằng --</option>
                 {% for fp in floorplans_list %}
                 <option value="{{ fp.id }}">{{ fp.name }}</option>
                 {% endfor %}
               </select>
               {% endif %}
             </div>
-            <div class="sm:col-span-7">
-              <label class="block text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Chọn thiết bị</label>
-              <select id="wo-asset" onchange="onAssetSelected(this.value)" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium truncate">
-                <option value="">-- Không liên kết tài sản --</option>
+
+            <div>
+              <label class="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1">
+                <span>2. Khu vực trực thuộc</span> <span class="text-danger">*</span>
+              </label>
+              <select id="wo-zone" onchange="onWoZoneChanged(this.value)" class="w-full px-3.5 py-2.5 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-700 focus:outline-none focus:border-primary focus:bg-white transition-all cursor-pointer">
+                <option value="">-- Chọn khu vực --</option>
+                {% for loc in locations_list %}
+                  {% if loc.zone_type != 'FLOORPLAN' %}
+                  <option value="{{ loc.code }}" data-floorplan="{{ loc.parent_id }}">{{ loc.name }} [{{ loc.code }}]</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1">
+                <span>3. Thiết bị / Tài sản cần bảo trì</span> <span class="text-danger">*</span>
+              </label>
+              <select id="wo-asset" required onchange="onAssetSelected(this.value)" class="w-full px-3.5 py-2.5 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-800 focus:outline-none focus:border-primary focus:bg-white transition-all cursor-pointer truncate shadow-2xs">
+                <option value="" disabled selected>-- Chọn thiết bị / tài sản * --</option>
                 {% for a in assets %}
                 <option value="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}" data-zone="{{ a.zone_id|default:'' }}">{{ a.name }}{% if a.zone_id %} - {{ a.zone_id }}{% endif %}</option>
                 {% endfor %}
               </select>
             </div>
           </div>
-          <div id="wo-asset-loc-badge" class="hidden mt-2 p-2.5 bg-sky-50 border border-sky-200 rounded-xl flex items-center gap-2 text-xs text-sky-800 font-medium">
-            <i class="ph-bold ph-map-pin text-sm shrink-0 text-sky-600"></i>
-            <span id="wo-asset-loc-text">📍 Vị trí kế thừa từ thiết bị</span>
+
+          <!-- Tầng & Tọa độ X - Y định vị (Tự động điền) & Huy hiệu định vị -->
+          <div class="space-y-2 pt-2.5 border-t border-neutral-100 text-xs">
+            <div class="flex items-center gap-4">
+              <div class="flex items-center gap-1.5">
+                <span class="text-neutral-500 text-[11px] font-semibold">Tầng:</span>
+                <input type="number" id="wo-floor" value="1" min="1" max="10" class="w-14 px-2 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-center focus:outline-none focus:border-primary">
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-neutral-500 text-[11px] font-semibold">Tọa độ X - Y:</span>
+                <div class="flex items-center gap-1">
+                  <input type="number" step="0.1" id="wo-coords-x" placeholder="X" value="0.0" class="w-16 px-2 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-center focus:outline-none focus:border-primary">
+                  <span class="text-neutral-400">,</span>
+                  <input type="number" step="0.1" id="wo-coords-y" placeholder="Y" value="0.0" class="w-16 px-2 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-center focus:outline-none focus:border-primary">
+                </div>
+              </div>
+            </div>
+            <div id="wo-asset-loc-badge" class="hidden px-3 py-2 bg-sky-50 border border-sky-200 rounded-xl flex items-center gap-2 text-[11px] text-sky-800 font-medium">
+              <i class="ph-bold ph-check text-sky-600 text-sm shrink-0"></i>
+              <span id="wo-asset-loc-text">📍 Đã định vị tự động</span>
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
@@ -508,52 +551,7 @@
                 </select>
               </div>
 
-              <!-- Location Coordinates (Auto-Inherited from Asset) -->
-              <div class="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-neutral-700 flex items-center gap-1.5">
-                    <i class="ph-bold ph-map-pin text-primary"></i> Vị trí & Tọa độ thực hiện
-                  </span>
-                  <span class="text-[11px] text-neutral-400">Tự động điền từ Thiết bị</span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                  <div>
-                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Mặt bằng</label>
-                    <select id="wo-floorplan" onchange="onWoFloorplanChanged(this.value)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
-                      <option value="">-- Chọn mặt bằng --</option>
-                      {% for fp in floorplans_list %}
-                      <option value="{{ fp.id }}">{{ fp.name }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Khu vực</label>
-                    <select id="wo-zone" onchange="onWoZoneChanged(this.value)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
-                      <option value="">-- Chọn khu vực --</option>
-                      {% for loc in locations_list %}
-                        {% if loc.zone_type != 'FLOORPLAN' %}
-                        <option value="{{ loc.code }}" data-floorplan="{{ loc.parent_id }}">{{ loc.name }} [{{ loc.code }}]</option>
-                        {% endif %}
-                      {% endfor %}
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Tầng</label>
-                    <input type="number" id="wo-floor" value="1" min="1" max="10" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-semibold text-neutral-500 mb-0.5">Tọa độ X - Y</label>
-                    <div class="flex items-center gap-1">
-                      <input type="number" step="0.1" id="wo-coords-x" placeholder="X" value="0.0" class="w-1/2 px-1.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
-                      <input type="number" step="0.1" id="wo-coords-y" placeholder="Y" value="0.0" class="w-1/2 px-1.5 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
-                    </div>
-                  </div>
-                </div>
-                <button type="button" onclick="openFloorplanPickerForWo()" class="w-full mt-2 py-1.5 px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 border border-indigo-200 transition">
-                  <i class="ph-bold ph-map-pin"></i>
-                  <span>Chọn trên sơ đồ mặt bằng</span>
-                </button>
-              </div>
+
             </div>
           </div>
         </div>
@@ -608,9 +606,7 @@
         <button id="detail-btn-start" onclick="updateStatus(currentWo.id, 'IN_PROGRESS')" class="hidden px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm">
           <i class="ph-fill ph-play-circle text-base"></i> Bắt đầu
         </button>
-        <button id="detail-btn-complete" onclick="updateStatus(currentWo.id, 'COMPLETED')" class="hidden px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm">
-          <i class="ph-fill ph-check-circle text-base"></i> Hoàn thành
-        </button>
+
         {% if 'work_order:update' in user_permissions %}
         <button onclick="editCurrentWo()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
           <i class="ph-bold ph-pencil-simple"></i> Sửa
@@ -667,33 +663,7 @@
   </div>
 </div>
 
-<!-- Completion Modal -->
-<div id="completion-modal" class="fixed inset-0 z-[110] hidden flex items-center justify-center">
-  <div class="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm" onclick="closeCompletionModal()"></div>
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col relative z-10">
-    <div class="p-6 border-b border-neutral-100 flex items-center justify-between">
-      <h3 class="font-black text-xl text-neutral-800 flex items-center gap-2">
-        <i class="ph-fill ph-check-circle text-green-500"></i> Hoàn thành Work Order
-      </h3>
-      <button onclick="closeCompletionModal()" class="text-neutral-400 hover:text-neutral-600">
-        <i class="ph-bold ph-x text-lg"></i>
-      </button>
-    </div>
-    <div class="p-6 space-y-4">
-      <input type="hidden" id="complete-wo-id" />
-      <div>
-        <label class="block text-sm font-bold text-neutral-700 mb-2">Ghi chú giải quyết / sửa chữa <span class="text-danger">*</span></label>
-        <textarea id="complete-notes" rows="4" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-white transition-all font-medium" placeholder="Nhập chi tiết các bước đã xử lý, tình trạng sau sửa chữa...">Đã hoàn thành kiểm tra, bảo dưỡng và hiệu chuẩn toàn bộ các hạng mục theo tiêu chuẩn kỹ thuật.</textarea>
-      </div>
-    </div>
-    <div class="p-4 border-t border-neutral-100 flex justify-end gap-3 bg-neutral-50/50">
-      <button onclick="closeCompletionModal()" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy</button>
-      <button onclick="submitCompletion()" id="btn-submit-complete" class="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2">
-        <i class="ph-bold ph-check"></i> Xác nhận hoàn thành
-      </button>
-    </div>
-  </div>
-</div>
+
 
 <!-- Modal Thông Báo Kiểm Tra Điều Kiện Thuật Toán -->
 <div id="algo-condition-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 hidden">
@@ -1260,137 +1230,133 @@
 </div>
 
 <!-- Modal Tối Ưu Hóa Lộ Trình Di Chuyển (TSP / TSPTW Route Visualizer) -->
-<div id="modal-tsp-routing" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-md hidden z-[120] flex items-center justify-center p-2 sm:p-4">
-  <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+<div id="modal-tsp-routing" class="fixed inset-0 bg-neutral-950/80 backdrop-blur-md hidden z-[120] flex items-center justify-center p-1.5 sm:p-3 md:p-5">
+  <div class="bg-white rounded-2xl md:rounded-3xl max-w-[96vw] xl:max-w-7xl w-full max-h-[94vh] h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
     <!-- Modal Header -->
-    <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-neutral-900 to-amber-950 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shrink-0 border-b border-slate-800">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 text-xl font-bold">
+    <div class="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-slate-900 via-neutral-900 to-amber-950 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5 shrink-0 border-b border-slate-800">
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 text-base sm:text-lg font-bold">
           <i class="ph-bold ph-path"></i>
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h3 class="text-base font-black text-white m-0">Tối Ưu Hóa Lộ Trình Di Chuyển Kỹ Thuật Viên</h3>
-            <span id="tsp-badge-mode" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-              Đang tải...
+          <div class="flex items-center gap-2 flex-wrap">
+            <h3 class="text-xs sm:text-sm md:text-base font-black text-white m-0">Tối Ưu Hóa Lộ Trình Di Chuyển</h3>
+            <span id="tsp-badge-mode" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+              Đang tính toán...
             </span>
           </div>
-          <p class="text-xs text-slate-300 m-0 mt-0.5">Sắp xếp chặng di chuyển ngắn nhất, gom tầng/phòng, tôn trọng khung giờ dừng máy TSPTW</p>
+          <p class="text-[10px] sm:text-[11px] text-slate-300 m-0 mt-0.5 hidden xs:block">Tự động tối ưu thứ tự di chuyển theo sơ đồ mặt bằng và khung giờ dừng máy</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button onclick="closeTSPRoutingModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer">
-          <i class="ph ph-x text-base"></i>
+      <!-- Employee & Facility Context Chips -->
+      <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <!-- Logged-in Technician Chip -->
+          <div class="px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700/80 text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs">
+            <div class="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">
+              <i class="ph-fill ph-user"></i>
+            </div>
+            <span id="tsp-chip-tech-name" class="font-bold text-white">{{ request.user.first_name }} {{ request.user.last_name|default:request.user.username }}</span>
+          </div>
+
+          <!-- Detected Facility / Floorplan Chip -->
+          <div class="px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700/80 text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs">
+            <i class="ph-fill ph-buildings text-sky-400"></i>
+            <span id="tsp-chip-facility-name" class="text-sky-200 font-bold truncate max-w-[200px] sm:max-w-[260px]">Đang nhận diện mặt bằng...</span>
+          </div>
+        </div>
+
+        <button onclick="closeTSPRoutingModal()" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer">
+          <i class="ph ph-x text-sm sm:text-base"></i>
         </button>
       </div>
     </div>
 
-    <!-- Controls & Filter Toolbar -->
-    <div class="px-6 py-3 bg-neutral-50 border-b border-neutral-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-      <div class="flex flex-wrap items-center gap-3">
+    <!-- Controls & Action Toolbar -->
+    <div class="px-4 sm:px-6 py-2 bg-neutral-50 border-b border-neutral-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <div class="flex flex-wrap items-center gap-2.5 sm:gap-4">
         <div class="flex items-center gap-1.5">
-          <label class="text-xs font-bold text-neutral-600">Kỹ thuật viên:</label>
-          <select id="tsp-select-technician" onchange="calculateTSPRoute()" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
-            <option value="">-- Tất cả công việc trong ca / Mặc định --</option>
-            {% for tech in technicians %}
-            <option value="{{ tech.id }}" {% if tech.id == request.user.id %}selected{% endif %}>{{ tech.username }} ({{ tech.first_name }} {{ tech.last_name }})</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        {% if floorplans_list %}
-        <div class="flex items-center gap-1.5">
-          <label class="text-xs font-bold text-neutral-600">Mặt bằng:</label>
-          <select id="tsp-select-floorplan" onchange="onTSPFloorplanChange(this.value)" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
-            {% for fp in floorplans_list %}
-            <option value="{{ fp.id }}">🏢 {{ fp.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        {% endif %}
-
-        <div class="flex items-center gap-1.5">
-          <label class="text-xs font-bold text-neutral-600">Giờ bắt đầu:</label>
-          <input type="time" id="tsp-start-time" value="08:00" class="bg-white border border-neutral-300 text-neutral-800 rounded-xl px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-amber-500">
+          <label class="text-[11px] font-bold text-neutral-600">Giờ xuất phát:</label>
+          <input type="time" id="tsp-start-time" value="08:00" onchange="calculateTSPRoute()" class="bg-white border border-neutral-300 text-neutral-800 rounded-lg px-2 py-0.5 text-xs font-semibold focus:outline-none focus:border-amber-500">
         </div>
 
         <label class="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 cursor-pointer select-none">
-          <input type="checkbox" id="tsp-return-depot" checked class="rounded text-amber-600 focus:ring-amber-500">
+          <input type="checkbox" id="tsp-return-depot" checked onchange="calculateTSPRoute()" class="rounded text-amber-600 focus:ring-amber-500">
           <span>Quay về kho cuối ca</span>
         </label>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="requestTSPPitstop()" id="btn-tsp-pitstop" class="px-3 py-1.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Quy tắc 6: Chèn trạm dừng Kho vật tư ngay sau trạm hiện tại">
-          <i class="ph-bold ph-package"></i>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <button type="button" onclick="requestTSPPitstop()" id="btn-tsp-pitstop" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer" title="Chèn trạm dừng Kho vật tư ngay sau trạm hiện tại">
+          <i class="ph-bold ph-package text-xs"></i>
           <span>Về kho lấy vật tư</span>
         </button>
-        <button type="button" onclick="requestTSPRerouteMidshift()" id="btn-tsp-reroute" class="px-3 py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Quy tắc 7: Tái định tuyến từ vị trí hiện tại">
-          <i class="ph-bold ph-arrows-clockwise"></i>
-          <span>Tái định tuyến từ vị trí này</span>
+        <button type="button" onclick="requestTSPRerouteMidshift()" id="btn-tsp-reroute" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer" title="Tái định tuyến từ vị trí hiện tại">
+          <i class="ph-bold ph-arrows-clockwise text-xs"></i>
+          <span>Tái định tuyến</span>
         </button>
-        <button type="button" onclick="calculateTSPRoute()" id="btn-tsp-calculate" class="px-4 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer">
-          <i class="ph-bold ph-lightning"></i>
-          <span>Tính toán lộ trình</span>
+        <button type="button" onclick="calculateTSPRoute()" id="btn-tsp-calculate" class="px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition flex items-center gap-1 cursor-pointer">
+          <i class="ph-bold ph-lightning text-xs"></i>
+          <span>Tính lại lộ trình</span>
         </button>
       </div>
     </div>
 
-    <!-- KPI Metric Cards Bar -->
-    <div class="px-6 py-2.5 bg-white border-b border-neutral-200 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg">
+    <!-- KPI Metric Cards Bar (Responsive 2x2 or 4-col) -->
+    <div class="px-4 sm:px-6 py-2 bg-white border-b border-neutral-200 grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 shrink-0">
+      <div class="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center text-sm sm:text-base shrink-0">
           <i class="ph-bold ph-clock"></i>
         </div>
-        <div>
-          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Tổng thời gian</span>
-          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-time">-- phút</span>
+        <div class="min-w-0">
+          <span class="text-[9px] sm:text-[10px] font-bold text-neutral-400 uppercase tracking-wider block truncate">Tổng thời gian</span>
+          <span class="text-xs sm:text-sm font-black text-neutral-900 truncate block" id="tsp-kpi-time">-- phút</span>
         </div>
       </div>
 
-      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-lg">
+      <div class="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-sm sm:text-base shrink-0">
           <i class="ph-bold ph-footprints"></i>
         </div>
-        <div>
-          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Tổng quãng đường</span>
-          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-distance">-- m</span>
+        <div class="min-w-0">
+          <span class="text-[9px] sm:text-[10px] font-bold text-neutral-400 uppercase tracking-wider block truncate">Tổng quãng đường</span>
+          <span class="text-xs sm:text-sm font-black text-neutral-900 truncate block" id="tsp-kpi-distance">-- m</span>
         </div>
       </div>
 
-      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center text-lg">
+      <div class="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center text-sm sm:text-base shrink-0">
           <i class="ph-bold ph-map-pin"></i>
         </div>
-        <div>
-          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Số trạm dừng</span>
-          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-stops">0 trạm</span>
+        <div class="min-w-0">
+          <span class="text-[9px] sm:text-[10px] font-bold text-neutral-400 uppercase tracking-wider block truncate">Số trạm dừng</span>
+          <span class="text-xs sm:text-sm font-black text-neutral-900 truncate block" id="tsp-kpi-stops">0 trạm</span>
         </div>
       </div>
 
-      <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-lg">
+      <div class="p-2 sm:p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2.5">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-sm sm:text-base shrink-0">
           <i class="ph-bold ph-hourglass-simple"></i>
         </div>
-        <div>
-          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">Ràng buộc khung giờ</span>
-          <span class="text-sm font-black text-neutral-900" id="tsp-kpi-tw">Tối ưu</span>
+        <div class="min-w-0">
+          <span class="text-[9px] sm:text-[10px] font-bold text-neutral-400 uppercase tracking-wider block truncate">Khung giờ máy</span>
+          <span class="text-xs sm:text-sm font-black text-neutral-900 truncate block" id="tsp-kpi-tw">Tối ưu</span>
         </div>
       </div>
     </div>
 
-    <!-- Main Dual Panel View -->
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden bg-neutral-100">
+    <!-- Main Dual Panel View (Flexible Height & Responsive Layout) -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden bg-neutral-100">
       <!-- Left Panel: Stops Timeline -->
-      <div class="w-full md:w-5/12 bg-white border-r border-neutral-200 flex flex-col overflow-hidden">
-        <div class="p-3 bg-neutral-50/80 border-b border-neutral-200 flex items-center justify-between">
+      <div class="w-full lg:w-[38%] xl:w-[35%] bg-white border-r border-neutral-200 flex flex-col overflow-hidden shrink-0 h-1/2 lg:h-full">
+        <div class="p-2.5 sm:p-3 bg-neutral-50/80 border-b border-neutral-200 flex items-center justify-between shrink-0">
           <span class="text-xs font-black text-neutral-800 uppercase tracking-wide flex items-center gap-1.5">
-            <i class="ph-bold ph-list-numbers text-amber-600"></i> Danh Sách Thứ Tự Chặng
+            <i class="ph-bold ph-list-numbers text-amber-600"></i> Thứ Tự Công Việc Trong Ca
           </span>
           <span class="text-[11px] text-neutral-500 font-medium" id="tsp-stops-count-sub">0 chặng</span>
         </div>
-        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="tsp-stops-timeline">
+        <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 sm:space-y-3" id="tsp-stops-timeline">
           <div class="py-12 text-center text-neutral-400 text-xs">
             <i class="ph-bold ph-circle-notch animate-spin text-2xl text-amber-500 mb-2 block"></i>
             Đang tải dữ liệu lộ trình tối ưu...
@@ -1399,25 +1365,30 @@
       </div>
 
       <!-- Right Panel: Dual Visualizer (Map / Stepper Tree) -->
-      <div class="w-full md:w-7/12 flex flex-col overflow-hidden bg-slate-950">
-        <!-- Tab Bar -->
-        <div class="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-          <div class="flex items-center gap-2">
-            <button type="button" id="tab-btn-tsp-map" onclick="switchTSPTab('map')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition">
-              <i class="ph-bold ph-map-trifold"></i> <span>Sơ Đồ Mặt Bằng 2D</span>
+      <div class="w-full lg:w-[62%] xl:w-[65%] flex flex-col overflow-hidden bg-slate-950 h-1/2 lg:h-full">
+        <!-- Tab Bar & Floor Switcher -->
+        <div class="px-3 sm:px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2 shrink-0 flex-wrap">
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <button type="button" id="tab-btn-tsp-map" onclick="switchTSPTab('map')" class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-map-trifold"></i> <span>Sơ Đồ Mặt Bằng</span>
             </button>
-            <button type="button" id="tab-btn-tsp-tree" onclick="switchTSPTab('tree')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition">
-              <i class="ph-bold ph-tree-structure"></i> <span>Cây Lộ Trình Phân Cấp (No-Map)</span>
+            <button type="button" id="tab-btn-tsp-tree" onclick="switchTSPTab('tree')" class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-tree-structure"></i> <span>Cây Tô-pô</span>
             </button>
           </div>
-          <div class="text-[11px] text-slate-400 font-mono" id="tsp-view-info">
-            Tỉ lệ chuẩn 100m x 70m
+
+          <!-- Dynamic Floor Switcher & View Info -->
+          <div class="flex items-center gap-2">
+            <div id="tsp-floor-switcher" class="flex items-center gap-1"></div>
+            <div class="text-[11px] text-slate-400 font-mono hidden sm:block truncate max-w-[260px]" id="tsp-view-info">
+              Tỉ lệ chuẩn 100m x 70m
+            </div>
           </div>
         </div>
 
         <!-- Tab 1: Map View -->
-        <div id="tsp-tab-content-map" class="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center p-3 select-none">
-          <svg id="tsp-route-svg" class="w-full h-full rounded-2xl border border-slate-800 shadow-2xl" viewBox="0 0 1000 700" preserveAspectRatio="none">
+        <div id="tsp-tab-content-map" class="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center p-2 sm:p-3 select-none">
+          <svg id="tsp-route-svg" class="w-full h-full rounded-xl sm:rounded-2xl border border-slate-800 shadow-2xl" viewBox="0 0 1000 650" preserveAspectRatio="xMidYMid meet">
             <defs>
               <pattern id="tsp-fp-grid-major" width="200" height="175" patternUnits="userSpaceOnUse">
                 <path d="M 200 0 L 0 0 0 175" fill="none" stroke="#1e293b" stroke-width="1.2"/>
@@ -1436,7 +1407,7 @@
             <rect width="100%" height="100%" fill="#070b13" />
             <rect width="100%" height="100%" fill="url(#tsp-fp-grid-minor)" />
             <rect width="100%" height="100%" fill="url(#tsp-fp-grid-major)" />
-            <rect x="50" y="40" width="910" height="620" rx="8" stroke="#334155" stroke-width="2" fill="#0f172a" fill-opacity="0.2"/>
+            <rect x="50" y="35" width="910" height="580" rx="8" stroke="#334155" stroke-width="2" fill="#0f172a" fill-opacity="0.2"/>
             <!-- Dynamic route layers -->
             <g id="tsp-svg-floorplan-layer"></g>
             <g id="tsp-svg-corridors-layer"></g>
@@ -1446,9 +1417,9 @@
         </div>
 
         <!-- Tab 2: Hierarchical Stepper Tree View (No-Map) -->
-        <div id="tsp-tab-content-tree" class="hidden flex-1 overflow-y-auto p-5 space-y-4 bg-slate-900/60">
+        <div id="tsp-tab-content-tree" class="hidden flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-4 bg-slate-900/60">
           <div class="p-3 bg-slate-800/80 rounded-xl border border-slate-700 text-xs text-slate-300 flex items-start gap-2.5">
-            <i class="ph-bold ph-info text-amber-400 text-base mt-0.5"></i>
+            <i class="ph-bold ph-info text-amber-400 text-base mt-0.5 shrink-0"></i>
             <div>
               <span class="font-bold text-slate-100 block mb-0.5">Mô hình Định tuyến Tô-pô Phân cấp (Topological Hierarchy)</span>
               Hệ thống tự động gom các việc cùng phòng, cùng tầng, và cùng tòa nhà. Tránh tối đa việc kỹ thuật viên phải leo cầu thang hay di chuyển giữa các tầng nhiều lần.
@@ -1462,17 +1433,17 @@
     </div>
 
     <!-- Modal Footer -->
-    <div class="px-6 py-3.5 bg-white border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
-      <div class="flex items-center gap-2 text-xs text-neutral-600 font-medium" id="tsp-footer-status">
-        <i class="ph-fill ph-check-circle text-emerald-500 text-base"></i>
-        <span>Đã tối ưu hóa lộ trình thành công theo giải thuật TSP.</span>
+    <div class="px-4 sm:px-6 py-2.5 sm:py-3 bg-white border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center gap-2.5 shrink-0">
+      <div class="flex items-center gap-2 text-xs text-neutral-600 font-medium truncate w-full sm:w-auto" id="tsp-footer-status">
+        <i class="ph-fill ph-check-circle text-emerald-500 text-base shrink-0"></i>
+        <span class="truncate">Đã tối ưu hóa lộ trình thành công theo giải thuật TSP.</span>
       </div>
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="syncTSPMobileCache()" class="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Quy tắc 9: Lưu đệm lộ trình trên SQLite/Local Storage để xem offline khi mất sóng">
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="syncTSPMobileCache()" class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Lưu đệm lộ trình trên SQLite/Local Storage để xem offline khi mất sóng">
           <i class="ph-bold ph-device-mobile"></i>
-          <span>Lưu đệm ngoại tuyến (Mobile)</span>
+          <span>Lưu đệm ngoại tuyến</span>
         </button>
-        <button type="button" onclick="closeTSPRoutingModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer">
+        <button type="button" onclick="closeTSPRoutingModal()" class="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer">
           Đóng
         </button>
       </div>
@@ -1523,52 +1494,76 @@
   }
 
   function onWoFloorplanChanged(floorplanId, selectedZoneCode = '') {
-    const zoneSelect = document.getElementById('wo-zone');
-    if (!zoneSelect) return;
-    zoneSelect.innerHTML = '<option value="">-- Chọn khu vực --</option>';
-
-    const filteredZones = (!floorplanId) 
-      ? LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN')
-      : LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(floorplanId));
-
-    filteredZones.forEach(loc => {
-      const opt = document.createElement('option');
-      opt.value = loc.code;
-      opt.textContent = `${loc.name} [${loc.code}]`;
-      opt.dataset.floorplan = loc.parent_id || '';
-      if (selectedZoneCode && (loc.code === selectedZoneCode || String(loc.id) === String(selectedZoneCode))) {
-        opt.selected = true;
-      }
-      zoneSelect.appendChild(opt);
-    });
-
-    if (selectedZoneCode) {
-      zoneSelect.value = selectedZoneCode;
-      onWoZoneChanged(selectedZoneCode);
+    const fpSelect = document.getElementById('wo-floorplan');
+    if (fpSelect && fpSelect.value !== String(floorplanId || '')) {
+      fpSelect.value = floorplanId || '';
     }
+
+    const zoneSelect = document.getElementById('wo-zone');
+    if (zoneSelect) {
+      zoneSelect.innerHTML = '<option value="">-- Chọn khu vực --</option>';
+
+      const filteredZones = (!floorplanId) 
+        ? LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN')
+        : LOCATIONS_LIST.filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(floorplanId));
+
+      filteredZones.forEach(loc => {
+        const opt = document.createElement('option');
+        opt.value = loc.code;
+        opt.textContent = `${loc.name} [${loc.code}]`;
+        opt.dataset.floorplan = loc.parent_id || '';
+        if (selectedZoneCode && (loc.code === selectedZoneCode || String(loc.id) === String(selectedZoneCode))) {
+          opt.selected = true;
+        }
+        zoneSelect.appendChild(opt);
+      });
+
+      if (selectedZoneCode) {
+        zoneSelect.value = selectedZoneCode;
+        onWoZoneChanged(selectedZoneCode);
+      }
+    }
+
+    filterWoAssetsByFloorplan(floorplanId, selectedZoneCode);
   }
 
-  function filterWoAssetsByFloorplan(selectedFpId) {
+  function filterWoAssetsByFloorplan(selectedFpId, selectedZoneCode = '') {
       const select = document.getElementById('wo-asset');
       if (!select) return;
       const options = select.querySelectorAll('option');
+      let zoneMatches = 0;
+      if (selectedZoneCode) {
+          options.forEach(opt => {
+              if (!opt.value) return;
+              let zoneCode = opt.dataset.zone || '';
+              if (window.ASSETS_MAP && window.ASSETS_MAP[opt.value]) {
+                  const a = window.ASSETS_MAP[opt.value];
+                  if (!zoneCode) zoneCode = a.zone_id || '';
+              }
+              if (zoneCode === String(selectedZoneCode)) zoneMatches++;
+          });
+      }
+
       options.forEach(opt => {
           if (!opt.value) {
               opt.hidden = false;
               return;
           }
           let fpId = opt.dataset.floorplanId || '';
-          if (!fpId && window.ASSETS_MAP && window.ASSETS_MAP[opt.value]) {
+          let zoneCode = opt.dataset.zone || '';
+          if (window.ASSETS_MAP && window.ASSETS_MAP[opt.value]) {
               const a = window.ASSETS_MAP[opt.value];
-              fpId = a.floorplan_id || '';
               if (!fpId) {
                   let locObj = null;
                   if (a.zone_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[a.zone_id]) locObj = window.LOCATIONS_MAP[a.zone_id];
                   else if (a.location_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[String(a.location_id)]) locObj = window.LOCATIONS_MAP[String(a.location_id)];
                   if (locObj) fpId = String(locObj.parent_id || (locObj.zone_type === 'FLOORPLAN' ? locObj.id : ''));
               }
+              if (!zoneCode) zoneCode = a.zone_id || '';
           }
-          if (!selectedFpId || fpId === String(selectedFpId)) {
+          const matchFp = !selectedFpId || fpId === String(selectedFpId);
+          const matchZone = (!selectedZoneCode || zoneMatches === 0) ? true : (zoneCode === String(selectedZoneCode));
+          if (matchFp && matchZone) {
               opt.hidden = false;
           } else {
               opt.hidden = true;
@@ -1576,7 +1571,8 @@
       });
       if (select.selectedOptions.length > 0 && select.selectedOptions[0].hidden) {
           select.value = '';
-          onAssetSelected('');
+          const badge = document.getElementById('wo-asset-loc-badge');
+          if (badge) badge.classList.add('hidden');
       }
   }
 
@@ -1607,10 +1603,10 @@
       }
 
       const fpSelect = document.getElementById('wo-floorplan');
-      if (fpSelect) {
+      if (fpSelect && parentFloorplanId && fpSelect.value !== parentFloorplanId) {
           fpSelect.value = parentFloorplanId;
+          onWoFloorplanChanged(parentFloorplanId, targetZoneCode);
       }
-      onWoFloorplanChanged(parentFloorplanId, targetZoneCode);
 
       if (document.getElementById('wo-zone') && targetZoneCode) document.getElementById('wo-zone').value = targetZoneCode;
       if (document.getElementById('wo-floor') && a.floor_level) document.getElementById('wo-floor').value = a.floor_level;
@@ -1620,19 +1616,21 @@
       if (badge && text) {
           const fpObj = (parentFloorplanId && FLOORPLANS_LIST.find(f => String(f.id) === parentFloorplanId));
           const fpLabel = fpObj ? `<b>${fpObj.name}</b> &rarr; ` : '';
-          text.innerHTML = `📍 Đã gán vị trí từ thiết bị: ${fpLabel}<b>${targetZoneCode || 'Chung'}</b>, Tầng <b>${a.floor_level || 1}</b> - Tọa độ: ${a.coords_x || 0}, ${a.coords_y || 0}`;
+          text.innerHTML = `📍 Đã định vị thiết bị: ${fpLabel}<b>${targetZoneCode || 'Chung'}</b>, Tầng <b>${a.floor_level || 1}</b> (Tọa độ: ${a.coords_x || 0}, ${a.coords_y || 0})`;
           badge.classList.remove('hidden');
       }
   }
 
   function onWoZoneChanged(zoneCode) {
-    if (!zoneCode || !LOCATIONS_MAP[zoneCode]) return;
+    const curFp = document.getElementById('wo-floorplan')?.value || '';
+    if (!zoneCode || !LOCATIONS_MAP[zoneCode]) {
+      filterWoAssetsByFloorplan(curFp, '');
+      return;
+    }
     const loc = LOCATIONS_MAP[zoneCode];
-    if (loc.parent_id) {
-      const fpSelect = document.getElementById('wo-floorplan');
-      if (fpSelect && !fpSelect.value) {
-        fpSelect.value = String(loc.parent_id);
-      }
+    const fpSelect = document.getElementById('wo-floorplan');
+    if (loc.parent_id && fpSelect && !fpSelect.value) {
+      fpSelect.value = String(loc.parent_id);
     }
     if (document.getElementById('wo-floor') && loc.floor_level) {
       document.getElementById('wo-floor').value = loc.floor_level;
@@ -1651,6 +1649,9 @@
       text.innerHTML = `📍 Đã gán tọa độ tâm từ khu vực: ${fpLabel}<b>${loc.name}</b>, Tầng <b>${loc.floor_level}</b> - Tọa độ: ${loc.center_x}, ${loc.center_y}`;
       badge.classList.remove('hidden');
     }
+
+    const activeFp = fpSelect?.value || (loc.parent_id ? String(loc.parent_id) : '');
+    filterWoAssetsByFloorplan(activeFp, zoneCode);
   }
 
   window.woFloorplanCurrentZoom = 1.0;
@@ -2053,22 +2054,19 @@
               let locObj = (a.zone_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[a.zone_id]) || (a.location_id && window.LOCATIONS_MAP && window.LOCATIONS_MAP[String(a.location_id)]);
               if (locObj) parentFp = String(locObj.parent_id || (locObj.zone_type === 'FLOORPLAN' ? locObj.id : ''));
           }
-          const fpFilter = document.getElementById('wo-asset-filter-floorplan');
-          if (fpFilter && parentFp) {
-              fpFilter.value = parentFp;
-              filterWoAssetsByFloorplan(parentFp);
-          } else if (fpFilter) {
-              fpFilter.value = '';
-              filterWoAssetsByFloorplan('');
+          const fpSelect = document.getElementById('wo-floorplan');
+          if (fpSelect && parentFp) {
+              fpSelect.value = parentFp;
+              onWoFloorplanChanged(parentFp, a.zone_id || '');
           }
           document.getElementById('wo-asset').value = asset_id;
           onAssetSelected(asset_id);
       } else {
-          const fpFilter = document.getElementById('wo-asset-filter-floorplan');
+          const fpSelect = document.getElementById('wo-floorplan');
           const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
-          if (fpFilter) {
-              fpFilter.value = userRestrictedFp;
-              filterWoAssetsByFloorplan(userRestrictedFp);
+          if (fpSelect) {
+              fpSelect.value = userRestrictedFp;
+              onWoFloorplanChanged(userRestrictedFp, '');
           }
           const badge = document.getElementById('wo-asset-loc-badge');
           if (badge) badge.classList.add('hidden');
@@ -2078,28 +2076,42 @@
   function closeWoModal() {
       document.getElementById('wo-modal').classList.add('hidden');
       document.getElementById('wo-form').reset();
-      const fpFilter = document.getElementById('wo-asset-filter-floorplan');
-      const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
-      if (fpFilter) {
-          fpFilter.value = userRestrictedFp;
-          filterWoAssetsByFloorplan(userRestrictedFp);
-      }
       const fpSelect = document.getElementById('wo-floorplan');
-      if (fpSelect) fpSelect.value = '';
-      onWoFloorplanChanged('', '');
+      const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
+      if (fpSelect) fpSelect.value = userRestrictedFp;
+      onWoFloorplanChanged(userRestrictedFp, '');
       const badge = document.getElementById('wo-asset-loc-badge');
       if (badge) badge.classList.add('hidden');
   }
 
   function saveWo() {
       const id = document.getElementById('wo-id').value;
+      const title = document.getElementById('wo-title').value;
+      const asset_id = document.getElementById('wo-asset').value;
+      const msg = document.getElementById('wo-msg');
+
+      if (!title || !title.trim()) {
+          msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+          msg.innerText = 'Vui lòng nhập tiêu đề Work Order.';
+          msg.classList.remove('hidden');
+          document.getElementById('wo-title').focus();
+          return;
+      }
+      if (!asset_id) {
+          msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+          msg.innerText = 'Vui lòng chọn thiết bị / tài sản cho công việc.';
+          msg.classList.remove('hidden');
+          document.getElementById('wo-asset').focus();
+          return;
+      }
+
       const data = {
           id: id,
-          title: document.getElementById('wo-title').value,
+          title: title.trim(),
           description: document.getElementById('wo-desc').value,
           priority: document.getElementById('wo-priority').value,
           status: document.getElementById('wo-status').value,
-          asset_id: document.getElementById('wo-asset').value,
+          asset_id: asset_id,
           assigned_to_id: document.getElementById('wo-assignee').value,
           deadline: document.getElementById('wo-deadline').value,
           // Optimization & Hungarian fields
@@ -2117,7 +2129,6 @@
       
       const method = id ? 'PUT' : 'POST';
       const btn = document.getElementById('btn-save-wo');
-      const msg = document.getElementById('wo-msg');
       btn.disabled = true;
       
       fetch('{% url "portal_work_orders" %}', {
@@ -2169,11 +2180,6 @@
   }
 
   function updateStatus(id, status) {
-    if (status === 'COMPLETED') {
-        document.getElementById('complete-wo-id').value = id;
-        document.getElementById('completion-modal').classList.remove('hidden');
-        return;
-    }
     fetch('{% url "portal_work_orders" %}', {
         method: 'PUT',
         headers: {
@@ -2190,40 +2196,6 @@
             alert(data.error || 'Có lỗi xảy ra khi cập nhật trạng thái');
         }
     });
-  }
-
-  function closeCompletionModal() {
-      document.getElementById('completion-modal').classList.add('hidden');
-  }
-
-  function submitCompletion() {
-      const id = document.getElementById('complete-wo-id').value;
-      const notes = document.getElementById('complete-notes').value;
-      if (!notes || !notes.trim()) {
-          alert('Vui lòng nhập ghi chú sửa chữa trước khi hoàn thành.');
-          return;
-      }
-      const btn = document.getElementById('btn-submit-complete');
-      btn.disabled = true;
-      fetch('{% url "portal_work_orders" %}', {
-          method: 'PUT',
-          headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-          },
-          body: JSON.stringify({id: id, status: 'COMPLETED', resolution_notes: notes.trim()})
-      })
-      .then(res => res.json())
-      .then(data => {
-          if(data.success) {
-              window.location.reload();
-          } else {
-              alert(data.error || 'Không thể hoàn thành Work Order');
-          }
-      })
-      .finally(() => {
-          btn.disabled = false;
-      });
   }
 
   function openAssignModal(id, currentAssignee) {
@@ -2284,14 +2256,9 @@
       const canExecute = {% if 'work_order:execute' in user_permissions or 'work_order:update' in user_permissions %}true{% else %}false{% endif %};
       const isAssignee = assignee_id && String(assignee_id).toLowerCase() === String(currentUserId).toLowerCase();
       const btnStart = document.getElementById('detail-btn-start');
-      const btnComplete = document.getElementById('detail-btn-complete');
       if (btnStart) {
           if (status === 'ASSIGNED' && isAssignee && canExecute) btnStart.classList.remove('hidden');
           else btnStart.classList.add('hidden');
-      }
-      if (btnComplete) {
-          if (status === 'IN_PROGRESS' && isAssignee && canExecute) btnComplete.classList.remove('hidden');
-          else btnComplete.classList.add('hidden');
       }
 
       if (!checklists || typeof checklists !== 'object') {
@@ -3681,16 +3648,10 @@
       modal.classList.remove('hidden');
 
       // Check if any work orders are checked in the main table
-      const checkedBoxes = document.querySelectorAll('.wo-row-cb:checked');
+      const checkedBoxes = document.querySelectorAll('.wo-select-cb:checked, .wo-row-cb:checked');
       const selectedIds = Array.from(checkedBoxes).map(cb => cb.value).filter(Boolean);
 
-      // Pre-select technician if available
-      const techSelect = document.getElementById('tsp-select-technician');
-      if (techSelect && !techSelect.value && window.CURRENT_USER_ID) {
-          techSelect.value = window.CURRENT_USER_ID;
-      }
-
-      calculateTSPRoute(selectedIds);
+      calculateTSPRoute(selectedIds.length > 0 ? selectedIds : null);
   }
 
   function closeTSPRoutingModal() {
@@ -3708,20 +3669,20 @@
 
       if (tabName === 'map') {
           if (btnMap) {
-              btnMap.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
+              btnMap.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
           }
           if (btnTree) {
-              btnTree.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
+              btnTree.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
           }
           if (contentMap) contentMap.classList.remove('hidden');
           if (contentTree) contentTree.classList.add('hidden');
           if (viewInfo) viewInfo.innerText = 'Tỉ lệ chuẩn 100m x 70m';
       } else {
           if (btnTree) {
-              btnTree.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
+              btnTree.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
           }
           if (btnMap) {
-              btnMap.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
+              btnMap.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
           }
           if (contentTree) contentTree.classList.remove('hidden');
           if (contentMap) contentMap.classList.add('hidden');
@@ -3745,19 +3706,17 @@
       }
       if (btnCalc) btnCalc.disabled = true;
 
-      const techId = document.getElementById('tsp-select-technician')?.value || null;
       const returnToDepot = document.getElementById('tsp-return-depot')?.checked ?? true;
       const startTime = document.getElementById('tsp-start-time')?.value || '08:00';
 
       let workOrderIds = preferredIds;
       if (!workOrderIds || workOrderIds.length === 0) {
-          const checkedBoxes = document.querySelectorAll('.wo-row-cb:checked');
+          const checkedBoxes = document.querySelectorAll('.wo-select-cb:checked, .wo-row-cb:checked');
           workOrderIds = Array.from(checkedBoxes).map(cb => cb.value).filter(Boolean);
       }
 
       const payload = {
-          technicianId: techId || null,
-          workOrderIds: workOrderIds,
+          workOrderIds: (workOrderIds && workOrderIds.length > 0) ? workOrderIds : [],
           returnToDepot: returnToDepot,
           startTime: startTime
       };
@@ -3800,7 +3759,6 @@
       const btn = document.getElementById('btn-tsp-pitstop');
       if (btn) btn.disabled = true;
 
-      const techId = document.getElementById('tsp-select-technician')?.value || null;
       const stops = tspCurrentRouteData.orderedStops;
       const currentStop = stops.find(s => s.type === 'WORK_ORDER' || s.type === 'CURRENT_LOCATION') || stops[0];
 
@@ -3809,7 +3767,6 @@
           .map(s => s.workOrderId);
 
       const payload = {
-          technicianId: techId,
           currentLocationId: currentStop.locationId || null,
           currentCoords: currentStop.coords || null,
           actionTrigger: 'PIT_STOP',
@@ -3853,7 +3810,6 @@
       const btn = document.getElementById('btn-tsp-reroute');
       if (btn) btn.disabled = true;
 
-      const techId = document.getElementById('tsp-select-technician')?.value || null;
       const stops = tspCurrentRouteData.orderedStops;
       const currentStop = stops[1] || stops[0];
 
@@ -3862,7 +3818,6 @@
           .map(s => s.workOrderId);
 
       const payload = {
-          technicianId: techId,
           currentLocationId: currentStop.locationId || null,
           currentCoords: currentStop.coords || null,
           actionTrigger: 'DYNAMIC_RE_ROUTE',
@@ -3964,6 +3919,22 @@
               <i class="ph-fill ph-check-circle text-emerald-500 text-base"></i>
               <span>Lộ trình tối ưu hóa hoàn tất (${modeLabels[data.routingMode] || data.routingMode}).</span>
           `;
+      }
+
+      // Update employee & facility chips
+      const chipTech = document.getElementById('tsp-chip-tech-name');
+      const chipFacility = document.getElementById('tsp-chip-facility-name');
+      if (chipTech && data.technicianName) {
+          chipTech.innerText = data.technicianName;
+      }
+      if (chipFacility && data.detectedFloorplanName) {
+          chipFacility.innerText = data.detectedFloorplanName;
+      }
+      if (data.detectedFloorplanId) {
+          window.tspActiveFloorplanId = data.detectedFloorplanId;
+      }
+      if (data.detectedFloorLevel) {
+          window.tspActiveFloorLevel = parseInt(data.detectedFloorLevel) || 1;
       }
 
       // Render Timeline & Views
@@ -4175,6 +4146,13 @@
       };
   }
 
+  function setTSPFloorLevel(lvl) {
+      window.tspActiveFloorLevel = lvl;
+      if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+          renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+      }
+  }
+
   function onTSPFloorplanChange(fpId) {
       window.tspActiveFloorplanId = fpId;
       if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
@@ -4198,7 +4176,7 @@
       if (!stops || stops.length === 0) return;
 
       // 1. Resolve Active Floorplan
-      let activeFpId = window.tspActiveFloorplanId || document.getElementById('tsp-select-floorplan')?.value;
+      let activeFpId = window.tspActiveFloorplanId;
       let activeFp = null;
       if (activeFpId && Array.isArray(FLOORPLANS_LIST)) {
           activeFp = FLOORPLANS_LIST.find(f => String(f.id) === String(activeFpId));
@@ -4213,8 +4191,7 @@
                       if (candidate) {
                           activeFp = candidate;
                           activeFpId = candidate.id;
-                          const fpSel = document.getElementById('tsp-select-floorplan');
-                          if (fpSel) fpSel.value = candidate.id;
+                          window.tspActiveFloorplanId = candidate.id;
                           break;
                       }
                   }
@@ -4223,21 +4200,57 @@
           if (!activeFp) {
               activeFp = FLOORPLANS_LIST[0];
               activeFpId = activeFp.id;
+              window.tspActiveFloorplanId = activeFp.id;
           }
       }
 
-      // Check if this tenant has a real floorplan
+      // Update Facility Chip display text
+      if (activeFp) {
+          const chipFacility = document.getElementById('tsp-chip-facility-name');
+          if (chipFacility) chipFacility.innerText = activeFp.name;
+      }
+
+      // 2. Multi-floor separation & filtering to avoid overlapping zones
       const hasFloorplan = !!activeFp;
-      const childZones = hasFloorplan
+      const allChildZones = hasFloorplan
           ? (Array.isArray(LOCATIONS_LIST) ? LOCATIONS_LIST : []).filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(activeFp.id))
           : [];
+
+      const availableFloors = Array.from(new Set(allChildZones.map(z => parseInt(z.floor_level) || 1))).sort((a, b) => a - b);
+      let currentFloor = window.tspActiveFloorLevel || (availableFloors.includes(1) ? 1 : (availableFloors[0] || 1));
+      if (!availableFloors.includes(currentFloor) && availableFloors.length > 0) {
+          currentFloor = availableFloors[0];
+      }
+      window.tspActiveFloorLevel = currentFloor;
+
+      // Render dynamic floor switcher pills if facility has multiple floors
+      const floorSwitcher = document.getElementById('tsp-floor-switcher');
+      if (floorSwitcher) {
+          if (availableFloors.length > 1) {
+              floorSwitcher.innerHTML = availableFloors.map(lvl => `
+                  <button type="button" onclick="setTSPFloorLevel(${lvl})" class="px-2.5 py-0.5 rounded-lg text-[10px] font-black transition cursor-pointer ${lvl === currentFloor ? 'bg-sky-500 text-white shadow-xs' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+                      Tầng ${lvl}
+                  </button>
+              `).join('');
+          } else {
+              floorSwitcher.innerHTML = '';
+          }
+      }
+
+      // Filter child zones strictly to active floor level so Level 2 labels never collide with Level 1!
+      const childZones = (availableFloors.length > 1)
+          ? allChildZones.filter(z => (parseInt(z.floor_level) || 1) === currentFloor)
+          : allChildZones;
 
       let mapper = null;
       let midHallY = 350;
       if (hasFloorplan) {
-          mapper = getFloorplanCoordinateMapper(activeFp, childZones);
+          mapper = getFloorplanCoordinateMapper(activeFp, allChildZones.length > 0 ? allChildZones : childZones);
           midHallY = mapper.mToPx(0, 62).y;
-          if (viewInfo) viewInfo.innerText = `🏢 ${activeFp.name} (Tỉ lệ chuẩn CAD - 1:${Math.round(10/mapper.scale)})`;
+          if (viewInfo) {
+              const floorTag = availableFloors.length > 1 ? ` | Tầng ${currentFloor}` : '';
+              viewInfo.innerText = `🏢 ${activeFp.name}${floorTag} (Tỉ lệ CAD 1:${Math.round(10/mapper.scale)})`;
+          }
 
           // A. Draw Outer Building Wall (Read-only blueprint)
           const bPxPts = mapper.bPts.map(p => mapper.mToPx(p.x, p.y));
@@ -4245,7 +4258,7 @@
           if (floorplanLayer) {
               floorplanLayer.innerHTML += `
                   <polygon points="${bPtsStr}" fill="#0a1020" fill-opacity="0.94" stroke="#0284c7" stroke-width="2.5" pointer-events="none" filter="drop-shadow(0 0 10px rgba(2,132,199,0.3))"/>
-                  <text x="${(bPxPts[0].x + bPxPts[1].x)/2}" y="${Math.max(65, bPxPts[0].y + 20)}" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="900" text-anchor="middle" pointer-events="none" letter-spacing="1">🏢 ${activeFp.name.toUpperCase()}</text>
+                  <text x="${(bPxPts[0].x + bPxPts[1].x)/2}" y="${Math.max(65, bPxPts[0].y + 20)}" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="900" text-anchor="middle" pointer-events="none" letter-spacing="1">🏢 ${activeFp.name.toUpperCase()}${availableFloors.length > 1 ? ` - TẦNG ${currentFloor}` : ''}</text>
               `;
 
               // B. Draw Child Zones / Rooms with Location theme styling (Read-only view)
@@ -4271,12 +4284,14 @@
                   cPx.x /= zPxPts.length;
                   cPx.y /= zPxPts.length;
 
+                  const zoneDisplayName = zone.name.length > 28 ? zone.name.substring(0, 26) + '...' : zone.name;
+
                   floorplanLayer.innerHTML += `
                       <g pointer-events="none">
                           <polygon points="${zPtsStr}" fill="${theme.fill}" stroke="${theme.stroke}" stroke-width="1.8"/>
-                          <rect x="${cPx.x - 55}" y="${cPx.y - 18}" width="110" height="15" rx="3" fill="${theme.bgBadge}" fill-opacity="0.5"/>
-                          <text x="${cPx.x}" y="${cPx.y - 7}" fill="#f8fafc" font-size="10" font-weight="bold" font-family="sans-serif" text-anchor="middle">${zone.name}</text>
-                          <text x="${cPx.x}" y="${cPx.y + 11}" fill="${theme.label}" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">[${zone.code || 'ZONE'}]</text>
+                          <rect x="${cPx.x - 65}" y="${cPx.y - 18}" width="130" height="16" rx="3" fill="${theme.bgBadge}" fill-opacity="0.65"/>
+                          <text x="${cPx.x}" y="${cPx.y - 6}" fill="#f8fafc" font-size="9" font-weight="bold" font-family="sans-serif" text-anchor="middle">${zoneDisplayName}</text>
+                          <text x="${cPx.x}" y="${cPx.y + 11}" fill="${theme.label}" font-size="8.5" font-family="monospace" font-weight="bold" text-anchor="middle">[${zone.code || 'ZONE'}]</text>
                       </g>
                   `;
               });

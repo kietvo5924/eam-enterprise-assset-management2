@@ -1635,6 +1635,8 @@ def portal_work_orders(request):
                 if not check_perm(request, 'work_order:create'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:create required'}, status=403)
                 asset_id = data.get('asset_id')
+                if not asset_id:
+                    return JsonResponse({'success': False, 'error': 'Vui lòng chọn thiết bị / tài sản cho Work Order.'}, status=400)
                 assigned_to_id = data.get('assigned_to_id')
                 
                 # Auto-inherit location from asset if not manually supplied
@@ -1692,7 +1694,7 @@ def portal_work_orders(request):
                     description=data.get('description'),
                     priority=priority_val,
                     status=data.get('status', 'CREATED'),
-                    asset_id=asset_id if asset_id else None,
+                    asset_id=asset_id,
                     assigned_to_id=assigned_to_id if assigned_to_id else None,
                     deadline=deadline_dt,
                     created_by=request.user,
@@ -1839,13 +1841,15 @@ def portal_work_orders(request):
                 if not check_perm(request, 'work_order:update'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
                 asset_id = data.get('asset_id')
+                if not asset_id:
+                    return JsonResponse({'success': False, 'error': 'Vui lòng chọn thiết bị / tài sản cho Work Order.'}, status=400)
                 assigned_to_id = data.get('assigned_to_id')
                 
                 wo.title = data.get('title')
                 wo.description = data.get('description')
                 wo.priority = data.get('priority')
                 wo.status = data.get('status')
-                wo.asset_id = asset_id if asset_id else None
+                wo.asset_id = asset_id
                 wo.assigned_to_id = assigned_to_id if assigned_to_id else None
                 
                 if data.get('deadline'):
@@ -1926,6 +1930,14 @@ def portal_work_orders(request):
 
     work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by').prefetch_related('checklists', 'follow_up_work_orders')
     
+    # Permission-based scope filtering (strictly permission-based, no role checks):
+    # Users with 'work_order:reassign' or 'system:admin' (dispatchers/managers) can view all work orders in the tenant.
+    # Users without 'work_order:reassign' (technicians/executors) can only view work orders assigned to them or created by them.
+    can_view_all_wos = check_perm(request, ('work_order:reassign', 'system:admin'))
+    if not can_view_all_wos:
+        from django.db.models import Q
+        work_orders = work_orders.filter(Q(assigned_to=request.user) | Q(created_by=request.user))
+
     total_wos = work_orders.count()
     in_progress = sum(1 for wo in work_orders if wo.status == 'IN_PROGRESS')
     overdue = sum(1 for wo in work_orders if wo.deadline and wo.deadline < now and wo.status not in ['COMPLETED', 'CANCELED'])

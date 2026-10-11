@@ -89,6 +89,31 @@ class OptimizeRouteView(APIView):
                 status__in=['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'OPEN', 'CREATED']
             ).order_by('-priority', 'created_at')[:10])
 
+        # Resolve detected floorplan from work orders
+        detected_fp_id = None
+        detected_fp_name = None
+        detected_floor_level = 1
+        for wo in work_orders:
+            loc = wo.asset.location if (wo.asset and wo.asset.location) else None
+            if loc:
+                detected_floor_level = loc.floor_level or 1
+                if loc.parent_id:
+                    detected_fp_id = str(loc.parent_id)
+                    break
+                elif loc.zone_type == 'FLOORPLAN':
+                    detected_fp_id = str(loc.id)
+                    break
+        from assets.models import Location
+        if detected_fp_id:
+            fp_obj = Location.objects.filter(id=detected_fp_id, tenant=tenant).first()
+            if fp_obj:
+                detected_fp_name = fp_obj.name
+        if not detected_fp_id or not detected_fp_name:
+            first_fp = Location.objects.filter(tenant=tenant, zone_type='FLOORPLAN').first()
+            if first_fp:
+                detected_fp_id = str(first_fp.id)
+                detected_fp_name = first_fp.name
+
         start_time_mins = parse_start_time_str(data.get('startTime'))
         service = TSPRoutingService(tenant=tenant)
         result = service.optimize_daily_route(
@@ -99,6 +124,20 @@ class OptimizeRouteView(APIView):
             return_to_depot=data.get('returnToDepot', True),
             start_time_minutes=start_time_mins,
         )
+
+        if result.get('success') and 'data' in result and isinstance(result['data'], dict):
+            result['data']['detectedFloorplanId'] = detected_fp_id
+            result['data']['detectedFloorplanName'] = detected_fp_name
+            result['data']['detectedFloorLevel'] = detected_floor_level
+            tech_user = None
+            for wo in work_orders:
+                if wo.assigned_to:
+                    tech_user = wo.assigned_to
+                    break
+            if not tech_user:
+                tech_user = technician or request.user
+            result['data']['technicianName'] = (tech_user.get_full_name() or tech_user.username) if tech_user else ''
+            result['data']['technicianUsername'] = tech_user.username if tech_user else ''
 
         return Response(result, status=status.HTTP_200_OK)
 
@@ -142,6 +181,31 @@ class ReRouteMidShiftView(APIView):
         else:
             rem_wos = []
 
+        # Resolve detected floorplan from remaining work orders
+        detected_fp_id = None
+        detected_fp_name = None
+        detected_floor_level = 1
+        for wo in rem_wos:
+            loc = wo.asset.location if (wo.asset and wo.asset.location) else None
+            if loc:
+                detected_floor_level = loc.floor_level or 1
+                if loc.parent_id:
+                    detected_fp_id = str(loc.parent_id)
+                    break
+                elif loc.zone_type == 'FLOORPLAN':
+                    detected_fp_id = str(loc.id)
+                    break
+        from assets.models import Location
+        if detected_fp_id:
+            fp_obj = Location.objects.filter(id=detected_fp_id, tenant=tenant).first()
+            if fp_obj:
+                detected_fp_name = fp_obj.name
+        if not detected_fp_id or not detected_fp_name:
+            first_fp = Location.objects.filter(tenant=tenant, zone_type='FLOORPLAN').first()
+            if first_fp:
+                detected_fp_id = str(first_fp.id)
+                detected_fp_name = first_fp.name
+
         start_time_mins = None
         if data.get('startTime'):
             start_time_mins = parse_start_time_str(data.get('startTime'))
@@ -157,6 +221,20 @@ class ReRouteMidShiftView(APIView):
             return_to_depot=data.get('returnToDepot', True),
             start_time_minutes=start_time_mins,
         )
+
+        if result.get('success') and 'data' in result and isinstance(result['data'], dict):
+            result['data']['detectedFloorplanId'] = detected_fp_id
+            result['data']['detectedFloorplanName'] = detected_fp_name
+            result['data']['detectedFloorLevel'] = detected_floor_level
+            tech_user = None
+            for wo in rem_wos:
+                if wo.assigned_to:
+                    tech_user = wo.assigned_to
+                    break
+            if not tech_user:
+                tech_user = technician or request.user
+            result['data']['technicianName'] = (tech_user.get_full_name() or tech_user.username) if tech_user else ''
+            result['data']['technicianUsername'] = tech_user.username if tech_user else ''
 
         return Response(result, status=status.HTTP_200_OK)
 
@@ -180,6 +258,35 @@ class MyDailyRouteView(APIView):
             assigned_to=technician,
             status__in=['OPEN', 'IN_PROGRESS', 'ASSIGNED', 'PENDING']
         ))
+        if not work_orders:
+            work_orders = list(qs.filter(
+                status__in=['ASSIGNED', 'IN_PROGRESS', 'PENDING', 'OPEN', 'CREATED']
+            ).order_by('-priority', 'created_at')[:10])
+
+        # Resolve detected floorplan from work orders
+        detected_fp_id = None
+        detected_fp_name = None
+        detected_floor_level = 1
+        for wo in work_orders:
+            loc = wo.asset.location if (wo.asset and wo.asset.location) else None
+            if loc:
+                detected_floor_level = loc.floor_level or 1
+                if loc.parent_id:
+                    detected_fp_id = str(loc.parent_id)
+                    break
+                elif loc.zone_type == 'FLOORPLAN':
+                    detected_fp_id = str(loc.id)
+                    break
+        from assets.models import Location
+        if detected_fp_id:
+            fp_obj = Location.objects.filter(id=detected_fp_id, tenant=tenant).first()
+            if fp_obj:
+                detected_fp_name = fp_obj.name
+        if not detected_fp_id or not detected_fp_name:
+            first_fp = Location.objects.filter(tenant=tenant, zone_type='FLOORPLAN').first()
+            if first_fp:
+                detected_fp_id = str(first_fp.id)
+                detected_fp_name = first_fp.name
 
         now = timezone.localtime()
         start_time_mins = float(now.hour * 60 + now.minute)
@@ -191,6 +298,20 @@ class MyDailyRouteView(APIView):
             start_time_minutes=start_time_mins,
             return_to_depot=True,
         )
+
+        if result.get('success') and 'data' in result and isinstance(result['data'], dict):
+            result['data']['detectedFloorplanId'] = detected_fp_id
+            result['data']['detectedFloorplanName'] = detected_fp_name
+            result['data']['detectedFloorLevel'] = detected_floor_level
+            tech_user = None
+            for wo in work_orders:
+                if wo.assigned_to:
+                    tech_user = wo.assigned_to
+                    break
+            if not tech_user:
+                tech_user = technician or request.user
+            result['data']['technicianName'] = (tech_user.get_full_name() or tech_user.username) if tech_user else ''
+            result['data']['technicianUsername'] = tech_user.username if tech_user else ''
 
         return Response(result, status=status.HTTP_200_OK)
 
