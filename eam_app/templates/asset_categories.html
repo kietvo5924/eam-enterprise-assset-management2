@@ -2780,97 +2780,315 @@
 
         let snapX = currX;
         let snapY = currY;
-        const SNAP_THRESH = 0.5; // Giới hạn hít từ tính 0.5m sắc nét, chống nhảy vị trí
+        const SNAP_THRESH = 0.8; // Giới hạn hít từ tính 0.8m nhạy, dễ căn khít mép
         let lines = [];
 
-        const targetsX = [{ val: 50.0, label: 'Tâm sàn 50m' }];
-        const targetsY = [{ val: 35.0, label: 'Tâm sàn 35m' }];
+        const curHalfW = (parseFloat(currW) || 0) / 2;
+        const curHalfH = (parseFloat(currH) || 0) / 2;
+        const curLeft = currX - curHalfW;
+        const curRight = currX + curHalfW;
+        const curTop = currY - curHalfH;
+        const curBottom = currY + curHalfH;
+
+        const candidatesX = [
+            { targetSnapX: 50.0, guideX: 50.0, label: 'Tâm sàn 50m', diff: Math.abs(currX - 50.0) }
+        ];
+        const candidatesY = [
+            { targetSnapY: 35.0, guideY: 35.0, label: 'Tâm sàn 35m', diff: Math.abs(currY - 35.0) }
+        ];
 
         // Other zones on current floor
-        const floorLocations = getStudioFloorLocations().filter(l => String(l.id) !== String(currentId));
+        const floorLocations = getStudioFloorLocations().filter(l => String(l.id) !== String(currentId) && isZonePlaced(l));
         floorLocations.forEach(l => {
-            const dims = getZoneDimensions(l);
-            const cx = parseFloat(l.center_x) || 25.0;
-            const cy = parseFloat(l.center_y) || 20.0;
-            targetsX.push({ val: cx, label: `Tâm ${l.name}` });
-            targetsX.push({ val: cx - dims.w / 2, label: `Trái ${l.name}` });
-            targetsX.push({ val: cx + dims.w / 2, label: `Phải ${l.name}` });
-            targetsY.push({ val: cy, label: `Tâm ${l.name}` });
-            targetsY.push({ val: cy - dims.h / 2, label: `Trên ${l.name}` });
-            targetsY.push({ val: cy + dims.h / 2, label: `Dưới ${l.name}` });
+            const pts = getZonePoints(l);
+            const bb = getPolygonBoundingBox(pts);
+            const oLeft = bb.minX;
+            const oRight = bb.maxX;
+            const oTop = bb.minY;
+            const oBottom = bb.maxY;
+            const oCx = bb.cx;
+            const oCy = bb.cy;
+            const name = l.name;
+
+            // 1. Sát vách mép nhau (Touching boundary)
+            candidatesX.push({
+                targetSnapX: oRight + curHalfW,
+                guideX: oRight,
+                label: `Khớp mép: ${name}`,
+                diff: Math.abs(curLeft - oRight)
+            });
+            candidatesX.push({
+                targetSnapX: oLeft - curHalfW,
+                guideX: oLeft,
+                label: `Khớp mép: ${name}`,
+                diff: Math.abs(curRight - oLeft)
+            });
+
+            // 2. Căn thẳng hàng mép (Flush edge alignment)
+            candidatesX.push({
+                targetSnapX: oLeft + curHalfW,
+                guideX: oLeft,
+                label: `Thẳng mép trái: ${name}`,
+                diff: Math.abs(curLeft - oLeft)
+            });
+            candidatesX.push({
+                targetSnapX: oRight - curHalfW,
+                guideX: oRight,
+                label: `Thẳng mép phải: ${name}`,
+                diff: Math.abs(curRight - oRight)
+            });
+            candidatesX.push({
+                targetSnapX: oCx,
+                guideX: oCx,
+                label: `Thẳng tâm: ${name}`,
+                diff: Math.abs(currX - oCx)
+            });
+
+            // Y candidates:
+            // Sát vách trên/dưới
+            candidatesY.push({
+                targetSnapY: oBottom + curHalfH,
+                guideY: oBottom,
+                label: `Khớp mép: ${name}`,
+                diff: Math.abs(curTop - oBottom)
+            });
+            candidatesY.push({
+                targetSnapY: oTop - curHalfH,
+                guideY: oTop,
+                label: `Khớp mép: ${name}`,
+                diff: Math.abs(curBottom - oTop)
+            });
+
+            // Căn thẳng hàng mép trên/dưới
+            candidatesY.push({
+                targetSnapY: oTop + curHalfH,
+                guideY: oTop,
+                label: `Thẳng mép trên: ${name}`,
+                diff: Math.abs(curTop - oTop)
+            });
+            candidatesY.push({
+                targetSnapY: oBottom - curHalfH,
+                guideY: oBottom,
+                label: `Thẳng mép dưới: ${name}`,
+                diff: Math.abs(curBottom - oBottom)
+            });
+            candidatesY.push({
+                targetSnapY: oCy,
+                guideY: oCy,
+                label: `Thẳng tâm: ${name}`,
+                diff: Math.abs(currY - oCy)
+            });
         });
 
         // Other placed assets on this floor
         if (dragType === 'asset') {
             const floorAssets = assetsData.filter(a => (parseInt(a.floor_level) || 1) === currentFloor && parseFloat(a.coords_x) > 0 && String(a.id) !== String(currentId));
             floorAssets.forEach(a => {
-                targetsX.push({ val: parseFloat(a.coords_x), label: a.name });
-                targetsY.push({ val: parseFloat(a.coords_y), label: a.name });
+                const aX = parseFloat(a.coords_x);
+                const aY = parseFloat(a.coords_y);
+                const aDims = getAssetDimensions(a);
+                const aHalfW = aDims.w / 2;
+                const aHalfH = aDims.h / 2;
+                candidatesX.push({ targetSnapX: aX, guideX: aX, label: `Tâm ${a.name}`, diff: Math.abs(currX - aX) });
+                candidatesX.push({ targetSnapX: aX + aHalfW + curHalfW, guideX: aX + aHalfW, label: `Sát mép ${a.name}`, diff: Math.abs(curLeft - (aX + aHalfW)) });
+                candidatesX.push({ targetSnapX: aX - aHalfW - curHalfW, guideX: aX - aHalfW, label: `Sát mép ${a.name}`, diff: Math.abs(curRight - (aX - aHalfW)) });
+                candidatesY.push({ targetSnapY: aY, guideY: aY, label: `Tâm ${a.name}`, diff: Math.abs(currY - aY) });
+                candidatesY.push({ targetSnapY: aY + aHalfH + curHalfH, guideY: aY + aHalfH, label: `Sát mép ${a.name}`, diff: Math.abs(curTop - (aY + aHalfH)) });
+                candidatesY.push({ targetSnapY: aY - aHalfH - curHalfH, guideY: aY - aHalfH, label: `Sát mép ${a.name}`, diff: Math.abs(curBottom - (aY - aHalfH)) });
             });
         }
 
-        // Include item's own original baseline position as a magnetic snap target (Vị trí ban đầu)
+        // Include item's own original baseline position
         if (typeof savedStudioBaseline !== 'undefined') {
             const baseKey = `${dragType}_${currentId}`;
             const base = savedStudioBaseline.get(baseKey);
             if (base) {
                 if (dragType === 'zone') {
-                    if (base.center_x !== null && !isNaN(base.center_x)) targetsX.push({ val: base.center_x, label: 'Vị trí ban đầu' });
-                    if (base.center_y !== null && !isNaN(base.center_y)) targetsY.push({ val: base.center_y, label: 'Vị trí ban đầu' });
+                    if (base.center_x !== null && !isNaN(base.center_x)) candidatesX.push({ targetSnapX: base.center_x, guideX: base.center_x, label: 'Vị trí ban đầu', diff: Math.abs(currX - base.center_x) });
+                    if (base.center_y !== null && !isNaN(base.center_y)) candidatesY.push({ targetSnapY: base.center_y, guideY: base.center_y, label: 'Vị trí ban đầu', diff: Math.abs(currY - base.center_y) });
                 } else if (dragType === 'asset') {
-                    if (base.coords_x !== null && !isNaN(base.coords_x)) targetsX.push({ val: base.coords_x, label: 'Vị trí ban đầu' });
-                    if (base.coords_y !== null && !isNaN(base.coords_y)) targetsY.push({ val: base.coords_y, label: 'Vị trí ban đầu' });
+                    if (base.coords_x !== null && !isNaN(base.coords_x)) candidatesX.push({ targetSnapX: base.coords_x, guideX: base.coords_x, label: 'Vị trí ban đầu', diff: Math.abs(currX - base.coords_x) });
+                    if (base.coords_y !== null && !isNaN(base.coords_y)) candidatesY.push({ targetSnapY: base.coords_y, guideY: base.coords_y, label: 'Vị trí ban đầu', diff: Math.abs(currY - base.coords_y) });
                 } else if (dragType === 'spatial') {
-                    if (base.x !== null && !isNaN(base.x)) targetsX.push({ val: base.x, label: 'Vị trí ban đầu' });
-                    if (base.y !== null && !isNaN(base.y)) targetsY.push({ val: base.y, label: 'Vị trí ban đầu' });
+                    if (base.x !== null && !isNaN(base.x)) candidatesX.push({ targetSnapX: base.x, guideX: base.x, label: 'Vị trí ban đầu', diff: Math.abs(currX - base.x) });
+                    if (base.y !== null && !isNaN(base.y)) candidatesY.push({ targetSnapY: base.y, guideY: base.y, label: 'Vị trí ban đầu', diff: Math.abs(currY - base.y) });
                 }
             }
         }
 
-        // Chọn mốc X gần nhất (chống tranh chấp nhiều mốc gây nhảy)
-        let bestDiffX = SNAP_THRESH;
-        let alignedX = null;
-        for (const t of targetsX) {
-            const d = Math.abs(currX - t.val);
-            if (d < bestDiffX) {
-                bestDiffX = d;
-                snapX = t.val;
-                alignedX = t;
+        // Chọn mốc X gần nhất
+        let bestX = null;
+        let minDiffX = SNAP_THRESH;
+        for (const c of candidatesX) {
+            if (c.diff < minDiffX) {
+                minDiffX = c.diff;
+                bestX = c;
             }
         }
-
-        // Chọn mốc Y gần nhất
-        let bestDiffY = SNAP_THRESH;
-        let alignedY = null;
-        for (const t of targetsY) {
-            const d = Math.abs(currY - t.val);
-            if (d < bestDiffY) {
-                bestDiffY = d;
-                snapY = t.val;
-                alignedY = t;
-            }
-        }
-
-        if (alignedX) {
-            const px = (snapX / FACTORY_WIDTH_METERS) * CANVAS_WIDTH_PX;
+        if (bestX) {
+            snapX = Math.round(bestX.targetSnapX * 10) / 10;
+            const px = (bestX.guideX / FACTORY_WIDTH_METERS) * CANVAS_WIDTH_PX;
             lines.push(`
-                <line x1="${px}" y1="0" x2="${px}" y2="${CANVAS_HEIGHT_PX}" stroke="#38bdf8" stroke-width="1.2" opacity="0.9" />
-                <rect x="${px - 45}" y="8" width="90" height="18" rx="0" fill="#0369a1" fill-opacity="0.9" stroke="#38bdf8" stroke-width="1" />
-                <text x="${px}" y="20" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">X: ${snapX.toFixed(1)}m</text>
+                <line x1="${px.toFixed(1)}" y1="0" x2="${px.toFixed(1)}" y2="${CANVAS_HEIGHT_PX}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.95" />
+                <rect x="${(px - 90).toFixed(1)}" y="8" width="180" height="20" rx="2" fill="#090d16" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1.2" />
+                <text x="${px.toFixed(1)}" y="22" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">${bestX.label} (${bestX.guideX.toFixed(1)}m)</text>
             `);
         }
 
-        if (alignedY) {
-            const py = (snapY / FACTORY_HEIGHT_METERS) * CANVAS_HEIGHT_PX;
+        // Chọn mốc Y gần nhất
+        let bestY = null;
+        let minDiffY = SNAP_THRESH;
+        for (const c of candidatesY) {
+            if (c.diff < minDiffY) {
+                minDiffY = c.diff;
+                bestY = c;
+            }
+        }
+        if (bestY) {
+            snapY = Math.round(bestY.targetSnapY * 10) / 10;
+            const py = (bestY.guideY / FACTORY_HEIGHT_METERS) * CANVAS_HEIGHT_PX;
             lines.push(`
-                <line x1="0" y1="${py}" x2="${CANVAS_WIDTH_PX}" y2="${py}" stroke="#38bdf8" stroke-width="1.2" opacity="0.9" />
-                <rect x="8" y="${py - 9}" width="90" height="18" rx="0" fill="#0369a1" fill-opacity="0.9" stroke="#38bdf8" stroke-width="1" />
-                <text x="53" y="${py + 3}" fill="#ffffff" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle">Y: ${snapY.toFixed(1)}m</text>
+                <line x1="0" y1="${py.toFixed(1)}" x2="${CANVAS_WIDTH_PX}" y2="${py.toFixed(1)}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.95" />
+                <rect x="8" y="${(py - 10).toFixed(1)}" width="190" height="20" rx="2" fill="#090d16" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1.2" />
+                <text x="103" y="${(py + 4).toFixed(1)}" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">${bestY.label} (${bestY.guideY.toFixed(1)}m)</text>
             `);
         }
 
         g.innerHTML = lines.join('');
         return { snapX, snapY };
+    }
+
+    // Căn chỉnh & Hít từ tính mép khu vực khi thay đổi kích thước (Resize Smart Alignment)
+    function computeZoneResizeAlignment(locId, dir, curMinX, curMaxX, curMinY, curMaxY) {
+        const g = document.getElementById('studio-alignment-guides');
+        const SNAP_THRESH = 0.8;
+        let snappedMinX = curMinX;
+        let snappedMaxX = curMaxX;
+        let snappedMinY = curMinY;
+        let snappedMaxY = curMaxY;
+        let lines = [];
+
+        const floorLocations = getStudioFloorLocations().filter(l => String(l.id) !== String(locId) && isZonePlaced(l));
+
+        if (dir.includes('e')) {
+            let bestDiff = SNAP_THRESH;
+            let bestGuide = null;
+            for (const l of floorLocations) {
+                const bb = getPolygonBoundingBox(getZonePoints(l));
+                const dLeft = Math.abs(curMaxX - bb.minX);
+                if (dLeft < bestDiff) {
+                    bestDiff = dLeft;
+                    snappedMaxX = bb.minX;
+                    bestGuide = { x: bb.minX, label: `Khớp mép: ${l.name}` };
+                }
+                const dRight = Math.abs(curMaxX - bb.maxX);
+                if (dRight < bestDiff) {
+                    bestDiff = dRight;
+                    snappedMaxX = bb.maxX;
+                    bestGuide = { x: bb.maxX, label: `Thẳng mép phải: ${l.name}` };
+                }
+            }
+            if (bestGuide) {
+                const px = (bestGuide.x / FACTORY_WIDTH_METERS) * CANVAS_WIDTH_PX;
+                lines.push(`
+                    <line x1="${px.toFixed(1)}" y1="0" x2="${px.toFixed(1)}" y2="${CANVAS_HEIGHT_PX}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.95" />
+                    <rect x="${(px - 90).toFixed(1)}" y="8" width="180" height="20" rx="2" fill="#090d16" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1.2" />
+                    <text x="${px.toFixed(1)}" y="22" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">${bestGuide.label} (${bestGuide.x.toFixed(1)}m)</text>
+                `);
+            }
+        }
+
+        if (dir.includes('w')) {
+            let bestDiff = SNAP_THRESH;
+            let bestGuide = null;
+            for (const l of floorLocations) {
+                const bb = getPolygonBoundingBox(getZonePoints(l));
+                const dRight = Math.abs(curMinX - bb.maxX);
+                if (dRight < bestDiff) {
+                    bestDiff = dRight;
+                    snappedMinX = bb.maxX;
+                    bestGuide = { x: bb.maxX, label: `Khớp mép: ${l.name}` };
+                }
+                const dLeft = Math.abs(curMinX - bb.minX);
+                if (dLeft < bestDiff) {
+                    bestDiff = dLeft;
+                    snappedMinX = bb.minX;
+                    bestGuide = { x: bb.minX, label: `Thẳng mép trái: ${l.name}` };
+                }
+            }
+            if (bestGuide) {
+                const px = (bestGuide.x / FACTORY_WIDTH_METERS) * CANVAS_WIDTH_PX;
+                lines.push(`
+                    <line x1="${px.toFixed(1)}" y1="0" x2="${px.toFixed(1)}" y2="${CANVAS_HEIGHT_PX}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.95" />
+                    <rect x="${(px - 90).toFixed(1)}" y="8" width="180" height="20" rx="2" fill="#090d16" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1.2" />
+                    <text x="${px.toFixed(1)}" y="22" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">${bestGuide.label} (${bestGuide.x.toFixed(1)}m)</text>
+                `);
+            }
+        }
+
+        if (dir.includes('s')) {
+            let bestDiff = SNAP_THRESH;
+            let bestGuide = null;
+            for (const l of floorLocations) {
+                const bb = getPolygonBoundingBox(getZonePoints(l));
+                const dTop = Math.abs(curMaxY - bb.minY);
+                if (dTop < bestDiff) {
+                    bestDiff = dTop;
+                    snappedMaxY = bb.minY;
+                    bestGuide = { y: bb.minY, label: `Khớp mép trên: ${l.name}` };
+                }
+                const dBottom = Math.abs(curMaxY - bb.maxY);
+                if (dBottom < bestDiff) {
+                    bestDiff = dBottom;
+                    snappedMaxY = bb.maxY;
+                    bestGuide = { y: bb.maxY, label: `Thẳng mép dưới: ${l.name}` };
+                }
+            }
+            if (bestGuide) {
+                const py = (bestGuide.y / FACTORY_HEIGHT_METERS) * CANVAS_HEIGHT_PX;
+                lines.push(`
+                    <line x1="0" y1="${py.toFixed(1)}" x2="${CANVAS_WIDTH_PX}" y2="${py.toFixed(1)}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.95" />
+                    <rect x="8" y="${(py - 10).toFixed(1)}" width="190" height="20" rx="2" fill="#090d16" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1.2" />
+                    <text x="103" y="${(py + 4).toFixed(1)}" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">${bestGuide.label} (${bestGuide.y.toFixed(1)}m)</text>
+                `);
+            }
+        }
+
+        if (dir.includes('n')) {
+            let bestDiff = SNAP_THRESH;
+            let bestGuide = null;
+            for (const l of floorLocations) {
+                const bb = getPolygonBoundingBox(getZonePoints(l));
+                const dBottom = Math.abs(curMinY - bb.maxY);
+                if (dBottom < bestDiff) {
+                    bestDiff = dBottom;
+                    snappedMinY = bb.maxY;
+                    bestGuide = { y: bb.maxY, label: `Khớp mép dưới: ${l.name}` };
+                }
+                const dTop = Math.abs(curMinY - bb.minY);
+                if (dTop < bestDiff) {
+                    bestDiff = dTop;
+                    snappedMinY = bb.minY;
+                    bestGuide = { y: bb.minY, label: `Thẳng mép trên: ${l.name}` };
+                }
+            }
+            if (bestGuide) {
+                const py = (bestGuide.y / FACTORY_HEIGHT_METERS) * CANVAS_HEIGHT_PX;
+                lines.push(`
+                    <line x1="0" y1="${py.toFixed(1)}" x2="${CANVAS_WIDTH_PX}" y2="${py.toFixed(1)}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.95" />
+                    <rect x="8" y="${(py - 10).toFixed(1)}" width="190" height="20" rx="2" fill="#090d16" fill-opacity="0.95" stroke="#38bdf8" stroke-width="1.2" />
+                    <text x="103" y="${(py + 4).toFixed(1)}" fill="#38bdf8" font-size="10" font-family="monospace" font-weight="bold" text-anchor="middle">${bestGuide.label} (${bestGuide.y.toFixed(1)}m)</text>
+                `);
+            }
+        }
+
+        if (g) g.innerHTML = lines.join('');
+        return {
+            curMinX: Math.round(snappedMinX * 10) / 10,
+            curMaxX: Math.round(snappedMaxX * 10) / 10,
+            curMinY: Math.round(snappedMinY * 10) / 10,
+            curMaxY: Math.round(snappedMaxY * 10) / 10
+        };
     }
 
     // Helper: kiểm tra tài sản đã được định vị toạ độ trên sơ đồ mặt bằng chưa
@@ -4217,6 +4435,24 @@
 
     const SPATIAL_ELEMENTS = [
         {
+            type: 'stairs',
+            name: 'Cầu thang bộ',
+            desc: 'Cầu thang bộ kỹ thuật kết nối giữa các tầng mặt bằng',
+            icon: 'ph-stairs',
+            color: 'text-violet-400',
+            border: 'border-violet-500/40',
+            bg: 'bg-violet-950/30'
+        },
+        {
+            type: 'elevator',
+            name: 'Thang máy chuyển tầng',
+            desc: 'Thang máy vận chuyển hàng & kỹ thuật giữa các tầng',
+            icon: 'ph-elevator',
+            color: 'text-indigo-400',
+            border: 'border-indigo-500/40',
+            bg: 'bg-indigo-950/30'
+        },
+        {
             type: 'room',
             name: 'Phòng trống',
             desc: 'Khối phòng trống 36x26m để quy hoạch khu vực mới',
@@ -4523,49 +4759,23 @@
     // =========================================================================
 
     function ensureCanvasEncompassesContent() {
-        let maxReqW = FACTORY_WIDTH_METERS;
-        let maxReqH = FACTORY_HEIGHT_METERS;
-        const bPts = getBuildingPoints();
-        if (Array.isArray(bPts) && bPts.length >= 3) {
-            const bbb = getPolygonBoundingBox(bPts);
-            maxReqW = Math.max(maxReqW, bbb.maxX);
-            maxReqH = Math.max(maxReqH, bbb.maxY);
+        // Đồng bộ kích thước canvas thế giới & SVG blueprint với kích thước mặt bằng cố định đã cấu hình
+        // Không tự ý mở rộng ranh giới mặt bằng khi kéo khu vực gần sát mép
+        CANVAS_WIDTH_PX = FACTORY_WIDTH_METERS * 10.0;
+        CANVAS_HEIGHT_PX = FACTORY_HEIGHT_METERS * 10.0;
+
+        const world = document.getElementById('studio-canvas-world');
+        const svg = document.getElementById('studio-svg-blueprint');
+        if (world) {
+            world.style.width = `${CANVAS_WIDTH_PX}px`;
+            world.style.height = `${CANVAS_HEIGHT_PX}px`;
         }
-        const floorLocs = (typeof getStudioFloorLocations === 'function') ? getStudioFloorLocations().filter(isZonePlaced) : [];
-        floorLocs.forEach(l => {
-            const pts = getZonePoints(l);
-            const zb = getPolygonBoundingBox(pts);
-            maxReqW = Math.max(maxReqW, zb.maxX + 4);
-            maxReqH = Math.max(maxReqH, zb.maxY + 4);
-        });
-        const ceilW = Math.ceil(maxReqW / 10) * 10;
-        const ceilH = Math.ceil(maxReqH / 10) * 10;
-        if (ceilW > FACTORY_WIDTH_METERS || ceilH > FACTORY_HEIGHT_METERS) {
-            FACTORY_WIDTH_METERS = Math.max(FACTORY_WIDTH_METERS, ceilW);
-            FACTORY_HEIGHT_METERS = Math.max(FACTORY_HEIGHT_METERS, ceilH);
-            CANVAS_WIDTH_PX = FACTORY_WIDTH_METERS * 10.0;
-            CANVAS_HEIGHT_PX = FACTORY_HEIGHT_METERS * 10.0;
-            if (currentBuildingPreset === 'rect' && Array.isArray(buildingPolygonPoints)) {
-                buildingPolygonPoints = [
-                    { x: 0, y: 0 },
-                    { x: FACTORY_WIDTH_METERS, y: 0 },
-                    { x: FACTORY_WIDTH_METERS, y: FACTORY_HEIGHT_METERS },
-                    { x: 0, y: FACTORY_HEIGHT_METERS }
-                ];
-            }
-            const world = document.getElementById('studio-canvas-world');
-            const svg = document.getElementById('studio-svg-blueprint');
-            if (world) {
-                world.style.width = `${CANVAS_WIDTH_PX}px`;
-                world.style.height = `${CANVAS_HEIGHT_PX}px`;
-            }
-            if (svg) {
-                svg.setAttribute('viewBox', `0 0 ${CANVAS_WIDTH_PX} ${CANVAS_HEIGHT_PX}`);
-            }
-            const minimapDim = document.getElementById('studio-minimap-dim');
-            if (minimapDim) {
-                minimapDim.innerText = `${FACTORY_WIDTH_METERS}m x ${FACTORY_HEIGHT_METERS}m`;
-            }
+        if (svg) {
+            svg.setAttribute('viewBox', `0 0 ${CANVAS_WIDTH_PX} ${CANVAS_HEIGHT_PX}`);
+        }
+        const minimapDim = document.getElementById('studio-minimap-dim');
+        if (minimapDim) {
+            minimapDim.innerText = `${Math.round(FACTORY_WIDTH_METERS)}m x ${Math.round(FACTORY_HEIGHT_METERS)}m`;
         }
     }
 
@@ -4685,6 +4895,89 @@
                     <rect x="${left}" y="${top}" width="${wPx}" height="${hPx}" rx="0" fill="#713f12" stroke="#eab308" stroke-width="2"/>
                     <text x="${px}" y="${py + 4}" fill="#fde047" font-size="10" font-weight="bold" text-anchor="middle">TỦ ĐIỆN</text>
                 `;
+            } else if (el.type === 'stairs') {
+                const isHorizontal = wPx >= hPx;
+                let stairCadSvg = '';
+
+                if (isHorizontal) {
+                    const midY = top + hPx / 2;
+                    const landingW = Math.max(22, Math.min(wPx * 0.24, 38));
+                    const flightW = wPx - landingW;
+                    const numSteps = Math.max(6, Math.min(12, Math.floor(flightW / 9)));
+                    
+                    // Chiếu nghỉ (Landing platform at left)
+                    let treads = `<rect x="${left}" y="${top}" width="${landingW}" height="${hPx}" fill="#1e293b" fill-opacity="0.9" stroke="#64748b" stroke-width="1.2"/>`;
+                    treads += `<text x="${left + landingW / 2}" y="${midY + 3}" fill="#94a3b8" font-size="7.5" font-family="monospace" font-weight="bold" text-anchor="middle">CHIẾU NGHỈ</text>`;
+                    
+                    // Khe giếng thang giữa 2 vế (Center well divider)
+                    treads += `<line x1="${left + landingW}" y1="${midY}" x2="${left + wPx}" y2="${midY}" stroke="#64748b" stroke-width="1.8"/>`;
+                    
+                    // Các bậc thang song song (Parallel step treads for Flight 1 & Flight 2)
+                    for (let s = 1; s <= numSteps; s++) {
+                        const stepX = left + landingW + (flightW / (numSteps + 1)) * s;
+                        treads += `<line x1="${stepX}" y1="${top + 2}" x2="${stepX}" y2="${midY - 2}" stroke="#cbd5e1" stroke-width="1.2"/>`;
+                        treads += `<line x1="${stepX}" y1="${midY + 2}" x2="${stepX}" y2="${top + hPx - 2}" stroke="#cbd5e1" stroke-width="1.2"/>`;
+                    }
+                    
+                    // Tay vịn / đường biên 2 vế (Handrails)
+                    treads += `<line x1="${left + landingW}" y1="${top + 3}" x2="${left + wPx}" y2="${top + 3}" stroke="#64748b" stroke-width="0.8" stroke-dasharray="3 2"/>`;
+                    treads += `<line x1="${left + landingW}" y1="${top + hPx - 3}" x2="${left + wPx}" y2="${top + hPx - 3}" stroke="#64748b" stroke-width="0.8" stroke-dasharray="3 2"/>`;
+                    
+                    // Đường tim thang kiến trúc CAD (Architectural flight direction arrow)
+                    const walkY1 = top + (midY - top) / 2;
+                    const walkY2 = midY + (top + hPx - midY) / 2;
+                    const turnX = left + landingW * 0.55;
+                    treads += `
+                        <circle cx="${left + wPx - 10}" cy="${walkY1}" r="2.5" fill="#38bdf8"/>
+                        <path d="M ${left + wPx - 10} ${walkY1} L ${turnX} ${walkY1} A 5 5 0 0 0 ${turnX} ${walkY2} L ${left + wPx - 14} ${walkY2}" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3 2"/>
+                        <polygon points="${left + wPx - 8},${walkY2} ${left + wPx - 14},${walkY2 - 3} ${left + wPx - 14},${walkY2 + 3}" fill="#38bdf8"/>
+                    `;
+                    stairCadSvg = treads;
+                } else {
+                    // Vertical orientation: 2 vertical flights side-by-side with landing at top
+                    const midX = left + wPx / 2;
+                    const landingH = Math.max(22, Math.min(hPx * 0.24, 38));
+                    const flightH = hPx - landingH;
+                    const numSteps = Math.max(6, Math.min(12, Math.floor(flightH / 9)));
+                    
+                    // Chiếu nghỉ (Landing platform at top)
+                    let treads = `<rect x="${left}" y="${top}" width="${wPx}" height="${landingH}" fill="#1e293b" fill-opacity="0.9" stroke="#64748b" stroke-width="1.2"/>`;
+                    treads += `<text x="${midX}" y="${top + landingH / 2 + 3}" fill="#94a3b8" font-size="7.5" font-family="monospace" font-weight="bold" text-anchor="middle">CHIẾU NGHỈ</text>`;
+                    
+                    // Khe giếng thang giữa 2 vế
+                    treads += `<line x1="${midX}" y1="${top + landingH}" x2="${midX}" y2="${top + hPx}" stroke="#64748b" stroke-width="1.8"/>`;
+                    
+                    // Các bậc thang ngang song song
+                    for (let s = 1; s <= numSteps; s++) {
+                        const stepY = top + landingH + (flightH / (numSteps + 1)) * s;
+                        treads += `<line x1="${left + 2}" y1="${stepY}" x2="${midX - 2}" y2="${stepY}" stroke="#cbd5e1" stroke-width="1.2"/>`;
+                        treads += `<line x1="${midX + 2}" y1="${stepY}" x2="${left + wPx - 2}" y2="${stepY}" stroke="#cbd5e1" stroke-width="1.2"/>`;
+                    }
+                    
+                    // Đường tim thang kiến trúc CAD
+                    const walkX1 = left + (midX - left) / 2;
+                    const walkX2 = midX + (left + wPx - midX) / 2;
+                    const turnY = top + landingH * 0.55;
+                    treads += `
+                        <circle cx="${walkX1}" cy="${top + hPx - 10}" r="2.5" fill="#38bdf8"/>
+                        <path d="M ${walkX1} ${top + hPx - 10} L ${walkX1} ${turnY} A 5 5 0 0 1 ${walkX2} ${turnY} L ${walkX2} ${top + hPx - 14}" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="3 2"/>
+                        <polygon points="${walkX2},${top + hPx - 8} ${walkX2 - 3},${top + hPx - 14} ${walkX2 + 3},${top + hPx - 14}" fill="#38bdf8"/>
+                    `;
+                    stairCadSvg = treads;
+                }
+
+                innerGraphic = `
+                    <rect x="${left}" y="${top}" width="${wPx}" height="${hPx}" rx="0" fill="#0f172a" fill-opacity="0.88" stroke="#94a3b8" stroke-width="1.6"/>
+                    ${stairCadSvg}
+                    <rect x="${px - 44}" y="${top - 16}" width="88" height="14" rx="2" fill="#0f172a" fill-opacity="0.95" stroke="#64748b" stroke-width="0.8"/>
+                    <text x="${px}" y="${top - 6}" fill="#e2e8f0" font-size="8.5" font-family="monospace" font-weight="bold" text-anchor="middle">🪜 ${el.name || 'CẦU THANG BỘ'}</text>
+                `;
+            } else if (el.type === 'elevator') {
+                innerGraphic = `
+                    <rect x="${left}" y="${top}" width="${wPx}" height="${hPx}" rx="0" fill="#1e1b4b" fill-opacity="0.85" stroke="#6366f1" stroke-width="2"/>
+                    <rect x="${left + 6}" y="${top + 4}" width="${wPx - 12}" height="${hPx - 8}" rx="0" fill="#312e81" stroke="#818cf8" stroke-width="1"/>
+                    <text x="${px}" y="${py + 4}" fill="#e0e7ff" font-size="9.5" font-weight="bold" text-anchor="middle">🛗 ${el.name || 'THANG MÁY'}</text>
+                `;
             } else {
                 innerGraphic = `
                     <rect x="${left}" y="${top}" width="${wPx}" height="${hPx}" rx="0" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/>
@@ -4724,6 +5017,8 @@
         'OFFICE': { border: 'border-purple-500/70', bg: 'bg-purple-950/20', badge: 'bg-purple-500/20 text-purple-300 border-purple-400/40', text: 'text-purple-300' },
         'OUTDOOR': { border: 'border-cyan-500/70', bg: 'bg-cyan-950/20', badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40', text: 'text-cyan-300' },
         'RESTRICTED': { border: 'border-rose-500/70', bg: 'bg-rose-950/20', badge: 'bg-rose-500/20 text-rose-300 border-rose-400/40', text: 'text-rose-300' },
+        'STAIRS': { border: 'border-violet-500/70', bg: 'bg-violet-950/20', badge: 'bg-violet-500/20 text-violet-300 border-violet-400/40', text: 'text-violet-300' },
+        'ELEVATOR': { border: 'border-indigo-500/70', bg: 'bg-indigo-950/20', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/40', text: 'text-indigo-300' },
     };
 
     function renderStudioZonesLayer(floorLocations) {
@@ -4774,6 +5069,8 @@
                 'OFFICE':     { stroke: '#9333ea', fill: 'rgba(168, 85, 247, 0.16)' },
                 'OUTDOOR':    { stroke: '#0891b2', fill: 'rgba(6, 182, 212, 0.16)' },
                 'RESTRICTED': { stroke: '#e11d48', fill: 'rgba(244, 63, 94, 0.18)' },
+                'STAIRS':     { stroke: '#8b5cf6', fill: 'rgba(139, 92, 246, 0.22)' },
+                'ELEVATOR':   { stroke: '#6366f1', fill: 'rgba(99, 102, 241, 0.22)' },
             };
             const baseTheme = themeMap[loc.zone_type] || themeMap['PRODUCTION'];
 
@@ -5328,16 +5625,23 @@
 
         document.body.style.userSelect = 'none';
 
-        const origDim = getZoneDimensions(loc);
-        const origCx = (loc.center_x !== null && loc.center_x !== undefined && !isNaN(parseFloat(loc.center_x))) ? parseFloat(loc.center_x) : 25.0;
-        const origCy = (loc.center_y !== null && loc.center_y !== undefined && !isNaN(parseFloat(loc.center_y))) ? parseFloat(loc.center_y) : 20.0;
-        const origMinX = origCx - origDim.w / 2;
-        const origMaxX = origCx + origDim.w / 2;
-        const origMinY = origCy - origDim.h / 2;
-        const origMaxY = origCy + origDim.h / 2;
+        const origPoints = getZonePoints(loc).map(p => ({ x: p.x, y: p.y }));
+        const origBb = getPolygonBoundingBox(origPoints);
+        const origDim = { w: origBb.w, h: origBb.h };
+        const origMinX = origBb.minX;
+        const origMaxX = origBb.maxX;
+        const origMinY = origBb.minY;
+        const origMaxY = origBb.maxY;
+        const origCx = origBb.cx;
+        const origCy = origBb.cy;
 
         const startMouseX = e.clientX;
         const startMouseY = e.clientY;
+
+        let curMinX = origMinX;
+        let curMaxX = origMaxX;
+        let curMinY = origMinY;
+        let curMaxY = origMaxY;
 
         let finalW = origDim.w;
         let finalH = origDim.h;
@@ -5355,10 +5659,10 @@
             const dxM = (dxPx / CANVAS_WIDTH_PX) * FACTORY_WIDTH_METERS;
             const dyM = (dyPx / CANVAS_HEIGHT_PX) * FACTORY_HEIGHT_METERS;
 
-            let curMinX = origMinX;
-            let curMaxX = origMaxX;
-            let curMinY = origMinY;
-            let curMaxY = origMaxY;
+            curMinX = origMinX;
+            curMaxX = origMaxX;
+            curMinY = origMinY;
+            curMaxY = origMaxY;
 
             if (dir.includes('e')) curMaxX = Math.max(origMinX + 6.0, Math.min(FACTORY_WIDTH_METERS, origMaxX + dxM));
             if (dir.includes('w')) curMinX = Math.min(origMaxX - 6.0, Math.max(0.0, origMinX + dxM));
@@ -5371,6 +5675,13 @@
                 if (dir.includes('s')) curMaxY = Math.round(curMaxY / snapGrid) * snapGrid;
                 if (dir.includes('n')) curMinY = Math.round(curMinY / snapGrid) * snapGrid;
             }
+
+            // Hỗ trợ căn chỉnh & Hít từ tính khi 2 khu vực sát vô nhau khi kéo to nhỏ
+            const resizeSnap = computeZoneResizeAlignment(loc.id, dir, curMinX, curMaxX, curMinY, curMaxY);
+            curMinX = resizeSnap.curMinX;
+            curMaxX = resizeSnap.curMaxX;
+            curMinY = resizeSnap.curMinY;
+            curMaxY = resizeSnap.curMaxY;
 
             finalW = Math.max(6.0, Math.round((curMaxX - curMinX) * 10) / 10);
             finalH = Math.max(6.0, Math.round((curMaxY - curMinY) * 10) / 10);
@@ -5386,8 +5697,7 @@
             zoneEl.style.height = `${heightPx}px`;
 
             // Cập nhật co giãn tỷ lệ các đỉnh SVG thời gian thực
-            const oldPoints = getZonePoints(loc);
-            const tempPoints = oldPoints.map(p => {
+            const tempPoints = origPoints.map(p => {
                 const rx = origDim.w > 0 ? (p.x - origMinX) / origDim.w : 0;
                 const ry = origDim.h > 0 ? (p.y - origMinY) / origDim.h : 0;
                 const nx = curMinX + rx * finalW;
@@ -5411,10 +5721,10 @@
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
 
+            clearAlignmentGuides();
             if (tooltip) tooltip.classList.add('hidden');
 
-            const oldPoints = getZonePoints(loc);
-            const newPoints = oldPoints.map(p => {
+            const newPoints = origPoints.map(p => {
                 const rx = origDim.w > 0 ? (p.x - origMinX) / origDim.w : 0;
                 const ry = origDim.h > 0 ? (p.y - origMinY) / origDim.h : 0;
                 const nx = Math.round((curMinX + rx * finalW) * 10) / 10;
@@ -5426,6 +5736,7 @@
             syncZoneSpatialHierarchy(currentFloor);
             renderStudio();
             renderLocationsTree();
+            renderInspector();
             showStudioToast(`Đã thay đổi kích thước "${loc.name}": ${finalW}m × ${finalH}m (${getPolygonArea(newPoints).toFixed(1)} m²)`);
         }
 
@@ -6064,7 +6375,9 @@
             } else {
                 // Item 3: Bố trí các cấu trúc không gian (Đường đi, Lối bộ, Dock cửa, Vách ngăn, Buffer, PCCC, Tủ điện)
                 let wM = 40.0, hM = 6.0;
-                if (dragData.spaceType === 'aisle_main') { wM = 70.0; hM = 6.0; }
+                if (dragData.spaceType === 'stairs') { wM = 16.0; hM = 10.0; }
+                else if (dragData.spaceType === 'elevator') { wM = 10.0; hM = 10.0; }
+                else if (dragData.spaceType === 'aisle_main') { wM = 70.0; hM = 6.0; }
                 else if (dragData.spaceType === 'walkway_safe') { wM = 50.0; hM = 4.0; }
                 else if (dragData.spaceType === 'dock_door') { wM = 16.0; hM = 6.0; }
                 else if (dragData.spaceType === 'wall_partition') { wM = 30.0; hM = 2.0; }
@@ -6330,7 +6643,9 @@
             'wall_partition': { label: 'Vách ngăn phân cách', badge: 'bg-slate-500/20 text-slate-300 border-slate-500/40' },
             'buffer_staging': { label: 'Bãi tập kết Buffer', badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' },
             'safety_station': { label: 'Trạm PCCC cứu hoả', badge: 'bg-rose-500/20 text-rose-300 border-rose-500/40' },
-            'electrical_station': { label: 'Tủ điện / Kỹ thuật', badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' }
+            'electrical_station': { label: 'Tủ điện / Kỹ thuật', badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
+            'stairs': { label: 'Cầu thang bộ', badge: 'bg-slate-700 text-slate-200 border-slate-500' },
+            'elevator': { label: 'Thang máy chuyển tầng', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' }
         };
         const tInfo = typeLabels[el.type] || { label: 'Cấu trúc không gian', badge: 'bg-slate-700 text-slate-300 border-slate-600' };
 

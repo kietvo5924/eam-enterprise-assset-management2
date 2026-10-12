@@ -8,6 +8,14 @@ class Location(BaseTenantModel):
         ('STANDARD', 'Tiêu chuẩn'),
         ('CONTROLLED', 'Kiểm soát đặc thù / Phòng sạch'),
         ('GENERAL', 'Chung / Toàn nhà máy'),
+        ('PRODUCTION', 'Khu vực sản xuất'),
+        ('CLEANROOM', 'Phòng sạch'),
+        ('WAREHOUSE', 'Kho hàng'),
+        ('OFFICE', 'Văn phòng'),
+        ('OUTDOOR', 'Ngoài trời'),
+        ('RESTRICTED', 'Khu hạn chế'),
+        ('STAIRS', 'Cầu thang bộ / Lối chuyển tầng'),
+        ('ELEVATOR', 'Thang máy'),
     )
 
     LOCATION_TYPE_CHOICES = (
@@ -101,6 +109,7 @@ class SparePart(BaseTenantModel):
     name = models.CharField(max_length=255)
     part_number = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+    location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='spare_parts')
     quantity_in_stock = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
     unit_cost = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -155,6 +164,14 @@ class Asset(BaseTenantModel):
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
     updated_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='updated_by', db_constraint=False)
+
+    @property
+    def floor_number(self):
+        return self.floor_level
+
+    @floor_number.setter
+    def floor_number(self, value):
+        self.floor_level = value
 
     @property
     def effective_purchase_cost(self):
@@ -231,6 +248,7 @@ class Tool(BaseTenantModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=64)
     name = models.CharField(max_length=255)
+    location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='tools')
     available_quantity = models.IntegerField(default=1)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

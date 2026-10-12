@@ -82,6 +82,14 @@ class WorkOrder(BaseTenantModel):
         related_name='incident_work_orders',
         help_text='Vị trí thực tế nơi phát sinh sự cố (ưu tiên trên lộ trình TSP)'
     )
+    tool_pickup_location = models.ForeignKey(
+        'assets.Location',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tool_pickup_work_orders',
+        help_text='Khu vực/Vị trí nơi cất giữ thiết bị, dụng cụ chuyên dụng cần lấy cho công việc'
+    )
     maintenance_window_start = models.TimeField(
         null=True,
         blank=True,

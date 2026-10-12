@@ -413,7 +413,7 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Priority</label>
             <select id="wo-priority" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
@@ -433,17 +433,6 @@
               <option value="CANCELLED">CANCELLED</option>
             </select>
           </div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Kỹ thuật viên phụ trách</label>
-            <select id="wo-assignee" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-              <option value="">-- Chưa phân công --</option>
-              {% for u in users %}
-              <option value="{{ u.id }}">{{ u.username }} - Thợ Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
-              {% endfor %}
-            </select>
-          </div>
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Deadline</label>
             <input type="date" id="wo-deadline" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
@@ -454,12 +443,12 @@
           <textarea id="wo-desc" rows="3" placeholder="Mô tả chi tiết sự cố hoặc nội dung bảo trì..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
         </div>
 
-        <!-- Tiêu chuẩn Kỹ thuật & Tối ưu Hungarian -->
+        <!-- Tiêu chuẩn Kỹ thuật & Phân công Thợ -->
         <div class="border border-neutral-200 rounded-2xl overflow-hidden bg-white shadow-xs">
           <button type="button" onclick="toggleTechAccordion()" class="w-full px-4 py-3 bg-neutral-50 hover:bg-neutral-100/80 flex items-center justify-between transition-colors border-b border-neutral-200 text-left">
             <div class="flex items-center gap-2.5 text-xs font-bold text-neutral-800 uppercase tracking-wider">
-              <i class="ph-fill ph-cpu text-primary text-base"></i>
-              <span>Yêu cầu Kỹ thuật & Tối ưu Hungarian</span>
+              <i class="ph-fill ph-user-gear text-primary text-base"></i>
+              <span>Tiêu chuẩn Kỹ thuật & Phân công Nhân sự</span>
             </div>
             <i id="tech-accordion-icon" class="ph-bold ph-caret-down text-neutral-500 transition-transform"></i>
           </button>
@@ -468,16 +457,19 @@
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block font-bold text-neutral-700 mb-1">Bậc thợ tối thiểu</label>
-                <select id="wo-min-skill-level" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                <select id="wo-min-skill-level" onchange="filterAssignableEmployees()" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                  <option value="">-- Chưa chọn / Không yêu cầu bậc --</option>
                   <option value="1">Bậc 1 - Sơ cấp</option>
                   <option value="2">Bậc 2 - Trung cấp</option>
                   <option value="3">Bậc 3 - Chuyên gia</option>
                   <option value="4">Bậc 4 - Bậc thầy</option>
+                  <option value="5">Bậc 5 - Chuyên gia cao cấp</option>
                 </select>
               </div>
               <div>
                 <label class="block font-bold text-neutral-700 mb-1">Chuyên môn yêu cầu</label>
-                <select id="wo-required-skill" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                <select id="wo-required-skill" onchange="filterAssignableEmployees()" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+                  <option value="">-- Chưa chọn / Không yêu cầu chuyên môn --</option>
                   {% if skills %}
                     {% for sk in skills %}
                     <option value="{{ sk.code }}">{{ sk.name }} - {{ sk.code }}</option>
@@ -495,7 +487,7 @@
 
             <div>
               <label class="block font-bold text-neutral-700 mb-1">Chứng chỉ an toàn bắt buộc</label>
-              <select id="wo-required-cert" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
+              <select id="wo-required-cert" onchange="filterAssignableEmployees()" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl font-medium focus:outline-none focus:border-primary">
                 <option value="">-- Không yêu cầu chứng chỉ đặc thù --</option>
                 {% if cert_types %}
                   {% for ct in cert_types %}
@@ -510,27 +502,96 @@
               </select>
             </div>
 
+            <!-- Nhân viên phụ trách (Tự động lọc theo tay nghề, chuyên môn & chứng chỉ) -->
+            <div class="p-3 bg-primary/5 rounded-xl border border-primary/20">
+              <label class="block font-bold text-neutral-800 mb-1.5 flex items-center justify-between">
+                <span class="flex items-center gap-1.5 text-xs text-primary-900 font-bold">
+                  <i class="ph-bold ph-user-check text-primary text-sm"></i>
+                  <span>Nhân viên phụ trách</span>
+                </span>
+                <span id="assignee-match-count" class="text-[10px] text-primary/80 font-normal">Tự động lọc theo tiêu chuẩn kỹ thuật</span>
+              </label>
+              <select id="wo-assignee" class="w-full px-3.5 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 focus:outline-none focus:border-primary transition-all">
+                <option value="">-- Chưa phân công / Điều phối sau --</option>
+                {% for u in users %}
+                <option value="{{ u.id }}">{{ u.username }} - Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
             <div>
-              <label class="block font-bold text-neutral-700 mb-1">Công cụ chuyên dụng cần thiết</label>
-              <div class="flex flex-wrap gap-2 pt-1">
+              <label class="block font-bold text-neutral-700 mb-1.5 flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                  <i class="ph-bold ph-wrench text-amber-600"></i>
+                  <span>Công cụ chuyên dụng cần thiết</span>
+                </span>
+                <span class="text-[10px] text-neutral-400 font-normal">Tự động định tuyến trạm lấy trên bản đồ</span>
+              </label>
+              <div class="max-h-48 overflow-y-auto pr-1 space-y-1.5">
                 {% if tools %}
                   {% for t in tools %}
-                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
-                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="{{ t.code }}">
-                    <span class="font-medium text-neutral-700">{{ t.name }}</span>
-                    <span class="text-[10px] text-neutral-400">SL: {{ t.available_quantity }}</span>
+                  <label class="flex items-center justify-between gap-2 p-2 rounded-xl border border-neutral-200/80 bg-neutral-50/70 hover:bg-neutral-100 hover:border-primary/40 cursor-pointer transition-all group">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <input type="checkbox" class="wo-tool-cb rounded text-primary focus:ring-primary h-4 w-4 shrink-0" value="{{ t.code }}">
+                      <div class="min-w-0">
+                        <div class="font-bold text-neutral-800 text-xs truncate group-hover:text-primary transition-colors" title="{{ t.name }}">{{ t.name }}</div>
+                        {% if t.location__name %}
+                        <div class="flex items-center gap-1 text-[10px] text-amber-700 font-medium truncate mt-0.5">
+                          <i class="ph-bold ph-map-pin text-amber-600 shrink-0 text-[10px]"></i>
+                          <span class="truncate">{{ t.location__name }}{% if t.location__floor_level %} (T{{ t.location__floor_level }}){% endif %}</span>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="shrink-0 flex items-center">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-200/70 text-neutral-700 whitespace-nowrap">
+                        SL: {{ t.available_quantity }}
+                      </span>
+                    </div>
                   </label>
                   {% endfor %}
                 {% else %}
-                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
-                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="TOOL_VIB_METER"> Máy đo độ rung
+                  <span class="text-xs text-neutral-400 italic block py-2 text-center">Chưa có danh mục công cụ trong kho.</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-neutral-100">
+              <label class="block font-bold text-neutral-700 mb-1.5 flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                  <i class="ph-bold ph-package text-emerald-600"></i>
+                  <span>Vật tư & Phụ tùng thay thế</span>
+                </span>
+                <span class="text-[10px] text-neutral-400 font-normal">Tự động định tuyến trạm lấy vật tư</span>
+              </label>
+              <div class="max-h-48 overflow-y-auto pr-1 space-y-1.5">
+                {% if spare_parts %}
+                  {% for sp in spare_parts %}
+                  <label class="flex items-center justify-between gap-2 p-2 rounded-xl border border-neutral-200/80 bg-neutral-50/70 hover:bg-neutral-100 hover:border-emerald-500/40 cursor-pointer transition-all group">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <input type="checkbox" class="wo-spare-part-cb rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 shrink-0" value="{{ sp.id }}">
+                      <div class="min-w-0">
+                        <div class="font-bold text-neutral-800 text-xs truncate group-hover:text-emerald-700 transition-colors" title="{{ sp.name }}">
+                          {{ sp.name }}
+                          {% if sp.part_number %}<span class="font-mono text-[10px] text-neutral-400 font-normal">[{{ sp.part_number }}]</span>{% endif %}
+                        </div>
+                        {% if sp.location__name %}
+                        <div class="flex items-center gap-1 text-[10px] text-amber-700 font-medium truncate mt-0.5">
+                          <i class="ph-bold ph-map-pin text-amber-600 shrink-0 text-[10px]"></i>
+                          <span class="truncate">{{ sp.location__name }}{% if sp.location__floor_level %} (T{{ sp.location__floor_level }}){% endif %}</span>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="shrink-0 flex items-center">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {% if sp.quantity_in_stock > 0 %}bg-emerald-50 text-emerald-700 border border-emerald-200/60{% else %}bg-rose-50 text-rose-700 border border-rose-200/60{% endif %} whitespace-nowrap">
+                        Tồn: {{ sp.quantity_in_stock|floatformat:0 }}
+                      </span>
+                    </div>
                   </label>
-                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
-                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="TOOL_LASER_ALIGN"> Cân đồng tâm laser
-                  </label>
-                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 cursor-pointer transition">
-                    <input type="checkbox" class="wo-tool-cb rounded text-primary" value="TOOL_THERMAL_CAM"> Camera nhiệt hồng ngoại
-                  </label>
+                  {% endfor %}
+                {% else %}
+                  <span class="text-xs text-neutral-400 italic block py-2 text-center">Chưa có danh mục vật tư trong kho.</span>
                 {% endif %}
               </div>
             </div>
@@ -550,7 +611,6 @@
                   {% endfor %}
                 </select>
               </div>
-
 
             </div>
           </div>
@@ -580,7 +640,7 @@
       <select id="assign-user" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
         <option value="">-- Bỏ phân công --</option>
         {% for u in users %}
-        <option value="{{ u.id }}">{{ u.username }} - Thợ Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
+        <option value="{{ u.id }}">{{ u.username }} - Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
         {% endfor %}
       </select>
       <div class="mt-6 flex justify-end gap-3">
@@ -1288,9 +1348,20 @@
       </div>
 
       <div class="flex items-center gap-1.5 flex-wrap">
-        <button type="button" onclick="requestTSPPitstop()" id="btn-tsp-pitstop" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer" title="Chèn trạm dừng Kho vật tư ngay sau trạm hiện tại">
+        <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-neutral-300 shadow-2xs">
+          <i class="ph-bold ph-toolbox text-[11px] text-amber-600"></i>
+          <select id="tsp-pitstop-location" class="bg-transparent text-[11px] font-bold text-neutral-700 focus:outline-none cursor-pointer max-w-[150px] sm:max-w-[180px] truncate" title="Chọn trạm tiếp vận hoặc nơi lấy dụng cụ">
+            <option value="">Kho vật tư / Dụng cụ chính</option>
+            {% for loc in locations_list %}
+              {% if loc.zone_type != 'FLOORPLAN' %}
+              <option value="{{ loc.id }}">{{ loc.name }} [{{ loc.code }}]{% if loc.floor_level %} - Tầng {{ loc.floor_level }}{% endif %}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <button type="button" onclick="requestTSPPitstop()" id="btn-tsp-pitstop" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer" title="Chèn trạm dừng Kho vật tư / lấy dụng cụ ngay sau trạm hiện tại">
           <i class="ph-bold ph-package text-xs"></i>
-          <span>Về kho lấy vật tư</span>
+          <span>Về lấy dụng cụ / vật tư</span>
         </button>
         <button type="button" onclick="requestTSPRerouteMidshift()" id="btn-tsp-reroute" class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-bold transition flex items-center gap-1 cursor-pointer" title="Tái định tuyến từ vị trí hiện tại">
           <i class="ph-bold ph-arrows-clockwise text-xs"></i>
@@ -1366,29 +1437,60 @@
 
       <!-- Right Panel: Dual Visualizer (Map / Stepper Tree) -->
       <div class="w-full lg:w-[62%] xl:w-[65%] flex flex-col overflow-hidden bg-slate-950 h-1/2 lg:h-full">
-        <!-- Tab Bar & Floor Switcher -->
+        <!-- Tab Bar & Controls Header -->
         <div class="px-3 sm:px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2 shrink-0 flex-wrap">
           <div class="flex items-center gap-1.5 sm:gap-2">
-            <button type="button" id="tab-btn-tsp-map" onclick="switchTSPTab('map')" class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition">
+            <button type="button" id="tab-btn-tsp-map" onclick="switchTSPTab('map')" class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer">
               <i class="ph-bold ph-map-trifold"></i> <span>Sơ Đồ Mặt Bằng</span>
             </button>
-            <button type="button" id="tab-btn-tsp-tree" onclick="switchTSPTab('tree')" class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition">
+            <button type="button" id="tab-btn-tsp-tree" onclick="switchTSPTab('tree')" class="px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition cursor-pointer">
               <i class="ph-bold ph-tree-structure"></i> <span>Cây Tô-pô</span>
             </button>
+
+            <!-- Stepper Navigation & Playback -->
+            <div id="tsp-stepper-control" class="hidden sm:flex items-center gap-0.5 bg-slate-950/80 border border-slate-800 rounded-lg p-0.5 ml-1 shadow-xs">
+              <button type="button" onclick="stepTSPStop(-1)" class="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Chặng trước">
+                <i class="ph-bold ph-caret-left text-xs"></i>
+              </button>
+              <span id="tsp-step-display" class="px-1.5 text-[10px] font-mono font-bold text-amber-400 select-none">Chặng 0/0</span>
+              <button type="button" onclick="stepTSPStop(1)" class="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Chặng kế tiếp">
+                <i class="ph-bold ph-caret-right text-xs"></i>
+              </button>
+              <button type="button" id="btn-tsp-play" onclick="toggleTSPPlayback()" class="w-6 h-6 flex items-center justify-center rounded bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 transition ml-0.5 cursor-pointer" title="Tự động chạy hành trình">
+                <i class="ph-bold ph-play text-xs" id="icon-tsp-play"></i>
+              </button>
+            </div>
           </div>
 
-          <!-- Dynamic Floor Switcher & View Info -->
+          <!-- Dynamic Floor Switcher, Machine Layer Toggle & View Info -->
           <div class="flex items-center gap-2">
+            <!-- Toggle Machine Layer -->
+            <button type="button" id="btn-toggle-tsp-machines" onclick="toggleTSPMachines()" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700/80 flex items-center gap-1.5 transition shadow-sm cursor-pointer" title="Bật/Tắt hiển thị vị trí thiết bị máy móc trên sơ đồ">
+              <i class="ph-bold ph-cube"></i> <span class="hidden md:inline">Hiện máy móc</span>
+            </button>
+
             <div id="tsp-floor-switcher" class="flex items-center gap-1"></div>
-            <div class="text-[11px] text-slate-400 font-mono hidden sm:block truncate max-w-[260px]" id="tsp-view-info">
-              Tỉ lệ chuẩn 100m x 70m
+            <div class="text-[11px] text-slate-400 font-mono hidden xl:block truncate max-w-[260px]" id="tsp-view-info">
+              Tỉ lệ chuẩn CAD 220m × 130m
             </div>
           </div>
         </div>
 
         <!-- Tab 1: Map View -->
         <div id="tsp-tab-content-map" class="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center p-2 sm:p-3 select-none">
-          <svg id="tsp-route-svg" class="w-full h-full rounded-xl sm:rounded-2xl border border-slate-800 shadow-2xl" viewBox="0 0 1000 650" preserveAspectRatio="xMidYMid meet">
+          <!-- Floating Step HUD Card -->
+          <div id="tsp-map-hud" class="hidden absolute top-4 left-4 right-4 sm:left-auto sm:right-4 max-w-sm z-20 bg-slate-900/95 backdrop-blur-md border border-amber-500/50 text-slate-200 px-3.5 py-2.5 rounded-xl shadow-2xl flex items-center justify-between gap-3 text-xs pointer-events-auto transition">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span id="tsp-hud-num" class="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-xs">0</span>
+              <div class="min-w-0">
+                <span id="tsp-hud-title" class="font-bold text-white block text-xs truncate">Tên công việc</span>
+                <span id="tsp-hud-sub" class="text-[10px] text-slate-300 font-mono block truncate">Vị trí trạm</span>
+              </div>
+            </div>
+            <button type="button" onclick="closeTSPHud()" class="text-slate-400 hover:text-white p-1 shrink-0 cursor-pointer"><i class="ph-bold ph-x text-sm"></i></button>
+          </div>
+
+          <svg id="tsp-route-svg" class="w-full h-full rounded-xl sm:rounded-2xl border border-slate-800 shadow-2xl cursor-grab select-none" viewBox="0 0 1000 650" preserveAspectRatio="xMidYMid meet">
             <defs>
               <pattern id="tsp-fp-grid-major" width="200" height="175" patternUnits="userSpaceOnUse">
                 <path d="M 200 0 L 0 0 0 175" fill="none" stroke="#1e293b" stroke-width="1.2"/>
@@ -1407,13 +1509,28 @@
             <rect width="100%" height="100%" fill="#070b13" />
             <rect width="100%" height="100%" fill="url(#tsp-fp-grid-minor)" />
             <rect width="100%" height="100%" fill="url(#tsp-fp-grid-major)" />
-            <rect x="50" y="35" width="910" height="580" rx="8" stroke="#334155" stroke-width="2" fill="#0f172a" fill-opacity="0.2"/>
-            <!-- Dynamic route layers -->
+            <!-- Dynamic CAD layers matching Floorplan Studio -->
+            <g id="tsp-svg-grid-layer"></g>
             <g id="tsp-svg-floorplan-layer"></g>
+            <g id="tsp-svg-assets-layer"></g>
             <g id="tsp-svg-corridors-layer"></g>
             <g id="tsp-svg-routes-layer"></g>
             <g id="tsp-svg-stops-layer"></g>
           </svg>
+
+          <!-- Floating CAD Zoom Controls Widget (Phóng to / Thu nhỏ / Mặc định) -->
+          <div id="tsp-map-zoom-toolbar" class="absolute bottom-4 right-4 z-20 flex flex-col items-center bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1 shadow-2xl gap-1 select-none pointer-events-auto">
+            <button type="button" onclick="adjustTSPSvgZoom(0.25)" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-sm font-bold transition shadow-xs cursor-pointer" title="Phóng to (Zoom In)">
+              <i class="ph-bold ph-plus"></i>
+            </button>
+            <div id="tsp-zoom-level-badge" class="px-1 text-[10px] font-mono font-bold text-amber-400 select-none">100%</div>
+            <button type="button" onclick="adjustTSPSvgZoom(-0.25)" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-sm font-bold transition shadow-xs cursor-pointer" title="Thu nhỏ (Zoom Out)">
+              <i class="ph-bold ph-minus"></i>
+            </button>
+            <button type="button" onclick="resetTSPSvgZoom()" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition shadow-xs cursor-pointer" title="Đặt lại kích thước ban đầu (Reset 100%)">
+              <i class="ph-bold ph-arrows-out-simple"></i>
+            </button>
+          </div>
         </div>
 
         <!-- Tab 2: Hierarchical Stepper Tree View (No-Map) -->
@@ -1462,6 +1579,27 @@
   .tsp-flow-dash {
     animation: tspDashFlow 1.2s linear infinite;
   }
+  @keyframes tspPulseRing {
+    0% { r: 15px; opacity: 0.9; stroke-width: 3; }
+    50% { r: 24px; opacity: 0.4; stroke-width: 2; }
+    100% { r: 32px; opacity: 0; stroke-width: 0.5; }
+  }
+  .tsp-pulse-ring {
+    animation: tspPulseRing 1.3s cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+    pointer-events: none;
+  }
+  .tsp-card-selected {
+    border-color: #f59e0b !important;
+    background-color: #fffbeb !important;
+    box-shadow: 0 0 0 2px #f59e0b, 0 10px 15px -3px rgba(245, 158, 11, 0.25) !important;
+  }
+  @keyframes fadeInQuick {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeIn {
+    animation: fadeInQuick 0.2s ease-out forwards;
+  }
 </style>
 <script>
   window.CURRENT_USER_ID = '{{ current_user_id|default:request.user.id }}';
@@ -1469,6 +1607,55 @@
   let currentWo = null;
   const ASSETS_MAP = {{ assets_json|default:'{}'|safe }};
   const WO_METADATA = {{ wo_metadata_json|default:'{}'|safe }};
+  const ALL_TECHNICIANS = {{ technicians_json|default:'[]'|safe }};
+
+  function filterAssignableEmployees(targetUserId = '') {
+      const minLevel = parseInt(document.getElementById('wo-min-skill-level')?.value || '0', 10);
+      const reqSkill = (document.getElementById('wo-required-skill')?.value || '').trim().toUpperCase();
+      const reqCert = (document.getElementById('wo-required-cert')?.value || '').trim().toUpperCase();
+      const select = document.getElementById('wo-assignee');
+      if (!select) return;
+
+      const currentVal = targetUserId !== undefined && targetUserId !== '' ? targetUserId : select.value;
+      select.innerHTML = '<option value="">-- Chưa phân công / Điều phối sau --</option>';
+
+      let matchedCount = 0;
+      ALL_TECHNICIANS.forEach(t => {
+          const tLevel = t.skill_level || 1;
+          const tSkills = (t.skills || []).map(s => String(s).toUpperCase());
+          const tCerts = (t.certifications || []).map(c => String(c).toUpperCase());
+
+          let ok = true;
+          // Filter 1: Min skill level
+          if (minLevel > 0 && tLevel < minLevel) ok = false;
+          // Filter 2: Required skill
+          if (reqSkill && !tSkills.includes(reqSkill) && !tSkills.some(s => s.includes(reqSkill) || reqSkill.includes(s))) ok = false;
+          // Filter 3: Required certification
+          if (reqCert && !tCerts.includes(reqCert) && !tCerts.some(c => c.includes(reqCert) || reqCert.includes(c))) ok = false;
+
+          if (ok) {
+              matchedCount++;
+              const opt = document.createElement('option');
+              opt.value = t.id;
+              opt.innerText = `${t.username} - Bậc ${tLevel}`;
+              if (String(t.id) === String(currentVal)) {
+                  opt.selected = true;
+              }
+              select.appendChild(opt);
+          }
+      });
+
+      const countBadge = document.getElementById('assignee-match-count');
+      if (countBadge) {
+          if (minLevel > 0 || reqSkill || reqCert) {
+              countBadge.innerText = `${matchedCount} nhân sự đáp ứng tiêu chuẩn`;
+              countBadge.className = 'text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200';
+          } else {
+              countBadge.innerText = 'Tự động lọc theo tiêu chuẩn kỹ thuật';
+              countBadge.className = 'text-[10px] text-primary/80 font-normal';
+          }
+      }
+  }
 
   function toggleTechAccordion() {
       const body = document.getElementById('tech-accordion-body');
@@ -1981,10 +2168,11 @@
 
       // Populate optimization fields from WO_METADATA if editing
       const meta = (id && window.WO_METADATA && window.WO_METADATA[id]) ? window.WO_METADATA[id] : {
-          required_skill: 'GENERAL',
-          min_skill_level: 1,
+          required_skill: '',
+          min_skill_level: '',
           required_certification: '',
           required_tools: [],
+          required_spare_parts: [],
           is_crew_task: false,
           depends_on_wo_id: '',
           zone_id: '',
@@ -1994,13 +2182,13 @@
       };
 
       if (document.getElementById('wo-min-skill-level')) {
-          document.getElementById('wo-min-skill-level').value = meta.min_skill_level || 1;
+          document.getElementById('wo-min-skill-level').value = (id && meta.min_skill_level) ? meta.min_skill_level : '';
           
-          const skillVal = (meta.required_skill || 'GENERAL').trim();
+          const skillVal = (id && meta.required_skill) ? meta.required_skill.trim() : '';
           const skillSelect = document.getElementById('wo-required-skill');
           if (skillSelect) {
               skillSelect.value = skillVal;
-              if (!skillSelect.value) {
+              if (skillVal && !skillSelect.value) {
                   for (let opt of skillSelect.options) {
                       if (opt.value.toUpperCase() === skillVal.toUpperCase() || opt.text.toUpperCase().includes(skillVal.toUpperCase())) {
                           skillSelect.value = opt.value;
@@ -2023,6 +2211,7 @@
                   }
               }
           }
+          filterAssignableEmployees(assignee_id);
           document.getElementById('wo-is-crew-task').checked = !!meta.is_crew_task;
           document.getElementById('wo-depends-on').value = meta.depends_on_wo_id || '';
 
@@ -2044,6 +2233,11 @@
           const reqTools = meta.required_tools || [];
           document.querySelectorAll('.wo-tool-cb').forEach(cb => {
               cb.checked = reqTools.includes(cb.value);
+          });
+
+          const reqParts = meta.required_spare_parts || [];
+          document.querySelectorAll('.wo-spare-part-cb').forEach(cb => {
+              cb.checked = reqParts.includes(cb.value);
           });
       }
 
@@ -2076,6 +2270,8 @@
   function closeWoModal() {
       document.getElementById('wo-modal').classList.add('hidden');
       document.getElementById('wo-form').reset();
+      document.querySelectorAll('.wo-tool-cb').forEach(cb => cb.checked = false);
+      document.querySelectorAll('.wo-spare-part-cb').forEach(cb => cb.checked = false);
       const fpSelect = document.getElementById('wo-floorplan');
       const userRestrictedFp = '{{ user_floorplan_id|default:"" }}';
       if (fpSelect) fpSelect.value = userRestrictedFp;
@@ -2114,11 +2310,12 @@
           asset_id: asset_id,
           assigned_to_id: document.getElementById('wo-assignee').value,
           deadline: document.getElementById('wo-deadline').value,
-          // Optimization & Hungarian fields
-          min_skill_level: parseInt(document.getElementById('wo-min-skill-level')?.value || '1'),
-          required_skill: document.getElementById('wo-required-skill')?.value || 'GENERAL',
+          // Technical & Optimization fields
+          min_skill_level: document.getElementById('wo-min-skill-level')?.value ? parseInt(document.getElementById('wo-min-skill-level').value) : 1,
+          required_skill: document.getElementById('wo-required-skill')?.value || '',
           required_certification: document.getElementById('wo-required-cert')?.value || '',
           required_tools: Array.from(document.querySelectorAll('.wo-tool-cb:checked')).map(cb => cb.value),
+          required_spare_parts: Array.from(document.querySelectorAll('.wo-spare-part-cb:checked')).map(cb => cb.value),
           is_crew_task: document.getElementById('wo-is-crew-task')?.checked || false,
           depends_on_wo_id: document.getElementById('wo-depends-on')?.value || '',
           zone_id: document.getElementById('wo-zone')?.value || '',
@@ -3646,6 +3843,7 @@
       const modal = document.getElementById('modal-tsp-routing');
       if (!modal) return;
       modal.classList.remove('hidden');
+      if (typeof resetTSPSvgZoom === 'function') resetTSPSvgZoom();
 
       // Check if any work orders are checked in the main table
       const checkedBoxes = document.querySelectorAll('.wo-select-cb:checked, .wo-row-cb:checked');
@@ -3655,6 +3853,15 @@
   }
 
   function closeTSPRoutingModal() {
+      if (window.tspPlaybackInterval) {
+          clearInterval(window.tspPlaybackInterval);
+          window.tspPlaybackInterval = null;
+          const iconPlay = document.getElementById('icon-tsp-play');
+          const btnPlay = document.getElementById('btn-tsp-play');
+          if (iconPlay) iconPlay.className = 'ph-bold ph-play text-xs';
+          if (btnPlay) btnPlay.title = 'Tự động chạy hành trình';
+      }
+      if (typeof resetTSPSvgZoom === 'function') resetTSPSvgZoom();
       const modal = document.getElementById('modal-tsp-routing');
       if (modal) modal.classList.add('hidden');
   }
@@ -3666,26 +3873,34 @@
       const contentMap = document.getElementById('tsp-tab-content-map');
       const contentTree = document.getElementById('tsp-tab-content-tree');
       const viewInfo = document.getElementById('tsp-view-info');
+      const stepper = document.getElementById('tsp-stepper-control');
+      const btnMachines = document.getElementById('btn-toggle-tsp-machines');
 
       if (tabName === 'map') {
           if (btnMap) {
-              btnMap.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
+              btnMap.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer';
           }
           if (btnTree) {
-              btnTree.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
+              btnTree.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition cursor-pointer';
           }
           if (contentMap) contentMap.classList.remove('hidden');
           if (contentTree) contentTree.classList.add('hidden');
-          if (viewInfo) viewInfo.innerText = 'Tỉ lệ chuẩn 100m x 70m';
+          if (stepper) stepper.classList.remove('hidden');
+          if (btnMachines) btnMachines.classList.remove('hidden');
+          if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+              renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+          }
       } else {
           if (btnTree) {
-              btnTree.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition';
+              btnTree.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer';
           }
           if (btnMap) {
-              btnMap.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition';
+              btnMap.className = 'px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition cursor-pointer';
           }
           if (contentTree) contentTree.classList.remove('hidden');
           if (contentMap) contentMap.classList.add('hidden');
+          if (stepper) stepper.classList.add('hidden');
+          if (btnMachines) btnMachines.classList.add('hidden');
           if (viewInfo) viewInfo.innerText = 'Cây Tô-pô: Tòa nhà > Tầng > Phòng';
       }
   }
@@ -3771,6 +3986,7 @@
           currentCoords: currentStop.coords || null,
           actionTrigger: 'PIT_STOP',
           includeWarehousePitstop: true,
+          pitstopLocationId: document.getElementById('tsp-pitstop-location')?.value || null,
           remainingWorkOrderIds: remainingIds,
           returnToDepot: document.getElementById('tsp-return-depot')?.checked ?? true,
           startTime: currentStop.departureTime || '10:00'
@@ -3941,6 +4157,12 @@
       renderTSPTimeline(data.orderedStops || []);
       renderTSPSvgRoute(data.orderedStops || []);
       renderTSPTree(data.orderedStops || []);
+
+      if (data.orderedStops && data.orderedStops.length > 0) {
+          setTimeout(() => {
+              focusTSPStop(0, false);
+          }, 80);
+      }
   }
 
   function renderTSPTimeline(stops) {
@@ -3955,22 +4177,28 @@
       let html = '';
       stops.forEach((stop, index) => {
           const isStart = stop.type === 'DEPOT' || stop.type === 'CURRENT_LOCATION';
+          const isToolPickup = stop.action === 'PICKUP_TOOLS' || (stop.name && stop.name.toLowerCase().includes('dụng cụ'));
           const isWh = stop.type === 'WAREHOUSE';
           const isUrgent = stop.priority === 'URGENT' || stop.priority === 'EMERGENCY';
           
-          let badgeBg = 'bg-slate-100 text-slate-700';
+          let badgeBg = 'bg-slate-700 text-white';
           let priorityPill = '';
           if (isUrgent) {
-              badgeBg = 'bg-red-500 text-white';
+              badgeBg = 'bg-red-500 text-white shadow-xs';
               priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 uppercase tracking-wider animate-pulse">Khẩn cấp</span>';
+          } else if (isToolPickup) {
+              badgeBg = 'bg-violet-600 text-white shadow-xs';
+              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-800 uppercase tracking-wider">Lấy Dụng Cụ</span>';
+          } else if (isWh) {
+              badgeBg = 'bg-orange-500 text-white shadow-xs';
+              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wider">Kho Vật Tư</span>';
           } else if (stop.priority === 'HIGH') {
               priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">Cao</span>';
-          } else if (isWh) {
-              badgeBg = 'bg-orange-500 text-white';
-              priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-800 uppercase tracking-wider">Kho Vật Tư</span>';
           } else if (isStart) {
-              badgeBg = 'bg-emerald-600 text-white';
+              badgeBg = 'bg-emerald-600 text-white shadow-xs';
               priorityPill = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Xuất Phát</span>';
+          } else {
+              badgeBg = 'bg-amber-500 text-slate-950 font-black shadow-xs';
           }
 
           let timeWindowHtml = '';
@@ -3993,26 +4221,54 @@
               `;
           }
 
+          let stairTransitionBanner = '';
+          if (index > 0) {
+              const prevStop = stops[index - 1];
+              const prevFloor = parseInt(prevStop.floorNumber) || 1;
+              const curFloor = parseInt(stop.floorNumber) || 1;
+              if (prevFloor !== curFloor) {
+                  stairTransitionBanner = `
+                      <div class="mb-2 p-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-100 shadow-xs flex items-center justify-between text-xs">
+                          <div class="flex items-center gap-2">
+                              <span class="w-6 h-6 rounded-md bg-slate-700 text-white flex items-center justify-center text-xs font-bold shadow-xs">🪜</span>
+                              <div>
+                                  <span class="font-bold block text-xs">
+                                      Chuyển tầng qua Cầu thang bộ
+                                  </span>
+                                  <span class="text-[10px] text-slate-400 font-mono">
+                                      Từ Tầng ${prevFloor} ➔ Sang Tầng ${curFloor} (${Math.abs(curFloor - prevFloor)} tầng)
+                                  </span>
+                              </div>
+                          </div>
+                          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-700 text-slate-300 border border-slate-600">
+                              Cầu thang
+                          </span>
+                      </div>
+                  `;
+              }
+          }
+
           html += `
-              <div class="relative pl-6 pb-2 border-l-2 ${index === stops.length - 1 ? 'border-transparent' : 'border-neutral-200'}">
+              <div id="tsp-stop-card-${index}" data-stop-index="${index}" onclick="focusTSPStop(${index})" class="relative pl-6 pb-2 border-l-2 cursor-pointer transition-all duration-200 group ${index === stops.length - 1 ? 'border-transparent' : 'border-neutral-200'}">
                   <!-- Step Marker -->
-                  <div class="absolute -left-3.5 top-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-xs ${badgeBg}">
+                  <div class="absolute -left-3.5 top-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-transform group-hover:scale-110 ${badgeBg}">
                       ${index}
                   </div>
 
+                  ${stairTransitionBanner}
                   ${transitInfo}
 
-                  <div class="p-3 rounded-2xl border ${isUrgent ? 'border-red-200 bg-red-50/40' : (isWh ? 'border-orange-200 bg-orange-50/40' : 'border-neutral-200/80 bg-white')} shadow-xs hover:shadow-sm transition">
+                  <div id="tsp-card-inner-${index}" class="p-3 rounded-2xl border ${isUrgent ? 'border-red-200 bg-red-50/40 hover:bg-red-50/70' : (isWh ? 'border-orange-200 bg-orange-50/40 hover:bg-orange-50/70' : 'border-neutral-200/80 bg-white hover:bg-slate-50')} shadow-xs hover:shadow-md transition">
                       <div class="flex items-start justify-between gap-2">
-                          <div>
+                          <div class="min-w-0">
                               <div class="flex items-center gap-1.5 flex-wrap">
-                                  <h4 class="text-xs font-black text-neutral-900 m-0">${stop.name}</h4>
+                                  <h4 class="text-xs font-black text-neutral-900 m-0 group-hover:text-amber-600 transition-colors">${stop.name}</h4>
                                   ${priorityPill}
                               </div>
-                              <p class="text-[11px] text-neutral-500 m-0 mt-0.5 flex items-center gap-1">
-                                  <i class="ph-bold ph-map-pin text-amber-600"></i>
-                                  <span>${stop.locationName || 'Chưa định vị cụ thể'}</span>
-                                  ${stop.floorNumber ? `<span class="text-slate-400">| Tầng ${stop.floorNumber}</span>` : ''}
+                              <p class="text-[11px] text-neutral-500 m-0 mt-0.5 flex items-center gap-1 truncate">
+                                  <i class="ph-bold ph-map-pin text-amber-600 shrink-0"></i>
+                                  <span class="truncate">${stop.locationName || 'Chưa định vị cụ thể'}</span>
+                                  ${stop.floorNumber ? `<span class="text-slate-400 shrink-0">| Tầng ${stop.floorNumber}</span>` : ''}
                               </p>
                           </div>
                           <div class="text-right shrink-0">
@@ -4025,11 +4281,18 @@
                           <div class="mt-2 text-[11px] text-neutral-600 flex items-center gap-1">
                               <i class="ph-bold ph-wrench text-neutral-400"></i>
                               <span>Thiết bị: <b>${stop.assetName}</b></span>
-                              ${stop.workOrderCode ? `<span class="text-neutral-400">(${stop.workOrderCode})</span>` : ''}
+                              ${stop.workOrderCode ? `<span class="text-neutral-400 font-mono">(${stop.workOrderCode})</span>` : ''}
                           </div>
                       ` : ''}
 
                       ${timeWindowHtml}
+
+                      <div class="mt-2 pt-1.5 border-t border-neutral-100 flex items-center justify-between text-[10px] text-neutral-400">
+                          <span class="flex items-center gap-1 text-sky-600 font-semibold group-hover:underline">
+                              <i class="ph-bold ph-crosshair"></i> Xem vị trí trên sơ đồ
+                          </span>
+                          ${stop.workOrderCode ? `<span class="font-mono bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-600 font-bold">${stop.workOrderCode}</span>` : ''}
+                      </div>
                   </div>
               </div>
           `;
@@ -4038,22 +4301,51 @@
       container.innerHTML = html;
   }
 
-  function getParsedBuildingPoints(fp) {
-      if (!fp) return [{x: 0, y: 0}, {x: 220, y: 0}, {x: 220, y: 130}, {x: 0, y: 130}];
-      if (fp.description) {
+  // Helper: kiểm tra khu vực đã được định vị tọa độ hợp lệ trên sơ đồ
+  function isZonePlaced(loc) {
+      if (!loc) return false;
+      if (loc.center_x === null || loc.center_x === undefined) return false;
+      if (loc.center_y === null || loc.center_y === undefined) return false;
+      const cx = parseFloat(loc.center_x);
+      const cy = parseFloat(loc.center_y);
+      return !isNaN(cx) && !isNaN(cy) && (cx > 0 || cy > 0);
+  }
+
+  // Helper: Lấy kích thước chuẩn của toàn bộ tòa nhà (Building Dimensions) từ floorplan
+  function getBuildingDimensions(fp) {
+      let w = 220.0, h = 130.0;
+      let bPts = null;
+      if (fp && fp.description) {
           try {
               const descObj = typeof fp.description === 'string' ? JSON.parse(fp.description) : fp.description;
               if (descObj && descObj.polygon_points && Array.isArray(descObj.polygon_points) && descObj.polygon_points.length >= 3) {
-                  return descObj.polygon_points;
-              }
-              if (descObj && descObj.width_m && descObj.height_m) {
-                  const w = parseFloat(descObj.width_m) || 220;
-                  const h = parseFloat(descObj.height_m) || 130;
-                  return [{x: 0, y: 0}, {x: w, y: 0}, {x: w, y: h}, {x: 0, y: h}];
+                  bPts = descObj.polygon_points;
+                  let maxX = 0, maxY = 0;
+                  bPts.forEach(p => {
+                      if (p.x > maxX) maxX = p.x;
+                      if (p.y > maxY) maxY = p.y;
+                  });
+                  if (maxX > 0) w = Math.ceil(maxX / 10) * 10;
+                  if (maxY > 0) h = Math.ceil(maxY / 10) * 10;
+              } else if (descObj && descObj.width_m && descObj.height_m) {
+                  w = parseFloat(descObj.width_m) || 220.0;
+                  h = parseFloat(descObj.height_m) || 130.0;
               }
           } catch (_) {}
       }
-      return [{x: 0, y: 0}, {x: 220, y: 0}, {x: 220, y: 130}, {x: 0, y: 130}];
+      if (!bPts) {
+          bPts = [
+              { x: 0, y: 0 },
+              { x: w, y: 0 },
+              { x: w, y: h },
+              { x: 0, y: h }
+          ];
+      }
+      return { width: w, height: h, bPts };
+  }
+
+  function getParsedBuildingPoints(fp) {
+      return getBuildingDimensions(fp).bPts;
   }
 
   function getParsedZonePoints(zone) {
@@ -4072,7 +4364,7 @@
           }
       }
       // Check DIM
-      let w = 45.0, h = 35.0;
+      let w = 36.0, h = 26.0;
       if (zone.description) {
           const dimMatch = zone.description.match(/\[DIM:(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)\]/);
           if (dimMatch) {
@@ -4080,8 +4372,8 @@
               h = parseFloat(dimMatch[2]);
           }
       }
-      const cx = (zone.center_x !== null && zone.center_x !== undefined) ? parseFloat(zone.center_x) : 50.0;
-      const cy = (zone.center_y !== null && zone.center_y !== undefined) ? parseFloat(zone.center_y) : 50.0;
+      const cx = (zone.center_x !== null && zone.center_x !== undefined) ? parseFloat(zone.center_x) : 25.0;
+      const cy = (zone.center_y !== null && zone.center_y !== undefined) ? parseFloat(zone.center_y) : 20.0;
       return [
           { x: cx - w/2, y: cy - h/2 },
           { x: cx + w/2, y: cy - h/2 },
@@ -4090,58 +4382,38 @@
       ];
   }
 
-  function getFloorplanCoordinateMapper(fp, zones) {
-      const bPts = getParsedBuildingPoints(fp);
-      let minX = Infinity, minY = Infinity;
-      let maxX = -Infinity, maxY = -Infinity;
-      bPts.forEach(p => {
-          if (p.x < minX) minX = p.x;
-          if (p.x > maxX) maxX = p.x;
-          if (p.y < minY) minY = p.y;
-          if (p.y > maxY) maxY = p.y;
-      });
-      zones.forEach(z => {
-          const pts = getParsedZonePoints(z);
-          pts.forEach(p => {
-              if (p.x < minX) minX = p.x;
-              if (p.x > maxX) maxX = p.x;
-              if (p.y < minY) minY = p.y;
-              if (p.y > maxY) maxY = p.y;
-          });
-      });
+  // Mapper chuẩn hóa tọa độ 1:1 theo kích thước CAD thực tế của Tòa nhà
+  function getFloorplanCoordinateMapper(fp) {
+      const { width: factoryW, height: factoryH, bPts } = getBuildingDimensions(fp);
 
-      if (!isFinite(minX)) { minX = 0; maxX = 220; minY = 0; maxY = 130; }
+      const canvasW = 910;
+      const canvasH = 560;
+      const originLeft = 52;
+      const originTop = 46;
 
-      const padM = 6;
-      minX -= padM; minY -= padM;
-      maxX += padM; maxY += padM;
-
-      const spanX = Math.max(30, maxX - minX);
-      const spanY = Math.max(30, maxY - minY);
-
-      const canvasW = 900;
-      const canvasH = 610;
-      const leftOffset = 50;
-      const topOffset = 45;
-
-      const scaleX = canvasW / spanX;
-      const scaleY = canvasH / spanY;
+      const scaleX = canvasW / factoryW;
+      const scaleY = canvasH / factoryH;
       const scale = Math.min(scaleX, scaleY);
 
-      const renderedW = spanX * scale;
-      const renderedH = spanY * scale;
-      const originX = leftOffset + (canvasW - renderedW) / 2;
-      const originY = topOffset + (canvasH - renderedH) / 2;
+      const renderedW = factoryW * scale;
+      const renderedH = factoryH * scale;
+      const originX = originLeft + (canvasW - renderedW) / 2;
+      const originY = originTop + (canvasH - renderedH) / 2;
 
       return {
           mToPx: function(mx, my) {
               return {
-                  x: originX + (mx - minX) * scale,
-                  y: originY + (my - minY) * scale
+                  x: originX + mx * scale,
+                  y: originY + my * scale
               };
           },
           bPts,
-          minX, maxX, minY, maxY,
+          factoryW,
+          factoryH,
+          originX,
+          originY,
+          renderedW,
+          renderedH,
           scale
       };
   }
@@ -4150,6 +4422,10 @@
       window.tspActiveFloorLevel = lvl;
       if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
           renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+      }
+      // Re-highlight active stop if exists
+      if (window.tspActiveStopIndex !== undefined && window.tspActiveStopIndex !== null) {
+          highlightTSPStopPin(window.tspActiveStopIndex);
       }
   }
 
@@ -4160,15 +4436,309 @@
       }
   }
 
+  window.tspShowMachines = true;
+  window.tspActiveStopIndex = 0;
+
+  function toggleTSPMachines() {
+      window.tspShowMachines = !window.tspShowMachines;
+      const btn = document.getElementById('btn-toggle-tsp-machines');
+      if (btn) {
+          if (window.tspShowMachines) {
+              btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40 flex items-center gap-1.5 transition shadow-sm cursor-pointer';
+          } else {
+              btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700/80 flex items-center gap-1.5 transition shadow-sm cursor-pointer';
+          }
+      }
+      if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+          renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+      }
+  }
+
+  function closeTSPHud() {
+      const hud = document.getElementById('tsp-map-hud');
+      if (hud) hud.classList.add('hidden');
+  }
+
+  // =========================================================================
+  // TSP ROUTE MAP PAN & ZOOM CONTROLLER (CAD Interactive Pan/Zoom)
+  // =========================================================================
+  window.tspSvgZoomState = {
+      zoom: 1.0,
+      minZoom: 0.6,
+      maxZoom: 4.0,
+      vbX: 0,
+      vbY: 0,
+      baseW: 1000,
+      baseH: 650,
+      isDragging: false,
+      hasDragged: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      startVbX: 0,
+      startVbY: 0
+  };
+
+  function updateTSPSvgViewBox() {
+      const svg = document.getElementById('tsp-route-svg');
+      const badge = document.getElementById('tsp-zoom-level-badge');
+      if (!svg) return;
+      const s = window.tspSvgZoomState;
+      const curW = s.baseW / s.zoom;
+      const curH = s.baseH / s.zoom;
+
+      svg.setAttribute('viewBox', `${s.vbX.toFixed(1)} ${s.vbY.toFixed(1)} ${curW.toFixed(1)} ${curH.toFixed(1)}`);
+      if (badge) {
+          badge.innerText = `${Math.round(s.zoom * 100)}%`;
+      }
+      svg.style.cursor = s.isDragging ? 'grabbing' : (s.zoom > 1.0 ? 'grab' : 'default');
+  }
+
+  function adjustTSPSvgZoom(delta, clientX = null, clientY = null) {
+      const svg = document.getElementById('tsp-route-svg');
+      if (!svg) return;
+      const s = window.tspSvgZoomState;
+      const oldZoom = s.zoom;
+      let newZoom = Math.max(s.minZoom, Math.min(s.maxZoom, oldZoom + delta));
+      if (Math.abs(newZoom - oldZoom) < 0.001) return;
+
+      const oldW = s.baseW / oldZoom;
+      const oldH = s.baseH / oldZoom;
+      const newW = s.baseW / newZoom;
+      const newH = s.baseH / newZoom;
+
+      if (clientX !== null && clientY !== null) {
+          const rect = svg.getBoundingClientRect();
+          const ratioX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+          const ratioY = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+          const focalX = s.vbX + ratioX * oldW;
+          const focalY = s.vbY + ratioY * oldH;
+          s.vbX = focalX - ratioX * newW;
+          s.vbY = focalY - ratioY * newH;
+      } else {
+          s.vbX += (oldW - newW) / 2;
+          s.vbY += (oldH - newH) / 2;
+      }
+
+      s.zoom = newZoom;
+      updateTSPSvgViewBox();
+  }
+
+  function resetTSPSvgZoom() {
+      const s = window.tspSvgZoomState;
+      s.zoom = 1.0;
+      s.vbX = 0;
+      s.vbY = 0;
+      updateTSPSvgViewBox();
+  }
+
+  function panTSPSvgToPoint(ptX, ptY) {
+      const s = window.tspSvgZoomState;
+      if (!s) return;
+      const curW = s.baseW / s.zoom;
+      const curH = s.baseH / s.zoom;
+      s.vbX = ptX - curW / 2;
+      s.vbY = ptY - curH / 2;
+      updateTSPSvgViewBox();
+  }
+
+  function initTSPSvgZoomEvents() {
+      const svg = document.getElementById('tsp-route-svg');
+      if (!svg || svg._zoomEventsInitialized) return;
+      svg._zoomEventsInitialized = true;
+
+      // Mouse Wheel Zoom centered on cursor
+      svg.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 0.2 : -0.2;
+          adjustTSPSvgZoom(delta, e.clientX, e.clientY);
+      }, { passive: false });
+
+      // Mouse Drag / Pan
+      svg.addEventListener('mousedown', (e) => {
+          if (e.button !== 0) return;
+          const s = window.tspSvgZoomState;
+          s.isDragging = true;
+          s.hasDragged = false;
+          s.dragStartX = e.clientX;
+          s.dragStartY = e.clientY;
+          s.startVbX = s.vbX;
+          s.startVbY = s.vbY;
+          svg.style.cursor = 'grabbing';
+      });
+
+      window.addEventListener('mousemove', (e) => {
+          const s = window.tspSvgZoomState;
+          if (!s.isDragging) return;
+          const dx = e.clientX - s.dragStartX;
+          const dy = e.clientY - s.dragStartY;
+          if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+              s.hasDragged = true;
+          }
+          const svg = document.getElementById('tsp-route-svg');
+          if (!svg) return;
+          const rect = svg.getBoundingClientRect();
+          const curW = s.baseW / s.zoom;
+          const curH = s.baseH / s.zoom;
+          const scaleX = curW / rect.width;
+          const scaleY = curH / rect.height;
+
+          s.vbX = s.startVbX - (dx * scaleX);
+          s.vbY = s.startVbY - (dy * scaleY);
+          updateTSPSvgViewBox();
+      });
+
+      window.addEventListener('mouseup', () => {
+          const s = window.tspSvgZoomState;
+          if (s.isDragging) {
+              s.isDragging = false;
+              const svg = document.getElementById('tsp-route-svg');
+              if (svg) svg.style.cursor = s.zoom > 1.0 ? 'grab' : 'default';
+          }
+      });
+  }
+
+  function focusTSPStop(index, autoSwitchFloor = true) {
+      if (!tspCurrentRouteData || !tspCurrentRouteData.orderedStops) return;
+      const stops = tspCurrentRouteData.orderedStops;
+      const stop = stops[index];
+      if (!stop) return;
+
+      window.tspActiveStopIndex = index;
+
+      // 1. Kiểm tra tầng của trạm và chuyển tầng tự động nếu cần
+      let stopFloor = 1;
+      if (stop.floorNumber !== undefined && stop.floorNumber !== null) {
+          stopFloor = parseInt(stop.floorNumber) || 1;
+      } else if (stop.locationId && Array.isArray(LOCATIONS_LIST)) {
+          const loc = LOCATIONS_LIST.find(l => String(l.id) === String(stop.locationId));
+          if (loc) stopFloor = parseInt(loc.floor_level || loc.floor_number) || 1;
+      }
+
+      if (autoSwitchFloor && window.tspActiveFloorLevel !== stopFloor) {
+          setTSPFloorLevel(stopFloor);
+      }
+
+      // 2. Cuộn mượt và highlight card thông tin bên trái
+      const card = document.getElementById(`tsp-stop-card-${index}`);
+      const innerCard = document.getElementById(`tsp-card-inner-${index}`);
+      const container = document.getElementById('tsp-stops-timeline');
+      if (card && container) {
+          document.querySelectorAll('.tsp-card-selected').forEach(el => el.classList.remove('tsp-card-selected'));
+          if (innerCard) {
+              innerCard.classList.add('tsp-card-selected');
+          }
+          const cardTop = card.offsetTop - container.offsetTop;
+          container.scrollTo({ top: Math.max(0, cardTop - 50), behavior: 'smooth' });
+      }
+
+      // 3. Highlight pin trạm trên bản đồ
+      highlightTSPStopPin(index);
+
+      // Tự động căn tâm tới trạm nếu sơ đồ đang được phóng to
+      if (window.tspSvgZoomState && window.tspSvgZoomState.zoom > 1.15) {
+          const pin = document.getElementById(`tsp-stop-pin-${index}`);
+          if (pin) {
+              const transform = pin.getAttribute('transform');
+              const match = transform && transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+              if (match) {
+                  const ptX = parseFloat(match[1]);
+                  const ptY = parseFloat(match[2]);
+                  panTSPSvgToPoint(ptX, ptY);
+              }
+          }
+      }
+
+      // 4. Cập nhật HUD nổi trên bản đồ
+      const hud = document.getElementById('tsp-map-hud');
+      const hudNum = document.getElementById('tsp-hud-num');
+      const hudTitle = document.getElementById('tsp-hud-title');
+      const hudSub = document.getElementById('tsp-hud-sub');
+      if (hud && hudNum && hudTitle && hudSub) {
+          hud.classList.remove('hidden');
+          hudNum.innerText = index;
+          hudTitle.innerText = stop.name || 'Công việc bảo trì';
+          const arr = stop.estimatedArrival ? `Dự kiến: ${stop.estimatedArrival}` : '';
+          const dist = (stop.travelDistanceMeters !== undefined && index > 0) ? ` | Đi: ${stop.travelDistanceMeters}m` : '';
+          const floorStr = ` | Tầng ${stopFloor}`;
+          const loc = stop.locationName || '';
+          hudSub.innerText = `${loc}${floorStr} - ${arr}${dist}`;
+      }
+
+      // 5. Cập nhật bộ đếm chặng trên toolbar
+      const stepDisp = document.getElementById('tsp-step-display');
+      if (stepDisp) {
+          stepDisp.innerText = `Chặng ${index}/${stops.length - 1}`;
+      }
+  }
+
+  function highlightTSPStopPin(index) {
+      document.querySelectorAll('.tsp-pulse-ring').forEach(el => el.classList.add('hidden'));
+      const activeRing = document.getElementById(`tsp-stop-active-ring-${index}`);
+      if (activeRing) {
+          activeRing.classList.remove('hidden');
+      }
+  }
+
+  function stepTSPStop(direction) {
+      if (!tspCurrentRouteData || !tspCurrentRouteData.orderedStops) return;
+      const stops = tspCurrentRouteData.orderedStops;
+      if (stops.length === 0) return;
+      let cur = window.tspActiveStopIndex || 0;
+      let target = cur + direction;
+      if (target < 0) target = 0;
+      if (target >= stops.length) target = stops.length - 1;
+      focusTSPStop(target, true);
+  }
+
+  window.tspPlaybackInterval = null;
+  function toggleTSPPlayback() {
+      const btnPlay = document.getElementById('btn-tsp-play');
+      const iconPlay = document.getElementById('icon-tsp-play');
+      if (window.tspPlaybackInterval) {
+          clearInterval(window.tspPlaybackInterval);
+          window.tspPlaybackInterval = null;
+          if (iconPlay) { iconPlay.className = 'ph-bold ph-play text-xs'; }
+          if (btnPlay) { btnPlay.title = 'Tự động chạy hành trình'; }
+      } else {
+          if (!tspCurrentRouteData || !tspCurrentRouteData.orderedStops) return;
+          const total = tspCurrentRouteData.orderedStops.length;
+          if (total === 0) return;
+          if (iconPlay) { iconPlay.className = 'ph-bold ph-pause text-xs text-amber-400'; }
+          if (btnPlay) { btnPlay.title = 'Tạm dừng chạy'; }
+
+          if ((window.tspActiveStopIndex || 0) >= total - 1) {
+              focusTSPStop(0, true);
+          }
+
+          window.tspPlaybackInterval = setInterval(() => {
+              let cur = window.tspActiveStopIndex || 0;
+              if (cur >= total - 1) {
+                  clearInterval(window.tspPlaybackInterval);
+                  window.tspPlaybackInterval = null;
+                  if (iconPlay) { iconPlay.className = 'ph-bold ph-play text-xs'; }
+                  return;
+              }
+              focusTSPStop(cur + 1, true);
+          }, 1400);
+      }
+  }
+
   function renderTSPSvgRoute(stops) {
+      const gridLayer = document.getElementById('tsp-svg-grid-layer');
       const floorplanLayer = document.getElementById('tsp-svg-floorplan-layer');
+      const assetsLayer = document.getElementById('tsp-svg-assets-layer');
       const corridorsLayer = document.getElementById('tsp-svg-corridors-layer');
       const routesLayer = document.getElementById('tsp-svg-routes-layer');
       const stopsLayer = document.getElementById('tsp-svg-stops-layer');
       const viewInfo = document.getElementById('tsp-view-info');
       if (!routesLayer || !stopsLayer) return;
 
+      initTSPSvgZoomEvents();
+      updateTSPSvgViewBox();
+
+      if (gridLayer) gridLayer.innerHTML = '';
       if (floorplanLayer) floorplanLayer.innerHTML = '';
+      if (assetsLayer) assetsLayer.innerHTML = '';
       if (corridorsLayer) corridorsLayer.innerHTML = '';
       routesLayer.innerHTML = '';
       stopsLayer.innerHTML = '';
@@ -4182,7 +4752,6 @@
           activeFp = FLOORPLANS_LIST.find(f => String(f.id) === String(activeFpId));
       }
       if (!activeFp && Array.isArray(FLOORPLANS_LIST) && FLOORPLANS_LIST.length > 0) {
-          // Attempt auto-detecting floorplan from stops' locations
           for (const s of stops) {
               if (s.locationId && Array.isArray(LOCATIONS_LIST)) {
                   const loc = LOCATIONS_LIST.find(l => String(l.id) === String(s.locationId));
@@ -4204,16 +4773,15 @@
           }
       }
 
-      // Update Facility Chip display text
       if (activeFp) {
           const chipFacility = document.getElementById('tsp-chip-facility-name');
           if (chipFacility) chipFacility.innerText = activeFp.name;
       }
 
-      // 2. Multi-floor separation & filtering to avoid overlapping zones
+      // 2. Multi-floor separation & filtering STRICTLY to placed zones
       const hasFloorplan = !!activeFp;
       const allChildZones = hasFloorplan
-          ? (Array.isArray(LOCATIONS_LIST) ? LOCATIONS_LIST : []).filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(activeFp.id))
+          ? (Array.isArray(LOCATIONS_LIST) ? LOCATIONS_LIST : []).filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(activeFp.id) && isZonePlaced(l))
           : [];
 
       const availableFloors = Array.from(new Set(allChildZones.map(z => parseInt(z.floor_level) || 1))).sort((a, b) => a - b);
@@ -4223,7 +4791,6 @@
       }
       window.tspActiveFloorLevel = currentFloor;
 
-      // Render dynamic floor switcher pills if facility has multiple floors
       const floorSwitcher = document.getElementById('tsp-floor-switcher');
       if (floorSwitcher) {
           if (availableFloors.length > 1) {
@@ -4237,40 +4804,70 @@
           }
       }
 
-      // Filter child zones strictly to active floor level so Level 2 labels never collide with Level 1!
       const childZones = (availableFloors.length > 1)
           ? allChildZones.filter(z => (parseInt(z.floor_level) || 1) === currentFloor)
           : allChildZones;
 
       let mapper = null;
-      let midHallY = 350;
+      let midHallY = 320;
       if (hasFloorplan) {
-          mapper = getFloorplanCoordinateMapper(activeFp, allChildZones.length > 0 ? allChildZones : childZones);
+          mapper = getFloorplanCoordinateMapper(activeFp);
           midHallY = mapper.mToPx(0, 62).y;
           if (viewInfo) {
               const floorTag = availableFloors.length > 1 ? ` | Tầng ${currentFloor}` : '';
-              viewInfo.innerText = `🏢 ${activeFp.name}${floorTag} (Tỉ lệ CAD 1:${Math.round(10/mapper.scale)})`;
+              viewInfo.innerText = `🏢 ${activeFp.name}${floorTag} (${Math.round(mapper.factoryW)}m × ${Math.round(mapper.factoryH)}m)`;
           }
 
-          // A. Draw Outer Building Wall (Read-only blueprint)
+          // A. Render CAD Grid & Precise Meter Scale Rulers matching Studio
+          if (gridLayer) {
+              const stepM = mapper.factoryW > 250 ? 40 : 20;
+              let gridSvg = '';
+
+              // Grid lines across building canvas
+              for (let mx = 0; mx <= mapper.factoryW; mx += stepM) {
+                  const ptX = mapper.originX + mx * mapper.scale;
+                  gridSvg += `<line x1="${ptX.toFixed(1)}" y1="${mapper.originY.toFixed(1)}" x2="${ptX.toFixed(1)}" y2="${(mapper.originY + mapper.renderedH).toFixed(1)}" stroke="#1e293b" stroke-width="0.8" stroke-dasharray="2 3" opacity="0.6"/>`;
+                  // Top scale ruler tick & text
+                  gridSvg += `<line x1="${ptX.toFixed(1)}" y1="${(mapper.originY - 6).toFixed(1)}" x2="${ptX.toFixed(1)}" y2="${mapper.originY.toFixed(1)}" stroke="#475569" stroke-width="1"/>`;
+                  gridSvg += `<text x="${ptX.toFixed(1)}" y="${(mapper.originY - 9).toFixed(1)}" fill="#64748b" font-size="8" font-family="monospace" font-weight="bold" text-anchor="middle">${mx}m</text>`;
+              }
+              for (let my = 0; my <= mapper.factoryH; my += stepM) {
+                  const ptY = mapper.originY + my * mapper.scale;
+                  gridSvg += `<line x1="${mapper.originX.toFixed(1)}" y1="${ptY.toFixed(1)}" x2="${(mapper.originX + mapper.renderedW).toFixed(1)}" y2="${ptY.toFixed(1)}" stroke="#1e293b" stroke-width="0.8" stroke-dasharray="2 3" opacity="0.6"/>`;
+                  // Left scale ruler tick & text
+                  gridSvg += `<line x1="${(mapper.originX - 6).toFixed(1)}" y1="${ptY.toFixed(1)}" x2="${mapper.originX.toFixed(1)}" y2="${ptY.toFixed(1)}" stroke="#475569" stroke-width="1"/>`;
+                  gridSvg += `<text x="${(mapper.originX - 9).toFixed(1)}" y="${(ptY + 3).toFixed(1)}" fill="#64748b" font-size="8" font-family="monospace" font-weight="bold" text-anchor="end">${my}m</text>`;
+              }
+              gridLayer.innerHTML = gridSvg;
+          }
+
+          // B. Outer Building Envelope Polygon
           const bPxPts = mapper.bPts.map(p => mapper.mToPx(p.x, p.y));
           const bPtsStr = bPxPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
           if (floorplanLayer) {
               floorplanLayer.innerHTML += `
-                  <polygon points="${bPtsStr}" fill="#0a1020" fill-opacity="0.94" stroke="#0284c7" stroke-width="2.5" pointer-events="none" filter="drop-shadow(0 0 10px rgba(2,132,199,0.3))"/>
-                  <text x="${(bPxPts[0].x + bPxPts[1].x)/2}" y="${Math.max(65, bPxPts[0].y + 20)}" fill="#38bdf8" font-size="12" font-family="monospace" font-weight="900" text-anchor="middle" pointer-events="none" letter-spacing="1">🏢 ${activeFp.name.toUpperCase()}${availableFloors.length > 1 ? ` - TẦNG ${currentFloor}` : ''}</text>
+                  <polygon points="${bPtsStr}" fill="#080e1a" fill-opacity="0.95" stroke="#0284c7" stroke-width="2.5" pointer-events="none" filter="drop-shadow(0 0 12px rgba(2,132,199,0.35))"/>
+                  <!-- Corner Handles -->
+                  ${bPxPts.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#ffffff" stroke="#0284c7" stroke-width="1.5"/>`).join('')}
+                  <!-- Outer Title Badge -->
+                  <g pointer-events="none">
+                      <rect x="${(mapper.originX + mapper.renderedW / 2 - 190).toFixed(1)}" y="${Math.max(12, mapper.originY - 32).toFixed(1)}" width="380" height="20" rx="4" fill="#0f172a" fill-opacity="0.9" stroke="#0284c7" stroke-width="1"/>
+                      <text x="${(mapper.originX + mapper.renderedW / 2).toFixed(1)}" y="${Math.max(26, mapper.originY - 18).toFixed(1)}" fill="#38bdf8" font-size="9.5" font-family="monospace" font-weight="900" text-anchor="middle" letter-spacing="1">🏢 ${activeFp.name.toUpperCase()}${availableFloors.length > 1 ? ` - TẦNG ${currentFloor}` : ''}</text>
+                  </g>
               `;
 
-              // B. Draw Child Zones / Rooms with Location theme styling (Read-only view)
+              // C. Child Zones (Only placed zones on active floor)
               const themeMap = {
-                  'PRODUCTION': { stroke: '#0284c7', fill: 'rgba(14, 165, 233, 0.16)', label: '#38bdf8', bgBadge: '#0369a1' },
-                  'CLEANROOM':  { stroke: '#0d9488', fill: 'rgba(20, 184, 166, 0.16)', label: '#2dd4bf', bgBadge: '#0f766e' },
-                  'CONTROLLED': { stroke: '#0d9488', fill: 'rgba(20, 184, 166, 0.16)', label: '#2dd4bf', bgBadge: '#0f766e' },
-                  'WAREHOUSE':  { stroke: '#d97706', fill: 'rgba(245, 158, 11, 0.16)', label: '#fbbf24', bgBadge: '#b45309' },
-                  'OFFICE':     { stroke: '#9333ea', fill: 'rgba(168, 85, 247, 0.16)', label: '#c084fc', bgBadge: '#7e22ce' },
-                  'OUTDOOR':    { stroke: '#0891b2', fill: 'rgba(6, 182, 212, 0.16)', label: '#22d3ee', bgBadge: '#0e7490' },
-                  'RESTRICTED': { stroke: '#e11d48', fill: 'rgba(244, 63, 94, 0.18)', label: '#fb7185', bgBadge: '#be123c' },
-                  'STANDARD':   { stroke: '#64748b', fill: 'rgba(100, 116, 139, 0.16)', label: '#94a3b8', bgBadge: '#475569' },
+                  'PRODUCTION': { stroke: '#0284c7', fill: 'rgba(14, 165, 233, 0.14)', label: '#38bdf8', bgBadge: '#0369a1' },
+                  'CLEANROOM':  { stroke: '#0d9488', fill: 'rgba(20, 184, 166, 0.14)', label: '#2dd4bf', bgBadge: '#0f766e' },
+                  'CONTROLLED': { stroke: '#0d9488', fill: 'rgba(20, 184, 166, 0.14)', label: '#2dd4bf', bgBadge: '#0f766e' },
+                  'WAREHOUSE':  { stroke: '#d97706', fill: 'rgba(245, 158, 11, 0.14)', label: '#fbbf24', bgBadge: '#b45309' },
+                  'OFFICE':     { stroke: '#9333ea', fill: 'rgba(168, 85, 247, 0.14)', label: '#c084fc', bgBadge: '#7e22ce' },
+                  'OUTDOOR':    { stroke: '#0891b2', fill: 'rgba(6, 182, 212, 0.14)', label: '#22d3ee', bgBadge: '#0e7490' },
+                  'RESTRICTED': { stroke: '#e11d48', fill: 'rgba(244, 63, 94, 0.16)', label: '#fb7185', bgBadge: '#be123c' },
+                  'STANDARD':   { stroke: '#64748b', fill: 'rgba(100, 116, 139, 0.14)', label: '#94a3b8', bgBadge: '#475569' },
+                  'STAIRS':     { stroke: '#8b5cf6', fill: 'rgba(139, 92, 246, 0.20)', label: '#c4b5fd', bgBadge: '#6d28d9' },
+                  'ELEVATOR':   { stroke: '#6366f1', fill: 'rgba(99, 102, 241, 0.20)', label: '#a5b4fc', bgBadge: '#4338ca' },
               };
 
               childZones.forEach(zone => {
@@ -4279,95 +4876,187 @@
                   const zPtsStr = zPxPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
                   const theme = themeMap[zone.zone_type] || themeMap['PRODUCTION'];
 
-                  let cPx = { x: 0, y: 0 };
-                  zPxPts.forEach(p => { cPx.x += p.x; cPx.y += p.y; });
-                  cPx.x /= zPxPts.length;
-                  cPx.y /= zPxPts.length;
+                  let minX = Infinity, minY = Infinity;
+                  zPxPts.forEach(p => {
+                      if (p.x < minX) minX = p.x;
+                      if (p.y < minY) minY = p.y;
+                  });
 
                   const zoneDisplayName = zone.name.length > 28 ? zone.name.substring(0, 26) + '...' : zone.name;
+                  const zoneTagX = minX + 5;
+                  const zoneTagY = minY + 5;
+                  const tagW = Math.min(150, zoneDisplayName.length * 6.0 + 16);
 
                   floorplanLayer.innerHTML += `
                       <g pointer-events="none">
-                          <polygon points="${zPtsStr}" fill="${theme.fill}" stroke="${theme.stroke}" stroke-width="1.8"/>
-                          <rect x="${cPx.x - 65}" y="${cPx.y - 18}" width="130" height="16" rx="3" fill="${theme.bgBadge}" fill-opacity="0.65"/>
-                          <text x="${cPx.x}" y="${cPx.y - 6}" fill="#f8fafc" font-size="9" font-weight="bold" font-family="sans-serif" text-anchor="middle">${zoneDisplayName}</text>
-                          <text x="${cPx.x}" y="${cPx.y + 11}" fill="${theme.label}" font-size="8.5" font-family="monospace" font-weight="bold" text-anchor="middle">[${zone.code || 'ZONE'}]</text>
+                          <polygon points="${zPtsStr}" fill="${theme.fill}" stroke="${theme.stroke}" stroke-width="1.6"/>
+                          <rect x="${zoneTagX.toFixed(1)}" y="${zoneTagY.toFixed(1)}" width="${tagW.toFixed(1)}" height="15" rx="3" fill="${theme.bgBadge}" fill-opacity="0.4" stroke="${theme.stroke}" stroke-width="0.8"/>
+                          <text x="${(zoneTagX + 5).toFixed(1)}" y="${(zoneTagY + 11).toFixed(1)}" fill="${theme.label}" font-size="8.5" font-family="sans-serif" font-weight="bold">${zoneDisplayName}</text>
                       </g>
                   `;
               });
           }
 
-          // C. Draw Hallway / Open Space guides ("những khoảng trống ấy đều là đường hết")
+          // D. Placed Machines / Asset Footprints (Matching Studio view)
+          if (assetsLayer && window.tspShowMachines && window.ASSETS_MAP) {
+              let assetsSvg = '';
+              Object.values(window.ASSETS_MAP).forEach(ast => {
+                  const astFloor = parseInt(ast.floor_level || 1);
+                  if (astFloor === currentFloor && ast.coords_x > 0 && ast.coords_y > 0) {
+                      const pt = mapper.mToPx(ast.coords_x, ast.coords_y);
+                      assetsSvg += `
+                          <g class="cursor-pointer" pointer-events="auto">
+                              <rect x="${(pt.x - 5).toFixed(1)}" y="${(pt.y - 4).toFixed(1)}" width="10" height="8" rx="1.5" fill="#0f172a" fill-opacity="0.9" stroke="#38bdf8" stroke-width="0.8"/>
+                              <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="1.5" fill="#38bdf8"/>
+                              <title>Thiết bị: ${ast.name} (${ast.coords_x}m, ${ast.coords_y}m)</title>
+                          </g>
+                      `;
+                  }
+              });
+              assetsLayer.innerHTML = assetsSvg;
+          }
+
+          // E. Hallway / Aisle guide line
           if (corridorsLayer) {
-              const leftHallX = mapper.mToPx(10, 62).x;
-              const rightHallX = mapper.mToPx(210, 62).x;
+              const leftHallX = mapper.mToPx(12, 62).x;
+              const rightHallX = mapper.mToPx(mapper.factoryW - 12, 62).x;
+              const hallLabelX = leftHallX + 115;
               corridorsLayer.innerHTML += `
-                  <g pointer-events="none" opacity="0.65">
-                      <line x1="${leftHallX}" y1="${midHallY}" x2="${rightHallX}" y2="${midHallY}" stroke="#38bdf8" stroke-width="2" stroke-dasharray="8 6" stroke-opacity="0.35" />
-                      <rect x="${(leftHallX + rightHallX)/2 - 130}" y="${midHallY - 9}" width="260" height="18" rx="4" fill="#0f172a" fill-opacity="0.85" stroke="#38bdf8" stroke-width="1" />
-                      <text x="${(leftHallX + rightHallX)/2}" y="${midHallY + 4}" fill="#38bdf8" font-size="9" font-family="monospace" font-weight="bold" text-anchor="middle" letter-spacing="1">HÀNH LANG VẬN CHUYỂN & LỐI ĐI BỘ (MAIN AISLE)</text>
+                  <g pointer-events="none" opacity="0.6">
+                      <line x1="${leftHallX.toFixed(1)}" y1="${midHallY.toFixed(1)}" x2="${rightHallX.toFixed(1)}" y2="${midHallY.toFixed(1)}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="8 6" stroke-opacity="0.28" />
+                      <rect x="${(hallLabelX - 85).toFixed(1)}" y="${(midHallY - 8).toFixed(1)}" width="170" height="15" rx="3" fill="#0f172a" fill-opacity="0.8" stroke="#38bdf8" stroke-width="0.8" />
+                      <text x="${hallLabelX.toFixed(1)}" y="${(midHallY + 3.5).toFixed(1)}" fill="#38bdf8" font-size="8" font-family="monospace" font-weight="bold" text-anchor="middle" letter-spacing="0.5">HÀNH LANG VẬN CHUYỂN (AISLE)</text>
                   </g>
               `;
           }
       } else {
-          if (viewInfo) viewInfo.innerText = 'Tỉ lệ chuẩn 100m x 70m';
+          if (viewInfo) viewInfo.innerText = 'Tỉ lệ chuẩn CAD 220m × 130m';
       }
 
-      // 2. Map Stops to Canvas Coordinates
+      // 3. Map Stops to Coordinates
       const points = stops.map((stop, i) => {
-          let x = 100 + ((i % 5) * 180);
-          let y = 120 + (Math.floor(i / 5) * 200);
+          let x = 120 + ((i % 5) * 160);
+          let y = 140 + (Math.floor(i / 5) * 180);
+
+          let stopFloor = 1;
+          if (stop.floorNumber !== undefined && stop.floorNumber !== null) {
+              stopFloor = parseInt(stop.floorNumber) || 1;
+          } else if (stop.locationId && Array.isArray(LOCATIONS_LIST)) {
+              const loc = LOCATIONS_LIST.find(l => String(l.id) === String(stop.locationId));
+              if (loc && (loc.floor_level !== undefined || loc.floor_number !== undefined)) {
+                  stopFloor = parseInt(loc.floor_level || loc.floor_number) || 1;
+              }
+          } else if (stop.assetName && window.ASSETS_MAP) {
+              const ast = Object.values(window.ASSETS_MAP).find(a => a.name === stop.assetName);
+              if (ast) {
+                  stopFloor = parseInt(ast.floor_level || ast.floor_number || 1) || 1;
+              }
+          }
 
           if (mapper) {
-              // Priority 1: Stop has explicit coords
-              if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined) {
+              // Priority 1: Stop has explicit coordinates
+              if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined && (stop.coords.x > 0 || stop.coords.y > 0)) {
                   const pt = mapper.mToPx(stop.coords.x, stop.coords.y);
                   x = pt.x; y = pt.y;
               }
-              // Priority 2: Stop matches a zone in LOCATIONS_LIST
-              else if (stop.locationId && Array.isArray(LOCATIONS_LIST)) {
-                  const loc = LOCATIONS_LIST.find(l => String(l.id) === String(stop.locationId));
-                  if (loc && loc.center_x !== null && loc.center_x !== undefined) {
-                      const pt = mapper.mToPx(loc.center_x, loc.center_y);
-                      x = pt.x; y = pt.y;
-                  }
-              }
-              // Priority 3: Stop matches an asset in ASSETS_MAP
+              // Priority 2: Stop matches an asset in ASSETS_MAP
               else if (stop.assetName && window.ASSETS_MAP) {
                   const ast = Object.values(window.ASSETS_MAP).find(a => a.name === stop.assetName);
-                  if (ast && ast.coords_x !== null && ast.coords_x !== undefined) {
+                  if (ast && ast.coords_x > 0 && ast.coords_y > 0) {
                       const pt = mapper.mToPx(ast.coords_x, ast.coords_y);
                       x = pt.x; y = pt.y;
                   }
               }
-          } else {
-              if (stop.coords && stop.coords.x !== null && stop.coords.x !== undefined) {
-                  x = Math.max(60, Math.min(940, stop.coords.x * 10));
-                  y = Math.max(60, Math.min(640, stop.coords.y * 10));
-              } else if (stop.floorNumber) {
-                  const floorOffset = ((stop.floorNumber - 1) % 4) * 120;
-                  x = 120 + ((i * 140) % 760);
-                  y = 100 + floorOffset + ((i * 30) % 150);
+              // Priority 3: Stop matches a zone in LOCATIONS_LIST
+              else if (stop.locationId && Array.isArray(LOCATIONS_LIST)) {
+                  const loc = LOCATIONS_LIST.find(l => String(l.id) === String(stop.locationId));
+                  if (loc && loc.center_x > 0 && loc.center_y > 0) {
+                      const pt = mapper.mToPx(loc.center_x, loc.center_y);
+                      x = pt.x; y = pt.y;
+                  }
+              }
+              // Priority 4: Warehouse stop -> map to warehouse zone
+              else if (stop.type === 'WAREHOUSE') {
+                  const whZone = childZones.find(z => z.zone_type === 'WAREHOUSE' || (z.name && z.name.toLowerCase().includes('kho')));
+                  if (whZone && whZone.center_x > 0 && whZone.center_y > 0) {
+                      const pt = mapper.mToPx(whZone.center_x, whZone.center_y);
+                      x = pt.x; y = pt.y;
+                  } else {
+                      const pt = mapper.mToPx(140, 95);
+                      x = pt.x; y = pt.y;
+                  }
+              }
+              // Priority 5: Start / Depot stop
+              else if (stop.type === 'DEPOT' || stop.type === 'CURRENT_LOCATION') {
+                  const pt = mapper.mToPx(140, 95);
+                  x = pt.x; y = pt.y;
               }
           }
-          return { x, y, stop, index: i };
+
+          return { x, y, stop, index: i, floor: stopFloor };
       });
 
-      // 3. Draw Connecting Paths Along Open Corridors / Hallways
-      for (let i = 0; i < points.length - 1; i++) {
-          const p1 = points[i];
-          const p2 = points[i + 1];
-          const isUrgentEdge = p2.stop.priority === 'URGENT';
+      // De-cluster overlapping stops on the same floor
+      const activePointsByFloor = {};
+      points.forEach(p => {
+          if (!activePointsByFloor[p.floor]) activePointsByFloor[p.floor] = [];
+          activePointsByFloor[p.floor].push(p);
+      });
+
+      Object.values(activePointsByFloor).forEach(fPts => {
+          const clusters = [];
+          fPts.forEach(pt => {
+              let cluster = clusters.find(c => Math.hypot(pt.x - c.x, pt.y - c.y) < 32);
+              if (cluster) {
+                  cluster.items.push(pt);
+              } else {
+                  clusters.push({ x: pt.x, y: pt.y, items: [pt] });
+              }
+          });
+
+          clusters.forEach(c => {
+              const count = c.items.length;
+              if (count > 1) {
+                  const radius = Math.max(32, Math.min(56, 20 + count * 6));
+                  c.items.forEach((pt, idx) => {
+                      const angle = (idx * (2 * Math.PI / count)) - (Math.PI / 2);
+                      pt.x = c.x + Math.cos(angle) * radius;
+                      pt.y = c.y + Math.sin(angle) * radius;
+                      pt.isClustered = true;
+                      pt.clusterAngle = angle;
+                  });
+              }
+          });
+      });
+
+      // Stair node at (110m, 62m)
+      let stairPt = { x: 507, y: midHallY };
+      if (mapper) {
+          let stairSpatial = null;
+          if (activeFp && activeFp.description) {
+              try {
+                  const descObj = typeof activeFp.description === 'string' ? JSON.parse(activeFp.description) : activeFp.description;
+                  const sps = descObj.spatials || [];
+                  stairSpatial = sps.find(s => s.type === 'stairs' && (parseInt(s.floor_level) || 1) === currentFloor) || sps.find(s => s.type === 'stairs');
+              } catch (_) {}
+          }
+          if (stairSpatial && stairSpatial.x !== undefined && stairSpatial.y !== undefined) {
+              stairPt = mapper.mToPx(stairSpatial.x, stairSpatial.y);
+          } else {
+              stairPt = mapper.mToPx(110, 62);
+          }
+      }
+
+      function drawPathSegment(pStart, pEnd, isUrgentEdge) {
           const strokeColor = isUrgentEdge ? '#ef4444' : '#f59e0b';
           const markerUrl = isUrgentEdge ? 'url(#tsp-arrow-urgent)' : 'url(#tsp-arrow)';
 
-          // Path routing through corridors:
-          // Leave p1 room, enter hallway (midHallY), walk along hallway, turn into p2 room
+          // Manhattan routing via central aisle
           let pathD = '';
-          if (mapper && Math.abs(p1.y - p2.y) > 25) {
-              pathD = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L ${p1.x.toFixed(1)} ${midHallY.toFixed(1)} L ${p2.x.toFixed(1)} ${midHallY.toFixed(1)} L ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+          if (mapper && Math.abs(pStart.y - pEnd.y) > 25) {
+              pathD = `M ${pStart.x.toFixed(1)} ${pStart.y.toFixed(1)} L ${pStart.x.toFixed(1)} ${midHallY.toFixed(1)} L ${pEnd.x.toFixed(1)} ${midHallY.toFixed(1)} L ${pEnd.x.toFixed(1)} ${pEnd.y.toFixed(1)}`;
           } else {
-              pathD = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+              pathD = `M ${pStart.x.toFixed(1)} ${pStart.y.toFixed(1)} L ${pEnd.x.toFixed(1)} ${pEnd.y.toFixed(1)}`;
           }
 
           // A. Glow Underlay
@@ -4375,8 +5064,8 @@
           glow.setAttribute('d', pathD);
           glow.setAttribute('fill', 'none');
           glow.setAttribute('stroke', strokeColor);
-          glow.setAttribute('stroke-width', isUrgentEdge ? '6.5' : '5');
-          glow.setAttribute('stroke-opacity', '0.28');
+          glow.setAttribute('stroke-width', isUrgentEdge ? '5' : '3.8');
+          glow.setAttribute('stroke-opacity', '0.22');
           glow.setAttribute('stroke-linejoin', 'round');
           glow.setAttribute('stroke-linecap', 'round');
           routesLayer.appendChild(glow);
@@ -4386,97 +5075,183 @@
           mainLine.setAttribute('d', pathD);
           mainLine.setAttribute('fill', 'none');
           mainLine.setAttribute('stroke', strokeColor);
-          mainLine.setAttribute('stroke-width', isUrgentEdge ? '3.5' : '2.5');
+          mainLine.setAttribute('stroke-width', isUrgentEdge ? '2.8' : '2.0');
           mainLine.setAttribute('stroke-linejoin', 'round');
           mainLine.setAttribute('stroke-linecap', 'round');
           mainLine.setAttribute('marker-end', markerUrl);
           routesLayer.appendChild(mainLine);
 
-          // C. Animated Flowing Dash Overlay (Walking direction stream)
+          // C. Animated Flowing Dash Overlay
           const dashFlow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           dashFlow.setAttribute('d', pathD);
           dashFlow.setAttribute('fill', 'none');
           dashFlow.setAttribute('stroke', '#ffffff');
-          dashFlow.setAttribute('stroke-width', '1.5');
-          dashFlow.setAttribute('stroke-dasharray', '6 8');
+          dashFlow.setAttribute('stroke-width', '1.2');
+          dashFlow.setAttribute('stroke-dasharray', '5 8');
           dashFlow.setAttribute('stroke-linejoin', 'round');
           dashFlow.setAttribute('stroke-linecap', 'round');
           dashFlow.setAttribute('class', 'tsp-flow-dash');
-          dashFlow.setAttribute('opacity', '0.8');
+          dashFlow.setAttribute('opacity', '0.75');
           routesLayer.appendChild(dashFlow);
       }
 
-      // 4. Draw Stop Markers
-      points.forEach(p => {
-          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-          g.setAttribute('transform', `translate(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`);
+      // 4. Draw Connecting Paths strictly for the active floor
+      let stairTransitions = [];
+      for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const isUrgentEdge = p2.stop.priority === 'URGENT';
 
-          const isUrgent = p.stop.priority === 'URGENT';
-          const isStart = p.stop.type === 'DEPOT' || p.stop.type === 'CURRENT_LOCATION';
-          const isWh = p.stop.type === 'WAREHOUSE';
+          if (p1.floor === currentFloor && p2.floor === currentFloor) {
+              drawPathSegment(p1, p2, isUrgentEdge);
+          } else if (p1.floor === currentFloor && p2.floor !== currentFloor) {
+              drawPathSegment(p1, stairPt, isUrgentEdge);
+              stairTransitions.push({
+                  targetFloor: p2.floor,
+                  fromFloor: currentFloor,
+                  fromStop: p1.index,
+                  toStop: p2.index,
+                  actionText: `Cầu thang (Sang Tầng ${p2.floor})`
+              });
+          } else if (p1.floor !== currentFloor && p2.floor === currentFloor) {
+              drawPathSegment(stairPt, p2, isUrgentEdge);
+              stairTransitions.push({
+                  fromFloor: p1.floor,
+                  targetFloor: currentFloor,
+                  fromStop: p1.index,
+                  toStop: p2.index,
+                  actionText: `Cầu thang (Đến từ Tầng ${p1.floor})`
+              });
+          }
+      }
 
-          let fillColor = '#f59e0b';
-          let radius = 15;
-          if (isUrgent) fillColor = '#ef4444';
-          else if (isStart) fillColor = '#10b981';
-          else if (isWh) fillColor = '#f97316';
+      // Draw Single Unified Stair Transition Marker
+      if (stairTransitions.length > 0) {
+          const stairG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          stairG.setAttribute('transform', `translate(${stairPt.x.toFixed(1)}, ${stairPt.y.toFixed(1)})`);
 
-          // Outer halo
-          const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          halo.setAttribute('r', radius + 5);
-          halo.setAttribute('fill', fillColor);
-          halo.setAttribute('opacity', '0.28');
-          g.appendChild(halo);
+          let pillsHtml = '';
+          stairTransitions.forEach((t, tIdx) => {
+              const pillY = -34 - (tIdx * 20);
+              const pillW = Math.max(145, t.actionText.length * 6.6 + 22);
+              pillsHtml += `
+                  <rect x="${(-pillW / 2).toFixed(1)}" y="${pillY}" width="${pillW.toFixed(1)}" height="17" rx="3" fill="#0f172a" fill-opacity="0.95" stroke="#94a3b8" stroke-width="1.2" filter="drop-shadow(0 2px 6px rgba(0,0,0,0.6))"/>
+                  <text x="0" y="${pillY + 12}" fill="#f1f5f9" font-size="8.5" font-family="monospace" font-weight="bold" text-anchor="middle">
+                      🪜 [CHẶNG ${t.fromStop}➔${t.toStop}] ${t.actionText}
+                  </text>
+              `;
+          });
 
-          // Inner circle
-          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          circle.setAttribute('r', radius);
-          circle.setAttribute('fill', fillColor);
-          circle.setAttribute('stroke', '#ffffff');
-          circle.setAttribute('stroke-width', '2');
-          g.appendChild(circle);
+          stairG.innerHTML = `
+              <!-- CAD Architectural Staircase Box -->
+              <rect x="-26" y="-18" width="52" height="36" rx="3" fill="#0f172a" fill-opacity="0.95" stroke="#94a3b8" stroke-width="1.8" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.7))"/>
+              <rect x="-24" y="-16" width="12" height="32" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+              <text x="-18" y="2" fill="#64748b" font-size="6" font-family="monospace" text-anchor="middle">CN</text>
+              <line x1="-12" y1="0" x2="24" y2="0" stroke="#64748b" stroke-width="1.5"/>
+              <line x1="-6" y1="-15" x2="-6" y2="-1" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="0" y1="-15" x2="0" y2="-1" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="6" y1="-15" x2="6" y2="-1" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="12" y1="-15" x2="12" y2="-1" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="18" y1="-15" x2="18" y2="-1" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="-6" y1="1" x2="-6" y2="15" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="0" y1="1" x2="0" y2="15" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="6" y1="1" x2="6" y2="15" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="12" y1="1" x2="12" y2="15" stroke="#cbd5e1" stroke-width="1.2"/>
+              <line x1="18" y1="1" x2="18" y2="15" stroke="#cbd5e1" stroke-width="1.2"/>
+              <rect x="-28" y="-20" width="56" height="40" rx="4" fill="none" stroke="#38bdf8" stroke-width="1.5" opacity="0.6"/>
+              <text x="0" y="28" fill="#94a3b8" font-size="8" font-family="monospace" font-weight="bold" text-anchor="middle">CẦU THANG BỘ</text>
+              ${pillsHtml}
+          `;
+          routesLayer.appendChild(stairG);
+      }
 
-          // Step label
-          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          text.setAttribute('text-anchor', 'middle');
-          text.setAttribute('dominant-baseline', 'central');
-          text.setAttribute('fill', '#ffffff');
-          text.setAttribute('font-size', '11');
-          text.setAttribute('font-weight', 'bold');
-          text.setAttribute('font-family', 'sans-serif');
-          text.textContent = String(p.index);
-          g.appendChild(text);
+      // 5. Draw Stop Markers belonging strictly to the active floor (Không vẽ text WO rườm rà, tập trung vào số trạm tương tác)
+      const activeFloorPoints = points.filter(p => p.floor === currentFloor);
 
-          // Name label under marker
-          const shortName = p.stop.workOrderCode || p.stop.name.substring(0, 14);
-          const labelText = `${shortName} (${p.stop.estimatedArrival || ''})`;
-          const textWidth = Math.min(170, labelText.length * 6.5 + 16);
+      if (activeFloorPoints.length === 0) {
+          const noticeG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          noticeG.setAttribute('transform', 'translate(500, 320)');
+          const otherFloorList = availableFloors.filter(f => f !== currentFloor).map(f => 'Tầng ' + f).join(', ') || 'tầng khác';
+          noticeG.innerHTML = `
+              <rect x="-220" y="-40" width="440" height="80" rx="14" fill="#0b1329" fill-opacity="0.94" stroke="#0284c7" stroke-width="1.8" filter="drop-shadow(0 10px 25px rgba(0,0,0,0.6))"/>
+              <text x="0" y="-10" fill="#38bdf8" font-size="13" font-weight="bold" font-family="sans-serif" text-anchor="middle">
+                  🏢 Không có trạm bảo trì nào trên Tầng ${currentFloor}
+              </text>
+              <text x="0" y="14" fill="#94a3b8" font-size="11" font-family="sans-serif" text-anchor="middle">
+                  Tất cả các trạm trong lộ trình hiện tại thuộc ${otherFloorList}.
+              </text>
+          `;
+          stopsLayer.appendChild(noticeG);
+      } else {
+          activeFloorPoints.forEach(p => {
+              const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+              g.setAttribute('id', `tsp-stop-pin-${p.index}`);
+              g.setAttribute('transform', `translate(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`);
+              g.style.cursor = 'pointer';
+              g.onclick = (e) => {
+                  if (window.tspSvgZoomState && window.tspSvgZoomState.hasDragged) return;
+                  focusTSPStop(p.index);
+              };
 
-          const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          labelBg.setAttribute('x', (-textWidth / 2).toFixed(1));
-          labelBg.setAttribute('y', (radius + 4).toFixed(1));
-          labelBg.setAttribute('width', textWidth.toFixed(1));
-          labelBg.setAttribute('height', '18');
-          labelBg.setAttribute('rx', '4');
-          labelBg.setAttribute('fill', '#0f172a');
-          labelBg.setAttribute('fill-opacity', '0.88');
-          labelBg.setAttribute('stroke', '#334155');
-          labelBg.setAttribute('stroke-width', '1');
-          g.appendChild(labelBg);
+              const isUrgent = p.stop.priority === 'URGENT' || p.stop.priority === 'EMERGENCY';
+              const isStart = p.stop.type === 'DEPOT' || p.stop.type === 'CURRENT_LOCATION';
+              const isWh = p.stop.type === 'WAREHOUSE';
+              const isToolPickup = p.stop.action === 'PICKUP_TOOLS' || (p.stop.name && p.stop.name.toLowerCase().includes('dụng cụ'));
 
-          const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          label.setAttribute('x', '0');
-          label.setAttribute('y', (radius + 16).toFixed(1));
-          label.setAttribute('text-anchor', 'middle');
-          label.setAttribute('fill', '#f8fafc');
-          label.setAttribute('font-size', '9.5');
-          label.setAttribute('font-weight', 'bold');
-          label.setAttribute('font-family', 'sans-serif');
-          label.textContent = labelText;
-          g.appendChild(label);
+              let fillColor = '#f59e0b';
+              let radius = 13.5;
+              if (isUrgent) fillColor = '#ef4444';
+              else if (isToolPickup) fillColor = '#8b5cf6';
+              else if (isStart) fillColor = '#10b981';
+              else if (isWh) fillColor = '#f97316';
 
-          stopsLayer.appendChild(g);
-      });
+              // Tooltip on Hover
+              const tooltip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+              const arrTime = p.stop.estimatedArrival ? ` [Dự kiến: ${p.stop.estimatedArrival}]` : '';
+              const woCode = p.stop.workOrderCode ? ` (${p.stop.workOrderCode})` : '';
+              tooltip.textContent = `Trạm #${p.index}: ${p.stop.name}${woCode}${arrTime}\n👉 Bấm vào số để xem thông tin chi tiết ở danh sách bên trái`;
+              g.appendChild(tooltip);
+
+              // Outer subtle halo
+              const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+              halo.setAttribute('r', (radius + 5).toFixed(1));
+              halo.setAttribute('fill', fillColor);
+              halo.setAttribute('opacity', '0.24');
+              g.appendChild(halo);
+
+              // Selection Animated Pulse Ring (Hidden by default, shown when focused)
+              const activeRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+              activeRing.setAttribute('id', `tsp-stop-active-ring-${p.index}`);
+              activeRing.setAttribute('r', (radius + 8).toFixed(1));
+              activeRing.setAttribute('fill', 'none');
+              activeRing.setAttribute('stroke', '#38bdf8');
+              activeRing.setAttribute('stroke-width', '2.5');
+              activeRing.setAttribute('class', 'hidden tsp-pulse-ring');
+              g.appendChild(activeRing);
+
+              // Inner solid circle pin
+              const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+              circle.setAttribute('r', radius.toFixed(1));
+              circle.setAttribute('fill', fillColor);
+              circle.setAttribute('stroke', '#ffffff');
+              circle.setAttribute('stroke-width', '2');
+              circle.setAttribute('filter', 'drop-shadow(0 2px 6px rgba(0,0,0,0.6))');
+              g.appendChild(circle);
+
+              // Clean Centered Stop Number
+              const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+              text.setAttribute('text-anchor', 'middle');
+              text.setAttribute('dominant-baseline', 'central');
+              text.setAttribute('fill', isStart || isUrgent || isToolPickup || isWh ? '#ffffff' : '#0f172a');
+              text.setAttribute('font-size', '11');
+              text.setAttribute('font-weight', '900');
+              text.setAttribute('font-family', 'sans-serif');
+              text.textContent = String(p.index);
+              g.appendChild(text);
+
+              stopsLayer.appendChild(g);
+          });
+      }
   }
 
   function renderTSPTree(stops) {

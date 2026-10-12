@@ -1602,6 +1602,7 @@ def portal_work_orders(request):
     import json
     from django.http import JsonResponse
     from django.utils.dateparse import parse_datetime
+    from django.utils import timezone
     
     tenant_id = request.user.tenant_id
     
@@ -1673,7 +1674,13 @@ def portal_work_orders(request):
                 incident_loc_id = data.get('incident_location_id')
                 if not incident_loc_id and zone_id:
                     from assets.models import Location
-                    loc_match = Location.objects.filter(tenant_id=tenant_id, id=zone_id).first()
+                    import uuid
+                    loc_match = None
+                    try:
+                        uuid.UUID(str(zone_id))
+                        loc_match = Location.objects.filter(tenant_id=tenant_id, id=zone_id).first()
+                    except (ValueError, TypeError, Exception):
+                        loc_match = None
                     if not loc_match:
                         loc_match = Location.objects.filter(tenant_id=tenant_id, code=zone_id).first()
                     if loc_match:
@@ -1699,10 +1706,11 @@ def portal_work_orders(request):
                     deadline=deadline_dt,
                     created_by=request.user,
                     # Hungarian & Optimization fields
-                    required_skill=data.get('required_skill', 'GENERAL') or 'GENERAL',
-                    min_skill_level=int(data.get('min_skill_level', 1)),
+                    required_skill=data.get('required_skill', '') or '',
+                    min_skill_level=int(data.get('min_skill_level', 1)) if data.get('min_skill_level') else 1,
                     required_certification=data.get('required_certification', '') or '',
                     required_tools=data.get('required_tools', []),
+                    required_spare_parts=data.get('required_spare_parts', []),
                     is_crew_task=bool(data.get('is_crew_task', False)),
                     depends_on_wo_id=data.get('depends_on_wo_id') if data.get('depends_on_wo_id') else None,
                     zone_id=zone_id or '',
@@ -1710,6 +1718,7 @@ def portal_work_orders(request):
                     coords_x=coords_x,
                     coords_y=coords_y,
                     incident_location_id=incident_loc_id,
+                    tool_pickup_location_id=data.get('tool_pickup_location_id') or None,
                     maintenance_window_start=parse_time_val(data.get('maintenance_window_start')),
                     maintenance_window_end=parse_time_val(data.get('maintenance_window_end')),
                 )
@@ -1859,13 +1868,15 @@ def portal_work_orders(request):
                     
                 # Hungarian & Optimization fields in PUT
                 if 'required_skill' in data:
-                    wo.required_skill = data.get('required_skill') or 'GENERAL'
+                    wo.required_skill = data.get('required_skill') or ''
                 if 'min_skill_level' in data:
-                    wo.min_skill_level = int(data.get('min_skill_level', 1))
+                    wo.min_skill_level = int(data.get('min_skill_level', 1)) if data.get('min_skill_level') else 1
                 if 'required_certification' in data:
                     wo.required_certification = data.get('required_certification') or ''
                 if 'required_tools' in data:
                     wo.required_tools = data.get('required_tools', [])
+                if 'required_spare_parts' in data:
+                    wo.required_spare_parts = data.get('required_spare_parts', [])
                 if 'is_crew_task' in data:
                     wo.is_crew_task = bool(data.get('is_crew_task', False))
                 if 'depends_on_wo_id' in data:
@@ -1880,6 +1891,8 @@ def portal_work_orders(request):
                     wo.coords_y = float(data.get('coords_y'))
                 if 'incident_location_id' in data:
                     wo.incident_location_id = data.get('incident_location_id') or None
+                if 'tool_pickup_location_id' in data:
+                    wo.tool_pickup_location_id = data.get('tool_pickup_location_id') or None
                 if 'maintenance_window_start' in data:
                     raw_s = data.get('maintenance_window_start')
                     if raw_s:
@@ -1928,7 +1941,7 @@ def portal_work_orders(request):
     from assets.models import Tool
     now = timezone.now()
 
-    work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by').prefetch_related('checklists', 'follow_up_work_orders')
+    work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by').prefetch_related('checklists', 'follow_up_work_orders').order_by('-created_at')
     
     # Permission-based scope filtering (strictly permission-based, no role checks):
     # Users with 'work_order:reassign' or 'system:admin' (dispatchers/managers) can view all work orders in the tenant.
@@ -1960,16 +1973,19 @@ def portal_work_orders(request):
         })
 
         wo_metadata[str(wo.id)] = {
-            'required_skill': wo.required_skill or 'GENERAL',
-            'min_skill_level': wo.min_skill_level or 1,
+            'required_skill': wo.required_skill or '',
+            'min_skill_level': wo.min_skill_level if wo.min_skill_level is not None else '',
             'required_certification': wo.required_certification or '',
             'required_tools': wo.required_tools or [],
+            'required_spare_parts': wo.required_spare_parts or [],
             'is_crew_task': bool(wo.is_crew_task),
             'depends_on_wo_id': str(wo.depends_on_wo_id) if wo.depends_on_wo_id else '',
             'zone_id': wo.zone_id or '',
             'floor_level': wo.floor_level or 1,
             'coords_x': wo.coords_x if wo.coords_x is not None else 0.0,
             'coords_y': wo.coords_y if wo.coords_y is not None else 0.0,
+            'tool_pickup_location_id': str(wo.tool_pickup_location_id) if wo.tool_pickup_location_id else '',
+            'tool_pickup_location_name': wo.tool_pickup_location.name if wo.tool_pickup_location else '',
         }
 
     prof = getattr(request.user, 'technician_profile', None)
@@ -2004,7 +2020,24 @@ def portal_work_orders(request):
         roles__permissions__id='work_order:execute'
     ).distinct().select_related('technician_profile')
 
-    tools = list(Tool.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name', 'available_quantity'))
+    technicians_data = []
+    for u in technicians:
+        tp = getattr(u, 'technician_profile', None)
+        technicians_data.append({
+            'id': str(u.id),
+            'username': u.username,
+            'full_name': u.username,
+            'skill_level': tp.skill_level if tp else 1,
+            'skills': tp.skills if (tp and tp.skills) else [],
+            'certifications': tp.certifications if (tp and tp.certifications) else [],
+        })
+
+    from assets.models import Tool, SparePart
+    tools = list(Tool.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'available_quantity', 'location_id', 'location__name', 'location__code', 'location__floor_level'))
+    spare_parts = list(SparePart.objects.filter(tenant_id=tenant_id).values('id', 'name', 'part_number', 'quantity_in_stock', 'location_id', 'location__name', 'location__code', 'location__floor_level'))
+    for sp in spare_parts:
+        sp['id'] = str(sp['id'])
+        sp['quantity_in_stock'] = float(sp['quantity_in_stock'])
 
     from users.models import WorkforceSkill, CertificationType
     skills = list(WorkforceSkill.objects.filter(tenant_id=tenant_id, is_active=True).values('code', 'name', 'category'))
@@ -2037,7 +2070,9 @@ def portal_work_orders(request):
         'users': technicians,
         'technicians': technicians,
         'technicians_list': technicians,
+        'technicians_json': json.dumps(technicians_data, default=str),
         'tools': tools,
+        'spare_parts': spare_parts,
         'skills': skills,
         'cert_types': cert_types,
         'available_zones': available_zones,
@@ -2076,6 +2111,7 @@ def portal_inventory(request):
                 name=data.get('name'),
                 part_number=data.get('part_number'),
                 description=data.get('description'),
+                location_id=data.get('location_id') or None,
                 quantity_in_stock=qty if qty is not None else 0,
                 unit_cost=data.get('unit_cost') or None
             )
@@ -2092,6 +2128,8 @@ def portal_inventory(request):
             sp.name = data.get('name')
             sp.part_number = data.get('part_number')
             sp.description = data.get('description')
+            if 'location_id' in data:
+                sp.location_id = data.get('location_id') or None
             
             if data.get('quantity_in_stock') is not None:
                 sp.quantity_in_stock = data['quantity_in_stock']
@@ -2113,8 +2151,35 @@ def portal_inventory(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-    spare_parts = SparePart.objects.filter(tenant_id=tenant_id)
-    return render(request, 'inventory.html', {'spare_parts': spare_parts})
+    from assets.models import Location
+    locations = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).order_by('name'))
+    locations_data = [
+        {
+            'id': str(l.id),
+            'code': l.code,
+            'name': l.name,
+            'zone_type': l.zone_type,
+            'floor_level': l.floor_level,
+            'parent_id': str(l.parent_id) if l.parent_id else '',
+        }
+        for l in locations
+    ]
+    floorplans_list = [l for l in locations_data if l['zone_type'] == 'FLOORPLAN']
+    
+    prof = getattr(request.user, 'technician_profile', None)
+    user_fp_id = str(prof.floorplan_id) if (prof and prof.floorplan_id) else None
+    user_is_restricted_floorplan = bool(user_fp_id) and not is_admin
+    if user_is_restricted_floorplan:
+        floorplans_list = [fp for fp in floorplans_list if str(fp['id']) == user_fp_id]
+
+    spare_parts = SparePart.objects.filter(tenant_id=tenant_id).select_related('location').order_by('name')
+    return render(request, 'inventory.html', {
+        'spare_parts': spare_parts,
+        'locations': locations,
+        'locations_json': json.dumps(locations_data, default=str),
+        'floorplans': floorplans_list,
+        'floorplans_json': json.dumps(floorplans_list, default=str),
+    })
 
 @login_required(login_url='portal_login')
 @permission_required('pm_plan:read')
@@ -2612,7 +2677,7 @@ def portal_workforce_tools(request):
         })
 
     # 3. Specialized Tools & Calibration Instances
-    tools = list(Tool.objects.filter(tenant_id=tenant_id).order_by('name'))
+    tools = list(Tool.objects.filter(tenant_id=tenant_id).select_related('location').order_by('name'))
     tool_instances = list(
         ToolInstance.objects.filter(tenant_id=tenant_id)
         .select_related('tool')
@@ -3426,6 +3491,8 @@ def portal_tools_api(request):
             if not code or not name:
                 return JsonResponse({'success': False, 'error': 'Mã và Tên công cụ không được để trống.'}, status=400)
 
+            location_id = data.get('location_id') or None
+
             if tool_id:
                 tool = Tool.objects.filter(id=tool_id, tenant_id=tenant_id).first()
                 if not tool:
@@ -3433,6 +3500,8 @@ def portal_tools_api(request):
                 tool.code = code
                 tool.name = name
                 tool.available_quantity = qty
+                if 'location_id' in data:
+                    tool.location_id = location_id
                 tool.save()
             else:
                 if Tool.objects.filter(code=code, tenant_id=tenant_id).exists():
@@ -3442,6 +3511,7 @@ def portal_tools_api(request):
                     code=code,
                     name=name,
                     available_quantity=qty,
+                    location_id=location_id,
                     is_active=True
                 )
             return JsonResponse({'success': True, 'id': str(tool.id), 'code': tool.code, 'name': tool.name})

@@ -574,3 +574,170 @@ class TSPRoutingTestCase(TestCase):
         self.assertEqual(wo_stops[0]['priority'], 'URGENT')
         self.assertEqual(wo_stops[1]['priority'], 'HIGH')
         self.assertEqual(wo_stops[2]['priority'], 'LOW')
+
+    def test_tc_tsp_14_specialized_tool_pickup_routing(self):
+        """
+        TC-TSP-14: Lộ trình lấy dụng cụ chuyên dụng tại vị trí cụ thể trước khi sửa chữa.
+        """
+        tool_room = Location.objects.create(
+            tenant=self.tenant_a,
+            code="TOOL-ROOM-01",
+            name="Phòng Dụng Cụ Đo Chuyên Dụng",
+            location_type="ROOM",
+            floor_level=2,
+            center_x=30.0,
+            center_y=20.0
+        )
+        wo_with_tool = self._create_wo(
+            "Cân chỉnh trục bơm bằng Laser",
+            incident_location=self.room_101,
+            priority="HIGH",
+        )
+        wo_with_tool.required_tools = ["TOOL_LASER_ALIGN"]
+        wo_with_tool.tool_pickup_location = tool_room
+        wo_with_tool.save()
+
+        service = TSPRoutingService(tenant=self.tenant_a)
+        res = service.optimize_daily_route(
+            technician=None,
+            work_orders=[wo_with_tool],
+            return_to_depot=True
+        )
+
+        self.assertTrue(res['success'])
+        ordered_stops = res['data']['orderedStops']
+        tool_stops = [s for s in ordered_stops if s.get('action') == 'PICKUP_TOOLS']
+        self.assertEqual(len(tool_stops), 1)
+        self.assertEqual(tool_stops[0]['locationId'], str(tool_room.id))
+        self.assertEqual(tool_stops[0]['floorNumber'], 2)
+        self.assertIn("TOOL_LASER_ALIGN", tool_stops[0]['name'])
+
+    def test_case_15_automatic_tool_and_spare_part_location_pickup_routing(self):
+        """
+        TC-TSP-15: Tự động phát hiện vị trí cất giữ của Công cụ và Vật tư đã gán,
+        tự động định tuyến trạm dừng lấy dụng cụ (PICKUP_TOOLS) và vật tư (PICKUP_SUPPLIES).
+        """
+        from assets.models import Tool, SparePart
+
+        # 1. Tạo vị trí kho dụng cụ chuyên dụng và kho phụ tùng
+        tool_storage = Location.objects.create(
+            tenant=self.tenant_a,
+            code="TOOL-VAULT-02",
+            name="Kho Dụng Cụ Đo Lường Tầng 2",
+            location_type="ROOM",
+            floor_level=2,
+            center_x=45.0,
+            center_y=35.0
+        )
+        parts_depot = Location.objects.create(
+            tenant=self.tenant_a,
+            code="SPARE-DEPOT-01",
+            name="Kho Vật Tư Cơ Điện Tầng 1",
+            location_type="ROOM",
+            floor_level=1,
+            center_x=15.0,
+            center_y=25.0
+        )
+
+        # 2. Tạo Tool và SparePart được cấu hình vị trí lưu trữ từ trước
+        tool = Tool.objects.create(
+            tenant=self.tenant_a,
+            code="TOOL_SKF_VIB",
+            name="Máy Đo Độ Rung SKF Microlog",
+            location=tool_storage,
+            available_quantity=2,
+            is_active=True
+        )
+        part = SparePart.objects.create(
+            tenant=self.tenant_a,
+            part_number="BEARING-6205-2RS",
+            name="Vòng Bi SKF 6205-2RS",
+            location=parts_depot,
+            quantity_in_stock=10,
+            unit_cost=25.5
+        )
+
+        # 3. Tạo Work Order chỉ cần chọn mã công cụ và ID phụ tùng (KHÔNG cần chọn vị trí thủ công)
+        wo = self._create_wo(
+            "Thay vòng bi động cơ quạt hút",
+            incident_location=self.room_101,
+            priority="HIGH",
+        )
+        wo.required_tools = [tool.code]
+        wo.required_spare_parts = [str(part.id)]
+        wo.save()
+
+        # 4. Tối ưu hóa lộ trình TSP
+        service = TSPRoutingService(tenant=self.tenant_a)
+        res = service.optimize_daily_route(
+            technician=None,
+            work_orders=[wo],
+            return_to_depot=True
+        )
+
+        self.assertTrue(res['success'])
+        stops = res['data']['orderedStops']
+
+        # Xác thực trạm lấy công cụ tự động
+        tool_stops = [s for s in stops if s.get('action') == 'PICKUP_TOOLS']
+        self.assertEqual(len(tool_stops), 1)
+        self.assertEqual(tool_stops[0]['locationId'], str(tool_storage.id))
+        self.assertEqual(tool_stops[0]['floorNumber'], 2)
+        self.assertIn("Máy Đo Độ Rung SKF", tool_stops[0]['name'])
+
+        # Xác thực trạm lấy vật tư/phụ tùng tự động
+        supply_stops = [s for s in stops if s.get('action') == 'PICKUP_SUPPLIES']
+        self.assertEqual(len(supply_stops), 1)
+        self.assertEqual(supply_stops[0]['locationId'], str(parts_depot.id))
+        self.assertEqual(supply_stops[0]['floorNumber'], 1)
+        self.assertIn("Vòng Bi SKF", supply_stops[0]['name'])
+
+    def test_case_16_multi_floor_stair_transition_metadata(self):
+        """
+        TC-TSP-16: Xác thực cơ chế chuyển tầng qua cầu thang bộ (Đi lên / Đi xuống)
+        khi kỹ thuật viên có công việc ở các tầng khác nhau.
+        """
+        # Tạo vị trí Tầng 1 và Tầng 2
+        loc_f1 = Location.objects.create(
+            tenant=self.tenant_a,
+            code="ROOM-F1-STAMP",
+            name="Xưởng Dập Tầng 1",
+            location_type="ROOM",
+            floor_level=1,
+            center_x=20.0,
+            center_y=30.0
+        )
+        loc_f2 = Location.objects.create(
+            tenant=self.tenant_a,
+            code="ROOM-F2-SCADA",
+            name="Phòng SCADA Tầng 2",
+            location_type="ROOM",
+            floor_level=2,
+            center_x=80.0,
+            center_y=30.0
+        )
+
+        wo_f1 = self._create_wo("Bảo trì máy ép T1", incident_location=loc_f1, priority="HIGH")
+        wo_f2 = self._create_wo("Kiểm tra máy chủ SCADA T2", incident_location=loc_f2, priority="HIGH")
+
+        service = TSPRoutingService(tenant=self.tenant_a)
+        res = service.optimize_daily_route(
+            technician=None,
+            work_orders=[wo_f1, wo_f2],
+            start_location_id=str(loc_f1.id),
+            return_to_depot=False
+        )
+
+        self.assertTrue(res['success'])
+        ordered_stops = res['data']['orderedStops']
+        self.assertGreaterEqual(len(ordered_stops), 2)
+
+        # Kiểm tra sự tồn tại của floorTransition khi chuyển từ Tầng 1 lên Tầng 2 hoặc ngược lại
+        transitions = [s['floorTransition'] for s in ordered_stops if 'floorTransition' in s]
+        self.assertGreaterEqual(len(transitions), 1)
+        t = transitions[0]
+        self.assertEqual(t['transitionType'], 'STAIRS')
+        self.assertIn(t['direction'], ['UP', 'DOWN'])
+        self.assertIn('Chuyển sang Tầng', t['actionLabel'])
+
+

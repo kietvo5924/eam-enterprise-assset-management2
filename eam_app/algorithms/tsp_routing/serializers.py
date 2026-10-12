@@ -24,6 +24,7 @@ class ReRouteMidShiftRequestSerializer(serializers.Serializer):
     currentCoords = serializers.DictField(required=False, allow_null=True)
     actionTrigger = serializers.CharField(required=False, default="MANUAL")
     includeWarehousePitstop = serializers.BooleanField(required=False, default=False)
+    pitstopLocationId = serializers.CharField(required=False, allow_null=True)
     completedWorkOrderIds = serializers.ListField(
         child=serializers.CharField(),
         required=False,

@@ -47,9 +47,10 @@
         <tr>
           <th class="px-3.5 py-2.5 font-semibold cursor-pointer" onclick="sortTable(0)">Tên vật tư <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
           <th class="px-3.5 py-2.5 font-semibold cursor-pointer" onclick="sortTable(1)">Mã phụ tùng (SKU) <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-3.5 py-2.5 font-semibold">Khu vực lưu trữ</th>
           <th class="px-3.5 py-2.5 font-semibold">Mô tả</th>
-          <th class="px-3.5 py-2.5 font-semibold cursor-pointer" onclick="sortTable(3, true)">Tồn kho <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
-          <th class="px-3.5 py-2.5 font-semibold cursor-pointer" onclick="sortTable(4, true)">Đơn giá ($) <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-3.5 py-2.5 font-semibold cursor-pointer" onclick="sortTable(4, true)">Tồn kho <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
+          <th class="px-3.5 py-2.5 font-semibold cursor-pointer" onclick="sortTable(5, true)">Đơn giá ($) <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
           <th class="px-3.5 py-2.5 font-semibold">Thao tác</th>
         </tr>
       </thead>
@@ -58,13 +59,24 @@
         <tr class="hover:bg-neutral-50/50 transition-colors group" data-qty="{{ part.quantity_in_stock|floatformat:0 }}">
           <td class="px-3.5 py-2.5 font-semibold text-neutral-800 name-cell">{{ part.name }}</td>
           <td class="px-3.5 py-2.5 text-neutral-600 part-cell font-mono">{{ part.part_number|default:"" }}</td>
+          <td class="px-3.5 py-2.5 text-neutral-600">
+            {% if part.location %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200/60 font-medium text-xs">
+              <i class="ph-bold ph-map-pin text-amber-600"></i>
+              <span>{{ part.location.name }}</span>
+              {% if part.location.floor_level %}<span class="text-[10px] text-amber-600/70 font-semibold">(T{{ part.location.floor_level }})</span>{% endif %}
+            </span>
+            {% else %}
+            <span class="text-neutral-400 text-xs italic">Chưa chỉ định</span>
+            {% endif %}
+          </td>
           <td class="px-3.5 py-2.5 text-neutral-600">{{ part.description|default:"" }}</td>
           <td class="px-3.5 py-2.5 text-neutral-600 font-semibold">{{ part.quantity_in_stock|floatformat:0 }}</td>
           <td class="px-3.5 py-2.5 text-neutral-600">{% if part.unit_cost %}${{ part.unit_cost|floatformat:2 }}{% else %}-{% endif %}</td>
           <td class="px-3.5 py-2.5">
             <div class="flex gap-2.5 items-center">
               {% if 'inventory:update' in user_permissions %}
-              <button onclick="openInventoryModal('{{ part.id }}', '{{ part.name|escapejs }}', '{{ part.part_number|escapejs }}', '{{ part.description|escapejs }}', '{{ part.quantity_in_stock }}', '{{ part.unit_cost }}')" class="text-neutral-400 hover:text-primary transition-colors" title="Edit" aria-label="Sửa vật tư">
+              <button onclick="openInventoryModal('{{ part.id }}', '{{ part.name|escapejs }}', '{{ part.part_number|escapejs }}', '{{ part.description|escapejs }}', '{{ part.quantity_in_stock }}', '{{ part.unit_cost }}', '{{ part.location_id|default:'' }}')" class="text-neutral-400 hover:text-primary transition-colors" title="Edit" aria-label="Sửa vật tư">
                 <i class="ph-bold ph-pencil-simple text-base"></i>
               </button>
               {% endif %}
@@ -81,7 +93,7 @@
         </tr>
         {% empty %}
         <tr id="empty-row">
-          <td colspan="6" class="px-4 py-10 text-center text-neutral-500">
+          <td colspan="7" class="px-4 py-10 text-center text-neutral-500">
             <div class="flex flex-col items-center justify-center">
               <i class="ph ph-package text-3xl text-neutral-300 mb-2"></i>
               <p class="text-sm font-semibold text-neutral-700 m-0">Chưa có vật tư phụ tùng nào</p>
@@ -127,6 +139,24 @@
         <div>
           <label class="block text-xs font-semibold text-neutral-700 mb-1">Mã phụ tùng (SKU) <span class="text-danger">*</span></label>
           <input type="text" id="inv-part-number" required placeholder="Ví dụ: FLT-001" class="w-full px-3.5 py-2 border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary hover:border-primary transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-neutral-700 mb-1">Mặt bằng (Tùy chọn lọc khu vực)</label>
+          <select id="inv-floorplan" onchange="filterInventoryLocations()" class="w-full px-3.5 py-2 border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary hover:border-primary transition-colors">
+            <option value="">-- Tất cả mặt bằng / Chọn để lọc --</option>
+            {% for fp in floorplans %}
+            <option value="{{ fp.id }}">{{ fp.name }} [{{ fp.code }}]</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-neutral-700 mb-1">Khu vực / Nơi cất giữ vật tư</label>
+          <select id="inv-location" class="w-full px-3.5 py-2 border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary hover:border-primary transition-colors">
+            <option value="">-- Mặc định / Chưa chỉ định khu vực --</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }} [{{ loc.code }}]{% if loc.floor_level %} - Tầng {{ loc.floor_level }}{% endif %}</option>
+            {% endfor %}
+          </select>
         </div>
         <div>
           <label class="block text-xs font-semibold text-neutral-700 mb-1">Mô tả chi tiết</label>
@@ -267,7 +297,34 @@
     filterTable();
   }
 
-  function openInventoryModal(id='', name='', part_number='', desc='', quantity='', cost='') {
+  const INV_LOCATIONS = {{ locations_json|default:'[]'|safe }};
+
+  function filterInventoryLocations(targetLocId = '') {
+      const fpSelect = document.getElementById('inv-floorplan');
+      const fpId = fpSelect ? fpSelect.value : '';
+      const locSelect = document.getElementById('inv-location');
+      if (!locSelect) return;
+      
+      const curVal = targetLocId || locSelect.value;
+      locSelect.innerHTML = '<option value="">-- Mặc định / Chưa chỉ định khu vực --</option>';
+      
+      const availableLocs = INV_LOCATIONS.filter(l => l.zone_type !== 'FLOORPLAN');
+      const filtered = fpId 
+          ? availableLocs.filter(l => String(l.parent_id) === String(fpId) || String(l.id) === String(fpId))
+          : availableLocs;
+          
+      filtered.forEach(loc => {
+          const opt = document.createElement('option');
+          opt.value = loc.id;
+          opt.innerText = `${loc.name} [${loc.code || ''}]` + (loc.floor_level ? ` - Tầng ${loc.floor_level}` : '');
+          if (String(loc.id) === String(curVal)) {
+              opt.selected = true;
+          }
+          locSelect.appendChild(opt);
+      });
+  }
+
+  function openInventoryModal(id='', name='', part_number='', desc='', quantity='', cost='', location_id='') {
       document.getElementById('inventory-modal').classList.remove('hidden');
       document.getElementById('inv-id').value = id;
       document.getElementById('inv-name').value = name;
@@ -276,6 +333,19 @@
       document.getElementById('inv-quantity').value = quantity !== 'None' ? quantity : '0';
       document.getElementById('inv-unit-cost').value = cost !== 'None' && cost ? cost : '0.00';
       
+      if (location_id) {
+          const matched = INV_LOCATIONS.find(l => String(l.id) === String(location_id));
+          if (matched && matched.parent_id) {
+              if (document.getElementById('inv-floorplan')) document.getElementById('inv-floorplan').value = matched.parent_id;
+          } else {
+              if (document.getElementById('inv-floorplan')) document.getElementById('inv-floorplan').value = '';
+          }
+          filterInventoryLocations(location_id);
+      } else {
+          if (document.getElementById('inv-floorplan')) document.getElementById('inv-floorplan').value = '';
+          filterInventoryLocations('');
+      }
+      
       document.getElementById('inv-modal-title').innerText = id ? 'Cập Nhật Vật Tư / Phụ Tùng' : 'Thêm Mới Vật Tư / Phụ Tùng';
       document.getElementById('inv-msg').classList.add('hidden');
   }
@@ -283,6 +353,10 @@
   function closeInventoryModal() {
       document.getElementById('inventory-modal').classList.add('hidden');
       document.getElementById('inv-form').reset();
+      if (document.getElementById('inv-floorplan')) {
+          document.getElementById('inv-floorplan').value = '';
+      }
+      filterInventoryLocations('');
   }
 
   function saveInventory() {
@@ -306,6 +380,7 @@
           name: name,
           part_number: partNum,
           description: document.getElementById('inv-desc').value,
+          location_id: document.getElementById('inv-location')?.value || null,
           quantity_in_stock: parseFloat(qty),
           unit_cost: parseFloat(cost)
       };

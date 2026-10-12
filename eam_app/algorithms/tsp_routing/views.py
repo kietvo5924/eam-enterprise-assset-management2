@@ -218,6 +218,7 @@ class ReRouteMidShiftView(APIView):
             completed_work_order_ids=data.get('completedWorkOrderIds', []),
             remaining_work_orders=rem_wos,
             include_warehouse_pitstop=data.get('includeWarehousePitstop', False),
+            pitstop_location_id=data.get('pitstopLocationId'),
             return_to_depot=data.get('returnToDepot', True),
             start_time_minutes=start_time_mins,
         )

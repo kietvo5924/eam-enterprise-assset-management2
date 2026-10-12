@@ -479,6 +479,40 @@
         </div>
       </div>
 
+      <!-- Danh mục Chủng loại Công cụ & Nơi cất giữ -->
+      <div class="p-4 bg-neutral-50/70 border-b border-neutral-200">
+        <div class="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+          <span>Chủng loại Công cụ & Nơi cất giữ ({{ tools|length }})</span>
+          <span class="text-[11px] text-neutral-400 font-normal">Tự động định tuyến trạm lấy khi Work Order yêu cầu</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {% for t in tools %}
+          <div class="bg-white p-3 rounded-xl border border-neutral-200/80 shadow-xs flex items-center justify-between">
+            <div class="min-w-0 flex-1 pr-2">
+              <div class="font-bold text-xs text-neutral-800 truncate">{{ t.name }}</div>
+              <div class="text-[11px] font-mono text-neutral-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                <span class="text-sky-700 font-semibold">{{ t.code }}</span>
+                <span>•</span>
+                <span>SL: {{ t.available_quantity }}</span>
+                {% if t.location %}
+                <span class="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-semibold inline-flex items-center gap-0.5 border border-amber-200/50">
+                  <i class="ph-bold ph-map-pin text-[10px]"></i> {{ t.location.name }}{% if t.location.floor_level %} (T{{ t.location.floor_level }}){% endif %}
+                </span>
+                {% else %}
+                <span class="text-neutral-400 italic">Kho tổng / Chưa gán</span>
+                {% endif %}
+              </div>
+            </div>
+            {% if can_manage_tools %}
+            <button type="button" onclick="openToolModal('{{ t.id }}', '{{ t.code|escapejs }}', '{{ t.name|escapejs }}', '{{ t.available_quantity }}', '{{ t.location_id|default:'' }}')" class="px-2 py-1 text-xs text-neutral-600 hover:text-primary hover:bg-neutral-50 border border-neutral-200 rounded-lg transition shrink-0" title="Sửa thông tin hoặc nơi cất giữ">
+              <i class="ph ph-pencil-simple"></i> Sửa
+            </button>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
       <!-- Table Tool Instances -->
       <div class="overflow-x-auto flex-1">
         <table class="w-full text-left text-sm">
@@ -500,7 +534,14 @@
               <!-- Công cụ cha -->
               <td class="py-3.5 px-4 font-semibold text-neutral-900">
                 <div>{{ inst.tool.name }}</div>
-                <div class="font-mono text-xs text-sky-700 font-bold">{{ inst.tool.code }}</div>
+                <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span class="font-mono text-xs text-sky-700 font-bold">{{ inst.tool.code }}</span>
+                  {% if inst.tool.location %}
+                  <span class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/50">
+                    <i class="ph-bold ph-map-pin text-[10px]"></i> {{ inst.tool.location.name }}
+                  </span>
+                  {% endif %}
+                </div>
               </td>
               <!-- Serial -->
               <td class="py-3.5 px-4 font-mono font-bold text-neutral-800">{{ inst.serial_number }}</td>
@@ -927,6 +968,24 @@
         <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số lượng khả dụng mặc định *</label>
         <input type="number" id="tool-qty" value="1" min="1" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
       </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mặt bằng (Tùy chọn lọc khu vực)</label>
+        <select id="tool-floorplan" onchange="filterToolLocations()" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+          <option value="">-- Tất cả mặt bằng / Chọn để lọc --</option>
+          {% for fp in floorplans %}
+          <option value="{{ fp.id }}">{{ fp.name }} [{{ fp.code }}]</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Khu vực / Nơi cất giữ công cụ</label>
+        <select id="tool-location" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+          <option value="">-- Mặc định tại Kho tổng / Chưa chỉ định --</option>
+          {% for loc in locations %}
+          <option value="{{ loc.id }}">{{ loc.name }} [{{ loc.code }}]{% if loc.floor_level %} - Tầng {{ loc.floor_level }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
         <button type="button" onclick="closeModal('modal-tool')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
         <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Dòng Công cụ</button>
@@ -1268,10 +1327,51 @@ async function submitSchedule(e) {
 }
 
 // 5. Tool & Tool Instance Actions
-function openToolModal() {
+function filterToolLocations(targetLocId = '') {
+  const fpId = document.getElementById('tool-floorplan')?.value;
+  const locSelect = document.getElementById('tool-location');
+  if (!locSelect) return;
+
+  const curVal = targetLocId || locSelect.value;
+  locSelect.innerHTML = '<option value="">-- Mặc định tại Kho tổng / Chưa chỉ định --</option>';
+
+  const availableLocs = LOCATIONS_DATA.filter(l => l.zone_type !== 'FLOORPLAN');
+  const filtered = fpId
+    ? availableLocs.filter(l => String(l.parent_id) === String(fpId) || String(l.id) === String(fpId))
+    : availableLocs;
+
+  filtered.forEach(loc => {
+    const opt = document.createElement('option');
+    opt.value = loc.id;
+    opt.innerText = `${loc.name} [${loc.code || ''}]` + (loc.floor_level ? ` - Tầng ${loc.floor_level}` : '');
+    if (String(loc.id) === String(curVal)) {
+      opt.selected = true;
+    }
+    locSelect.appendChild(opt);
+  });
+}
+
+function openToolModal(id='', code='', name='', qty=1, locationId='') {
   document.getElementById('form-tool').reset();
-  document.getElementById('tool-id').value = '';
-  document.getElementById('tool-modal-title').innerText = 'Thêm Dòng Công cụ';
+  document.getElementById('tool-id').value = id;
+  document.getElementById('tool-code').value = code;
+  document.getElementById('tool-name').value = name;
+  document.getElementById('tool-qty').value = qty || 1;
+  
+  if (locationId) {
+    const matched = LOCATIONS_DATA.find(l => String(l.id) === String(locationId));
+    if (matched && matched.parent_id) {
+      if (document.getElementById('tool-floorplan')) document.getElementById('tool-floorplan').value = matched.parent_id;
+    } else {
+      if (document.getElementById('tool-floorplan')) document.getElementById('tool-floorplan').value = '';
+    }
+    filterToolLocations(locationId);
+  } else {
+    if (document.getElementById('tool-floorplan')) document.getElementById('tool-floorplan').value = '';
+    filterToolLocations('');
+  }
+  
+  document.getElementById('tool-modal-title').innerText = id ? 'Cập nhật Dòng Công cụ' : 'Thêm Dòng Công cụ';
   openModal('modal-tool');
 }
 async function submitTool(e) {
@@ -1280,7 +1380,8 @@ async function submitTool(e) {
     id: document.getElementById('tool-id').value || null,
     code: document.getElementById('tool-code').value,
     name: document.getElementById('tool-name').value,
-    available_quantity: document.getElementById('tool-qty').value
+    available_quantity: document.getElementById('tool-qty').value,
+    location_id: document.getElementById('tool-location')?.value || null
   };
   try {
     const res = await fetch("{% url 'portal_tools_api' %}", {

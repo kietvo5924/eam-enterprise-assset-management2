@@ -106,10 +106,12 @@ class RoutingNode:
             coords_y = getattr(loc, 'center_y', None)
 
         floor_number = 1
-        if loc and hasattr(loc, 'floor_number') and loc.floor_number:
-            floor_number = loc.floor_number
-        elif getattr(wo, 'asset', None) and getattr(wo.asset, 'floor_number', None):
-            floor_number = wo.asset.floor_number
+        if loc and (getattr(loc, 'floor_level', None) is not None or getattr(loc, 'floor_number', None) is not None):
+            floor_number = getattr(loc, 'floor_level', None) or getattr(loc, 'floor_number', 1) or 1
+        elif getattr(wo, 'floor_level', None) is not None:
+            floor_number = wo.floor_level or 1
+        elif getattr(wo, 'asset', None):
+            floor_number = getattr(wo.asset, 'floor_level', None) or getattr(wo.asset, 'floor_number', 1) or 1
 
         is_controlled = False
         if loc and getattr(loc, 'zone_type', '') in ('CONTROLLED', 'CLEANROOM'):

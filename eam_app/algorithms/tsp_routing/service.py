@@ -119,6 +119,11 @@ class TSPRoutingService:
         )
 
         nodes: List[RoutingNode] = [depot_node]
+
+        # Specialized Tool & Spare Part Pickup Stop injection (automatic resolution)
+        pickup_nodes = self._resolve_pickup_nodes(work_orders, exclude_location_id=str(start_loc.id) if start_loc else None)
+        nodes.extend(pickup_nodes)
+
         for wo in work_orders:
             wo_node = RoutingNode.from_work_order(wo, location_cache=self.distance_engine._location_cache)
             nodes.append(wo_node)
@@ -172,12 +177,13 @@ class TSPRoutingService:
         completed_work_order_ids: Optional[List[str]] = None,
         remaining_work_orders: Optional[List[WorkOrder]] = None,
         include_warehouse_pitstop: bool = False,
+        pitstop_location_id: Optional[str] = None,
         return_to_depot: bool = True,
         start_time_minutes: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Rule 7: Dynamic Mid-shift Re-routing from current location.
-        Rule 6: Intermediate Pit-Stop insertion for warehouse replenishment.
+        Rule 6: Intermediate Pit-Stop insertion for warehouse replenishment / tool pickup.
         """
         routing_enabled = getattr(self.tenant, 'enable_tsp_routing', True) if self.tenant else True
 
@@ -195,7 +201,7 @@ class TSPRoutingService:
 
         cx = current_coords.get('x') if current_coords else (getattr(curr_loc, 'center_x', 0.0) if curr_loc else 0.0)
         cy = current_coords.get('y') if current_coords else (getattr(curr_loc, 'center_y', 0.0) if curr_loc else 0.0)
-        curr_floor = getattr(curr_loc, 'floor_number', 1) if curr_loc else 1
+        curr_floor = getattr(curr_loc, 'floor_level', None) or getattr(curr_loc, 'floor_number', 1) if curr_loc else 1
 
         curr_node = RoutingNode(
             node_id="current_position",
@@ -211,16 +217,21 @@ class TSPRoutingService:
 
         nodes: List[RoutingNode] = [curr_node]
 
-        # Rule 6: Intermediate Pit-stop to warehouse
+        # Rule 6: Intermediate Pit-stop to warehouse / tool storage room
         if include_warehouse_pitstop:
-            wh_loc = self._get_warehouse_location()
+            wh_loc = None
+            if pitstop_location_id:
+                wh_loc = self.distance_engine.get_location(pitstop_location_id)
+            if not wh_loc:
+                wh_loc = self._get_warehouse_location()
             wh_x = getattr(wh_loc, 'center_x', 0.0) if wh_loc else 0.0
             wh_y = getattr(wh_loc, 'center_y', 0.0) if wh_loc else 0.0
-            wh_floor = getattr(wh_loc, 'floor_number', 1) if wh_loc else 1
+            wh_floor = getattr(wh_loc, 'floor_level', None) or getattr(wh_loc, 'floor_number', 1) if wh_loc else 1
+            wh_name = f"Trạm tiếp vận: {wh_loc.name if wh_loc else 'Kho vật tư'}"
             wh_node = RoutingNode(
                 node_id="warehouse_pitstop",
                 node_type=STOP_WAREHOUSE,
-                name=f"Trạm tiếp vận: {wh_loc.name if wh_loc else 'Kho vật tư'}",
+                name=wh_name,
                 location=wh_loc,
                 coords_x=wh_x,
                 coords_y=wh_y,
@@ -229,6 +240,10 @@ class TSPRoutingService:
                 estimated_duration_minutes=15.0,  # 15 minutes replenishment time
             )
             nodes.append(wh_node)
+        else:
+            curr_loc_id = str(curr_node.location.id) if curr_node.location else None
+            pickup_nodes = self._resolve_pickup_nodes(active_wos, exclude_location_id=curr_loc_id)
+            nodes.extend(pickup_nodes)
 
         # Append remaining work orders
         for wo in active_wos:
@@ -386,9 +401,25 @@ class TSPRoutingService:
             if node.node_type in (STOP_DEPOT, STOP_CURRENT_LOCATION):
                 stop_data['action'] = 'DEPART'
             elif node.node_type == STOP_WAREHOUSE:
-                stop_data['action'] = 'PICKUP_SUPPLIES'
+                if node.node_id.startswith('tool_pickup_'):
+                    stop_data['action'] = 'PICKUP_TOOLS'
+                else:
+                    stop_data['action'] = 'PICKUP_SUPPLIES'
             else:
                 stop_data['action'] = 'SERVICE'
+
+            if step_idx > 0:
+                prev_floor = ordered_stops[step_idx - 1].get('floorNumber')
+                curr_floor = stop_data.get('floorNumber')
+                if prev_floor and curr_floor and prev_floor != curr_floor:
+                    is_up = curr_floor > prev_floor
+                    stop_data['floorTransition'] = {
+                        'fromFloor': prev_floor,
+                        'toFloor': curr_floor,
+                        'direction': 'UP' if is_up else 'DOWN',
+                        'transitionType': 'STAIRS',
+                        'actionLabel': f"Chuyển sang Tầng {curr_floor}"
+                    }
 
             ordered_stops.append(stop_data)
 
@@ -406,3 +437,122 @@ class TSPRoutingService:
                 'orderedStops': ordered_stops,
             }
         }
+
+    def _resolve_pickup_nodes(self, work_orders, exclude_location_id=None) -> List[RoutingNode]:
+        """
+        Automatically resolves tool and spare part storage locations for the given work orders
+        and generates high-priority pickup stops.
+        """
+        from assets.models import Tool, SparePart
+        pickup_nodes: List[RoutingNode] = []
+        seen_loc_ids = set()
+        if exclude_location_id:
+            seen_loc_ids.add(str(exclude_location_id))
+
+        # 1. Collect required tool codes and required spare parts across all work orders
+        tool_code_to_wos = {}
+        part_ref_to_wos = {}
+        for wo in work_orders:
+            req_tools = getattr(wo, 'required_tools', None) or []
+            for t_code in req_tools:
+                if t_code:
+                    tool_code_to_wos.setdefault(str(t_code).strip(), []).append(wo)
+
+            req_parts = getattr(wo, 'required_spare_parts', None) or []
+            for p_ref in req_parts:
+                if p_ref:
+                    part_ref_to_wos.setdefault(str(p_ref).strip(), []).append(wo)
+
+        # 2. Query Tools and their locations
+        if tool_code_to_wos:
+            tenant_filter = {'tenant': self.tenant} if self.tenant else {}
+            tools_qs = Tool.objects.filter(code__in=list(tool_code_to_wos.keys()), is_active=True, **tenant_filter).select_related('location')
+            loc_to_tool_names = {}
+            for t in tools_qs:
+                if t.location:
+                    loc_to_tool_names.setdefault(t.location, []).append(t.name)
+            
+            for loc, t_names in loc_to_tool_names.items():
+                lid = str(loc.id)
+                if lid not in seen_loc_ids:
+                    seen_loc_ids.add(lid)
+                    tx = getattr(loc, 'center_x', 0.0) or 0.0
+                    ty = getattr(loc, 'center_y', 0.0) or 0.0
+                    t_floor = getattr(loc, 'floor_level', None) or getattr(loc, 'floor_number', 1) or 1
+                    t_summary = ", ".join(t_names[:2])
+                    pickup_nodes.append(RoutingNode(
+                        node_id=f"tool_pickup_{loc.id}",
+                        node_type=STOP_WAREHOUSE,
+                        name=f"Lấy dụng cụ chuyên dụng ({t_summary}): {loc.name}",
+                        location=loc,
+                        coords_x=tx,
+                        coords_y=ty,
+                        floor_number=t_floor,
+                        priority='HIGH',
+                        estimated_duration_minutes=5.0,
+                    ))
+
+        # Fallback for wo.tool_pickup_location if any work orders specified it
+        for wo in work_orders:
+            req_tools = getattr(wo, 'required_tools', None) or []
+            tool_loc = getattr(wo, 'tool_pickup_location', None)
+            if req_tools and tool_loc and str(tool_loc.id) not in seen_loc_ids:
+                seen_loc_ids.add(str(tool_loc.id))
+                tx = getattr(tool_loc, 'center_x', 0.0) or 0.0
+                ty = getattr(tool_loc, 'center_y', 0.0) or 0.0
+                t_floor = getattr(tool_loc, 'floor_level', None) or getattr(tool_loc, 'floor_number', 1) or 1
+                tool_names = ", ".join(str(t) for t in req_tools[:2])
+                pickup_nodes.append(RoutingNode(
+                    node_id=f"tool_pickup_{tool_loc.id}",
+                    node_type=STOP_WAREHOUSE,
+                    name=f"Lấy dụng cụ chuyên dụng ({tool_names}): {tool_loc.name}",
+                    location=tool_loc,
+                    coords_x=tx,
+                    coords_y=ty,
+                    floor_number=t_floor,
+                    priority='HIGH',
+                    estimated_duration_minutes=5.0,
+                ))
+
+        # 3. Query Spare Parts and their locations
+        if part_ref_to_wos:
+            from django.db.models import Q
+            tenant_filter = {'tenant': self.tenant} if self.tenant else {}
+            part_refs = list(part_ref_to_wos.keys())
+            valid_uuids = []
+            for r in part_refs:
+                try:
+                    import uuid
+                    uuid.UUID(r)
+                    valid_uuids.append(r)
+                except ValueError:
+                    pass
+
+            q_filter = Q(id__in=valid_uuids) | Q(part_number__in=part_refs)
+            parts_qs = SparePart.objects.filter(q_filter, **tenant_filter).select_related('location')
+            loc_to_part_names = {}
+            for p in parts_qs:
+                if p.location:
+                    loc_to_part_names.setdefault(p.location, []).append(p.name)
+
+            for loc, p_names in loc_to_part_names.items():
+                lid = str(loc.id)
+                if lid not in seen_loc_ids:
+                    seen_loc_ids.add(lid)
+                    px = getattr(loc, 'center_x', 0.0) or 0.0
+                    py = getattr(loc, 'center_y', 0.0) or 0.0
+                    p_floor = getattr(loc, 'floor_level', None) or getattr(loc, 'floor_number', 1) or 1
+                    p_summary = ", ".join(p_names[:2])
+                    pickup_nodes.append(RoutingNode(
+                        node_id=f"part_pickup_{loc.id}",
+                        node_type=STOP_WAREHOUSE,
+                        name=f"Lấy vật tư/phụ tùng ({p_summary}): {loc.name}",
+                        location=loc,
+                        coords_x=px,
+                        coords_y=py,
+                        floor_number=p_floor,
+                        priority='HIGH',
+                        estimated_duration_minutes=5.0,
+                    ))
+
+        return pickup_nodes
