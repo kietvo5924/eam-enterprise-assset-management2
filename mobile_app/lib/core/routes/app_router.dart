@@ -10,6 +10,7 @@ import '../../features/work_orders/screens/work_order_detail_screen.dart';
 import '../../features/scanner/screens/qr_scanner_screen.dart';
 import '../../features/dashboard/screens/equipment_detail_screen.dart';
 import '../../features/dashboard/screens/floorplan_viewer_screen.dart';
+import '../../features/work_orders/screens/technician_route_screen.dart';
 
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -82,6 +83,14 @@ class AppRouter {
             builder: (context, state) {
               final equipment = state.extra as Map<String, dynamic>;
               return EquipmentDetailScreen(equipment: equipment);
+            },
+          ),
+          GoRoute(
+            path: 'technician-route',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>?;
+              final workOrderIds = extra?['workOrderIds'] as List<String>?;
+              return TechnicianRouteScreen(initialWorkOrderIds: workOrderIds);
             },
           ),
         ],

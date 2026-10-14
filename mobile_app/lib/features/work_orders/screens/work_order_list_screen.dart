@@ -78,6 +78,13 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.neutral900),
+        actions: [
+          IconButton(
+            icon: Icon(PhosphorIcons.navigationArrow(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+            tooltip: 'Sơ đồ lộ trình KTV',
+            onPressed: () => context.push('/technician-route'),
+          ),
+        ],
       ),
       floatingActionButton: canCreate
           ? FloatingActionButton(
@@ -153,6 +160,77 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
                             ),
                           );
                         }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Banner sơ đồ lộ trình di chuyển tối ưu KTV
+                    InkWell(
+                      onTap: () => context.push('/technician-route'),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0284c7), Color(0xFF0369a1)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0284c7).withValues(alpha: 0.25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(PhosphorIcons.navigationArrow(PhosphorIconsStyle.fill), color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Sơ đồ di chuyển tối ưu KTV',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  Text(
+                                    'Điều hướng trực giao 2D qua các trạm bảo trì',
+                                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Xem ngay',
+                                    style: TextStyle(color: Color(0xFF0284c7), fontWeight: FontWeight.bold, fontSize: 11),
+                                  ),
+                                  SizedBox(width: 2),
+                                  Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF0284c7)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

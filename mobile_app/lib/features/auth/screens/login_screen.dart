@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
 
@@ -326,6 +327,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: Colors.white,
                                   ),
                                 ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setString('username', 'ktv.minhnv');
+                          await prefs.setString('roles', 'TECHNICIAN,ADMIN');
+                          await prefs.setString('tenantId', 'demo-tenant-id');
+                          await prefs.setBool('isLoggedIn', true);
+                          if (mounted) context.go('/');
+                        },
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 44),
+                          side: const BorderSide(color: Color(0xFF0284c7), width: 1.2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          backgroundColor: Colors.white.withValues(alpha: 0.8),
+                        ),
+                        icon: Icon(PhosphorIcons.navigationArrow(PhosphorIconsStyle.bold), size: 16, color: const Color(0xFF0284c7)),
+                        label: const Text(
+                          'Trải nghiệm Sơ đồ KTV (Demo)',
+                          style: TextStyle(color: Color(0xFF0284c7), fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ),
                     ],
