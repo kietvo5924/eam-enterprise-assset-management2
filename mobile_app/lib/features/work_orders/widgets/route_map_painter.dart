@@ -10,10 +10,10 @@ class RouteMapPainter extends CustomPainter {
   final double animationProgress; // 0.0 -> 1.0 for dash animation & pulsing
   final double pulseValue; // 0.0 -> 1.0 for active stop pulsing ring
 
-  static const double canvasWidth = 1000.0;
-  static const double canvasHeight = 700.0;
-  static const double midHallY = 320.0;
-  static const Offset stairPoint = Offset(507.0, midHallY);
+  static const double canvasWidth = 1100.0;
+  static const double canvasHeight = 750.0;
+  static const double midHallY = 345.0;
+  static const Offset stairPoint = Offset(530.0, midHallY);
 
   RouteMapPainter({
     required this.routeData,
@@ -24,7 +24,7 @@ class RouteMapPainter extends CustomPainter {
     this.pulseValue = 0.0,
   });
 
-  /// Chuyển đổi tọa độ trạm dừng sang tọa độ pixel trên canvas 1000x700
+  /// Chuyển đổi tọa độ trạm dừng sang tọa độ pixel trên canvas 1100x750
   static Offset getStopCanvasOffset(RouteStop stop, int index) {
     if (stop.coords != null && stop.coords!.x > 0 && stop.coords!.y > 0) {
       double rawX = stop.coords!.x;
@@ -32,22 +32,22 @@ class RouteMapPainter extends CustomPainter {
 
       // Nếu tọa độ tính theo mét (0 - 220m, 0 - 130m)
       if (rawX <= 250 && rawY <= 150) {
-        double px = 60.0 + (rawX / 220.0) * 880.0;
-        double py = 60.0 + (rawY / 130.0) * 580.0;
-        return Offset(px.clamp(70.0, 930.0), py.clamp(70.0, 630.0));
+        double px = 90.0 + (rawX / 220.0) * 920.0;
+        double py = 105.0 + (rawY / 130.0) * 520.0;
+        return Offset(px.clamp(80.0, 1020.0), py.clamp(90.0, 650.0));
       }
-      return Offset(rawX.clamp(70.0, 930.0), rawY.clamp(70.0, 630.0));
+      return Offset(rawX.clamp(80.0, 1020.0), rawY.clamp(90.0, 650.0));
     }
 
-    // Tọa độ mặc định phân bổ đẹp theo lưới phân xưởng nếu không có tọa độ cụ thể
+    // Tọa độ mặc định phân bổ đẹp theo lưới 6 phân xưởng nếu không có tọa độ cụ thể
     final defaultPositions = [
-      const Offset(140.0, 510.0), // 0: Depot / Kho
-      const Offset(200.0, 190.0), // 1: Xưởng Dập
-      const Offset(480.0, 190.0), // 2: Xưởng Hàn
-      const Offset(310.0, 510.0), // 3: Kho Vật tư
-      const Offset(780.0, 190.0), // 4: Xưởng Lắp ráp
-      const Offset(720.0, 510.0), // 5: Khu QC
-      const Offset(140.0, 510.0), // 6: Quay về Depot
+      const Offset(619.0, 525.0), // 0: Depot / Kho CKD
+      const Offset(213.0, 205.0), // 1: Xưởng Dập
+      const Offset(507.0, 205.0), // 2: Xưởng Hàn
+      const Offset(619.0, 525.0), // 3: Kho Vật tư CKD
+      const Offset(278.0, 515.0), // 4: Xưởng Lắp ráp
+      const Offset(844.0, 205.0), // 5: Xưởng Sơn
+      const Offset(619.0, 525.0), // 6: Quay về Depot
     ];
     int posIndex = index % defaultPositions.length;
     return defaultPositions[posIndex];
@@ -64,7 +64,7 @@ class RouteMapPainter extends CustomPainter {
     // 3. Các phân khu (Child Zones) trên tầng hiện tại
     _drawZones(canvas, size);
 
-    // 4. Trục hành lang chính vận chuyển (Central Aisle line tại midHallY = 320)
+    // 4. Trục hành lang chính vận chuyển (Central Aisle line tại midHallY = 345)
     _drawCentralAisle(canvas, size);
 
     // 5. Lớp thiết bị / máy móc (nếu showMachines == true)
@@ -92,12 +92,12 @@ class RouteMapPainter extends CustomPainter {
       ..strokeWidth = 0.8;
 
     // Lưới dọc mỗi 40px
-    for (double x = 50; x <= 950; x += 40) {
-      canvas.drawLine(Offset(x, 50), Offset(x, 650), gridPaint);
+    for (double x = 60; x <= 1040; x += 40) {
+      canvas.drawLine(Offset(x, 65), Offset(x, 685), gridPaint);
     }
     // Lưới ngang mỗi 40px
-    for (double y = 50; y <= 650; y += 40) {
-      canvas.drawLine(Offset(50, y), Offset(950, y), gridPaint);
+    for (double y = 65; y <= 685; y += 40) {
+      canvas.drawLine(Offset(60, y), Offset(1040, y), gridPaint);
     }
 
     // Vạch chia thước đo mét phía trên và bên trái
@@ -109,40 +109,40 @@ class RouteMapPainter extends CustomPainter {
     );
 
     for (int m = 0; m <= 220; m += 20) {
-      double px = 50.0 + (m / 220.0) * 900.0;
+      double px = 90.0 + (m / 220.0) * 920.0;
       final tickPaint = Paint()
         ..color = const Color(0xFF475569)
         ..strokeWidth = 1.0;
-      canvas.drawLine(Offset(px, 44), Offset(px, 50), tickPaint);
+      canvas.drawLine(Offset(px, 59), Offset(px, 65), tickPaint);
 
       final textSpan = TextSpan(text: '${m}m', style: rulerTextPaint);
       final textPainter = TextPainter(
         text: textSpan,
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, Offset(px - textPainter.width / 2, 32));
+      textPainter.paint(canvas, Offset(px - textPainter.width / 2, 47));
     }
 
     for (int m = 0; m <= 130; m += 20) {
-      double py = 50.0 + (m / 130.0) * 600.0;
+      double py = 105.0 + (m / 130.0) * 520.0;
       final tickPaint = Paint()
         ..color = const Color(0xFF475569)
         ..strokeWidth = 1.0;
-      canvas.drawLine(Offset(44, py), Offset(50, py), tickPaint);
+      canvas.drawLine(Offset(54, py), Offset(60, py), tickPaint);
 
       final textSpan = TextSpan(text: '${m}m', style: rulerTextPaint);
       final textPainter = TextPainter(
         text: textSpan,
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, Offset(24, py - textPainter.height / 2));
+      textPainter.paint(canvas, Offset(32, py - textPainter.height / 2));
     }
   }
 
   /// 2. Vẽ viền bao tòa nhà phân xưởng
   void _drawBuildingEnvelope(Canvas canvas, Size size) {
     final buildingRect = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(50, 50, 900, 600),
+      const Rect.fromLTWH(60, 65, 980, 620),
       const Radius.circular(8),
     );
 
@@ -157,20 +157,9 @@ class RouteMapPainter extends CustomPainter {
       ..strokeWidth = 2.5;
     canvas.drawRRect(buildingRect, borderPaint);
 
-    // Huy hiệu tên phân xưởng & tầng ở góc trên
-    final badgeRect = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(310, 14, 380, 24),
-      const Radius.circular(6),
-    );
-    canvas.drawRRect(badgeRect, Paint()..color = const Color(0xFF0f172a));
-    canvas.drawRRect(badgeRect, Paint()
-      ..color = const Color(0xFF0284c7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2);
-
     final facilityTitle = (routeData.detectedFloorplanName != null && routeData.detectedFloorplanName!.isNotEmpty)
         ? routeData.detectedFloorplanName!.toUpperCase()
-        : 'PHÂN XƯỞNG SẢN XUẤT THIẾT BỊ';
+        : 'TỔ HỢP NHÀ MÁY SẢN XUẤT VINFAST';
     final titleSpan = TextSpan(
       text: '🏢 $facilityTitle - TẦNG $currentFloor',
       style: const TextStyle(
@@ -185,22 +174,39 @@ class RouteMapPainter extends CustomPainter {
       text: titleSpan,
       textDirection: TextDirection.ltr,
     )..layout();
-    titlePainter.paint(canvas, Offset(500 - titlePainter.width / 2, 26 - titlePainter.height / 2));
+
+    // Huy hiệu tên phân xưởng & tầng ở góc trên - tự động co giãn bao trọn toàn bộ tiêu đề
+    final double badgeWidth = titlePainter.width + 36.0;
+    final double badgeLeft = 550.0 - badgeWidth / 2.0;
+    final badgeRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(badgeLeft, 22, badgeWidth, 26),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(badgeRect, Paint()..color = const Color(0xFF0f172a));
+    canvas.drawRRect(badgeRect, Paint()
+      ..color = const Color(0xFF0284c7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2);
+
+    titlePainter.paint(canvas, Offset(550 - titlePainter.width / 2, 35 - titlePainter.height / 2));
   }
 
   /// 3. Vẽ các phân khu chức năng (Child Zones) theo tầng
   void _drawZones(Canvas canvas, Size size) {
     if (currentFloor == 1) {
-      _drawZoneRect(canvas, const Rect.fromLTWH(70, 70, 260, 225), 'PHÂN XƯỞNG DẬP (STAMPING)', const Color(0xFF0284c7), const Color(0x240ea5e9));
-      _drawZoneRect(canvas, const Rect.fromLTWH(360, 70, 270, 225), 'PHÂN XƯỞNG HÀN & SƠN', const Color(0xFF0d9488), const Color(0x2414b8a6));
-      _drawZoneRect(canvas, const Rect.fromLTWH(660, 70, 270, 225), 'PHÂN XƯỞNG LẮP RÁP', const Color(0xFF6366f1), const Color(0x246366f1));
-      _drawZoneRect(canvas, const Rect.fromLTWH(70, 400, 380, 230), 'KHO VẬT TƯ & TIẾP VẬN CKD', const Color(0xFFd97706), const Color(0x24f59e0b));
-      _drawZoneRect(canvas, const Rect.fromLTWH(480, 400, 450, 230), 'KHU VỰC KIỂM TRA CHẤT LƯỢNG QC', const Color(0xFF0891b2), const Color(0x2406b6d4));
+      // Hàng trên (Top Row)
+      _drawZoneRect(canvas, const Rect.fromLTWH(80, 85, 280, 240), 'PHÂN XƯỞNG DẬP (STAMPING)', const Color(0xFF0284c7), const Color(0x240ea5e9));
+      _drawZoneRect(canvas, const Rect.fromLTWH(375, 85, 320, 240), 'PHÂN XƯỞNG HÀN THÂN VỎ', const Color(0xFF0d9488), const Color(0x2414b8a6));
+      _drawZoneRect(canvas, const Rect.fromLTWH(710, 85, 310, 240), 'XƯỞNG SƠN NHÚNG & PHỦ BÓNG', const Color(0xFF6366f1), const Color(0x246366f1));
+      // Hàng dưới (Bottom Row)
+      _drawZoneRect(canvas, const Rect.fromLTWH(80, 365, 360, 290), 'DÂY CHUYỀN LẮP RÁP HOÀN THIỆN', const Color(0xFF10b981), const Color(0x2410b981));
+      _drawZoneRect(canvas, const Rect.fromLTWH(455, 365, 315, 290), 'TỔNG KHO VẬT TƯ & TIẾP VẬN CKD', const Color(0xFFd97706), const Color(0x24f59e0b));
+      _drawZoneRect(canvas, const Rect.fromLTWH(785, 365, 235, 290), 'TRUNG TÂM KIỂM ĐỊNH CL (QA/QC)', const Color(0xFF0891b2), const Color(0x2406b6d4));
     } else {
-      _drawZoneRect(canvas, const Rect.fromLTWH(70, 70, 400, 225), 'PHÒNG ĐIỀU HÀNH SCADA & SERVER', const Color(0xFF9333ea), const Color(0x24a855f7));
-      _drawZoneRect(canvas, const Rect.fromLTWH(500, 70, 430, 225), 'PHÒNG THỬ NGHIỆM CHẤT LƯỢNG R&D', const Color(0xFF10b981), const Color(0x2410b981));
-      _drawZoneRect(canvas, const Rect.fromLTWH(70, 400, 430, 230), 'TRUNG TÂM BẢO TRÌ CƠ ĐIỆN TẦNG 2', const Color(0xFFd97706), const Color(0x24f59e0b));
-      _drawZoneRect(canvas, const Rect.fromLTWH(530, 400, 400, 230), 'PHÒNG NGHỈ & DỤNG CỤ KTV', const Color(0xFF0284c7), const Color(0x240ea5e9));
+      _drawZoneRect(canvas, const Rect.fromLTWH(80, 85, 450, 240), 'PHÒNG ĐIỀU HÀNH SCADA & SERVER', const Color(0xFF9333ea), const Color(0x24a855f7));
+      _drawZoneRect(canvas, const Rect.fromLTWH(550, 85, 470, 240), 'VĂN PHÒNG KỸ SƯ & R&D', const Color(0xFF10b981), const Color(0x2410b981));
+      _drawZoneRect(canvas, const Rect.fromLTWH(80, 365, 470, 290), 'TRUNG TÂM BẢO TRÌ CƠ ĐIỆN TẦNG 2', const Color(0xFFd97706), const Color(0x24f59e0b));
+      _drawZoneRect(canvas, const Rect.fromLTWH(570, 365, 450, 290), 'PHÒNG NGHỈ & DỤNG CỤ KTV', const Color(0xFF0284c7), const Color(0x240ea5e9));
     }
   }
 
@@ -240,10 +246,10 @@ class RouteMapPainter extends CustomPainter {
     tp.paint(canvas, Offset(rect.left + 16, rect.top + 17 - tp.height / 2));
   }
 
-  /// 4. Vẽ trục hành lang chính vận chuyển (Central Aisle line tại midHallY = 320)
+  /// 4. Vẽ trục hành lang chính vận chuyển (Central Aisle line tại midHallY = 345)
   void _drawCentralAisle(Canvas canvas, Size size) {
-    const startX = 65.0;
-    const endX = 935.0;
+    const startX = 75.0;
+    const endX = 1025.0;
 
     // Đường nét đứt hành lang
     final aislePaint = Paint()
@@ -260,7 +266,7 @@ class RouteMapPainter extends CustomPainter {
     const badgeW = 200.0;
     const badgeH = 18.0;
     final aisleBadgeRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(180.0, midHallY - (badgeH / 2), badgeW, badgeH),
+      Rect.fromLTWH(200.0, midHallY - (badgeH / 2), badgeW, badgeH),
       const Radius.circular(4),
     );
     canvas.drawRRect(aisleBadgeRect, Paint()..color = const Color(0xFF0f172a).withValues(alpha: 0.9));
@@ -283,7 +289,7 @@ class RouteMapPainter extends CustomPainter {
       text: span,
       textDirection: TextDirection.ltr,
     )..layout();
-    tp.paint(canvas, Offset(280.0 - tp.width / 2, midHallY - tp.height / 2));
+    tp.paint(canvas, Offset(300.0 - tp.width / 2, midHallY - tp.height / 2));
   }
 
   /// 5. Vẽ footprint các máy móc thiết bị trong xưởng

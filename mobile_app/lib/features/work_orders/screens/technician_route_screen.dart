@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/technician_route_model.dart';
 import '../services/tsp_routing_service.dart';
@@ -33,6 +35,9 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
   int _currentFloor = 1;
   int _selectedStopIndex = 0;
   bool _showMachines = true;
+
+  Size? _viewportSize;
+  bool _hasAutoFitted = false;
 
   // Cấu hình tham số lộ trình
   TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
@@ -151,7 +156,25 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
   }
 
   void _resetZoom() {
-    _transformController.value = Matrix4.identity();
+    if (_viewportSize != null) {
+      _fitMapToScreen(_viewportSize!.width, _viewportSize!.height);
+    } else {
+      _transformController.value = Matrix4.identity();
+    }
+  }
+
+  void _fitMapToScreen(double vw, double vh) {
+    if (vw <= 0 || vh <= 0) return;
+    final availableH = vh * 0.58;
+    final scaleX = (vw - 24) / RouteMapPainter.canvasWidth;
+    final scaleY = (availableH - 24) / RouteMapPainter.canvasHeight;
+    final fitScale = math.min(scaleX, scaleY).clamp(0.2, 1.0);
+
+    final dx = (vw - RouteMapPainter.canvasWidth * fitScale) / 2;
+    final dy = math.max(16.0, (availableH - RouteMapPainter.canvasHeight * fitScale) / 2);
+
+    _transformController.value = Matrix4.diagonal3Values(fitScale, fitScale, 1.0)
+      ..setTranslationRaw(dx, dy, 0.0);
   }
 
   void _adjustZoom(double factor) {
@@ -181,14 +204,16 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
   }
 
   void _centerCameraOnOffset(Offset point) {
-    const centerCanvasX = RouteMapPainter.canvasWidth / 2; // 500
-    const centerCanvasY = RouteMapPainter.canvasHeight / 2; // 350
+    final vw = _viewportSize?.width ?? 390.0;
+    final vh = (_viewportSize?.height ?? 600.0) * 0.60;
+    const currentScale = 0.75;
 
-    final dx = centerCanvasX - point.dx;
-    final dy = centerCanvasY - point.dy;
+    final dx = (vw / 2) - point.dx * currentScale;
+    final dy = (vh / 2) - point.dy * currentScale;
 
     _transformController.value = Matrix4.identity()
-      ..translateByDouble(dx, dy, 0.0, 1.0);
+      ..translateByDouble(dx, dy, 0.0, 1.0)
+      ..scaleByDouble(currentScale, currentScale, 1.0, 1.0);
   }
 
   void _scrollTimelineToStop(int index) {
@@ -279,6 +304,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
     setState(() => _isActionLoading = true);
     try {
       final route = await _routingService.optimizeRoute(
+        workOrderIds: widget.initialWorkOrderIds,
         startTime: _formatTimeOfDay(_startTime),
         returnToDepot: _returnToDepot,
       );
@@ -311,11 +337,17 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
 
     try {
       final currentStop = _routeData!.orderedStops[_selectedStopIndex];
-      final remainingIds = _routeData!.orderedStops
+      List<String> remainingIds = _routeData!.orderedStops
           .skip(_selectedStopIndex + 1)
           .where((s) => s.workOrderId != null)
           .map((s) => s.workOrderId!)
           .toList();
+      if (remainingIds.isEmpty) {
+        remainingIds = _routeData!.orderedStops
+            .where((s) => s.workOrderId != null)
+            .map((s) => s.workOrderId!)
+            .toList();
+      }
 
       final route = await _routingService.reRouteMidShift(
         currentLocationId: currentStop.locationId,
@@ -359,11 +391,17 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
 
     try {
       final currentStop = _routeData!.orderedStops[_selectedStopIndex];
-      final remainingIds = _routeData!.orderedStops
+      List<String> remainingIds = _routeData!.orderedStops
           .skip(_selectedStopIndex + 1)
           .where((s) => s.workOrderId != null)
           .map((s) => s.workOrderId!)
           .toList();
+      if (remainingIds.isEmpty) {
+        remainingIds = _routeData!.orderedStops
+            .where((s) => s.workOrderId != null)
+            .map((s) => s.workOrderId!)
+            .toList();
+      }
 
       final route = await _routingService.reRouteMidShift(
         currentLocationId: currentStop.locationId,
@@ -484,53 +522,67 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
               children: [
                 // 1. Bản đồ 2D tương tác Fullscreen CAD Map
                 Positioned.fill(
-                  child: InteractiveViewer(
-                    transformationController: _transformController,
-                    minScale: 0.35,
-                    maxScale: 4.0,
-                    boundaryMargin: const EdgeInsets.all(500),
-                    child: Center(
-                      child: Container(
-                        width: RouteMapPainter.canvasWidth,
-                        height: RouteMapPainter.canvasHeight,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0f172a),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: const [
-                            BoxShadow(color: Colors.black87, blurRadius: 40, spreadRadius: 8),
-                          ],
-                        ),
-                        child: AnimatedBuilder(
-                          animation: Listenable.merge([_dashAnimController, _pulseAnimController]),
-                          builder: (context, _) {
-                            return Stack(
-                              children: [
-                                // Nền CustomPaint CAD Map
-                                CustomPaint(
-                                  size: const Size(
-                                    RouteMapPainter.canvasWidth,
-                                    RouteMapPainter.canvasHeight,
-                                  ),
-                                  painter: RouteMapPainter(
-                                    routeData: _routeData!,
-                                    currentFloor: _currentFloor,
-                                    selectedStopIndex: _selectedStopIndex,
-                                    showMachines: _showMachines,
-                                    animationProgress: _dashAnimController.value,
-                                    pulseValue: _pulseAnimController.value,
-                                  ),
-                                ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+                      if (!_hasAutoFitted && constraints.maxWidth > 0) {
+                        _hasAutoFitted = true;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _resetZoom();
+                        });
+                      }
 
-                                // Các Pin bấm tương tác trực tiếp trên bản đồ
-                                for (int i = 0; i < _routeData!.orderedStops.length; i++)
-                                  if (_routeData!.orderedStops[i].floorNumber == _currentFloor)
-                                    _buildInteractivePinOverlay(i),
+                      return InteractiveViewer(
+                        transformationController: _transformController,
+                        minScale: 0.2,
+                        maxScale: 4.0,
+                        constrained: false,
+                        boundaryMargin: const EdgeInsets.symmetric(horizontal: 1600, vertical: 1200),
+                        child: SizedBox(
+                          width: RouteMapPainter.canvasWidth,
+                          height: RouteMapPainter.canvasHeight,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0f172a),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black87, blurRadius: 40, spreadRadius: 8),
                               ],
-                            );
-                          },
+                            ),
+                            child: AnimatedBuilder(
+                              animation: Listenable.merge([_dashAnimController, _pulseAnimController]),
+                              builder: (context, _) {
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    // Nền CustomPaint CAD Map
+                                    CustomPaint(
+                                      size: const Size(
+                                        RouteMapPainter.canvasWidth,
+                                        RouteMapPainter.canvasHeight,
+                                      ),
+                                      painter: RouteMapPainter(
+                                        routeData: _routeData!,
+                                        currentFloor: _currentFloor,
+                                        selectedStopIndex: _selectedStopIndex,
+                                        showMachines: _showMachines,
+                                        animationProgress: _dashAnimController.value,
+                                        pulseValue: _pulseAnimController.value,
+                                      ),
+                                    ),
+
+                                    // Các Pin bấm tương tác trực tiếp trên bản đồ
+                                    for (int i = 0; i < _routeData!.orderedStops.length; i++)
+                                      if (_routeData!.orderedStops[i].floorNumber == _currentFloor)
+                                        _buildInteractivePinOverlay(i),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
 
@@ -578,7 +630,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                   child: _buildPlaybackStepperControl(),
                 ),
 
-                // 5. Thanh trượt Bottom Sheet chi tiết lộ trình (DraggableScrollableSheet)
+                // 5. Thanh trượt Bottom Sheet chi tiết lộ trình (DraggableScrollableSheet - nằm trên hết các nút điều khiển nổi)
                 _buildDraggableBottomSheet(),
 
                 // 6. Loading overlay khi đang gọi API tái định tuyến
@@ -850,6 +902,10 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                 ),
               ),
 
+              // Banner lộ trình linh động thích ứng theo vị trí thao tác gần nhất của KTV
+              if (_routeData != null && (_routeData!.isAdaptiveStart || (_routeData!.orderedStops.isNotEmpty && _routeData!.orderedStops.first.isCurrentLocation)))
+                _buildAdaptiveStartBanner(),
+
               // 4 Thẻ KPI cuộn ngang
               _buildKpiCardsHorizontal(),
 
@@ -866,6 +922,74 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAdaptiveStartBanner() {
+    final stop0 = _routeData!.orderedStops.first;
+    final machineName = _routeData!.lastKnownMachine ?? stop0.assetName ?? stop0.name;
+    final timeStr = _routeData!.lastKnownTime ?? 'gần đây';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFecfdf5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF6ee7b7), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10b981).withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: const BoxDecoration(
+              color: Color(0xFF10b981),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.navigation, color: Colors.white, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Text(
+                      'LỘ TRÌNH LINH ĐỘNG THÍCH ỨNG',
+                      style: TextStyle(
+                        color: Color(0xFF047857),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Text('⚡', style: TextStyle(fontSize: 11)),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'KTV vừa thao tác tại: $machineName (lúc $timeStr). Hệ thống đã tự động định tuyến xuất phát từ máy này tới công việc tiếp theo!',
+                  style: const TextStyle(
+                    color: Color(0xFF065f46),
+                    fontSize: 11.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1344,6 +1468,34 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                               ],
                             ],
                           ),
+                          if (stop.workOrderId != null) ...[
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () {
+                                context.push('/work-order-detail/${stop.workOrderId}', extra: stop.workOrderCode);
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284c7).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFF0284c7).withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(PhosphorIcons.arrowSquareOut(PhosphorIconsStyle.bold), size: 13, color: const Color(0xFF0284c7)),
+                                    const SizedBox(width: 5),
+                                    const Text(
+                                      'Mở chi tiết phiếu việc',
+                                      style: TextStyle(color: Color(0xFF0284c7), fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

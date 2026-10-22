@@ -740,4 +740,70 @@ class TSPRoutingTestCase(TestCase):
         self.assertIn(t['direction'], ['UP', 'DOWN'])
         self.assertIn('Chuyển sang Tầng', t['actionLabel'])
 
+    def test_precedence_constraint_pickup_before_work_order(self):
+        """
+        Verify that tool and spare part pickup stops MUST precede the work order that consumes them,
+        even if the work order is geographically closer to the starting point.
+        """
+        from assets.models import Tool
+
+        loc_tool = Location.objects.create(
+            tenant=self.tenant_a,
+            code="LOC-TOOL-ROOM",
+            name="Phòng Dụng Cụ Đo Đạc",
+            location_type="ROOM",
+            floor_level=2,
+            center_x=90.0,
+            center_y=90.0,
+        )
+        Tool.objects.create(
+            tenant=self.tenant_a,
+            code="TOOL_PREC_TEST",
+            name="Camera Đo Nhiệt Độ",
+            location=loc_tool,
+            is_active=True,
+        )
+
+        loc_wo = Location.objects.create(
+            tenant=self.tenant_a,
+            code="LOC-MACHINE-CLOSE",
+            name="Khu Vực Máy Cần Sửa",
+            location_type="ROOM",
+            floor_level=1,
+            center_x=10.0,
+            center_y=10.0,
+        )
+
+        wo_requiring_tool = self._create_wo(
+            "Bảo trì thiết bị đòi hỏi dụng cụ đo",
+            incident_location=loc_wo,
+            priority="MEDIUM",
+        )
+        wo_requiring_tool.required_tools = ["TOOL_PREC_TEST"]
+        wo_requiring_tool.save()
+
+        service = TSPRoutingService(tenant=self.tenant_a)
+        res = service.optimize_daily_route(
+            technician=None,
+            work_orders=[wo_requiring_tool],
+            start_location_id=str(loc_wo.id),
+            return_to_depot=True,
+        )
+
+        self.assertTrue(res['success'])
+        stops = res['data']['orderedStops']
+
+        pickup_idx = None
+        wo_idx = None
+        for idx, s in enumerate(stops):
+            if s.get('locationId') == str(loc_tool.id):
+                pickup_idx = idx
+            elif s.get('workOrderId') == str(wo_requiring_tool.id):
+                wo_idx = idx
+
+        self.assertIsNotNone(pickup_idx, "Pickup stop must be present in the route")
+        self.assertIsNotNone(wo_idx, "Work order stop must be present in the route")
+        self.assertLess(pickup_idx, wo_idx, "Tool pickup MUST precede the work order consuming it")
+
+
 

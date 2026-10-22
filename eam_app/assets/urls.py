@@ -11,7 +11,7 @@ from assets.views import (
 
 urlpatterns = [
     re_path(r'^locations/?$', LocationListView.as_view(), name='location_list'),
-    re_path(r'^locations/(?P<location_id>[0-9a-fA-F-]+)/floorplan/?$', LocationFloorplanDetailView.as_view(), name='location_floorplan_detail'),
+    re_path(r'^locations/(?P<location_id>[0-9a-zA-Z_ -]+)/floorplan/?$', LocationFloorplanDetailView.as_view(), name='location_floorplan_detail'),
     re_path(r'^locations/(?P<location_id>[0-9a-fA-F-]+)/?$', LocationDetailView.as_view(), name='location_detail'),
     
     re_path(r'^asset-categories/?$', AssetCategoryListView.as_view(), name='asset_category_list'),

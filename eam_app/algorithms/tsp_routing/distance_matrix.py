@@ -61,6 +61,7 @@ class RoutingNode:
         work_order_code: Optional[str] = None,
         is_controlled_zone: bool = False,
         one_way_exit_only: bool = False,
+        required_for_wo_ids: Optional[List[str]] = None,
     ):
         self.node_id = str(node_id)
         self.node_type = node_type
@@ -81,6 +82,7 @@ class RoutingNode:
         self.work_order_code = work_order_code or (getattr(work_order, 'code', '') or str(getattr(work_order, 'id', '')))
         self.is_controlled_zone = is_controlled_zone
         self.one_way_exit_only = one_way_exit_only
+        self.required_for_wo_ids = [str(x) for x in required_for_wo_ids] if required_for_wo_ids else []
 
     @classmethod
     def from_work_order(cls, wo, location_cache: Optional[Dict[str, Location]] = None) -> 'RoutingNode':

@@ -7,7 +7,7 @@ Implements:
 4. Pure Business Ordering (Rule 11): Priority + Due Date fallback.
 """
 
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Set
 from datetime import time, datetime
 
 from .constants import (
@@ -33,6 +33,21 @@ def minutes_to_time_str(mins: float) -> str:
     hours = normalized_mins // 60
     minutes = normalized_mins % 60
     return f"{hours:02d}:{minutes:02d}"
+
+
+def is_precedence_valid(tour: List[int], precedence_map: Optional[Dict[int, Set[int]]]) -> bool:
+    """Checks whether the tour visits all prerequisite nodes before their dependent nodes."""
+    if not precedence_map:
+        return True
+    visited = set()
+    for idx in tour:
+        visited.add(idx)
+        prereqs = precedence_map.get(idx)
+        if prereqs:
+            for p in prereqs:
+                if p in tour and p not in visited:
+                    return False
+    return True
 
 
 class TourEvaluation:
@@ -62,7 +77,7 @@ class TourEvaluation:
 
 class TieredATSPSolver:
     """
-    Solves multi-tier asymmetric routing with time windows and Or-opt local search.
+    Solves multi-tier asymmetric routing with time windows, precedence constraints, and Or-opt local search.
     """
 
     def __init__(self, walking_speed: float = WALKING_SPEED_METERS_PER_MIN, default_start_time: float = 480.0):
@@ -77,10 +92,11 @@ class TieredATSPSolver:
         dist_matrix: List[List[float]],
         start_time_minutes: float,
         return_to_depot: bool = False,
+        precedence_map: Optional[Dict[int, Set[int]]] = None,
     ) -> TourEvaluation:
         """
         Evaluates a sequence of node indices: computes travel distances, arrival times,
-        time-window waiting or violation penalties, and departure times.
+        time-window waiting or violation penalties, precedence penalties, and departure times.
         """
         if not tour:
             return TourEvaluation()
@@ -90,6 +106,18 @@ class TieredATSPSolver:
         total_waiting = 0.0
         total_penalty = 0.0
         schedule = []
+
+        # Precedence constraint verification
+        if precedence_map:
+            visited_indices = set()
+            for node_idx in tour:
+                visited_indices.add(node_idx)
+                prereqs = precedence_map.get(node_idx)
+                if prereqs:
+                    for p in prereqs:
+                        if p in tour and p not in visited_indices:
+                            # Prerequisite pickup visited after dependent work order!
+                            total_penalty += BIG_M
 
         for idx, node_idx in enumerate(tour):
             node = nodes[node_idx]
@@ -179,20 +207,31 @@ class TieredATSPSolver:
         nodes: List[RoutingNode],
         dist_matrix: List[List[float]],
         start_time_minutes: float,
+        precedence_map: Optional[Dict[int, Set[int]]] = None,
+        initial_visited: Optional[Set[int]] = None,
     ) -> List[int]:
         """
-        Greedy Nearest Neighbor with Time-Window awareness to construct an initial tour.
+        Greedy Nearest Neighbor with Time-Window and Precedence awareness to construct an initial tour.
         """
         unvisited = list(candidates)
         tour = [start_idx]
         current_node = start_idx
         current_time = start_time_minutes
+        all_visited = set(initial_visited or [start_idx])
+        all_visited.add(start_idx)
 
         while unvisited:
             best_cand = None
             best_cost = float('inf')
 
             for cand in unvisited:
+                # Precedence check: candidate can only be visited if all its prerequisites are already visited
+                if precedence_map:
+                    prereqs = precedence_map.get(cand, set())
+                    unvisited_prereqs = [p for p in prereqs if p not in all_visited and (p in candidates or p in all_visited)]
+                    if unvisited_prereqs:
+                        continue
+
                 d = dist_matrix[current_node][cand]
                 travel_time = d / self.walking_speed
                 cand_arr = current_time + travel_time
@@ -216,6 +255,7 @@ class TieredATSPSolver:
             if best_cand is not None:
                 unvisited.remove(best_cand)
                 tour.append(best_cand)
+                all_visited.add(best_cand)
                 # Advance time
                 travel_d = dist_matrix[current_node][best_cand]
                 current_time += travel_d / self.walking_speed
@@ -226,7 +266,16 @@ class TieredATSPSolver:
                 current_time += node_cand.estimated_duration_minutes
                 current_node = best_cand
             else:
-                break
+                # Fallback if remaining candidates have cyclic/unresolved dependencies
+                if unvisited:
+                    cand = unvisited.pop(0)
+                    tour.append(cand)
+                    all_visited.add(cand)
+                    travel_d = dist_matrix[current_node][cand]
+                    current_time += travel_d / self.walking_speed + nodes[cand].estimated_duration_minutes
+                    current_node = cand
+                else:
+                    break
 
         return tour
 
@@ -237,17 +286,18 @@ class TieredATSPSolver:
         dist_matrix: List[List[float]],
         start_time_minutes: float,
         max_iterations: int = 100,
+        precedence_map: Optional[Dict[int, Set[int]]] = None,
     ) -> List[int]:
         """
         Rule 5: Or-opt Relocate Move.
         Moves segments of length 1 or 2 without reversing them.
-        Preserves ATSP one-way corridor asymmetry and directional flows.
+        Preserves ATSP one-way corridor asymmetry and directional flows while respecting precedence constraints.
         """
         if len(tour) <= 3:
             return tour
 
         best_tour = list(tour)
-        best_eval = self.evaluate_tour(best_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False)
+        best_eval = self.evaluate_tour(best_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False, precedence_map=precedence_map)
         best_cost = best_eval.total_cost
 
         improved = True
@@ -269,7 +319,10 @@ class TieredATSPSolver:
                     # Try inserting segment into every position j >= 1
                     for j in range(1, len(remaining) + 1):
                         new_tour = remaining[:j] + segment + remaining[j:]
-                        new_eval = self.evaluate_tour(new_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False)
+                        if not is_precedence_valid(new_tour, precedence_map):
+                            continue
+
+                        new_eval = self.evaluate_tour(new_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False, precedence_map=precedence_map)
                         new_cost = new_eval.total_cost
 
                         # Epsilon threshold for improvement
@@ -292,19 +345,23 @@ class TieredATSPSolver:
         nodes: List[RoutingNode],
         dist_matrix: List[List[float]],
         start_time_minutes: float,
+        precedence_map: Optional[Dict[int, Set[int]]] = None,
+        initial_visited: Optional[Set[int]] = None,
     ) -> List[int]:
         """
-        Solves ATSP for a single cluster of stops from start_idx.
+        Solves ATSP for a single cluster of stops from start_idx with precedence awareness.
         Returns the ordered list of node indices starting with start_idx.
         """
         if not candidates:
             return [start_idx]
 
         init_tour = self._nearest_neighbor_construct(
-            start_idx, candidates, nodes, dist_matrix, start_time_minutes
+            start_idx, candidates, nodes, dist_matrix, start_time_minutes,
+            precedence_map=precedence_map, initial_visited=initial_visited
         )
         optimized_tour = self._or_opt_improve(
-            init_tour, nodes, dist_matrix, start_time_minutes
+            init_tour, nodes, dist_matrix, start_time_minutes,
+            precedence_map=precedence_map
         )
         return optimized_tour
 
@@ -316,14 +373,15 @@ class TieredATSPSolver:
         dist_matrix: List[List[float]],
         start_time_minutes: float = 480.0,
         return_to_depot: bool = False,
+        precedence_map: Optional[Dict[int, Set[int]]] = None,
     ) -> TourEvaluation:
         """
-        Rule 3: Tiered ATSP Solver.
-        Tier 1: URGENT & EMERGENCY work orders.
+        Rule 3: Tiered ATSP Solver with Precedence Constraints (Pickup before Delivery/Work Order).
+        Tier 1: URGENT & EMERGENCY work orders (plus any prerequisite pickups).
         Tier 2: NORMAL work orders (HIGH, MEDIUM, LOW).
         """
         if not work_order_indices:
-            return self.evaluate_tour([start_node_idx], nodes, dist_matrix, start_time_minutes, return_to_depot)
+            return self.evaluate_tour([start_node_idx], nodes, dist_matrix, start_time_minutes, return_to_depot, precedence_map=precedence_map)
 
         urgent_indices = []
         normal_indices = []
@@ -335,34 +393,50 @@ class TieredATSPSolver:
             else:
                 normal_indices.append(idx)
 
+        # Elevate prerequisite pickups of urgent tasks to Tier 1
+        if precedence_map and urgent_indices:
+            elevated = set()
+            for u_idx in list(urgent_indices):
+                for prereq in precedence_map.get(u_idx, set()):
+                    if prereq in normal_indices and prereq not in elevated:
+                        elevated.add(prereq)
+            for p in elevated:
+                normal_indices.remove(p)
+                urgent_indices.append(p)
+
         current_start_idx = start_node_idx
         current_time = start_time_minutes
         overall_tour = [start_node_idx]
+        visited_all = {start_node_idx}
 
         # 1. Solve Tier 1 (Urgent Cluster)
         if urgent_indices:
             urgent_tour = self.solve_atsp_cluster(
-                current_start_idx, urgent_indices, nodes, dist_matrix, current_time
+                current_start_idx, urgent_indices, nodes, dist_matrix, current_time,
+                precedence_map=precedence_map, initial_visited=visited_all
             )
             # urgent_tour starts with current_start_idx, slice [1:]
             overall_tour.extend(urgent_tour[1:])
+            visited_all.update(urgent_tour)
             current_start_idx = overall_tour[-1]
 
             # Re-evaluate to get accurate start time for Tier 2
-            interim_eval = self.evaluate_tour(overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False)
+            interim_eval = self.evaluate_tour(overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False, precedence_map=precedence_map)
             if interim_eval.schedule:
                 current_time = interim_eval.schedule[-1]['departureTimeMinutes']
 
         # 2. Solve Tier 2 (Normal Cluster)
         if normal_indices:
             normal_tour = self.solve_atsp_cluster(
-                current_start_idx, normal_indices, nodes, dist_matrix, current_time
+                current_start_idx, normal_indices, nodes, dist_matrix, current_time,
+                precedence_map=precedence_map, initial_visited=visited_all
             )
             overall_tour.extend(normal_tour[1:])
 
         # Final Evaluation
         final_evaluation = self.evaluate_tour(
-            overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=return_to_depot
+            overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=return_to_depot,
+            precedence_map=precedence_map
         )
         return final_evaluation
 
@@ -374,11 +448,12 @@ class TieredATSPSolver:
         dist_matrix: List[List[float]],
         start_time_minutes: float = 480.0,
         return_to_depot: bool = False,
+        precedence_map: Optional[Dict[int, Set[int]]] = None,
     ) -> TourEvaluation:
         """
-        Rule 11: Pure Business Fallback.
-        Orders strictly by Priority (URGENT -> HIGH -> MEDIUM -> LOW), then due_date.
-        No spatial distance optimization.
+        Rule 11: Pure Business Fallback with Precedence Constraints.
+        Orders by Priority (URGENT -> HIGH -> MEDIUM -> LOW), then due_date.
+        Ensures any required pickup nodes precede their dependent work orders.
         """
         priority_ranks = {
             'EMERGENCY': 0,
@@ -396,6 +471,23 @@ class TieredATSPSolver:
             return (rank, due_str)
 
         sorted_wos = sorted(work_order_indices, key=sort_key)
+
+        # Enforce precedence topological ordering
+        if precedence_map:
+            adjusted = []
+            visited = set()
+            for cand in sorted_wos:
+                prereqs = precedence_map.get(cand, set())
+                for p in prereqs:
+                    if p in sorted_wos and p not in visited:
+                        adjusted.append(p)
+                        visited.add(p)
+                if cand not in visited:
+                    adjusted.append(cand)
+                    visited.add(cand)
+            sorted_wos = adjusted
+
         tour = [start_node_idx] + sorted_wos
 
-        return self.evaluate_tour(tour, nodes, dist_matrix, start_time_minutes, return_to_depot=return_to_depot)
+        return self.evaluate_tour(tour, nodes, dist_matrix, start_time_minutes, return_to_depot=return_to_depot, precedence_map=precedence_map)
+

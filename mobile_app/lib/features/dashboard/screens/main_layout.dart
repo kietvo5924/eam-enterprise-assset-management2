@@ -640,6 +640,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -854,29 +855,6 @@ class _ProfileScreenState extends State<_ProfileScreen> {
                   Text(
                     '${dutyZone['code'] ?? ''} • Tầng ${dutyZone['floorLevel'] ?? 1} (${dutyZone['centerX'] ?? 0}m, ${dutyZone['centerY'] ?? 0}m)',
                     style: const TextStyle(color: Colors.white60, fontSize: 12, fontFamily: 'monospace'),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        context.push('/floorplan-viewer', extra: {
-                          'locationId': dutyZone['id'] ?? dutyZone['code'],
-                          'locationName': dutyZone['name'],
-                          'dutyZoneCoordsX': dutyZone['centerX'],
-                          'dutyZoneCoordsY': dutyZone['centerY'],
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284c7),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      icon: const Icon(Icons.map, size: 18),
-                      label: const Text('Xem Sơ đồ Phân xưởng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    ),
                   ),
                 ],
               ),

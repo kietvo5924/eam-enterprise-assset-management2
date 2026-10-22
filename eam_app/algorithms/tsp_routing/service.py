@@ -4,7 +4,7 @@ Coordinates distance matrix computation, tiered ATSP/TSPTW solving,
 mid-shift re-routing, pit-stops, and scan-to-relocate operations.
 """
 
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Set
 from datetime import datetime, time
 import logging
 
@@ -95,21 +95,72 @@ class TSPRoutingService:
                 }
             }
 
-        # Resolve Depot / Starting Stop
+        # Resolve Depot / Starting Stop (Dynamic based on technician's recent activity or Depot fallback)
         start_loc = None
+        start_node_type = STOP_DEPOT
+        start_node_name = None
+        recent_machine_info = None
+
         if start_location_id:
             start_loc = self.distance_engine.get_location(start_location_id)
-        if not start_loc:
+        elif not start_coords and technician:
+            # Dynamic adaptivity: check if technician actively worked on a machine
+            # within the current active session (last 60 minutes).
+            # No stale hours-old work orders or mock data.
+            from datetime import timedelta
+            import zoneinfo
+
+            vn_tz = zoneinfo.ZoneInfo(getattr(self.tenant, 'timezone', None) or 'Asia/Ho_Chi_Minh')
+            active_cutoff = timezone.now() - timedelta(minutes=60)
+
+            recent_wo = WorkOrder.objects.filter(
+                tenant=self.tenant,
+                assigned_to=technician,
+                status='IN_PROGRESS',
+                updated_at__gte=active_cutoff,
+            ).order_by('-updated_at').first()
+
+            if not recent_wo:
+                recent_wo = WorkOrder.objects.filter(
+                    tenant=self.tenant,
+                    assigned_to=technician,
+                    status='COMPLETED',
+                    updated_at__gte=active_cutoff,
+                ).order_by('-updated_at').first()
+
+            if recent_wo and recent_wo.asset and (recent_wo.asset.location or recent_wo.asset.coords_x):
+                start_loc = recent_wo.asset.location
+                sx = recent_wo.asset.coords_x or (getattr(start_loc, 'center_x', 0.0) if start_loc else 0.0)
+                sy = recent_wo.asset.coords_y or (getattr(start_loc, 'center_y', 0.0) if start_loc else 0.0)
+                start_floor = getattr(recent_wo.asset, 'floor_number', None) or (getattr(start_loc, 'floor_number', 1) if start_loc else 1)
+                local_time_str = recent_wo.updated_at.astimezone(vn_tz).strftime('%H:%M')
+                start_node_type = STOP_CURRENT_LOCATION
+                start_node_name = f"Vị trí gần nhất: {recent_wo.asset.name} (Làm lúc {local_time_str})"
+                recent_machine_info = {
+                    'isAdaptiveStart': True,
+                    'lastKnownMachine': recent_wo.asset.name,
+                    'lastKnownTime': local_time_str,
+                    'lastKnownWorkOrder': recent_wo.code,
+                }
+                # Direct route from this machine to the next pending machine(s)
+                other_wos = [wo for wo in work_orders if str(wo.id) != str(recent_wo.id)]
+                if other_wos:
+                    work_orders = other_wos
+
+        if not start_loc and not start_coords:
             start_loc = self._get_warehouse_location()
 
-        sx = start_coords.get('x') if start_coords else (getattr(start_loc, 'center_x', 0.0) if start_loc else 0.0)
-        sy = start_coords.get('y') if start_coords else (getattr(start_loc, 'center_y', 0.0) if start_loc else 0.0)
-        start_floor = getattr(start_loc, 'floor_number', 1) if start_loc else 1
+        if not start_node_name:
+            start_node_name = f"Điểm xuất phát: {start_loc.name if start_loc else 'Phòng Điều Phối'}"
+
+        sx = start_coords.get('x') if start_coords else (sx if 'sx' in locals() else (getattr(start_loc, 'center_x', 0.0) if start_loc else 0.0))
+        sy = start_coords.get('y') if start_coords else (sy if 'sy' in locals() else (getattr(start_loc, 'center_y', 0.0) if start_loc else 0.0))
+        start_floor = getattr(start_loc, 'floor_number', 1) if start_loc else (start_floor if 'start_floor' in locals() else 1)
 
         depot_node = RoutingNode(
             node_id="depot_start",
-            node_type=STOP_DEPOT,
-            name=f"Điểm xuất phát: {start_loc.name if start_loc else 'Phòng Điều Phối'}",
+            node_type=start_node_type,
+            name=start_node_name,
             location=start_loc,
             coords_x=sx,
             coords_y=sy,
@@ -129,6 +180,7 @@ class TSPRoutingService:
             nodes.append(wo_node)
 
         wo_indices = list(range(1, len(nodes)))
+        precedence_map = self._build_precedence_map(nodes)
 
         # If TSP Routing disabled on tenant, use Rule 11 pure business fallback
         if not routing_enabled:
@@ -140,8 +192,9 @@ class TSPRoutingService:
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes,
                 return_to_depot=return_to_depot,
+                precedence_map=precedence_map,
             )
-            return self._build_response(eval_result, nodes, MODE_PURE_BUSINESS, routing_enabled=False)
+            return self._build_response(eval_result, nodes, MODE_PURE_BUSINESS, routing_enabled=False, extra_data=recent_machine_info)
 
         # Build Distance Matrix & determine mode
         dist_matrix, resolved_mode = self.distance_engine.build_distance_matrix(nodes)
@@ -155,9 +208,10 @@ class TSPRoutingService:
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes,
                 return_to_depot=return_to_depot,
+                precedence_map=precedence_map,
             )
         else:
-            # Rule 3, 4, 5: Tiered ATSP with TSPTW Solver
+            # Rule 3, 4, 5: Tiered ATSP with TSPTW Solver & Precedence Constraints
             eval_result = self.solver.solve_tiered_tsp(
                 start_node_idx=0,
                 work_order_indices=wo_indices,
@@ -165,9 +219,10 @@ class TSPRoutingService:
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes,
                 return_to_depot=return_to_depot,
+                precedence_map=precedence_map,
             )
 
-        return self._build_response(eval_result, nodes, resolved_mode, routing_enabled=True)
+        return self._build_response(eval_result, nodes, resolved_mode, routing_enabled=True, extra_data=recent_machine_info)
 
     def re_route_mid_shift(
         self,
@@ -263,8 +318,9 @@ class TSPRoutingService:
                 }
             }
 
-        # Build distance matrix
+        # Build distance matrix & precedence map
         dist_matrix, resolved_mode = self.distance_engine.build_distance_matrix(nodes)
+        precedence_map = self._build_precedence_map(nodes)
 
         if not routing_enabled:
             wo_indices = list(range(1, len(nodes)))
@@ -275,6 +331,7 @@ class TSPRoutingService:
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes,
                 return_to_depot=return_to_depot,
+                precedence_map=precedence_map,
             )
             return self._build_response(eval_result, nodes, MODE_PURE_BUSINESS, routing_enabled=False)
 
@@ -290,11 +347,12 @@ class TSPRoutingService:
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes + (dist_matrix[0][wh_idx] / self.solver.walking_speed),
                 return_to_depot=return_to_depot,
+                precedence_map=precedence_map,
             )
             # Prepend current position (index 0)
             overall_tour = [0] + [s['nodeIndex'] for s in sub_eval.schedule]
             eval_result = self.solver.evaluate_tour(
-                overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False
+                overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False, precedence_map=precedence_map
             )
         else:
             wo_indices = list(range(1, len(nodes)))
@@ -305,6 +363,7 @@ class TSPRoutingService:
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes,
                 return_to_depot=return_to_depot,
+                precedence_map=precedence_map,
             )
 
         return self._build_response(eval_result, nodes, resolved_mode, routing_enabled=True)
@@ -367,6 +426,7 @@ class TSPRoutingService:
         nodes: List[RoutingNode],
         routing_mode: str,
         routing_enabled: bool,
+        extra_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Formats solving evaluation into uniform JSON response structure."""
         ordered_stops = []
@@ -426,16 +486,20 @@ class TSPRoutingService:
         total_distance = round(eval_result.total_distance, 1) if routing_enabled else 0.0
         total_time = int(round(eval_result.total_time_minutes))
 
+        res_data = {
+            'totalEstimatedMinutes': total_time,
+            'totalDistanceMeters': total_distance,
+            'routingMode': routing_mode,
+            'routingEnabled': routing_enabled,
+            'totalStops': len(ordered_stops),
+            'orderedStops': ordered_stops,
+        }
+        if extra_data:
+            res_data.update(extra_data)
+
         return {
             'success': True,
-            'data': {
-                'totalEstimatedMinutes': total_time,
-                'totalDistanceMeters': total_distance,
-                'routingMode': routing_mode,
-                'routingEnabled': routing_enabled,
-                'totalStops': len(ordered_stops),
-                'orderedStops': ordered_stops,
-            }
+            'data': res_data,
         }
 
     def _resolve_pickup_nodes(self, work_orders, exclude_location_id=None) -> List[RoutingNode]:
@@ -448,6 +512,8 @@ class TSPRoutingService:
         seen_loc_ids = set()
         if exclude_location_id:
             seen_loc_ids.add(str(exclude_location_id))
+
+        loc_to_wo_ids: Dict[str, Set[str]] = {}
 
         # 1. Collect required tool codes and required spare parts across all work orders
         tool_code_to_wos = {}
@@ -471,6 +537,8 @@ class TSPRoutingService:
             for t in tools_qs:
                 if t.location:
                     loc_to_tool_names.setdefault(t.location, []).append(t.name)
+                    for wo in tool_code_to_wos.get(t.code, []):
+                        loc_to_wo_ids.setdefault(str(t.location.id), set()).add(str(wo.id))
             
             for loc, t_names in loc_to_tool_names.items():
                 lid = str(loc.id)
@@ -490,29 +558,33 @@ class TSPRoutingService:
                         floor_number=t_floor,
                         priority='HIGH',
                         estimated_duration_minutes=5.0,
+                        required_for_wo_ids=list(loc_to_wo_ids.get(lid, set())),
                     ))
 
         # Fallback for wo.tool_pickup_location if any work orders specified it
         for wo in work_orders:
             req_tools = getattr(wo, 'required_tools', None) or []
             tool_loc = getattr(wo, 'tool_pickup_location', None)
-            if req_tools and tool_loc and str(tool_loc.id) not in seen_loc_ids:
-                seen_loc_ids.add(str(tool_loc.id))
-                tx = getattr(tool_loc, 'center_x', 0.0) or 0.0
-                ty = getattr(tool_loc, 'center_y', 0.0) or 0.0
-                t_floor = getattr(tool_loc, 'floor_level', None) or getattr(tool_loc, 'floor_number', 1) or 1
-                tool_names = ", ".join(str(t) for t in req_tools[:2])
-                pickup_nodes.append(RoutingNode(
-                    node_id=f"tool_pickup_{tool_loc.id}",
-                    node_type=STOP_WAREHOUSE,
-                    name=f"Lấy dụng cụ chuyên dụng ({tool_names}): {tool_loc.name}",
-                    location=tool_loc,
-                    coords_x=tx,
-                    coords_y=ty,
-                    floor_number=t_floor,
-                    priority='HIGH',
-                    estimated_duration_minutes=5.0,
-                ))
+            if req_tools and tool_loc:
+                loc_to_wo_ids.setdefault(str(tool_loc.id), set()).add(str(wo.id))
+                if str(tool_loc.id) not in seen_loc_ids:
+                    seen_loc_ids.add(str(tool_loc.id))
+                    tx = getattr(tool_loc, 'center_x', 0.0) or 0.0
+                    ty = getattr(tool_loc, 'center_y', 0.0) or 0.0
+                    t_floor = getattr(tool_loc, 'floor_level', None) or getattr(tool_loc, 'floor_number', 1) or 1
+                    tool_names = ", ".join(str(t) for t in req_tools[:2])
+                    pickup_nodes.append(RoutingNode(
+                        node_id=f"tool_pickup_{tool_loc.id}",
+                        node_type=STOP_WAREHOUSE,
+                        name=f"Lấy dụng cụ chuyên dụng ({tool_names}): {tool_loc.name}",
+                        location=tool_loc,
+                        coords_x=tx,
+                        coords_y=ty,
+                        floor_number=t_floor,
+                        priority='HIGH',
+                        estimated_duration_minutes=5.0,
+                        required_for_wo_ids=list(loc_to_wo_ids.get(str(tool_loc.id), set())),
+                    ))
 
         # 3. Query Spare Parts and their locations
         if part_ref_to_wos:
@@ -534,6 +606,9 @@ class TSPRoutingService:
             for p in parts_qs:
                 if p.location:
                     loc_to_part_names.setdefault(p.location, []).append(p.name)
+                    wos = part_ref_to_wos.get(str(p.id), []) + part_ref_to_wos.get(p.part_number, [])
+                    for wo in wos:
+                        loc_to_wo_ids.setdefault(str(p.location.id), set()).add(str(wo.id))
 
             for loc, p_names in loc_to_part_names.items():
                 lid = str(loc.id)
@@ -553,6 +628,27 @@ class TSPRoutingService:
                         floor_number=p_floor,
                         priority='HIGH',
                         estimated_duration_minutes=5.0,
+                        required_for_wo_ids=list(loc_to_wo_ids.get(lid, set())),
                     ))
 
         return pickup_nodes
+
+    def _build_precedence_map(self, nodes: List[RoutingNode]) -> Dict[int, Set[int]]:
+        """
+        Builds a map from work order node index -> set of pickup node indices
+        that must precede this work order node in the route.
+        """
+        precedence_map: Dict[int, Set[int]] = {}
+        # Find all pickup nodes and which work order IDs they are required for
+        pickup_map: Dict[str, List[int]] = {}  # wo_id -> [pickup_node_idx, ...]
+        for p_idx, node in enumerate(nodes):
+            if node.required_for_wo_ids:
+                for wo_id in node.required_for_wo_ids:
+                    pickup_map.setdefault(str(wo_id), []).append(p_idx)
+
+        for wo_idx, node in enumerate(nodes):
+            if node.work_order:
+                wo_id = str(node.work_order.id)
+                if wo_id in pickup_map:
+                    precedence_map[wo_idx] = set(pickup_map[wo_id])
+        return precedence_map

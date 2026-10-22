@@ -235,6 +235,10 @@ class TechnicianRouteData {
   final String? technicianUsername;
   final List<RouteStop> orderedStops;
   final DateTime? cachedAt;
+  final bool isAdaptiveStart;
+  final String? lastKnownMachine;
+  final String? lastKnownTime;
+  final String? lastKnownWorkOrder;
 
   const TechnicianRouteData({
     required this.totalEstimatedMinutes,
@@ -249,6 +253,10 @@ class TechnicianRouteData {
     this.technicianUsername,
     required this.orderedStops,
     this.cachedAt,
+    this.isAdaptiveStart = false,
+    this.lastKnownMachine,
+    this.lastKnownTime,
+    this.lastKnownWorkOrder,
   });
 
   factory TechnicianRouteData.fromJson(Map<String, dynamic> json) {
@@ -274,6 +282,10 @@ class TechnicianRouteData {
       technicianUsername: json['technicianUsername'] as String?,
       orderedStops: stopsList,
       cachedAt: json['cachedAt'] != null ? DateTime.tryParse(json['cachedAt'] as String) : null,
+      isAdaptiveStart: json['isAdaptiveStart'] as bool? ?? false,
+      lastKnownMachine: json['lastKnownMachine'] as String?,
+      lastKnownTime: json['lastKnownTime'] as String?,
+      lastKnownWorkOrder: json['lastKnownWorkOrder'] as String?,
     );
   }
 
@@ -290,10 +302,18 @@ class TechnicianRouteData {
     'technicianUsername': technicianUsername,
     'orderedStops': orderedStops.map((s) => s.toJson()).toList(),
     'cachedAt': cachedAt?.toIso8601String(),
+    'isAdaptiveStart': isAdaptiveStart,
+    'lastKnownMachine': lastKnownMachine,
+    'lastKnownTime': lastKnownTime,
+    'lastKnownWorkOrder': lastKnownWorkOrder,
   };
 
   TechnicianRouteData copyWith({
     DateTime? cachedAt,
+    bool? isAdaptiveStart,
+    String? lastKnownMachine,
+    String? lastKnownTime,
+    String? lastKnownWorkOrder,
   }) {
     return TechnicianRouteData(
       totalEstimatedMinutes: totalEstimatedMinutes,
@@ -308,6 +328,10 @@ class TechnicianRouteData {
       technicianUsername: technicianUsername,
       orderedStops: orderedStops,
       cachedAt: cachedAt ?? this.cachedAt,
+      isAdaptiveStart: isAdaptiveStart ?? this.isAdaptiveStart,
+      lastKnownMachine: lastKnownMachine ?? this.lastKnownMachine,
+      lastKnownTime: lastKnownTime ?? this.lastKnownTime,
+      lastKnownWorkOrder: lastKnownWorkOrder ?? this.lastKnownWorkOrder,
     );
   }
 }
