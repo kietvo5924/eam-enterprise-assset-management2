@@ -6,7 +6,7 @@ from assets.views import (
     SparePartListView, SparePartDetailView,
     AssetListView, AssetDetailView, MeterReadingListView,
     AssetTreeView, AssetQRCodeView, AssetImportView, AssetExportView,
-    AssetImportTemplateView
+    AssetImportTemplateView, AssetAnomalyHistoryView, ConditionMonitoringAlertFeedbackView
 )
 
 urlpatterns = [
@@ -32,4 +32,6 @@ urlpatterns = [
     re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/?$', AssetDetailView.as_view(), name='asset_detail'),
     
     re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/meter-readings/?$', MeterReadingListView.as_view(), name='meter_reading_list'),
+    re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/anomaly-history/?$', AssetAnomalyHistoryView.as_view(), name='asset_anomaly_history'),
+    re_path(r'^condition-monitoring/alerts/(?P<alert_id>[0-9a-fA-F-]+)/feedback/?$', ConditionMonitoringAlertFeedbackView.as_view(), name='condition_monitoring_alert_feedback'),
 ]

@@ -115,18 +115,127 @@ class AssetCreateUpdateSerializer(serializers.Serializer):
     qrCode = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     isActive = serializers.BooleanField(required=False, default=True)
 
+from assets.models import AssetAnomalyAlert
+
 class MeterReadingSerializer(serializers.ModelSerializer):
     assetId = serializers.UUIDField(source='asset.id', read_only=True)
+    workOrderId = serializers.UUIDField(source='work_order.id', read_only=True, allow_null=True)
+    workOrderCode = serializers.CharField(source='work_order.code', read_only=True, allow_null=True)
+    metricCode = serializers.CharField(source='metric_code', read_only=True)
     readingValue = serializers.DecimalField(source='reading_value', read_only=True, max_digits=19, decimal_places=2)
+    value = serializers.DecimalField(source='reading_value', read_only=True, max_digits=19, decimal_places=2)
     readingDate = serializers.DateTimeField(source='reading_date', read_only=True)
+    recordedAt = serializers.DateTimeField(source='reading_date', read_only=True)
+    machineState = serializers.CharField(source='machine_state', read_only=True)
+    ambientTemperature = serializers.FloatField(source='ambient_temperature', read_only=True)
+    isPreRepair = serializers.BooleanField(source='is_pre_repair', read_only=True)
+    isSuppressed = serializers.BooleanField(source='is_suppressed', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     
     class Meta:
         model = MeterReading
-        fields = ['id', 'assetId', 'readingValue', 'readingDate', 'unit', 'remarks', 'createdAt']
+        fields = [
+            'id', 'assetId', 'workOrderId', 'workOrderCode', 'metricCode', 'value', 'readingValue',
+            'readingDate', 'recordedAt', 'unit', 'machineState',
+            'ambientTemperature', 'isPreRepair', 'isSuppressed',
+            'remarks', 'createdAt'
+        ]
 
-class MeterReadingCreateSerializer(serializers.Serializer):
-    readingValue = serializers.DecimalField(max_digits=19, decimal_places=2)
-    readingDate = serializers.DateTimeField(required=False, allow_null=True)
+class SingleReadingItemSerializer(serializers.Serializer):
+    metricCode = serializers.CharField(max_length=64, required=False, default='VIBRATION')
+    value = serializers.FloatField(required=False)
+    readingValue = serializers.FloatField(required=False)
     unit = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
     remarks = serializers.CharField(max_length=1000, required=False, allow_blank=True, allow_null=True)
+
+    def validate_metricCode(self, value):
+        if not value or not str(value).strip():
+            return 'VIBRATION'
+        cleaned = str(value).strip().upper()
+        import re
+        if not re.match(r'^[A-Z0-9_\-]+$', cleaned):
+            raise serializers.ValidationError("Mã chỉ số đo chỉ được chứa chữ cái, số, dấu gạch dưới hoặc gạch nối (VD: RPM, FLOW_RATE).")
+        return cleaned
+
+    def validate(self, attrs):
+        val = attrs.get('value')
+        if val is None:
+            val = attrs.get('readingValue')
+        if val is not None:
+            import math
+            if math.isnan(val) or math.isinf(val):
+                raise serializers.ValidationError("Giá trị đo không được là NaN hoặc vô cực.")
+        return attrs
+
+class MeterReadingCreateSerializer(serializers.Serializer):
+    # Hỗ trợ cả định dạng đa chỉ số (Condition Monitoring Round) lẫn đơn chỉ số
+    readings = serializers.ListField(
+        child=SingleReadingItemSerializer(),
+        required=False,
+        allow_empty=False
+    )
+    # Định dạng đơn chỉ số truyền thống
+    readingValue = serializers.FloatField(required=False)
+    value = serializers.FloatField(required=False)
+    metricCode = serializers.CharField(max_length=64, required=False, default='VIBRATION')
+    readingDate = serializers.DateTimeField(required=False, allow_null=True)
+    recordedAt = serializers.DateTimeField(required=False, allow_null=True)
+    unit = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
+    remarks = serializers.CharField(max_length=1000, required=False, allow_blank=True, allow_null=True)
+    
+    # Liên kết với Work Order đang thực thi (nếu có)
+    workOrderId = serializers.UUIDField(required=False, allow_null=True)
+    work_order_id = serializers.UUIDField(required=False, allow_null=True)
+
+    # Ngữ cảnh kiểm tra hiện trường (Quy Tắc 1 & Quy Tắc 4)
+    machineState = serializers.CharField(max_length=20, required=False, default='RUNNING')
+    ambientTemperature = serializers.FloatField(required=False, allow_null=True)
+
+    def validate_metricCode(self, value):
+        if not value or not str(value).strip():
+            return 'VIBRATION'
+        cleaned = str(value).strip().upper()
+        import re
+        if not re.match(r'^[A-Z0-9_\-]+$', cleaned):
+            raise serializers.ValidationError("Mã chỉ số đo chỉ được chứa chữ cái, số, dấu gạch dưới hoặc gạch nối (VD: RPM, FLOW_RATE).")
+        return cleaned
+
+    def validate(self, attrs):
+        val = attrs.get('value')
+        if val is None:
+            val = attrs.get('readingValue')
+        if val is not None:
+            import math
+            if math.isnan(val) or math.isinf(val):
+                raise serializers.ValidationError("Giá trị đo không được là NaN hoặc vô cực.")
+        return attrs
+
+
+class AssetAnomalyAlertSerializer(serializers.ModelSerializer):
+    assetId = serializers.UUIDField(source='asset.id', read_only=True)
+    readingId = serializers.UUIDField(source='reading.id', read_only=True, allow_null=True)
+    metricType = serializers.CharField(source='metric_type', read_only=True)
+    metricCode = serializers.CharField(source='metric_code', read_only=True)
+    currentValue = serializers.FloatField(source='current_value', read_only=True)
+    zScore = serializers.FloatField(source='z_score', read_only=True)
+    anomalyScore = serializers.FloatField(source='anomaly_score', read_only=True)
+    trendSlope = serializers.FloatField(source='trend_slope', read_only=True)
+    predictedFailureDate = serializers.DateField(source='predicted_failure_date', read_only=True)
+    daysRemaining = serializers.IntegerField(source='days_remaining', read_only=True)
+    severity = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    occurrenceCount = serializers.IntegerField(source='occurrence_count', read_only=True)
+    isSuppressed = serializers.BooleanField(source='is_suppressed', read_only=True)
+    draftWorkOrderId = serializers.UUIDField(source='draft_work_order.id', read_only=True, allow_null=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    lastDetectedAt = serializers.DateTimeField(source='last_detected_at', read_only=True)
+
+    class Meta:
+        model = AssetAnomalyAlert
+        fields = [
+            'id', 'assetId', 'readingId', 'metricType', 'metricCode',
+            'currentValue', 'zScore', 'anomalyScore', 'trendSlope',
+            'predictedFailureDate', 'daysRemaining', 'severity', 'status',
+            'occurrenceCount', 'isSuppressed', 'draftWorkOrderId',
+            'message', 'createdAt', 'lastDetectedAt'
+        ]

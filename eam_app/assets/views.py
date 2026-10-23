@@ -5,16 +5,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart, Asset, MeterReading
+from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart, Asset, MeterReading, AssetAnomalyAlert
 from assets.serializers import (
     LocationSerializer, LocationCreateUpdateSerializer,
     AssetCategorySerializer, AssetCategoryCreateUpdateSerializer,
     HierarchyTemplateSerializer, HierarchyTemplateCreateUpdateSerializer,
     SparePartSerializer, SparePartCreateUpdateSerializer,
     AssetSerializer, AssetCreateUpdateSerializer,
-    MeterReadingSerializer, MeterReadingCreateSerializer
+    MeterReadingSerializer, MeterReadingCreateSerializer,
+    AssetAnomalyAlertSerializer
 )
 from users.permissions import HasPermission
+from algorithms.anomaly_detection import ConditionMonitoringEngine, is_static_asset, evaluate_trend_drift
 
 def success_response(data=None, message="Success"):
     return Response({
@@ -764,22 +766,138 @@ class MeterReadingListView(APIView):
             raise ValidationError("Asset not found")
 
         serializer = MeterReadingCreateSerializer(data=request.data)
-        if not serializer.is_valid():
-            raise ValidationError(serializer.errors)
+        serializer.is_valid(raise_exception=True)
             
         data = serializer.validated_data
-        
         from django.utils import timezone
-        
-        reading = MeterReading.objects.create(
+
+        # Chuẩn bị danh sách chỉ số đo kiểm tra
+        if data.get('readings'):
+            readings_data = data['readings']
+        else:
+            val = data.get('value')
+            if val is None:
+                val = data.get('readingValue')
+            if val is None:
+                raise ValidationError("Thiếu giá trị đo đạc (value hoặc readingValue).")
+            readings_data = [{
+                'metricCode': data.get('metricCode', 'VIBRATION'),
+                'value': val,
+                'unit': data.get('unit'),
+                'remarks': data.get('remarks')
+            }]
+
+        machine_state = data.get('machineState', 'RUNNING')
+        ambient_temp = data.get('ambientTemperature')
+        rec_time = data.get('recordedAt') or data.get('readingDate') or timezone.now()
+
+        # Liên kết với Work Order nếu được gửi lên từ quy trình bảo dưỡng
+        work_order = None
+        work_order_id = data.get('workOrderId') or data.get('work_order_id') or request.data.get('workOrderId') or request.data.get('work_order_id')
+        if work_order_id:
+            from workorders.models import WorkOrder
+            work_order = WorkOrder.objects.filter(id=work_order_id, tenant_id=asset.tenant_id).first()
+
+        # Thực thi qua ConditionMonitoringEngine
+        result = ConditionMonitoringEngine.process_readings(
             asset=asset,
-            reading_value=data['readingValue'],
-            reading_date=data.get('readingDate') or timezone.now(),
-            unit=data.get('unit'),
-            remarks=data.get('remarks')
+            readings_data=readings_data,
+            machine_state=machine_state,
+            ambient_temperature=ambient_temp,
+            recorded_at=rec_time,
+            recorded_by=request.user if request.user and request.user.is_authenticated else None,
+            tenant=asset.tenant,
+            work_order=work_order
         )
-        
-        return success_response(MeterReadingSerializer(reading).data, message="Created")
+
+        return success_response(result, message="Created")
+
+
+class AssetAnomalyHistoryView(APIView):
+    def get(self, request, asset_id):
+        if not HasPermission('asset:read')().has_permission(request, self):
+            self.permission_denied(request)
+
+        try:
+            asset = Asset.objects.get(id=asset_id, is_active=True)
+        except Asset.DoesNotExist:
+            raise ValidationError("Asset not found")
+
+        readings = MeterReading.objects.filter(asset=asset).order_by('-reading_date')[:50]
+        alerts = AssetAnomalyAlert.objects.filter(asset=asset).order_by('-last_detected_at')[:20]
+
+        # Tính toán đường xu hướng Theil-Sen cho độ rung
+        vib_readings = list(MeterReading.objects.filter(
+            asset=asset,
+            metric_code='VIBRATION',
+            machine_state='RUNNING',
+            is_pre_repair=False,
+            is_suppressed=False
+        ).order_by('reading_date'))
+
+        trend_summary = None
+        if len(vib_readings) >= 5:
+            trend_summary = evaluate_trend_drift(
+                timestamps=[r.reading_date for r in vib_readings],
+                values=[float(r.reading_value) for r in vib_readings],
+                limit_value=7.1
+            )
+
+        data = {
+            "assetId": str(asset.id),
+            "assetName": asset.name,
+            "isStaticAsset": is_static_asset(asset),
+            "readings": MeterReadingSerializer(readings, many=True).data,
+            "alerts": AssetAnomalyAlertSerializer(alerts, many=True).data,
+            "trendDrift": trend_summary,
+            "isoBenchmark": {
+                "standard": "ISO 10816-3",
+                "metric": "VIBRATION",
+                "zones": [
+                    {"zone": "ZONE_AB", "range": "< 2.8 mm/s", "label": "Tốt / Đạt chuẩn", "color": "green"},
+                    {"zone": "ZONE_C", "range": "2.8 - 7.1 mm/s", "label": "Cảnh báo - Cần theo dõi", "color": "yellow"},
+                    {"zone": "ZONE_D", "range": "> 7.1 mm/s", "label": "Nguy hiểm - Dừng máy khẩn cấp", "color": "red"}
+                ]
+            }
+        }
+        return success_response(data)
+
+
+class ConditionMonitoringAlertFeedbackView(APIView):
+    def post(self, request, alert_id):
+        if not (HasPermission('asset:update')().has_permission(request, self) or HasPermission('work_order:update')().has_permission(request, self)):
+            self.permission_denied(request)
+
+        try:
+            alert = AssetAnomalyAlert.objects.get(id=alert_id)
+        except AssetAnomalyAlert.DoesNotExist:
+            raise ValidationError("Alert not found")
+
+        feedback = str(request.data.get('feedback') or request.data.get('status') or '').strip().upper()
+        notes = request.data.get('notes', '')
+
+        # Quy Tắc 8 & TC-ANOM-08: Quản đốc đánh dấu Báo động giả
+        if feedback in ('FALSE_ALARM', 'FALSE_POSITIVE', 'SPURIOUS'):
+            alert.status = 'FALSE_ALARM'
+            alert.is_suppressed = True
+            if alert.reading:
+                alert.reading.is_suppressed = True
+                alert.reading.save()
+            if notes:
+                alert.message = f"{alert.message or ''} [Quản đốc phản hồi: {notes}]".strip()
+            alert.save()
+        elif feedback in ('CONFIRMED', 'ACKNOWLEDGED'):
+            alert.status = 'ACKNOWLEDGED'
+            if notes:
+                alert.message = f"{alert.message or ''} [Quản đốc xác nhận: {notes}]".strip()
+            alert.save()
+        elif feedback == 'RESOLVED':
+            alert.status = 'RESOLVED'
+            alert.save()
+        else:
+            raise ValidationError(f"Phản hồi không hợp lệ: {feedback}. Hỗ trợ: FALSE_ALARM, CONFIRMED, RESOLVED")
+
+        return success_response(AssetAnomalyAlertSerializer(alert).data, message="Phản hồi đã được ghi nhận")
 
 class AssetTreeView(APIView):
     def get(self, request):

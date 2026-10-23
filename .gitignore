@@ -8,6 +8,9 @@
 *.pem
 *.key
 *.secret
+TEST_CREDENTIALS.md
+*CREDENTIALS*.md
+CREDENTIALS.md
 
 node_modules/
 dist/

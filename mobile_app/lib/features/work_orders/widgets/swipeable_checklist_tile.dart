@@ -123,16 +123,57 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.title,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.neutral900,
-                            height: 1.3,
-                            decoration: _isCompleted ? TextDecoration.lineThrough : null,
-                            decorationColor: AppTheme.neutral400,
-                          ),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.neutral900,
+                                height: 1.3,
+                                decoration: _isCompleted ? TextDecoration.lineThrough : null,
+                                decorationColor: AppTheme.neutral400,
+                              ),
+                            ),
+                            if (widget.isMandatory)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFffe4e6),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFfecdd3)),
+                                ),
+                                child: const Text(
+                                  '* BẮT BUỘC',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFbe123c),
+                                  ),
+                                ),
+                              ),
+                            if (widget.inputType == 'NUMBER')
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFe0f2fe),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFbae6fd)),
+                                ),
+                                child: const Text(
+                                  'ĐO SỐ LIỆU',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0369a1),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         if (widget.subtitle != null && !_isCompleted) ...[
                           const SizedBox(height: 6),
@@ -154,21 +195,34 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                           ),
                         ],
                         if (widget.expectedValue != null && widget.expectedValue!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Yêu cầu: ${widget.expectedValue}',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.neutral500),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFf8fafc),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFe2e8f0)),
+                            ),
+                            child: Text(
+                              '🎯 Tiêu chuẩn: ${widget.expectedValue}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
                           ),
                         ],
                         if (widget.inputType == 'NUMBER' || widget.inputType == 'TEXT') ...[
                           const SizedBox(height: 8),
                           TextFormField(
                             initialValue: widget.actualValue,
-                            keyboardType: widget.inputType == 'NUMBER' ? TextInputType.number : TextInputType.text,
+                            keyboardType: widget.inputType == 'NUMBER' ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
                             enabled: widget.onChanged != null,
                             decoration: InputDecoration(
-                              hintText: widget.inputType == 'NUMBER' ? 'Nhập số liệu...' : 'Nhập ghi chú...',
+                              hintText: widget.inputType == 'NUMBER' ? 'Nhập số liệu thực tế...' : 'Nhập ghi chú...',
                               isDense: true,
+                              prefixIcon: widget.inputType == 'NUMBER' ? const Icon(Icons.speed, size: 18, color: AppTheme.primaryColor) : null,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -176,6 +230,11 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                               ),
                             ),
                             onChanged: (val) {
+                              if (val.trim().isNotEmpty && !_isCompleted) {
+                                setState(() {
+                                  _isCompleted = true;
+                                });
+                              }
                               if (widget.onValueChanged != null) {
                                 widget.onValueChanged!(val);
                               }

@@ -264,105 +264,225 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
 
   void _showLogMeterDialog() {
     final valueController = TextEditingController();
-    final unitController = TextEditingController();
+    final unitController = TextEditingController(text: 'mm/s');
+    final customMetricController = TextEditingController();
     final notesController = TextEditingController();
+    String metricCode = 'VIBRATION';
+    String machineState = 'RUNNING';
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Cập nhật chỉ số (Meter)'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: valueController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Chỉ số mới (bắt buộc)',
-                    border: OutlineInputBorder(),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Cập nhật chỉ số (Meter Reading)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: metricCode,
+                      decoration: const InputDecoration(
+                        labelText: 'Loại chỉ số đo',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'VIBRATION', child: Text('Độ rung RMS (VIBRATION)')),
+                        DropdownMenuItem(value: 'TEMPERATURE', child: Text('Nhiệt độ (TEMPERATURE)')),
+                        DropdownMenuItem(value: 'PRESSURE', child: Text('Áp suất (PRESSURE)')),
+                        DropdownMenuItem(value: 'CURRENT', child: Text('Dòng điện (CURRENT)')),
+                        DropdownMenuItem(value: 'VOLTAGE', child: Text('Điện áp (VOLTAGE)')),
+                        DropdownMenuItem(value: 'RPM', child: Text('Tốc độ vòng quay (RPM)')),
+                        DropdownMenuItem(value: 'FLOW_RATE', child: Text('Lưu lượng (FLOW_RATE)')),
+                        DropdownMenuItem(value: 'OIL_LEVEL', child: Text('Mức dầu bôi trơn (OIL_LEVEL)')),
+                        DropdownMenuItem(value: 'RUN_HOURS', child: Text('Giờ vận hành (RUN_HOURS)')),
+                        DropdownMenuItem(value: 'NOISE', child: Text('Độ ồn (NOISE)')),
+                        DropdownMenuItem(value: 'CUSTOM', child: Text('Khác... (Chỉ số tùy chỉnh)')),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          metricCode = val ?? 'VIBRATION';
+                          if (metricCode == 'VIBRATION') {
+                            unitController.text = 'mm/s';
+                          } else if (metricCode == 'TEMPERATURE') {
+                            unitController.text = '°C';
+                          } else if (metricCode == 'PRESSURE') {
+                            unitController.text = 'bar';
+                          } else if (metricCode == 'CURRENT') {
+                            unitController.text = 'A';
+                          } else if (metricCode == 'VOLTAGE') {
+                            unitController.text = 'V';
+                          } else if (metricCode == 'RPM') {
+                            unitController.text = 'v/p';
+                          } else if (metricCode == 'FLOW_RATE') {
+                            unitController.text = 'm³/h';
+                          } else if (metricCode == 'OIL_LEVEL') {
+                            unitController.text = '%';
+                          } else if (metricCode == 'RUN_HOURS') {
+                            unitController.text = 'h';
+                          } else if (metricCode == 'NOISE') {
+                            unitController.text = 'dB';
+                          } else if (metricCode == 'CUSTOM') {
+                            unitController.text = '';
+                          }
+                        });
+                      },
+                    ),
+                    if (metricCode == 'CUSTOM') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: customMetricController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Mã chỉ số tùy chỉnh (*)',
+                          hintText: 'VD: RPM, NOISE, FLOW_RATE',
+                          border: OutlineInputBorder(),
+                          helperText: 'Chữ in hoa, số và dấu gạch dưới',
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: valueController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Chỉ số mới (bắt buộc)',
+                        hintText: 'VD: 1.2 hoặc 7.8',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: unitController,
+                      decoration: const InputDecoration(
+                        labelText: 'Đơn vị tính',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: machineState,
+                      decoration: const InputDecoration(
+                        labelText: 'Trạng thái vận hành máy',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'RUNNING', child: Text('Đang chạy ổn định (RUNNING)')),
+                        DropdownMenuItem(value: 'WARM_UP', child: Text('Đang khởi động (WARM-UP)')),
+                        DropdownMenuItem(value: 'IDLE', child: Text('Không tải / Nghỉ (IDLE)')),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          machineState = val ?? 'RUNNING';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Ghi chú',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: unitController,
-                  decoration: const InputDecoration(
-                    labelText: 'Đơn vị tính (VD: km, giờ)',
-                    border: OutlineInputBorder(),
-                  ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy'),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Ghi chú',
-                    border: OutlineInputBorder(),
+                ElevatedButton(
+                  onPressed: () async {
+                    String effectiveMetric = metricCode;
+                    if (metricCode == 'CUSTOM') {
+                      final customCode = customMetricController.text.trim().toUpperCase();
+                      if (customCode.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vui lòng nhập mã chỉ số đo tùy chỉnh!'),
+                            backgroundColor: AppTheme.dangerColor,
+                          ),
+                        );
+                        return;
+                      }
+                      final regex = RegExp(r'^[A-Z0-9_\-]+$');
+                      if (!regex.hasMatch(customCode)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Mã chỉ số đo chỉ gồm chữ cái, số, gạch dưới hoặc gạch nối.'),
+                            backgroundColor: AppTheme.dangerColor,
+                          ),
+                        );
+                        return;
+                      }
+                      effectiveMetric = customCode;
+                    }
+
+                    final val = double.tryParse(valueController.text.trim().replaceFirst(',', '.'));
+                    if (val == null || val.isNaN || val.isInfinite) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng nhập chỉ số là số hợp lệ',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          backgroundColor: AppTheme.dangerColor,
+                        ),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(context); // Close dialog
+
+                    final success = await _workOrderService
+                        .logMeterReading(widget.equipment['id'], {
+                          'metricCode': effectiveMetric,
+                          'readingValue': val,
+                          'unit': unitController.text.trim(),
+                          'machineState': machineState,
+                          'remarks': notesController.text.trim(),
+                          'readingDate': DateTime.now().toIso8601String(),
+                        });
+
+                    if (mounted) {
+                      if (success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              effectiveMetric == 'VIBRATION' && val > 4.5
+                                  ? '⚠️ CẢNH BÁO: Độ rung $val mm/s vượt ngưỡng Zone D! Đã kích hoạt cảnh báo bất thường.'
+                                  : 'Cập nhật chỉ số thành công ($effectiveMetric: $val ${unitController.text})',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: (effectiveMetric == 'VIBRATION' && val > 4.5) ? AppTheme.dangerColor : AppTheme.successColor,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Lỗi khi cập nhật chỉ số',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: AppTheme.dangerColor,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
                   ),
-                  maxLines: 2,
+                  child: const Text('Lưu', style: TextStyle(color: Colors.white)),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final val = double.tryParse(valueController.text);
-                if (val == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Vui lòng nhập chỉ số hợp lệ',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: AppTheme.dangerColor,
-                    ),
-                  );
-                  return;
-                }
-
-                Navigator.pop(context); // Close dialog
-
-                final success = await _workOrderService
-                    .logMeterReading(widget.equipment['id'], {
-                      'readingValue': val,
-                      'unit': unitController.text,
-                      'remarks': notesController.text,
-                      'readingDate': DateTime.now().toIso8601String(),
-                    });
-
-                if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Cập nhật chỉ số thành công',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: AppTheme.successColor,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Lỗi khi cập nhật chỉ số',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      backgroundColor: AppTheme.dangerColor,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-              ),
-              child: const Text('Lưu', style: TextStyle(color: Colors.white)),
-            ),
-          ],
+            );
+          },
         );
       },
     );

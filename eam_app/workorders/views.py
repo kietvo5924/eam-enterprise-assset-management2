@@ -467,14 +467,58 @@ class WorkOrderChecklistView(APIView):
             item = WorkOrderChecklistItem(
                 work_order=wo,
                 item_name=data['itemName'],
-                is_mandatory=False,
-                input_type='PASS_FAIL'
+                is_mandatory=data.get('isMandatory', False),
+                input_type=data.get('inputType', 'PASS_FAIL'),
+                expected_value=data.get('expectedValue')
             )
+        else:
+            if 'inputType' in data:
+                item.input_type = data['inputType']
+            if 'expectedValue' in data:
+                item.expected_value = data['expectedValue']
+            if 'isMandatory' in data:
+                item.is_mandatory = data['isMandatory']
             
         item.is_completed = data['isCompleted']
         if 'actualValue' in data:
             item.actual_value = data['actualValue']
         item.save()
+
+        # Tự động đồng bộ số đo cảm biến vào Condition Monitoring nếu là loại NUMBER
+        if item.input_type == 'NUMBER' and item.actual_value and wo.asset:
+            try:
+                num_val = float(str(item.actual_value).strip().replace(',', '.'))
+                lower_name = item.item_name.lower()
+                metric_code = 'VIBRATION'
+                unit_str = 'mm/s'
+                if 'nhiệt' in lower_name or 'temp' in lower_name:
+                    metric_code = 'TEMPERATURE'
+                    unit_str = '°C'
+                elif 'áp' in lower_name or 'press' in lower_name:
+                    metric_code = 'PRESSURE'
+                    unit_str = 'bar'
+                elif 'dòng' in lower_name or 'current' in lower_name:
+                    metric_code = 'CURRENT'
+                    unit_str = 'A'
+
+                from algorithms.condition_monitoring import ConditionMonitoringEngine
+                from django.utils import timezone
+                ConditionMonitoringEngine.process_readings(
+                    asset=wo.asset,
+                    readings_data=[{
+                        'metricCode': metric_code,
+                        'value': num_val,
+                        'unit': unit_str,
+                        'remarks': f"Ghi nhận từ phiếu bảo trì {wo.code or wo.title} - mục {item.item_name}"
+                    }],
+                    machine_state='RUNNING',
+                    recorded_at=timezone.now(),
+                    recorded_by=request.user if request.user and request.user.is_authenticated else None,
+                    tenant=wo.tenant,
+                    work_order=wo
+                )
+            except Exception:
+                pass
         
         return success_response(WorkOrderChecklistItemSerializer(item).data)
 

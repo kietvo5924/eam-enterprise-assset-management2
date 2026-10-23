@@ -26,6 +26,111 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
   List<Map<String, dynamic>> _assets = [];
 
   final List<String> _priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+  final List<Map<String, dynamic>> _checklists = [];
+
+  void _addChecklistPreset(String name, String type, String expected, bool mandatory) {
+    setState(() {
+      _checklists.add({
+        'itemName': name,
+        'inputType': type,
+        'expectedValue': expected,
+        'isMandatory': mandatory,
+      });
+    });
+  }
+
+  void _showAddChecklistModal() {
+    String name = '';
+    String type = 'PASS_FAIL';
+    String expected = '';
+    bool mandatory = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Thêm Bước / Chỉ Số Đo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Tên bước hoặc chỉ số đo (*)',
+                        hintText: 'VD: Đo độ rung RMS, Kiểm tra bu-lông',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => name = val,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: type,
+                      decoration: const InputDecoration(
+                        labelText: 'Loại dữ liệu',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'PASS_FAIL', child: Text('Đạt / Không đạt (Checklist)')),
+                        DropdownMenuItem(value: 'NUMBER', child: Text('Đo số liệu (Cảm biến/Thước đo)')),
+                        DropdownMenuItem(value: 'TEXT', child: Text('Ghi chú văn bản')),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          type = val ?? 'PASS_FAIL';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Tiêu chuẩn / Giá trị kỳ vọng',
+                        hintText: 'VD: <= 4.5 mm/s, Đạt chuẩn',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => expected = val,
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Bắt buộc đo kiểm / hoàn thành', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      value: mandatory,
+                      activeThumbColor: AppTheme.dangerColor,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          mandatory = val;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    if (name.trim().isEmpty) return;
+                    _addChecklistPreset(name.trim(), type, expected.trim(), mandatory);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Thêm vào danh sách', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -59,6 +164,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       'priority': _priority,
       'deadline': _deadline.toUtc().toIso8601String(),
       'assetId': _selectedAssetId,
+      'checklists': _checklists,
     };
 
     final success = await _service.createWorkOrder(data);
@@ -437,7 +543,145 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                   ),
                 ),
               
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
+              _buildSectionTitle('QUY TRÌNH & ĐO KIỂM (CHECKLISTS)'),
+              const SizedBox(height: 8),
+
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.speed, size: 14, color: Color(0xFF0369a1)),
+                      label: const Text('+ Độ rung RMS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0369a1))),
+                      backgroundColor: const Color(0xFFe0f2fe),
+                      side: const BorderSide(color: Color(0xFFbae6fd)),
+                      onPressed: () => _addChecklistPreset('Đo kiểm độ rung RMS', 'NUMBER', '<= 4.5 mm/s (ISO 10816-3)', true),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.thermostat, size: 14, color: Color(0xFFb45309)),
+                      label: const Text('+ Nhiệt độ ổ bi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFb45309))),
+                      backgroundColor: const Color(0xFFfef3c7),
+                      side: const BorderSide(color: Color(0xFFfde68a)),
+                      onPressed: () => _addChecklistPreset('Đo nhiệt độ ổ trục động cơ', 'NUMBER', '< 70°C', true),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.compress, size: 14, color: Color(0xFF047857)),
+                      label: const Text('+ Áp suất dầu', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF047857))),
+                      backgroundColor: const Color(0xFFd1fae5),
+                      side: const BorderSide(color: Color(0xFFa7f3d0)),
+                      onPressed: () => _addChecklistPreset('Kiểm tra áp suất dầu bôi trơn', 'NUMBER', '2.5 - 4.0 bar', false),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.add, size: 14, color: AppTheme.primaryColor),
+                      label: const Text('+ Tự nhập bước', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryColor)),
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: AppTheme.primaryColor),
+                      onPressed: _showAddChecklistModal,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              if (_checklists.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.neutral200),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Chưa có bước thực hiện nào. Nhấn các nút trên để thêm nhanh.',
+                      style: TextStyle(color: AppTheme.neutral400, fontSize: 13),
+                    ),
+                  ),
+                )
+              else
+                ..._checklists.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final item = entry.value;
+                  final isMandatory = item['isMandatory'] == true;
+                  final isNumber = item['inputType'] == 'NUMBER';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.neutral200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isNumber ? Icons.speed : Icons.check_circle_outline,
+                          size: 18,
+                          color: isNumber ? const Color(0xFF0284c7) : AppTheme.neutral500,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    item['itemName'],
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  if (isMandatory)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFffe4e6),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text('* BẮT BUỘC', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFbe123c))),
+                                    ),
+                                  if (isNumber)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFe0f2fe),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text('ĐO SỐ LIỆU', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF0369a1))),
+                                    ),
+                                ],
+                              ),
+                              if (item['expectedValue'] != null && (item['expectedValue'] as String).isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '🎯 Tiêu chuẩn: ${item['expectedValue']}',
+                                    style: const TextStyle(fontSize: 11, color: AppTheme.neutral500),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: AppTheme.dangerColor, size: 18),
+                          onPressed: () {
+                            setState(() {
+                              _checklists.removeAt(idx);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+
+              const SizedBox(height: 32),
               
               Container(
                 decoration: BoxDecoration(

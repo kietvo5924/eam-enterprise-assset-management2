@@ -33,9 +33,10 @@ def global_exception_handler(exc, context):
     
     # Non-DRF exceptions
     if isinstance(exc, DjangoValidationError):
+        msg = getattr(exc, 'messages', None) or getattr(exc, 'message_dict', None) or getattr(exc, 'message', None) or str(exc)
         return Response({
             'success': False,
-            'message': str(exc.message if hasattr(exc, 'message') else exc),
+            'message': str(msg),
             'data': None
         }, status=status.HTTP_400_BAD_REQUEST)
         

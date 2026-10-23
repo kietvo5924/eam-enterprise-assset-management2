@@ -1624,11 +1624,15 @@ def portal_work_orders(request):
             elif action == 'add_checklist':
                 if not check_perm(request, 'work_order:update'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
-                wo = WorkOrder.objects.get(id=data.get('work_order_id'), tenant_id=tenant_id)
+                wo_target_id = data.get('work_order_id') or data.get('wo_id')
+                wo = WorkOrder.objects.get(id=wo_target_id, tenant_id=tenant_id)
                 item = WorkOrderChecklistItem.objects.create(
                     tenant_id=tenant_id,
                     work_order=wo,
-                    item_name=data.get('item_name')
+                    item_name=data.get('item_name'),
+                    input_type=data.get('input_type', 'PASS_FAIL'),
+                    expected_value=data.get('expected_value') or None,
+                    is_mandatory=bool(data.get('is_mandatory', False))
                 )
                 return JsonResponse({'success': True, 'id': str(item.id)})
                 
@@ -1701,6 +1705,8 @@ def portal_work_orders(request):
                     description=data.get('description'),
                     priority=priority_val,
                     status=data.get('status', 'CREATED'),
+                    type=data.get('type', 'CORRECTIVE'),
+                    parent_id_id=data.get('parent_id') if data.get('parent_id') else None,
                     asset_id=asset_id,
                     assigned_to_id=assigned_to_id if assigned_to_id else None,
                     deadline=deadline_dt,
@@ -1722,6 +1728,29 @@ def portal_work_orders(request):
                     maintenance_window_start=parse_time_val(data.get('maintenance_window_start')),
                     maintenance_window_end=parse_time_val(data.get('maintenance_window_end')),
                 )
+
+                # Save initial checklists if provided
+                if 'checklists' in data and isinstance(data['checklists'], list):
+                    from workorders.models import WorkOrderChecklistItem
+                    for pc in data['checklists']:
+                        c_name = str(pc.get('item_name') or pc.get('itemName') or '').strip()
+                        if not c_name:
+                            continue
+                        c_type = str(pc.get('input_type') or pc.get('inputType') or 'PASS_FAIL').upper()
+                        if c_type not in ('PASS_FAIL', 'NUMBER', 'TEXT'):
+                            c_type = 'PASS_FAIL'
+                        c_exp = str(pc.get('expected_value') or pc.get('expectedValue') or '').strip() or None
+                        c_mand = bool(pc.get('is_mandatory') if 'is_mandatory' in pc else pc.get('isMandatory', False))
+                        WorkOrderChecklistItem.objects.create(
+                            tenant_id=tenant_id,
+                            work_order=wo,
+                            item_name=c_name,
+                            input_type=c_type,
+                            expected_value=c_exp,
+                            is_mandatory=c_mand,
+                            is_completed=False
+                        )
+
                 return JsonResponse({'success': True, 'id': str(wo.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -1729,7 +1758,8 @@ def portal_work_orders(request):
     elif request.method == 'PUT':
         try:
             data = json.loads(request.body)
-            wo = WorkOrder.objects.get(id=data.get('id'), tenant_id=tenant_id)
+            wo_id = data.get('id') or request.GET.get('id')
+            wo = WorkOrder.objects.get(id=wo_id, tenant_id=tenant_id)
             from django.utils import timezone
             
             # 1. Update Status Action
@@ -1915,6 +1945,46 @@ def portal_work_orders(request):
                         wo.maintenance_window_end = None
 
                 wo.save()
+
+                # Sync checklists if provided
+                if 'checklists' in data and isinstance(data['checklists'], list):
+                    from workorders.models import WorkOrderChecklistItem
+                    kept_ids = set()
+                    for pc in data['checklists']:
+                        cid = pc.get('id')
+                        c_name = str(pc.get('item_name') or pc.get('itemName') or '').strip()
+                        if not c_name:
+                            continue
+                        c_type = str(pc.get('input_type') or pc.get('inputType') or 'PASS_FAIL').upper()
+                        if c_type not in ('PASS_FAIL', 'NUMBER', 'TEXT'):
+                            c_type = 'PASS_FAIL'
+                        c_exp = str(pc.get('expected_value') or pc.get('expectedValue') or '').strip() or None
+                        c_mand = bool(pc.get('is_mandatory') if 'is_mandatory' in pc else pc.get('isMandatory', False))
+
+                        if cid:
+                            existing_item = WorkOrderChecklistItem.objects.filter(id=cid, work_order=wo, tenant_id=tenant_id).first()
+                            if existing_item:
+                                existing_item.item_name = c_name
+                                existing_item.input_type = c_type
+                                existing_item.expected_value = c_exp
+                                existing_item.is_mandatory = c_mand
+                                existing_item.save()
+                                kept_ids.add(str(existing_item.id))
+                                continue
+
+                        new_item = WorkOrderChecklistItem.objects.create(
+                            tenant_id=tenant_id,
+                            work_order=wo,
+                            item_name=c_name,
+                            input_type=c_type,
+                            expected_value=c_exp,
+                            is_mandatory=c_mand,
+                            is_completed=False
+                        )
+                        kept_ids.add(str(new_item.id))
+
+                    wo.checklists.exclude(id__in=kept_ids).filter(is_completed=False).delete()
+
                 return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -1973,6 +2043,7 @@ def portal_work_orders(request):
         })
 
         wo_metadata[str(wo.id)] = {
+            'checklists': checklists,
             'required_skill': wo.required_skill or '',
             'min_skill_level': wo.min_skill_level if wo.min_skill_level is not None else '',
             'required_certification': wo.required_certification or '',

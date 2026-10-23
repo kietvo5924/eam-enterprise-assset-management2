@@ -199,19 +199,102 @@ class Asset(BaseTenantModel):
                 pass
 
 class MeterReading(BaseTenantModel):
+    MACHINE_STATE_CHOICES = (
+        ('RUNNING', 'Running'),
+        ('WARM_UP', 'Warm-Up'),
+        ('IDLE', 'Idle'),
+    )
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='meter_readings')
+    metric_code = models.CharField(max_length=64, default='VIBRATION')
     reading_value = models.DecimalField(max_digits=19, decimal_places=2)
     reading_date = models.DateTimeField()
     unit = models.CharField(max_length=50, null=True, blank=True)
+    ambient_temperature = models.FloatField(null=True, blank=True)
+    machine_state = models.CharField(max_length=20, choices=MACHINE_STATE_CHOICES, default='RUNNING')
+    is_pre_repair = models.BooleanField(default=False)
+    is_suppressed = models.BooleanField(default=False)
+    recorded_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_meter_readings')
+    work_order = models.ForeignKey('workorders.WorkOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='meter_readings')
     remarks = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'meter_readings'
+        indexes = [
+            models.Index(fields=['tenant', 'asset', 'metric_code', 'reading_date']),
+            models.Index(fields=['tenant', 'asset', 'machine_state']),
+        ]
 
     def __str__(self):
-        return f"{self.asset.name} - {self.reading_value} {self.unit}"
+        return f"{self.asset.name} - {self.metric_code}: {self.reading_value} {self.unit or ''}"
+
+    @property
+    def value(self):
+        return float(self.reading_value) if self.reading_value is not None else 0.0
+
+    @value.setter
+    def value(self, val):
+        self.reading_value = val
+
+    @property
+    def recorded_at(self):
+        return self.reading_date
+
+    @recorded_at.setter
+    def recorded_at(self, val):
+        self.reading_date = val
+
+
+class AssetAnomalyAlert(BaseTenantModel):
+    STATUS_CHOICES = (
+        ('OPEN', 'Open'),
+        ('ACKNOWLEDGED', 'Acknowledged'),
+        ('RESOLVED', 'Resolved'),
+        ('FALSE_ALARM', 'False Alarm'),
+    )
+
+    SEVERITY_CHOICES = (
+        ('WARNING', 'Warning'),
+        ('CRITICAL', 'Critical'),
+    )
+
+    METRIC_TYPE_CHOICES = (
+        ('SINGLE_METRIC', 'Single Metric'),
+        ('MULTIVARIATE', 'Multivariate'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='anomaly_alerts')
+    reading = models.ForeignKey(MeterReading, on_delete=models.SET_NULL, null=True, blank=True, related_name='anomaly_alerts')
+    metric_type = models.CharField(max_length=32, choices=METRIC_TYPE_CHOICES, default='SINGLE_METRIC')
+    metric_code = models.CharField(max_length=64, default='VIBRATION')
+    current_value = models.FloatField()
+    z_score = models.FloatField(null=True, blank=True)
+    anomaly_score = models.FloatField(null=True, blank=True)
+    trend_slope = models.FloatField(null=True, blank=True)
+    predicted_failure_date = models.DateField(null=True, blank=True)
+    days_remaining = models.IntegerField(null=True, blank=True)
+    severity = models.CharField(max_length=16, choices=SEVERITY_CHOICES, default='WARNING')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='OPEN')
+    occurrence_count = models.IntegerField(default=1)
+    is_suppressed = models.BooleanField(default=False)
+    draft_work_order = models.ForeignKey('workorders.WorkOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='anomaly_alerts')
+    message = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_detected_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'asset_anomaly_alerts'
+        ordering = ['-last_detected_at']
+        indexes = [
+            models.Index(fields=['tenant', 'asset', 'status']),
+            models.Index(fields=['tenant', 'status']),
+        ]
+
+    def __str__(self):
+        return f"Alert {self.asset.name} - {self.metric_code} ({self.severity} / {self.status})"
 
 class StockTransaction(BaseTenantModel):
     TRANSACTION_TYPE_CHOICES = (

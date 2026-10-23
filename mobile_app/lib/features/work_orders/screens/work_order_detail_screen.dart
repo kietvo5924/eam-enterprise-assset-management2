@@ -82,58 +82,462 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
     }
   }
 
+  Future<void> _showLogMeterReadingModal() async {
+    if (_workOrder?.assetId == null) return;
+    
+    final vibController = TextEditingController();
+    final tempController = TextEditingController();
+    final extraCustomCodeController = TextEditingController();
+    final extraValController = TextEditingController();
+    final extraUnitController = TextEditingController();
+    String extraMetricType = 'NONE';
+    String machineState = 'RUNNING';
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFe0f2fe),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.speed, color: Color(0xFF0369a1), size: 20),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Đo kiểm & Phân tích hiện trường',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Nhập chỉ số cảm biến để hệ thống AI phân tích tình trạng bất thường ngay lập tức.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.neutral500),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: vibController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Độ rung RMS (mm/s)',
+                        hintText: 'VD: 1.2 hoặc 7.8',
+                        prefixIcon: Icon(Icons.speed, color: Color(0xFF0369a1)),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tempController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Nhiệt độ ổ trục (°C)',
+                        hintText: 'VD: 45.0',
+                        prefixIcon: Icon(Icons.thermostat, color: Color(0xFFb45309)),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: extraMetricType,
+                      decoration: const InputDecoration(
+                        labelText: 'Chỉ số đo bổ sung / tùy chỉnh',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'NONE', child: Text('-- Không thêm chỉ số khác --')),
+                        DropdownMenuItem(value: 'PRESSURE', child: Text('Áp suất (PRESSURE - bar)')),
+                        DropdownMenuItem(value: 'CURRENT', child: Text('Dòng điện (CURRENT - A)')),
+                        DropdownMenuItem(value: 'VOLTAGE', child: Text('Điện áp (VOLTAGE - V)')),
+                        DropdownMenuItem(value: 'RPM', child: Text('Tốc độ vòng quay (RPM - v/p)')),
+                        DropdownMenuItem(value: 'FLOW_RATE', child: Text('Lưu lượng (FLOW_RATE - m³/h)')),
+                        DropdownMenuItem(value: 'OIL_LEVEL', child: Text('Mức dầu (OIL_LEVEL - %)')),
+                        DropdownMenuItem(value: 'RUN_HOURS', child: Text('Giờ vận hành (RUN_HOURS - h)')),
+                        DropdownMenuItem(value: 'NOISE', child: Text('Độ ồn (NOISE - dB)')),
+                        DropdownMenuItem(value: 'CUSTOM', child: Text('Khác... (Chỉ số tùy chỉnh)')),
+                      ],
+                      onChanged: (val) {
+                        setModalState(() {
+                          extraMetricType = val ?? 'NONE';
+                          if (extraMetricType == 'PRESSURE') {
+                            extraUnitController.text = 'bar';
+                          } else if (extraMetricType == 'CURRENT') {
+                            extraUnitController.text = 'A';
+                          } else if (extraMetricType == 'VOLTAGE') {
+                            extraUnitController.text = 'V';
+                          } else if (extraMetricType == 'RPM') {
+                            extraUnitController.text = 'v/p';
+                          } else if (extraMetricType == 'FLOW_RATE') {
+                            extraUnitController.text = 'm³/h';
+                          } else if (extraMetricType == 'OIL_LEVEL') {
+                            extraUnitController.text = '%';
+                          } else if (extraMetricType == 'RUN_HOURS') {
+                            extraUnitController.text = 'h';
+                          } else if (extraMetricType == 'NOISE') {
+                            extraUnitController.text = 'dB';
+                          } else if (extraMetricType == 'CUSTOM') {
+                            extraUnitController.text = '';
+                          }
+                        });
+                      },
+                    ),
+                    if (extraMetricType == 'CUSTOM') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: extraCustomCodeController,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Mã chỉ số tùy chỉnh (*)',
+                          hintText: 'VD: RPM, NOISE, FLOW_RATE',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                    if (extraMetricType != 'NONE') ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: extraValController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Giá trị bổ sung (*)',
+                                hintText: 'Nhập số đo...',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 1,
+                            child: TextField(
+                              controller: extraUnitController,
+                              decoration: const InputDecoration(
+                                labelText: 'Đơn vị',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: machineState,
+                      decoration: const InputDecoration(
+                        labelText: 'Trạng thái vận hành máy',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'RUNNING', child: Text('Đang chạy ổn định (RUNNING)')),
+                        DropdownMenuItem(value: 'WARM_UP', child: Text('Đang khởi động (WARM-UP)')),
+                        DropdownMenuItem(value: 'IDLE', child: Text('Không tải / Nghỉ (IDLE)')),
+                      ],
+                      onChanged: (val) {
+                        setModalState(() {
+                          machineState = val ?? 'RUNNING';
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Đóng'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final readings = <Map<String, dynamic>>[];
+
+                          // 1. Kiểm tra độ rung
+                          final vibText = vibController.text.trim().replaceFirst(',', '.');
+                          double? vib;
+                          if (vibText.isNotEmpty) {
+                            vib = double.tryParse(vibText);
+                            if (vib == null || vib.isNaN || vib.isInfinite || vib < 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Vui lòng nhập giá trị độ rung hợp lệ (>= 0)!'),
+                                  backgroundColor: AppTheme.dangerColor,
+                                ),
+                              );
+                              return;
+                            }
+                            readings.add({
+                              'metricCode': 'VIBRATION',
+                              'value': vib,
+                              'unit': 'mm/s',
+                              'remarks': 'Đo kiểm độ rung tại hiện trường',
+                            });
+                          }
+
+                          // 2. Kiểm tra nhiệt độ
+                          final tempText = tempController.text.trim().replaceFirst(',', '.');
+                          if (tempText.isNotEmpty) {
+                            final temp = double.tryParse(tempText);
+                            if (temp == null || temp.isNaN || temp.isInfinite) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Vui lòng nhập nhiệt độ hợp lệ!'),
+                                  backgroundColor: AppTheme.dangerColor,
+                                ),
+                              );
+                              return;
+                            }
+                            readings.add({
+                              'metricCode': 'TEMPERATURE',
+                              'value': temp,
+                              'unit': '°C',
+                              'remarks': 'Nhiệt độ ổ trục đo kiểm di động',
+                            });
+                          }
+
+                          // 3. Kiểm tra chỉ số bổ sung / tùy chỉnh
+                          if (extraMetricType != 'NONE') {
+                            String code = extraMetricType;
+                            if (extraMetricType == 'CUSTOM') {
+                              final customCode = extraCustomCodeController.text.trim().toUpperCase();
+                              if (customCode.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Vui lòng nhập mã chỉ số tùy chỉnh!'),
+                                    backgroundColor: AppTheme.dangerColor,
+                                  ),
+                                );
+                                return;
+                              }
+                              if (!RegExp(r'^[A-Z0-9_\-]+$').hasMatch(customCode)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Mã chỉ số tùy chỉnh chỉ gồm chữ cái, số, gạch dưới hoặc gạch nối.'),
+                                    backgroundColor: AppTheme.dangerColor,
+                                  ),
+                                );
+                                return;
+                              }
+                              code = customCode;
+                            }
+
+                            final extraValText = extraValController.text.trim().replaceFirst(',', '.');
+                            if (extraValText.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Vui lòng nhập giá trị đo cho chỉ số $code!'),
+                                  backgroundColor: AppTheme.dangerColor,
+                                ),
+                              );
+                              return;
+                            }
+                            final extraVal = double.tryParse(extraValText);
+                            if (extraVal == null || extraVal.isNaN || extraVal.isInfinite) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Giá trị đo của chỉ số $code không hợp lệ!'),
+                                  backgroundColor: AppTheme.dangerColor,
+                                ),
+                              );
+                              return;
+                            }
+
+                            readings.add({
+                              'metricCode': code,
+                              'value': extraVal,
+                              'unit': extraUnitController.text.trim(),
+                              'remarks': 'Chỉ số đo bổ sung tại hiện trường',
+                            });
+                          }
+
+                          // Ràng buộc: phải có ít nhất 1 chỉ số đo
+                          if (readings.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Vui lòng nhập ít nhất một chỉ số đo (Độ rung, Nhiệt độ hoặc Chỉ số khác)!'),
+                                backgroundColor: AppTheme.dangerColor,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setModalState(() {
+                            isSubmitting = true;
+                          });
+
+                          final payload = {
+                            'workOrderId': widget.workOrderId,
+                            'machineState': machineState,
+                            'readings': readings,
+                            'readingValue': readings.first['value'],
+                            'metricCode': readings.first['metricCode'],
+                            'readingDate': DateTime.now().toIso8601String(),
+                          };
+
+                          final success = await _service.logMeterReading(
+                            _workOrder!.assetId!,
+                            payload,
+                          );
+
+                          if (mounted) {
+                            Navigator.pop(context);
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    vib != null && vib > 4.5
+                                        ? '⚠️ CẢNH BÁO: Độ rung $vib mm/s vượt ngưỡng Zone D! Đã kích hoạt cảnh báo bất thường.'
+                                        : '✅ Đã ghi nhận ${readings.length} chỉ số đo kiểm thành công.',
+                                  ),
+                                  backgroundColor: (vib != null && vib > 4.5) ? AppTheme.dangerColor : AppTheme.successColor,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                              _fetchWorkOrderDetails();
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Lỗi khi lưu số đo cảm biến. Vui lòng thử lại.'),
+                                  backgroundColor: AppTheme.dangerColor,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Lưu & Phân Tích', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _addChecklistItem() async {
-    String? newItemName;
+    String name = '';
+    String type = 'PASS_FAIL';
+    String expected = '';
+    bool mandatory = false;
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'Thêm bước thực hiện',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Nhập tên bước...',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
-            onChanged: (val) => newItemName = val,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => context.pop(),
-              child: const Text(
-                'Hủy',
-                style: TextStyle(color: AppTheme.neutral500),
-              ),
-            ),
-            TextButton(
-              onPressed: () => context.pop(true),
-              child: const Text(
-                'Thêm',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Thêm bước thực hiện / Chỉ số đo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Tên bước hoặc chỉ số đo (*)',
+                        hintText: 'VD: Đo độ rung RMS, Kiểm tra bu-lông',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => name = val,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: type,
+                      decoration: const InputDecoration(
+                        labelText: 'Loại dữ liệu',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'PASS_FAIL', child: Text('Đạt / Không đạt (Checklist)')),
+                        DropdownMenuItem(value: 'NUMBER', child: Text('Đo số liệu (Cảm biến/Thước đo)')),
+                        DropdownMenuItem(value: 'TEXT', child: Text('Ghi chú văn bản')),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          type = val ?? 'PASS_FAIL';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Tiêu chuẩn / Giá trị kỳ vọng',
+                        hintText: 'VD: <= 4.5 mm/s',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => expected = val,
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Bắt buộc đo kiểm / hoàn thành', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      value: mandatory,
+                      activeThumbColor: AppTheme.dangerColor,
+                      onChanged: (val) {
+                        setDialogState(() {
+                          mandatory = val;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Hủy', style: TextStyle(color: AppTheme.neutral500)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    if (name.trim().isEmpty) return;
+                    Navigator.pop(context, true);
+                  },
+                  child: const Text('Thêm', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
-    if (result == true &&
-        newItemName != null &&
-        newItemName!.trim().isNotEmpty) {
+    if (result == true && name.trim().isNotEmpty) {
       final success = await _service.updateChecklist(
         widget.workOrderId,
-        newItemName!.trim(),
+        name.trim(),
         false,
+        null,
+        type,
+        expected.trim().isNotEmpty ? expected.trim() : null,
+        mandatory,
       );
       if (success && mounted) {
         _fetchWorkOrderDetails();
@@ -506,6 +910,33 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     }
                   }
                 } else {
+                  final missingMandatory = _workOrder?.checklists.any((c) => c.isMandatory && !c.isCompleted) ?? false;
+                  final hasNotes = _workOrder?.resolutionNotes != null && _workOrder!.resolutionNotes!.trim().isNotEmpty;
+                  final hasAttachments = _workOrder?.attachments.isNotEmpty ?? false;
+
+                  if (missingMandatory) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Chưa hoàn thành các bước bắt buộc (*) đo kiểm trước khi đóng phiếu!'),
+                          backgroundColor: AppTheme.dangerColor,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  if (!hasNotes && !hasAttachments) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng nhập ghi chú sửa chữa hoặc tải lên ít nhất một ảnh minh chứng!'),
+                          backgroundColor: AppTheme.dangerColor,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
                   final success = await _service.updateStatus(
                     widget.workOrderId,
                     'COMPLETED',
@@ -516,7 +947,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Vui lòng hoàn thành tất cả các bước và ghi chú trước khi hoàn thành!'),
+                          content: Text('Lỗi khi hoàn thành công việc. Vui lòng kiểm tra lại kết nối hoặc dữ liệu.'),
                           backgroundColor: AppTheme.dangerColor,
                         ),
                       );
@@ -803,14 +1234,38 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     ],
                   ),
                   if (_workOrder!.status != 'COMPLETED')
-                    IconButton(
-                      onPressed: _addChecklistItem,
-                      icon: Icon(
-                        PhosphorIcons.plusCircle(PhosphorIconsStyle.fill),
-                        color: AppTheme.primaryColor,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                    Row(
+                      children: [
+                        if (_workOrder!.assetId != null) ...[
+                          TextButton.icon(
+                            onPressed: _showLogMeterReadingModal,
+                            icon: const Icon(Icons.speed, size: 16, color: Color(0xFF0284c7)),
+                            label: const Text(
+                              'Đo Rung/Nhiệt',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0284c7),
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFFe0f2fe),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        IconButton(
+                          onPressed: _addChecklistItem,
+                          icon: Icon(
+                            PhosphorIcons.plusCircle(PhosphorIconsStyle.fill),
+                            color: AppTheme.primaryColor,
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                     ),
                 ],
               ),

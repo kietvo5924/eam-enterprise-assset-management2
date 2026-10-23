@@ -122,6 +122,12 @@ class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
     isCompleted = serializers.BooleanField(required=False)
     completed = serializers.BooleanField(required=False)
     actualValue = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    inputType = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
+    input_type = serializers.CharField(max_length=50, required=False, allow_blank=True, allow_null=True)
+    expectedValue = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    expected_value = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    isMandatory = serializers.BooleanField(required=False, allow_null=True)
+    is_mandatory = serializers.BooleanField(required=False, allow_null=True)
 
     def validate(self, attrs):
         name = attrs.get('itemName') or attrs.get('item_name')
@@ -135,6 +141,21 @@ class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
         if comp is None:
             comp = False
         attrs['isCompleted'] = comp
+
+        input_type = attrs.get('inputType') or attrs.get('input_type')
+        if input_type:
+            attrs['inputType'] = input_type
+
+        expected_val = attrs.get('expectedValue') or attrs.get('expected_value')
+        if expected_val is not None:
+            attrs['expectedValue'] = expected_val
+
+        is_mand = attrs.get('isMandatory')
+        if is_mand is None:
+            is_mand = attrs.get('is_mandatory')
+        if is_mand is not None:
+            attrs['isMandatory'] = is_mand
+
         return attrs
 
 class WorkOrderNoteUpdateRequestSerializer(serializers.Serializer):

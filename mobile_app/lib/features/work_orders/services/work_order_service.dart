@@ -10,8 +10,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:path_provider/path_provider.dart';
-import '../../../core/network/network_service.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import '../../../core/network/network_service.dart';
 import '../../../core/constants/api_constants.dart';
 
 class WorkOrderService {
@@ -125,8 +125,9 @@ class WorkOrderService {
                     res.data['data'],
                     tenantId,
                   );
-                  if (entity != null)
+                  if (entity != null) {
                     AppDatabase.instance.assetDao.insertOrUpdateAsset(entity);
+                  }
                 }
               })
               .catchError((_) {});
@@ -440,6 +441,9 @@ class WorkOrderService {
     String itemName,
     bool isCompleted, [
     String? actualValue,
+    String? inputType,
+    String? expectedValue,
+    bool? isMandatory,
   ]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -448,13 +452,17 @@ class WorkOrderService {
 
       if (NetworkService().isOnline) {
         try {
+          final payload = <String, dynamic>{
+            'itemName': itemName,
+            'isCompleted': isCompleted,
+            if (actualValue != null) 'actualValue': actualValue,
+            if (inputType != null) 'inputType': inputType,
+            if (expectedValue != null) 'expectedValue': expectedValue,
+            if (isMandatory != null) 'isMandatory': isMandatory,
+          };
           final response = await _dio.post(
             '/api/v1/work-orders/$woId/checklists',
-            data: {
-              'itemName': itemName,
-              'isCompleted': isCompleted,
-              if (actualValue != null) 'actualValue': actualValue,
-            },
+            data: payload,
           );
           if (response.statusCode == 200 && response.data['success'] == true) {
             apiSuccess = true;
@@ -474,6 +482,9 @@ class WorkOrderService {
           'itemName': itemName,
           'isCompleted': isCompleted,
           if (actualValue != null) 'actualValue': actualValue,
+          if (inputType != null) 'inputType': inputType,
+          if (expectedValue != null) 'expectedValue': expectedValue,
+          if (isMandatory != null) 'isMandatory': isMandatory,
         });
         await AppDatabase.instance.syncQueueDao.addSyncTask(
           SyncQueuesCompanion.insert(
@@ -493,8 +504,11 @@ class WorkOrderService {
             var item = checklists[i];
             if (item['itemName'] == itemName) {
               item = Map<String, dynamic>.from(item);
-              item['completed'] = isCompleted; // Fixed key
+              item['completed'] = isCompleted;
               if (actualValue != null) item['actualValue'] = actualValue;
+              if (inputType != null) item['inputType'] = inputType;
+              if (expectedValue != null) item['expectedValue'] = expectedValue;
+              if (isMandatory != null) item['isMandatory'] = isMandatory;
               checklists[i] = item;
               found = true;
               break;
@@ -505,7 +519,10 @@ class WorkOrderService {
               'itemName': itemName,
               'completed': isCompleted,
               if (actualValue != null) 'actualValue': actualValue,
-            }); // Fixed key
+              if (inputType != null) 'inputType': inputType,
+              if (expectedValue != null) 'expectedValue': expectedValue,
+              if (isMandatory != null) 'isMandatory': isMandatory,
+            });
           }
           await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
             wo.copyWith(checklists: checklists),
@@ -600,16 +617,19 @@ class WorkOrderService {
           woId,
         );
         if (wo != null) {
-          bool allChecked = true;
+          bool missingMandatory = false;
           for (var item in wo.checklists) {
-            if (item['completed'] != true) {
-              allChecked = false;
+            final isMandatory = item['isMandatory'] == true || item['is_mandatory'] == true;
+            if (isMandatory && item['completed'] != true) {
+              missingMandatory = true;
               break;
             }
           }
-          if (!allChecked || (wo.resolutionNotes?.isEmpty ?? true)) {
+          final hasNotes = wo.resolutionNotes != null && wo.resolutionNotes!.trim().isNotEmpty;
+          final hasAttachments = wo.attachments.isNotEmpty;
+          if (missingMandatory || (!hasNotes && !hasAttachments)) {
             debugPrint(
-              'Local validation failed: Missing notes or incomplete checklists.',
+              'Local validation failed: Missing notes/attachments or incomplete mandatory checklists.',
             );
             return false;
           }

@@ -278,12 +278,23 @@
             </div>
 
             <div id="tab-content-meterReadings" class="mt-2 min-h-[300px] hidden">
-              <div class="flex flex-col h-full">
-                <div class="relative mb-6 w-full sm:max-w-md">
-                  <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
-                  <input type="text" id="meter-search" onkeyup="filterMeterReadings()" placeholder="Tìm kiếm theo chỉ số, đơn vị, hoặc ghi chú..." class="w-full pl-9 pr-3 py-2 h-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+              <div class="flex flex-col h-full space-y-4">
+                <!-- Anomaly Alerts Container -->
+                <div id="meter-alerts-container" class="hidden"></div>
+
+                <!-- Control Bar -->
+                <div class="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+                  <div class="relative w-full sm:max-w-md">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"></i>
+                    <input type="text" id="meter-search" onkeyup="filterMeterReadings()" placeholder="Tìm kiếm theo chỉ số, đơn vị, trạng thái..." class="w-full pl-9 pr-3 py-2 h-10 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                  </div>
+                  <button onclick="openAddMeterModal()" class="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-hover shadow-sm transition-all flex items-center justify-center gap-2 shrink-0">
+                    <i class="ph-bold ph-plus-circle text-lg"></i>
+                    <span>Nhập số đo kiểm tra</span>
+                  </button>
                 </div>
-                <div id="meter-list" class="max-h-[400px] overflow-y-auto px-2 pb-4 custom-scrollbar">
+
+                <div id="meter-list" class="max-h-[420px] overflow-y-auto px-2 pb-4 custom-scrollbar">
                   <div id="meter-empty-state" class="flex flex-col items-center justify-center text-neutral-400 py-12 bg-neutral-50 rounded-2xl border border-neutral-100">
                     <i class="ph ph-gauge text-5xl mb-3 text-neutral-300"></i>
                     <p class="font-medium text-neutral-500">Chưa có chỉ số hoạt động nào</p>
@@ -298,6 +309,118 @@
 
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Meter Reading / Condition Monitoring Modal -->
+<div id="add-meter-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
+      <div class="flex items-center gap-2">
+        <i class="ph-bold ph-gauge text-xl text-primary"></i>
+        <h3 class="text-lg font-bold text-neutral-800 m-0">Ghi nhận số đo kiểm tra (Condition Monitoring)</h3>
+      </div>
+      <button onclick="closeAddMeterModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
+        <i class="ph ph-x text-xl"></i>
+      </button>
+    </div>
+    
+    <div class="p-6 space-y-4">
+      {% csrf_token %}
+      <!-- Trạng thái máy lúc đo (Quy Tắc 1) -->
+      <div>
+        <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-2">Trạng thái máy lúc đo (*)</label>
+        <div class="grid grid-cols-3 gap-2" id="machine-state-selector">
+          <button type="button" onclick="selectMachineState('RUNNING')" id="state-btn-RUNNING" class="py-2.5 px-3 rounded-xl border-2 border-primary bg-primary/10 text-primary font-bold text-xs flex flex-col items-center gap-1 transition-all">
+            <i class="ph-fill ph-play-circle text-base"></i>
+            <span>RUNNING</span>
+            <span class="text-[10px] font-normal opacity-80">Đang chạy</span>
+          </button>
+          <button type="button" onclick="selectMachineState('WARM_UP')" id="state-btn-WARM_UP" class="py-2.5 px-3 rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-600 font-bold text-xs flex flex-col items-center gap-1 hover:border-neutral-300 transition-all">
+            <i class="ph-bold ph-clock-countdown text-base"></i>
+            <span>WARM-UP</span>
+            <span class="text-[10px] font-normal opacity-80">Vừa bật máy</span>
+          </button>
+          <button type="button" onclick="selectMachineState('IDLE')" id="state-btn-IDLE" class="py-2.5 px-3 rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-600 font-bold text-xs flex flex-col items-center gap-1 hover:border-neutral-300 transition-all">
+            <i class="ph-bold ph-pause-circle text-base"></i>
+            <span>IDLE</span>
+            <span class="text-[10px] font-normal opacity-80">Nghỉ / Dừng</span>
+          </button>
+        </div>
+        <input type="hidden" id="meter-machine-state" value="RUNNING">
+        <p id="machine-state-notice" class="hidden mt-2 text-xs font-medium text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 flex items-center gap-1.5">
+          <i class="ph-fill ph-info"></i>
+          <span>Chỉ ghi nhận lịch sử đo đạc, không kích hoạt phân tích bất thường AI.</span>
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <!-- Metric Code -->
+        <div>
+          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Chỉ số đo (*)</label>
+          <select id="meter-metric-code" onchange="onMetricCodeChange(this.value)" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-800 focus:outline-none focus:border-primary">
+            <option value="VIBRATION">Độ rung RMS (Vibration - mm/s)</option>
+            <option value="TEMPERATURE">Nhiệt độ (Temperature - °C)</option>
+            <option value="PRESSURE">Áp suất (Pressure - bar)</option>
+            <option value="CURRENT">Dòng điện (Current - A)</option>
+            <option value="VOLTAGE">Điện áp (Voltage - V)</option>
+            <option value="RPM">Tốc độ vòng quay (RPM - v/p)</option>
+            <option value="FLOW_RATE">Lưu lượng (Flow Rate - m³/h)</option>
+            <option value="OIL_LEVEL">Mức dầu bôi trơn (Oil Level - %)</option>
+            <option value="RUN_HOURS">Giờ vận hành (Run Hours - h)</option>
+            <option value="NOISE">Độ ồn (Noise - dB)</option>
+            <option value="CUSTOM">Khác... (Chỉ số tùy chỉnh)</option>
+          </select>
+        </div>
+        <!-- Ambient Temperature -->
+        <div>
+          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Nhiệt độ môi trường (°C)</label>
+          <input type="number" id="meter-ambient-temp" step="0.5" placeholder="VD: 30.0" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-800 focus:outline-none focus:border-primary">
+        </div>
+
+        <!-- Custom Metric Input (Hiển thị khi chọn Khác...) -->
+        <div id="meter-custom-metric-container" class="hidden col-span-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl">
+          <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <i class="ph-bold ph-pencil-simple text-amber-700"></i>
+            <span>Mã chỉ số tùy chỉnh (*)</span>
+          </label>
+          <input type="text" id="meter-custom-metric-code" placeholder="VD: OIL_PRESS, BEARING_TEMP_2, VISCOSITY..." class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-sm font-bold text-neutral-900 focus:outline-none focus:border-primary uppercase" maxlength="64">
+          <p class="text-[11px] text-amber-700 mt-1 mb-0">Chỉ gồm chữ in hoa, số, gạch dưới hoặc gạch nối (VD: RPM, NOISE, FLOW_RATE).</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <!-- Giá trị đo được -->
+        <div>
+          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Giá trị đo (*)</label>
+          <input type="number" id="meter-reading-value" step="0.01" placeholder="Nhập số đo..." class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-bold text-neutral-800 focus:outline-none focus:border-primary">
+        </div>
+        <!-- Đơn vị -->
+        <div>
+          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Đơn vị đo</label>
+          <input type="text" id="meter-reading-unit" value="mm/s" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-600 focus:outline-none focus:border-primary">
+        </div>
+      </div>
+
+      <!-- Ghi chú kiểm tra -->
+      <div>
+        <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Ghi chú hiện trường</label>
+        <textarea id="meter-reading-remarks" rows="2" placeholder="Vị trí ổ bi, tiếng ồn lạ, lưu ý..." class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-700 focus:outline-none focus:border-primary resize-none"></textarea>
+      </div>
+
+      <!-- Result Banner (Hidden initially) -->
+      <div id="meter-submit-result" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+    </div>
+
+    <div class="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-3">
+      <button type="button" onclick="closeAddMeterModal()" class="px-4 py-2 border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors">
+        Hủy
+      </button>
+      <button type="button" onclick="submitConditionMonitoringReading()" id="btn-submit-meter-reading" class="px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-hover shadow-sm transition-all flex items-center gap-2">
+        <i class="ph-bold ph-check"></i>
+        <span>Lưu & Phân tích AI</span>
+      </button>
     </div>
   </div>
 </div>
@@ -812,6 +935,7 @@
 
       currentSelectedAssetId = id;
       document.getElementById('btn-create-wo').href = "{% url 'portal_work_orders' %}?asset_id=" + id;
+      fetchMeterReadings(id);
 
       // Generate QR
       const qrContainer = document.getElementById('qr-container');
@@ -1139,63 +1263,8 @@
     if (!hasVisible && meterReadingsData.length > 0) {
       // Could show a "no results" state here
     }
-  }
-
-  function fetchMeterReadings(assetId) {
-    const timeline = document.getElementById('meter-timeline');
-    const emptyState = document.getElementById('meter-empty-state');
-    
-    fetch(`/api/assets/${assetId}/meter-readings/`)
-      .then(res => res.json())
-      .then(resData => {
-        if (resData.success) {
-          meterReadingsData = resData.data || [];
-          if (meterReadingsData.length === 0) {
-            emptyState.classList.remove('hidden');
-            timeline.classList.add('hidden');
-            timeline.innerHTML = '';
-          } else {
-            emptyState.classList.add('hidden');
-            timeline.classList.remove('hidden');
-            
-            timeline.innerHTML = meterReadingsData.map(reading => {
-              const remarks = reading.remarks || '';
-              const isWarning = /(nguy hiểm|cảnh báo|vượt ngưỡng|bất thường|quá cao|nóng|lỗi|danger|warning|high)/i.test(remarks);
-              const dateStr = new Date(reading.reading_date).toLocaleString('vi-VN');
-              const val = new Intl.NumberFormat('vi-VN').format(reading.reading_value);
-              const color = isWarning ? 'bg-red-500' : 'bg-blue-500';
-              const cardBg = isWarning ? 'bg-red-50/50 border-red-100' : 'bg-neutral-50 border-neutral-200';
-              const textColor = isWarning ? 'text-red-700 font-bold' : 'text-neutral-800 font-medium';
-              
-              return `
-                <div class="timeline-item relative">
-                  <!-- Timeline Node -->
-                  <div class="absolute -left-[31px] top-4 w-3 h-3 rounded-full ${color} border-2 border-white shadow-sm"></div>
-                  <!-- Card -->
-                  <div class="mb-5 rounded-xl p-5 border shadow-sm w-full lg:w-3/4 xl:w-2/3 ${cardBg}">
-                    <div class="flex items-center flex-wrap gap-3 mb-3">
-                      <span class="font-black text-neutral-900 text-lg">
-                        ${val} <span class="text-sm text-neutral-500 font-bold">${reading.unit}</span>
-                      </span>
-                      ${isWarning ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 flex items-center gap-1 tracking-widest"><i class="ph-fill ph-warning"></i> CẢNH BÁO</span>` : ''}
-                      <span class="text-xs text-neutral-500 ml-auto flex items-center gap-1.5 font-semibold bg-white px-3 py-1.5 rounded-lg border border-neutral-100 shadow-sm">
-                        <i class="ph ph-clock text-primary"></i> ${dateStr}
-                      </span>
-                    </div>
-                    ${remarks ? `<p class="text-base mb-3 ${textColor}">${remarks}</p>` : ''}
-                    <div class="flex items-center gap-2">
-                      <span class="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-500">
-                        <i class="ph-fill ph-user text-xs"></i>
-                      </span> 
-                      <span class="text-sm font-medium text-neutral-600">${reading.recorded_by_name || 'Người ghi nhận'}</span>
-                    </div>
-                  </div>
-                </div>
-              `;
-            }).join('');
-          }
-        }
-      });
+  function filterMeterReadings() {
+    renderMeterReadings();
   }
 
   function toggleAssetFilter() {
@@ -1592,34 +1661,151 @@
     renderHistory();
   }
 
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
   let currentMeterReadings = [];
+  let currentAssetAlerts = [];
+  let currentTrendDrift = null;
+
   function fetchMeterReadings(assetId) {
-    fetch(`/api/v1/assets/${assetId}/meter-readings`, {
+    fetch(`/api/v1/assets/${assetId}/anomaly-history`, {
       credentials: 'same-origin',
       headers: (() => {
         const h = { 'Content-Type': 'application/json' };
         const token = localStorage.getItem('access_token');
         if (token) h['Authorization'] = `Bearer ${token}`;
+        const csrf = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrf) h['X-CSRFToken'] = csrf;
         return h;
       })()
     })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        // Fallback to meter-readings endpoint if anomaly-history is not available
+        return fetch(`/api/v1/assets/${assetId}/meter-readings`, {
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }
+        }).then(r => r.json()).then(d => ({ success: d.success, data: { readings: d.data, alerts: [] } }));
+      }
+      return res.json();
+    })
     .then(resData => {
       if (resData.success) {
-        currentMeterReadings = resData.data;
+        currentMeterReadings = resData.data.readings || resData.data || [];
+        currentAssetAlerts = resData.data.alerts || [];
+        currentTrendDrift = resData.data.trendDrift || null;
+        renderAnomalyAlerts();
         renderMeterReadings();
       }
     })
-    .catch(err => console.error("Error fetching meter readings:", err));
+    .catch(err => console.error("Error fetching meter readings/anomaly history:", err));
+  }
+
+  function renderAnomalyAlerts() {
+    const container = document.getElementById('meter-alerts-container');
+    if (!container) return;
+
+    const activeAlerts = (currentAssetAlerts || []).filter(a => a.status === 'OPEN');
+    if (activeAlerts.length === 0 && (!currentTrendDrift || !currentTrendDrift.isDrifting)) {
+      container.classList.add('hidden');
+      container.innerHTML = '';
+      return;
+    }
+
+    container.classList.remove('hidden');
+    let alertsHtml = '';
+
+    activeAlerts.forEach(alert => {
+      const isCritical = alert.severity === 'CRITICAL';
+      const borderClass = isCritical ? 'border-rose-200 bg-rose-50/80 text-rose-900' : 'border-amber-200 bg-amber-50/80 text-amber-900';
+      const badgeClass = isCritical ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+      const icon = isCritical ? 'ph-bold ph-warning-circle text-rose-600' : 'ph-bold ph-warning text-amber-600';
+
+      alertsHtml += `
+        <div class="border ${borderClass} rounded-2xl p-4 shadow-sm mb-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex items-start gap-3">
+              <i class="${icon} text-2xl mt-0.5 shrink-0"></i>
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs font-black uppercase px-2 py-0.5 rounded-md border ${badgeClass}">
+                    ${alert.severity} (${alert.metricCode})
+                  </span>
+                  ${alert.occurrenceCount > 1 ? `<span class="text-xs font-semibold bg-neutral-200/80 text-neutral-700 px-2 py-0.5 rounded-md">Lặp lại: ${alert.occurrenceCount} lần</span>` : ''}
+                </div>
+                <p class="text-sm font-semibold m-0 mb-1">${alert.message || 'Phát hiện bất thường từ chỉ số cảm biến.'}</p>
+                <div class="flex flex-wrap items-center gap-4 text-xs font-medium opacity-85">
+                  ${alert.zScore !== null && alert.zScore !== undefined ? `<span>Z-Score: <b>${alert.zScore}</b></span>` : ''}
+                  ${alert.daysRemaining !== null && alert.daysRemaining !== undefined ? `<span>Dự kiến sự cố sau: <b>${alert.daysRemaining} ngày</b></span>` : ''}
+                  ${alert.trendSlope ? `<span>Tốc độ trôi: <b>+${alert.trendSlope}/ngày</b></span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="handleAlertFeedback('${alert.id}', 'FALSE_ALARM')" class="px-3 py-1.5 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-700 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+                <i class="ph-bold ph-shield-slash text-neutral-500"></i>
+                <span>Báo động giả</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = alertsHtml;
+  }
+
+  function handleAlertFeedback(alertId, feedback) {
+    if (!confirm(feedback === 'FALSE_ALARM' ? "Xác nhận đánh dấu báo động giả? Điểm đo này sẽ bị loại trừ khỏi tập huấn luyện AI." : "Xác nhận xử lý cảnh báo?")) {
+      return;
+    }
+
+    fetch(`/api/v1/condition-monitoring/alerts/${alertId}/feedback/`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: (() => {
+        const h = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        const csrf = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrf) h['X-CSRFToken'] = csrf;
+        return h;
+      })(),
+      body: JSON.stringify({ feedback: feedback, notes: "Xác nhận bởi Quản đốc trên giao diện Web Portal" })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        if (currentSelectedAssetId) fetchMeterReadings(currentSelectedAssetId);
+      } else {
+        alert("Lỗi: " + (res.message || "Không thể gửi phản hồi"));
+      }
+    })
+    .catch(err => alert("Lỗi kết nối: " + err));
   }
 
   function renderMeterReadings() {
-    const term = document.getElementById('meter-search').value.toLowerCase();
+    const term = (document.getElementById('meter-search').value || '').toLowerCase();
     const filtered = currentMeterReadings.filter(mr => {
-      const matchVal = String(mr.readingValue).toLowerCase().includes(term);
+      const matchVal = String(mr.value || mr.readingValue || '').toLowerCase().includes(term);
+      const matchCode = (mr.metricCode || '').toLowerCase().includes(term);
       const matchUnit = (mr.unit || '').toLowerCase().includes(term);
+      const matchState = (mr.machineState || '').toLowerCase().includes(term);
       const matchRemarks = (mr.remarks || '').toLowerCase().includes(term);
-      return matchVal || matchUnit || matchRemarks;
+      return matchVal || matchCode || matchUnit || matchState || matchRemarks;
     });
 
     const empty = document.getElementById('meter-empty-state');
@@ -1634,20 +1820,54 @@
       
       let html = '';
       filtered.forEach(mr => {
-        const date = new Date(mr.readingDate);
+        const val = mr.value !== undefined ? mr.value : mr.readingValue;
+        const date = new Date(mr.recordedAt || mr.readingDate);
         const dateStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' ' + date.toLocaleDateString('en-GB');
-        
+        const metricCode = mr.metricCode || 'VIBRATION';
+        const machineState = mr.machineState || 'RUNNING';
+
+        // Badges
+        let isoBadge = '';
+        if (metricCode === 'VIBRATION' && val !== undefined) {
+          const numVal = parseFloat(val);
+          if (numVal < 2.8) {
+            isoBadge = `<span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">ISO 10816: Vùng A/B (Tốt)</span>`;
+          } else if (numVal <= 7.1) {
+            isoBadge = `<span class="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">ISO 10816: Vùng C (Cảnh báo)</span>`;
+          } else {
+            isoBadge = `<span class="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">ISO 10816: Vùng D (Nguy hiểm)</span>`;
+          }
+        }
+
+        let stateBadge = '';
+        if (machineState === 'RUNNING') {
+          stateBadge = `<span class="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">RUNNING</span>`;
+        } else if (machineState === 'WARM_UP') {
+          stateBadge = `<span class="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">WARM-UP</span>`;
+        } else {
+          stateBadge = `<span class="text-[10px] font-bold text-neutral-600 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded">IDLE</span>`;
+        }
+
+        const preRepairBadge = mr.isPreRepair ? `<span class="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">Lịch sử trước sửa chữa</span>` : '';
+        const suppressedBadge = mr.isSuppressed ? `<span class="text-[10px] font-bold text-neutral-400 bg-neutral-100 px-1.5 py-0.5 rounded">Đã loại trừ AI</span>` : '';
+
         html += `
           <div class="relative group">
             <div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full border-4 border-white bg-primary shadow-sm group-hover:scale-125 transition-transform"></div>
             <div class="bg-white border border-neutral-200 rounded-xl p-4 hover:border-primary/30 transition-colors shadow-sm">
               <div class="flex justify-between items-start mb-2">
-                <div class="flex items-center gap-2">
-                  <span class="font-black text-primary text-lg">${mr.readingValue}</span>
-                  <span class="text-xs font-bold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">${mr.unit || 'N/A'}</span>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-xs font-black uppercase text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded">${metricCode}</span>
+                  <span class="font-black text-primary text-xl">${val}</span>
+                  <span class="text-xs font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded">${mr.unit || 'N/A'}</span>
+                  ${stateBadge}
+                  ${isoBadge}
+                  ${preRepairBadge}
+                  ${suppressedBadge}
                 </div>
-                <span class="text-xs font-medium text-neutral-400 flex items-center gap-1"><i class="ph-fill ph-clock"></i> ${dateStr}</span>
+                <span class="text-xs font-medium text-neutral-400 flex items-center gap-1 shrink-0"><i class="ph-fill ph-clock"></i> ${dateStr}</span>
               </div>
+              ${mr.ambientTemperature ? `<p class="text-xs text-neutral-500 mb-1">Nhiệt độ môi trường xưởng: <b>${mr.ambientTemperature}°C</b></p>` : ''}
               ${mr.remarks ? `<p class="text-sm text-neutral-600 m-0">${mr.remarks}</p>` : ''}
             </div>
           </div>
@@ -1659,6 +1879,182 @@
 
   function filterMeterReadings() {
     renderMeterReadings();
+  }
+
+  function openAddMeterModal() {
+    document.getElementById('add-meter-modal').classList.remove('hidden');
+    document.getElementById('meter-submit-result').classList.add('hidden');
+    document.getElementById('meter-reading-value').value = '';
+    document.getElementById('meter-reading-remarks').value = '';
+    
+    // Reset chỉ số về mặc định VIBRATION
+    const metricSelect = document.getElementById('meter-metric-code');
+    if (metricSelect) metricSelect.value = 'VIBRATION';
+    const customContainer = document.getElementById('meter-custom-metric-container');
+    if (customContainer) customContainer.classList.add('hidden');
+    const customInput = document.getElementById('meter-custom-metric-code');
+    if (customInput) customInput.value = '';
+    const unitInput = document.getElementById('meter-reading-unit');
+    if (unitInput) unitInput.value = 'mm/s';
+
+    selectMachineState('RUNNING');
+  }
+
+  function closeAddMeterModal() {
+    document.getElementById('add-meter-modal').classList.add('hidden');
+  }
+
+  function selectMachineState(state) {
+    document.getElementById('meter-machine-state').value = state;
+    const states = ['RUNNING', 'WARM_UP', 'IDLE'];
+    states.forEach(s => {
+      const btn = document.getElementById('state-btn-' + s);
+      if (btn) {
+        if (s === state) {
+          btn.className = 'py-2.5 px-3 rounded-xl border-2 border-primary bg-primary/10 text-primary font-bold text-xs flex flex-col items-center gap-1 transition-all';
+        } else {
+          btn.className = 'py-2.5 px-3 rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-600 font-bold text-xs flex flex-col items-center gap-1 hover:border-neutral-300 transition-all';
+        }
+      }
+    });
+
+    const notice = document.getElementById('machine-state-notice');
+    if (notice) {
+      if (state === 'WARM_UP' || state === 'IDLE') {
+        notice.classList.remove('hidden');
+      } else {
+        notice.classList.add('hidden');
+      }
+    }
+  }
+
+  function onMetricCodeChange(metric) {
+    const unitInput = document.getElementById('meter-reading-unit');
+    const customContainer = document.getElementById('meter-custom-metric-container');
+    const customInput = document.getElementById('meter-custom-metric-code');
+
+    const defaultUnits = {
+      'VIBRATION': 'mm/s',
+      'TEMPERATURE': '°C',
+      'PRESSURE': 'bar',
+      'CURRENT': 'A',
+      'VOLTAGE': 'V',
+      'RPM': 'v/p',
+      'FLOW_RATE': 'm³/h',
+      'OIL_LEVEL': '%',
+      'RUN_HOURS': 'h',
+      'NOISE': 'dB'
+    };
+
+    if (metric === 'CUSTOM') {
+      if (customContainer) customContainer.classList.remove('hidden');
+      if (customInput) {
+        customInput.focus();
+      }
+      if (unitInput) unitInput.value = '';
+    } else {
+      if (customContainer) customContainer.classList.add('hidden');
+      if (unitInput) unitInput.value = defaultUnits[metric] || '';
+    }
+  }
+
+  function submitConditionMonitoringReading() {
+    if (!currentSelectedAssetId) {
+      alert("Chưa chọn tài sản.");
+      return;
+    }
+
+    const valStr = document.getElementById('meter-reading-value').value;
+    const numVal = parseFloat(valStr);
+    if (!valStr || isNaN(numVal) || !isFinite(numVal)) {
+      alert("Vui lòng nhập giá trị đo là số hợp lệ.");
+      return;
+    }
+
+    const metricSelectVal = document.getElementById('meter-metric-code').value;
+    let effectiveMetricCode = metricSelectVal;
+
+    if (metricSelectVal === 'CUSTOM') {
+      const customInput = document.getElementById('meter-custom-metric-code');
+      const rawCustom = customInput ? customInput.value.trim().toUpperCase() : '';
+      if (!rawCustom) {
+        const resBox = document.getElementById('meter-submit-result');
+        resBox.className = 'p-3 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700';
+        resBox.textContent = "Vui lòng nhập mã chỉ số đo tùy chỉnh (VD: RPM, FLOW_RATE, NOISE).";
+        resBox.classList.remove('hidden');
+        if (customInput) customInput.focus();
+        return;
+      }
+
+      const metricRegex = /^[A-Z0-9_\-]+$/;
+      if (!metricRegex.test(rawCustom)) {
+        const resBox = document.getElementById('meter-submit-result');
+        resBox.className = 'p-3 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700';
+        resBox.textContent = "Mã chỉ số tùy chỉnh chỉ được chứa chữ cái, số, gạch dưới hoặc gạch nối (VD: RPM, OIL_LEVEL).";
+        resBox.classList.remove('hidden');
+        if (customInput) customInput.focus();
+        return;
+      }
+      effectiveMetricCode = rawCustom;
+    }
+
+    const machineState = document.getElementById('meter-machine-state').value;
+    const unit = document.getElementById('meter-reading-unit').value;
+    const remarks = document.getElementById('meter-reading-remarks').value;
+    const ambStr = document.getElementById('meter-ambient-temp').value;
+    const ambTemp = ambStr && !isNaN(parseFloat(ambStr)) ? parseFloat(ambStr) : null;
+
+    const payload = {
+      machineState: machineState,
+      ambientTemperature: ambTemp,
+      readings: [
+        {
+          metricCode: effectiveMetricCode,
+          value: numVal,
+          unit: unit,
+          remarks: remarks
+        }
+      ]
+    };
+
+    const submitBtn = document.getElementById('btn-submit-meter-reading');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> <span>Đang xử lý...</span>';
+
+    fetch(`/api/v1/assets/${currentSelectedAssetId}/meter-readings/`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: (() => {
+        const h = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        const csrf = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrf) h['X-CSRFToken'] = csrf;
+        return h;
+      })(),
+      body: JSON.stringify(payload)
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || (typeof data === 'string' ? data : JSON.stringify(data)));
+      }
+      return data;
+    })
+    .then(resData => {
+      closeAddMeterModal();
+      fetchMeterReadings(currentSelectedAssetId);
+    })
+    .catch(err => {
+      const resBox = document.getElementById('meter-submit-result');
+      resBox.className = 'p-3 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700';
+      resBox.textContent = err.message || "Lỗi khi lưu số đo.";
+      resBox.classList.remove('hidden');
+    })
+    .finally(() => {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="ph-bold ph-check"></i> <span>Lưu & Phân tích AI</span>';
+    });
   }
 
   function switchTab(tab) {
