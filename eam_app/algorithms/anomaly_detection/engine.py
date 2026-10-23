@@ -130,7 +130,8 @@ class ConditionMonitoringEngine:
             cur_tenant=cur_tenant,
             ambient_temperature=ambient_temperature,
             rec_time=rec_time,
-            work_order=work_order
+            work_order=work_order,
+            recorded_by=recorded_by
         )
 
         return {
@@ -147,7 +148,8 @@ class ConditionMonitoringEngine:
         cur_tenant,
         ambient_temperature: Optional[float],
         rec_time: datetime,
-        work_order = None
+        work_order = None,
+        recorded_by = None
     ) -> Dict[str, Any]:
         has_anomaly = False
         highest_severity = 'NORMAL'
@@ -330,34 +332,132 @@ class ConditionMonitoringEngine:
                     message=z_score_alert_info.get('message') if z_score_alert_info else (multi_res.get('message') if multi_res.get('has_anomaly') else None)
                 )
 
-                # Nếu xu hướng suy thoái sắp chạm ngưỡng (days_remaining <= 7 ngày) hoặc CRITICAL: Tạo Draft PM
-                if (days_rem is not None and days_rem <= 7) or highest_severity == 'CRITICAL':
+                created_or_updated_alert = new_alert
+
+                # === CƠ CHẾ ĐIỀU PHỐI PHÂN CẤP HYBRID (CRITICAL vs WARNING) ===
+                if highest_severity == 'CRITICAL':
+                    # 1. TRƯỜNG HỢP NẶNG (Sự cố Đỏ / CRITICAL / ISO Zone D / Z-Score >= 3.0):
+                    # Tự động tạo Work Order khẩn cấp (CORRECTIVE/URGENT) và điều phối tức thời qua Hungarian
+                    crit_deadline = timezone.now() + timedelta(hours=4)
+                    critical_wo = WorkOrder.objects.create(
+                        tenant=cur_tenant,
+                        asset=asset,
+                        parent_id=work_order,
+                        title=f"Sự cố khẩn cấp: {asset.name} ({primary_metric} vượt ngưỡng)",
+                        description=(
+                            f"Tự động tạo bởi AI Condition Monitoring khi phát hiện chỉ số {primary_metric} "
+                            f"({primary_val} {primary_rec.unit or ''}) chạm ngưỡng nguy hiểm CRITICAL.\n"
+                            f"Chi tiết: {new_alert.message or 'Vượt ngưỡng an toàn OEM / ISO 10816 Zone D.'}"
+                        ),
+                        type='CORRECTIVE',
+                        priority='URGENT',
+                        status='CREATED',
+                        deadline=crit_deadline,
+                        required_skill='Cơ khí' if primary_metric == 'VIBRATION' else ('Điện' if primary_metric in ('CURRENT', 'VOLTAGE') else None),
+                        min_skill_level=2,
+                        coords_x=getattr(asset, 'coords_x', None),
+                        coords_y=getattr(asset, 'coords_y', None),
+                        floor_level=getattr(asset, 'floor_level', 1) or 1,
+                        zone_id=getattr(asset, 'zone_id', '') or ''
+                    )
+                    new_alert.draft_work_order = critical_wo
+                    new_alert.save(update_fields=['draft_work_order'])
+                    draft_pm_action = "CREATED_CRITICAL_WO"
+
+                    # Điều phối tức thời bằng giải thuật Hungarian (Auto-dispatch)
+                    assigned_tech_name = None
+                    try:
+                        from algorithms.hungarian.service import HungarianAssignmentService
+                        preview = HungarianAssignmentService.preview(tenant=cur_tenant, work_order_ids=[str(critical_wo.id)])
+                        assignments = preview.get('assignments', [])
+                        if assignments:
+                            top_assignment = assignments[0]
+                            tech_id = top_assignment['technicianId']
+                            assigned_tech_name = top_assignment.get('technicianName')
+                            HungarianAssignmentService.apply(
+                                tenant=cur_tenant,
+                                assignments_data=[{
+                                    'workOrderId': str(critical_wo.id),
+                                    'technicianId': str(tech_id),
+                                    'slotRole': 'SOLO'
+                                }],
+                                current_user=recorded_by
+                            )
+                            critical_wo.refresh_from_db()
+                            draft_pm_action = "CREATED_AND_DISPATCHED_CRITICAL_WO"
+                        else:
+                            critical_wo.description = (critical_wo.description or '') + "\n\n[Tự động điều phối Hungarian]: Không có kỹ thuật viên khả dụng đang trực trong ca. Chờ Quản đốc phân công khẩn cấp."
+                            critical_wo.save(update_fields=['description'])
+                    except Exception as e:
+                        critical_wo.description = (critical_wo.description or '') + f"\n\n[Tự động điều phối Hungarian]: Lỗi giải thuật: {str(e)}"
+                        critical_wo.save(update_fields=['description'])
+
+                    # Bắn thông báo CRITICAL tới Quản lý bảo trì
+                    try:
+                        notify_sensor_anomaly(
+                            asset=asset,
+                            anomaly_type=f"{primary_metric} (CRITICAL)",
+                            metric_value=f"{primary_val} {primary_rec.unit or ''}",
+                            threshold_value="Ngưỡng nguy hiểm OEM / ISO 10816 Zone D",
+                            severity='CRITICAL',
+                            work_order=critical_wo
+                        )
+                    except Exception:
+                        pass
+
+                elif (days_rem is not None and days_rem <= 7) or highest_severity == 'WARNING':
+                    # 2. TRƯỜNG HỢP NHẸ (Cảnh báo sớm / WARNING / Trend Drift / ISO Zone C):
+                    # Tự động tạo Bản thảo PM Work Order + Chạy Hungarian ở chế độ PREVIEW gợi ý thợ + Gửi thông báo
                     draft_deadline = timezone.now() + timedelta(days=days_rem if days_rem is not None else 7)
                     draft_wo = WorkOrder.objects.create(
                         tenant=cur_tenant,
                         asset=asset,
                         parent_id=work_order,
                         title=f"Bản thảo PM: Dự phòng sự cố {asset.name} ({primary_metric})",
-                        description=f"Tự động tạo bởi AI Condition Monitoring. Tốc độ suy thoái: {slope}/ngày. Dự kiến sự cố sau {days_rem} ngày.",
+                        description=(
+                            f"Tự động tạo bởi AI Condition Monitoring. "
+                            f"{f'Tốc độ suy thoái: {slope}/ngày. Dự kiến sự cố sau {days_rem} ngày.' if slope else 'Phát hiện bất thường cảnh báo sớm.'}"
+                        ),
                         type='PREVENTIVE',
-                        priority='HIGH' if highest_severity != 'CRITICAL' else 'URGENT',
+                        priority='HIGH',
                         status='CREATED',
-                        deadline=draft_deadline
+                        deadline=draft_deadline,
+                        required_skill='Cơ khí' if primary_metric == 'VIBRATION' else ('Điện' if primary_metric in ('CURRENT', 'VOLTAGE') else None),
+                        min_skill_level=1,
+                        coords_x=getattr(asset, 'coords_x', None),
+                        coords_y=getattr(asset, 'coords_y', None),
+                        floor_level=getattr(asset, 'floor_level', 1) or 1,
+                        zone_id=getattr(asset, 'zone_id', '') or ''
                     )
                     new_alert.draft_work_order = draft_wo
-                    new_alert.save()
+                    new_alert.save(update_fields=['draft_work_order'])
                     draft_pm_action = "CREATED_NEW_DRAFT"
 
-                created_or_updated_alert = new_alert
+                    # Chạy Hungarian PREVIEW để gợi ý kỹ thuật viên tối ưu
+                    suggested_tech_name = None
+                    try:
+                        from algorithms.hungarian.service import HungarianAssignmentService
+                        preview = HungarianAssignmentService.preview(tenant=cur_tenant, work_order_ids=[str(draft_wo.id)])
+                        assignments = preview.get('assignments', [])
+                        if assignments:
+                            top_assignment = assignments[0]
+                            suggested_tech_name = top_assignment.get('technicianName')
+                            cost = top_assignment.get('cost')
+                            draft_wo.description = (draft_wo.description or '') + f"\n\n[Gợi ý Hungarian]: Đề xuất phân công cho thợ {suggested_tech_name} (Chi phí tối ưu: {cost}). Quản đốc có thể phê duyệt 1-click."
+                            draft_wo.save(update_fields=['description'])
+                    except Exception:
+                        pass
 
-                # Kích hoạt thông báo CRITICAL tới Quản lý bảo trì (Task 10.1 & Mục 2)
-                if highest_severity == 'CRITICAL':
+                    # Bắn thông báo WARNING tới Quản lý bảo trì
                     try:
                         notify_sensor_anomaly(
                             asset=asset,
-                            anomaly_type=f"{primary_metric} ({highest_severity})",
+                            anomaly_type=f"{primary_metric} (WARNING)",
                             metric_value=f"{primary_val} {primary_rec.unit or ''}",
-                            threshold_value="Ngưỡng nguy hiểm OEM / ISO 10816 Zone D"
+                            threshold_value="Ngưỡng cảnh báo OEM / ISO 10816 Zone C",
+                            severity='WARNING',
+                            work_order=draft_wo,
+                            suggested_technician=suggested_tech_name
                         )
                     except Exception:
                         pass
@@ -365,6 +465,12 @@ class ConditionMonitoringEngine:
         # Gắn draftWorkOrderAction vào trend_drift_info nếu có
         if trend_drift_info:
             trend_drift_info["draftWorkOrderAction"] = draft_pm_action or "NONE"
+
+        assigned_tech_display = None
+        if created_or_updated_alert and created_or_updated_alert.draft_work_order:
+            wo = created_or_updated_alert.draft_work_order
+            if wo.assigned_to:
+                assigned_tech_display = wo.assigned_to.get_full_name() or wo.assigned_to.username
 
         return {
             "machineState": saved_records[0].machine_state if saved_records else "RUNNING",
@@ -379,5 +485,8 @@ class ConditionMonitoringEngine:
             "occurrenceCount": created_or_updated_alert.occurrence_count if created_or_updated_alert else 0,
             "draftWorkOrderAction": draft_pm_action,
             "draftWorkOrderId": str(created_or_updated_alert.draft_work_order.id) if (created_or_updated_alert and created_or_updated_alert.draft_work_order) else None,
+            "draftWorkOrderCode": created_or_updated_alert.draft_work_order.code if (created_or_updated_alert and created_or_updated_alert.draft_work_order) else None,
+            "draftWorkOrderStatus": created_or_updated_alert.draft_work_order.status if (created_or_updated_alert and created_or_updated_alert.draft_work_order) else None,
+            "assignedTechnicianName": assigned_tech_display,
             "workOrderId": str(work_order.id) if work_order else None
         }

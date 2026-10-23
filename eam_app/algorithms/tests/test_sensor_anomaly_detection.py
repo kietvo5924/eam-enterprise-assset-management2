@@ -748,3 +748,116 @@ class SensorAnomalyDetectionTestCase(TestCase):
         alerts_count = AssetAnomalyAlert.objects.filter(asset=self.pump_asset, metric_code='CUSTOM_FLOW').count()
         self.assertEqual(alerts_count, 0)
 
+    def test_tc_anom_15_hybrid_anomaly_workflow(self):
+        """
+        TC-ANOM-15: Kiểm thử phân cấp Hybrid:
+        1. Trường hợp nhẹ (WARNING / ISO Zone C): Tạo Draft PM + Gợi ý Hungarian + Bắn Notification WARNING.
+        2. Trường hợp nặng (CRITICAL / ISO Zone D): Tự động tạo WO khẩn cấp + Tự động điều phối Hungarian (ASSIGNED) + Bắn Notification CRITICAL.
+        """
+        from users.models import TechnicianProfile
+        from notifications.models import Notification
+
+        # Tạo Manager để nhận thông báo
+        manager = User.objects.create_user(
+            username="manager_bob",
+            email="manager_bob@efc.com",
+            password="password123",
+            tenant=self.tenant
+        )
+        role_mgr = Role.objects.create(name="MAINTENANCE_MANAGER", tenant=self.tenant)
+        perm_approve = Permission.objects.filter(id='work_order:approve').first() or Permission.objects.create(id='work_order:approve', name='Approve WO')
+        role_mgr.permissions.add(perm_approve)
+        manager.roles.add(role_mgr)
+
+        # Tạo Kỹ thuật viên sẵn sàng trực ca
+        tech_user = User.objects.create_user(
+            username="tech_charlie",
+            email="tech_charlie@efc.com",
+            password="password123",
+            tenant=self.tenant
+        )
+        tech_user.roles.add(self.role)
+        tech_profile = TechnicianProfile.objects.create(
+            tenant=self.tenant,
+            user=tech_user,
+            skills=["Cơ khí", "VIBRATION"],
+            skill_level=3,
+            is_on_duty=True,
+            availability_status='AVAILABLE'
+        )
+
+        # Tạo thiết bị thứ 2 cho kịch bản nặng
+        pump_heavy = Asset.objects.create(
+            tenant=self.tenant,
+            name="Máy Bơm Ly Tâm P-102 (Heavy Test)",
+            category=self.category_pump,
+            location=self.location,
+            qr_code="QR-PUMP-102"
+        )
+
+        # === 1. KIỂM THỬ TRƯỜNG HỢP NHẸ (WARNING - 6.5 mm/s, ISO Zone C) ===
+        now = timezone.now()
+        for i in range(5):
+            MeterReading.objects.create(
+                tenant=self.tenant,
+                asset=self.pump_asset,
+                metric_code='VIBRATION',
+                reading_value=4.0 + (i * 0.5),
+                reading_date=now - timedelta(days=6 - i),
+                machine_state='RUNNING',
+                unit='mm/s'
+            )
+
+        url_light = f"/api/v1/assets/{self.pump_asset.id}/meter-readings/"
+        payload_light = {
+            "machineState": "RUNNING",
+            "readings": [{"metricCode": "VIBRATION", "value": 6.5, "unit": "mm/s"}]
+        }
+        res_light = self.client.post(url_light, data=payload_light, format='json')
+        self.assertEqual(res_light.status_code, status.HTTP_200_OK)
+        light_summary = res_light.json()['data']['analysisSummary']
+        self.assertEqual(light_summary['highestSeverity'], 'WARNING')
+
+        # Kiểm tra Draft PM Work Order được tạo ở trạng thái CREATED
+        draft_wo = WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE').first()
+        self.assertIsNotNone(draft_wo)
+        self.assertEqual(draft_wo.status, 'CREATED')
+        self.assertIn("Gợi ý Hungarian", draft_wo.description)
+
+        # Kiểm tra Notification WARNING được gửi tới Manager
+        notif_light = Notification.objects.filter(
+            recipient=manager,
+            severity='WARNING',
+            event_type='SENSOR_ANOMALY_DETECTED'
+        ).first()
+        self.assertIsNotNone(notif_light)
+        self.assertIn(draft_wo.code, notif_light.message)
+
+        # === 2. KIỂM THỬ TRƯỜNG HỢP NẶNG (CRITICAL - 8.5 mm/s, ISO Zone D) ===
+        url_heavy = f"/api/v1/assets/{pump_heavy.id}/meter-readings/"
+        payload_heavy = {
+            "machineState": "RUNNING",
+            "readings": [{"metricCode": "VIBRATION", "value": 8.5, "unit": "mm/s"}]
+        }
+        res_heavy = self.client.post(url_heavy, data=payload_heavy, format='json')
+        self.assertEqual(res_heavy.status_code, status.HTTP_200_OK)
+        heavy_summary = res_heavy.json()['data']['analysisSummary']
+        self.assertEqual(heavy_summary['highestSeverity'], 'CRITICAL')
+
+        # Kiểm tra Work Order khẩn cấp (CORRECTIVE) được tạo và tự động điều phối qua Hungarian
+        crit_wo = WorkOrder.objects.filter(asset=pump_heavy, type='CORRECTIVE').first()
+        self.assertIsNotNone(crit_wo)
+        self.assertEqual(crit_wo.priority, 'URGENT')
+        self.assertEqual(crit_wo.status, 'ASSIGNED')
+        self.assertEqual(crit_wo.assigned_to, tech_user)
+
+        # Kiểm tra Notification CRITICAL được gửi tới Manager
+        notif_crit = Notification.objects.filter(
+            recipient=manager,
+            severity='CRITICAL',
+            event_type='SENSOR_ANOMALY_DETECTED'
+        ).first()
+        self.assertIsNotNone(notif_crit)
+        self.assertIn(crit_wo.code, notif_crit.message)
+
+

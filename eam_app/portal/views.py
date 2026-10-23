@@ -1699,6 +1699,22 @@ def portal_work_orders(request):
                     except Exception:
                         return None
 
+                req_tools = data.get('required_tools', [])
+                if req_tools and isinstance(req_tools, list):
+                    from assets.models import Tool
+                    for t_code in req_tools:
+                        t_obj = Tool.objects.filter(tenant_id=tenant_id, code=t_code, is_active=True).first()
+                        if t_obj and t_obj.available_quantity <= 0:
+                            return JsonResponse({'success': False, 'error': f"Dụng cụ '{t_obj.name}' ({t_obj.code}) hiện đã hết số lượng khả dụng."}, status=400)
+
+                req_parts = data.get('required_spare_parts', [])
+                if req_parts and isinstance(req_parts, list):
+                    from assets.models import SparePart
+                    for sp_id in req_parts:
+                        sp_obj = SparePart.objects.filter(tenant_id=tenant_id, id=sp_id).first()
+                        if sp_obj and sp_obj.quantity_in_stock <= 0:
+                            return JsonResponse({'success': False, 'error': f"Vật tư '{sp_obj.name}' hiện đã hết hàng tồn kho."}, status=400)
+
                 wo = WorkOrder.objects.create(
                     tenant_id=tenant_id,
                     title=data.get('title'),
@@ -1818,6 +1834,27 @@ def portal_work_orders(request):
                                 raise Exception(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
                                 
                         wo.completed_at = timezone.now()
+
+                        # Auto-return any active ToolReservation for this work order (BUG-TOOL-006)
+                        try:
+                            from assets.models import ToolReservation
+                            active_res = ToolReservation.objects.filter(
+                                tenant_id=tenant_id,
+                                work_order=wo,
+                                status__in=['RESERVED', 'IN_USE']
+                            )
+                            for r in active_res:
+                                r.status = 'RETURNED'
+                                r.returned_at = timezone.now()
+                                r.save()
+                                if r.tool:
+                                    r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
+                                    r.tool.save()
+                                if r.tool_instance:
+                                    r.tool_instance.status = 'AVAILABLE'
+                                    r.tool_instance.save()
+                        except Exception:
+                            pass
 
                         # Event-based technician positioning: return tech to duty zone station
                         if hasattr(request.user, 'technician_profile'):
@@ -2104,7 +2141,33 @@ def portal_work_orders(request):
         })
 
     from assets.models import Tool, SparePart
-    tools = list(Tool.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'available_quantity', 'location_id', 'location__name', 'location__code', 'location__floor_level'))
+    from django.utils import timezone
+    today = timezone.now().date()
+    tools_qs = Tool.objects.filter(tenant_id=tenant_id, is_active=True).select_related('location').prefetch_related('instances')
+    tools = []
+    for t in tools_qs:
+        instances = list(t.instances.all())
+        is_expired = False
+        if instances:
+            has_valid = any(
+                inst.inspection_status != 'EXPIRED' and
+                (not inst.calibration_due_date or inst.calibration_due_date >= today)
+                for inst in instances
+            )
+            is_expired = not has_valid
+
+        tools.append({
+            'id': str(t.id),
+            'code': t.code,
+            'name': t.name,
+            'available_quantity': t.available_quantity,
+            'is_disabled': (t.available_quantity <= 0) or is_expired,
+            'is_expired': is_expired,
+            'location_id': str(t.location_id) if t.location_id else '',
+            'location__name': t.location.name if t.location else '',
+            'location__code': t.location.code if t.location else '',
+            'location__floor_level': t.location.floor_level if t.location else None
+        })
     spare_parts = list(SparePart.objects.filter(tenant_id=tenant_id).values('id', 'name', 'part_number', 'quantity_in_stock', 'location_id', 'location__name', 'location__code', 'location__floor_level'))
     for sp in spare_parts:
         sp['id'] = str(sp['id'])
@@ -2176,6 +2239,12 @@ def portal_inventory(request):
         try:
             data = json.loads(request.body)
             qty = data.get('quantity_in_stock')
+            cost = data.get('unit_cost')
+
+            if qty is not None and float(qty) < 0:
+                return JsonResponse({'success': False, 'error': 'Số lượng tồn kho phải lớn hơn hoặc bằng 0.'}, status=400)
+            if cost is not None and float(cost) < 0:
+                return JsonResponse({'success': False, 'error': 'Đơn giá phải lớn hơn hoặc bằng 0.'}, status=400)
             
             sp = SparePart.objects.create(
                 tenant_id=tenant_id,
@@ -2195,6 +2264,14 @@ def portal_inventory(request):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
+            qty = data.get('quantity_in_stock')
+            cost = data.get('unit_cost')
+
+            if qty is not None and float(qty) < 0:
+                return JsonResponse({'success': False, 'error': 'Số lượng tồn kho phải lớn hơn hoặc bằng 0.'}, status=400)
+            if cost is not None and float(cost) < 0:
+                return JsonResponse({'success': False, 'error': 'Đơn giá phải lớn hơn hoặc bằng 0.'}, status=400)
+
             sp = SparePart.objects.get(id=data.get('id'), tenant_id=tenant_id)
             sp.name = data.get('name')
             sp.part_number = data.get('part_number')

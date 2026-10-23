@@ -227,8 +227,17 @@ class AssetAnomalyAlertSerializer(serializers.ModelSerializer):
     occurrenceCount = serializers.IntegerField(source='occurrence_count', read_only=True)
     isSuppressed = serializers.BooleanField(source='is_suppressed', read_only=True)
     draftWorkOrderId = serializers.UUIDField(source='draft_work_order.id', read_only=True, allow_null=True)
+    draftWorkOrderCode = serializers.CharField(source='draft_work_order.code', read_only=True, allow_null=True)
+    draftWorkOrderStatus = serializers.CharField(source='draft_work_order.status', read_only=True, allow_null=True)
+    assignedTechnicianName = serializers.SerializerMethodField()
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     lastDetectedAt = serializers.DateTimeField(source='last_detected_at', read_only=True)
+
+    def get_assignedTechnicianName(self, obj):
+        if obj.draft_work_order and obj.draft_work_order.assigned_to:
+            user = obj.draft_work_order.assigned_to
+            return user.get_full_name() or user.username
+        return None
 
     class Meta:
         model = AssetAnomalyAlert
@@ -237,5 +246,6 @@ class AssetAnomalyAlertSerializer(serializers.ModelSerializer):
             'currentValue', 'zScore', 'anomalyScore', 'trendSlope',
             'predictedFailureDate', 'daysRemaining', 'severity', 'status',
             'occurrenceCount', 'isSuppressed', 'draftWorkOrderId',
+            'draftWorkOrderCode', 'draftWorkOrderStatus', 'assignedTechnicianName',
             'message', 'createdAt', 'lastDetectedAt'
         ]

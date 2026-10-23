@@ -374,6 +374,13 @@
           return;
       }
 
+      if (parseFloat(qty) < 0 || parseFloat(cost) < 0) {
+          msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 font-medium';
+          msg.innerText = 'Số lượng tồn kho và đơn giá phải lớn hơn hoặc bằng 0.';
+          msg.classList.remove('hidden');
+          return;
+      }
+
       const id = document.getElementById('inv-id').value;
       const data = {
           id: id,

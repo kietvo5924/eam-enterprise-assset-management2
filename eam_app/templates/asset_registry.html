@@ -1752,6 +1752,21 @@
                   ${alert.daysRemaining !== null && alert.daysRemaining !== undefined ? `<span>Dự kiến sự cố sau: <b>${alert.daysRemaining} ngày</b></span>` : ''}
                   ${alert.trendSlope ? `<span>Tốc độ trôi: <b>+${alert.trendSlope}/ngày</b></span>` : ''}
                 </div>
+                ${alert.draftWorkOrderId ? `
+                  <div class="mt-2.5 pt-2 border-t ${isCritical ? 'border-rose-200/70' : 'border-amber-200/70'} flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 text-xs">
+                      <i class="${isCritical ? 'ph-bold ph-lightning text-rose-600' : 'ph-bold ph-file-text text-amber-600'}"></i>
+                      <span class="font-bold">${isCritical ? 'Phiếu sự cố khẩn cấp:' : 'Bản thảo PM (Hungarian đề xuất):'}</span>
+                      <a href="/portal/work-orders/?wo_id=${alert.draftWorkOrderId}" class="font-extrabold underline ${isCritical ? 'text-rose-700 hover:text-rose-900' : 'text-amber-700 hover:text-amber-900'}">${alert.draftWorkOrderCode || 'Xem chi tiết'}</a>
+                      ${alert.assignedTechnicianName ? `<span class="px-1.5 py-0.5 rounded bg-white/80 border border-neutral-200 text-neutral-700 font-semibold text-[11px]"><i class="ph-bold ph-user-check text-emerald-600"></i> ${alert.assignedTechnicianName}</span>` : ''}
+                      ${alert.draftWorkOrderStatus ? `<span class="px-1.5 py-0.5 rounded ${alert.draftWorkOrderStatus === 'ASSIGNED' ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-neutral-700'} font-bold text-[10px] uppercase">${alert.draftWorkOrderStatus}</span>` : ''}
+                    </div>
+                    <a href="/portal/work-orders/?wo_id=${alert.draftWorkOrderId}" class="px-2.5 py-1 ${isCritical ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'} rounded-lg text-xs font-bold shadow-xs transition-all flex items-center gap-1">
+                      <span>${isCritical ? 'Mở Phiếu Khẩn Cấp' : 'Duyệt Bản Thảo'}</span>
+                      <i class="ph-bold ph-arrow-up-right text-[10px]"></i>
+                    </a>
+                  </div>
+                ` : ''}
               </div>
             </div>
             <div class="flex items-center gap-2 shrink-0">

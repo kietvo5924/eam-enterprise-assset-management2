@@ -541,11 +541,18 @@
               <div class="max-h-48 overflow-y-auto pr-1 space-y-1.5">
                 {% if tools %}
                   {% for t in tools %}
-                  <label class="flex items-center justify-between gap-2 p-2 rounded-xl border border-neutral-200/80 bg-neutral-50/70 hover:bg-neutral-100 hover:border-primary/40 cursor-pointer transition-all group">
+                  <label class="flex items-center justify-between gap-2 p-2 rounded-xl border border-neutral-200/80 {% if t.is_disabled %}opacity-50 bg-neutral-100 cursor-not-allowed{% else %}bg-neutral-50/70 hover:bg-neutral-100 hover:border-primary/40 cursor-pointer{% endif %} transition-all group">
                     <div class="flex items-center gap-2.5 min-w-0">
-                      <input type="checkbox" class="wo-tool-cb rounded text-primary focus:ring-primary h-4 w-4 shrink-0" value="{{ t.code }}">
+                      <input type="checkbox" class="wo-tool-cb rounded text-primary focus:ring-primary h-4 w-4 shrink-0" value="{{ t.code }}" {% if t.is_disabled %}disabled title="Công cụ hiện không khả dụng (hết hàng hoặc quá hạn kiểm định)"{% endif %}>
                       <div class="min-w-0">
-                        <div class="font-bold text-neutral-800 text-xs truncate group-hover:text-primary transition-colors" title="{{ t.name }}">{{ t.name }}</div>
+                        <div class="font-bold text-neutral-800 text-xs truncate group-hover:text-primary transition-colors" title="{{ t.name }}">
+                          {{ t.name }}
+                          {% if t.is_expired %}
+                          <span class="ml-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5">Quá hạn KĐ</span>
+                          {% elif t.available_quantity <= 0 %}
+                          <span class="ml-1 text-[10px] font-bold text-neutral-500 bg-neutral-200 rounded px-1.5 py-0.5">Hết dụng cụ</span>
+                          {% endif %}
+                        </div>
                         {% if t.location__name %}
                         <div class="flex items-center gap-1 text-[10px] text-amber-700 font-medium truncate mt-0.5">
                           <i class="ph-bold ph-map-pin text-amber-600 shrink-0 text-[10px]"></i>
@@ -555,7 +562,7 @@
                       </div>
                     </div>
                     <div class="shrink-0 flex items-center">
-                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-200/70 text-neutral-700 whitespace-nowrap">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {% if t.is_disabled %}bg-rose-50 text-rose-700 border border-rose-200/60{% else %}bg-neutral-200/70 text-neutral-700{% endif %} whitespace-nowrap">
                         SL: {{ t.available_quantity }}
                       </span>
                     </div>
@@ -578,13 +585,16 @@
               <div class="max-h-48 overflow-y-auto pr-1 space-y-1.5">
                 {% if spare_parts %}
                   {% for sp in spare_parts %}
-                  <label class="flex items-center justify-between gap-2 p-2 rounded-xl border border-neutral-200/80 bg-neutral-50/70 hover:bg-neutral-100 hover:border-emerald-500/40 cursor-pointer transition-all group">
+                  <label class="flex items-center justify-between gap-2 p-2 rounded-xl border border-neutral-200/80 {% if sp.quantity_in_stock <= 0 %}opacity-50 bg-neutral-100 cursor-not-allowed{% else %}bg-neutral-50/70 hover:bg-neutral-100 hover:border-emerald-500/40 cursor-pointer{% endif %} transition-all group">
                     <div class="flex items-center gap-2.5 min-w-0">
-                      <input type="checkbox" class="wo-spare-part-cb rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 shrink-0" value="{{ sp.id }}">
+                      <input type="checkbox" class="wo-spare-part-cb rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 shrink-0" value="{{ sp.id }}" {% if sp.quantity_in_stock <= 0 %}disabled title="Vật tư hiện đã hết tồn kho"{% endif %}>
                       <div class="min-w-0">
                         <div class="font-bold text-neutral-800 text-xs truncate group-hover:text-emerald-700 transition-colors" title="{{ sp.name }}">
                           {{ sp.name }}
                           {% if sp.part_number %}<span class="font-mono text-[10px] text-neutral-400 font-normal">[{{ sp.part_number }}]</span>{% endif %}
+                          {% if sp.quantity_in_stock <= 0 %}
+                          <span class="ml-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5">Hết tồn kho</span>
+                          {% endif %}
                         </div>
                         {% if sp.location__name %}
                         <div class="flex items-center gap-1 text-[10px] text-amber-700 font-medium truncate mt-0.5">
@@ -1819,6 +1829,15 @@
   const WO_METADATA = {{ wo_metadata_json|default:'{}'|safe }};
   const ALL_TECHNICIANS = {{ technicians_json|default:'[]'|safe }};
 
+  document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('wo-title')?.addEventListener('input', function() {
+          this.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+      });
+      document.getElementById('wo-asset')?.addEventListener('change', function() {
+          this.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+      });
+  });
+
   function filterAssignableEmployees(targetUserId = '') {
       const minLevel = parseInt(document.getElementById('wo-min-skill-level')?.value || '0', 10);
       const reqSkill = (document.getElementById('wo-required-skill')?.value || '').trim().toUpperCase();
@@ -2389,6 +2408,12 @@
       document.getElementById('wo-modal-title').innerText = id ? 'Sửa Work Order' : (parentId ? 'Tạo Phiếu Sửa Chữa Tiếp Theo (Follow-up)' : 'Tạo Work Order');
       document.getElementById('wo-msg').classList.add('hidden');
 
+      // Clear any previous error styling
+      const titleInput = document.getElementById('wo-title');
+      const assetSelect = document.getElementById('wo-asset');
+      if (titleInput) titleInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+      if (assetSelect) assetSelect.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+
       // Populate optimization fields from WO_METADATA if editing
       const meta = (id && window.WO_METADATA && window.WO_METADATA[id]) ? window.WO_METADATA[id] : {
           required_skill: '',
@@ -2686,18 +2711,29 @@
       const asset_id = document.getElementById('wo-asset').value;
       const msg = document.getElementById('wo-msg');
 
+      const titleInput = document.getElementById('wo-title');
+      const assetSelect = document.getElementById('wo-asset');
+      if (titleInput) titleInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+      if (assetSelect) assetSelect.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
+
       if (!title || !title.trim()) {
+          if (titleInput) {
+              titleInput.classList.add('border-rose-500', 'ring-2', 'ring-rose-200');
+              titleInput.focus();
+          }
           msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
           msg.innerText = 'Vui lòng nhập tiêu đề Work Order.';
           msg.classList.remove('hidden');
-          document.getElementById('wo-title').focus();
           return;
       }
       if (!asset_id) {
+          if (assetSelect) {
+              assetSelect.classList.add('border-rose-500', 'ring-2', 'ring-rose-200');
+              assetSelect.focus();
+          }
           msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
           msg.innerText = 'Vui lòng chọn thiết bị / tài sản cho công việc.';
           msg.classList.remove('hidden');
-          document.getElementById('wo-asset').focus();
           return;
       }
 

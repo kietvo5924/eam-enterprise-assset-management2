@@ -648,26 +648,55 @@ def notify_spare_part_requested(spare_part, work_order, quantity_requested, requ
     )
 
 
-def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value):
+def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, severity='CRITICAL', work_order=None, suggested_technician=None):
     """Event 11: SENSOR_ANOMALY_DETECTED"""
     managers = NotificationRouter.get_maintenance_managers(asset.tenant_id)
-    title = f"Cảnh báo bất thường cảm biến: {asset.name}"
-    message = f"Cảm biến phát hiện {anomaly_type} bất thường tại thiết bị '{asset.name}': {metric_value} (Ngưỡng: {threshold_value})."
-    link = f"/portal/assets/{asset.id}/"
+    
+    if severity == 'CRITICAL':
+        title = f"KHẨN CẤP: Bất thường cảm biến tại {asset.name}"
+        if work_order and getattr(work_order, 'assigned_to', None):
+            assigned_name = work_order.assigned_to.get_full_name() or work_order.assigned_to.username
+            message = (
+                f"Phát hiện {anomaly_type} vượt ngưỡng nguy hiểm tại '{asset.name}': {metric_value} (Ngưỡng: {threshold_value}). "
+                f"Đã tự động tạo phiếu {work_order.code} và điều phối tức thời qua Hungarian cho kỹ thuật viên {assigned_name}."
+            )
+        elif work_order:
+            message = (
+                f"Phát hiện {anomaly_type} vượt ngưỡng nguy hiểm tại '{asset.name}': {metric_value} (Ngưỡng: {threshold_value}). "
+                f"Đã tự động tạo phiếu {work_order.code} (đang chờ phân công khẩn cấp)."
+            )
+        else:
+            message = f"Cảm biến phát hiện {anomaly_type} bất thường tại thiết bị '{asset.name}': {metric_value} (Ngưỡng: {threshold_value})."
+        
+        sla_val = 15
+    else:
+        title = f"Cảnh báo theo dõi thiết bị: {asset.name}"
+        tech_note = f" (Đề xuất phân công: {suggested_technician})" if suggested_technician else ""
+        if work_order:
+            message = (
+                f"Cảnh báo {anomaly_type} tại '{asset.name}': {metric_value} (Ngưỡng: {threshold_value}). "
+                f"Đã tạo bản thảo phiếu {work_order.code}{tech_note}."
+            )
+        else:
+            message = f"Cảnh báo {anomaly_type} tại '{asset.name}': {metric_value} (Ngưỡng: {threshold_value})."
+        
+        sla_val = 120
+
+    link = f"/portal/work-orders/?wo_id={work_order.id}" if work_order else f"/portal/assets/{asset.id}/"
 
     return dispatch_event_notification(
         event_type='SENSOR_ANOMALY_DETECTED',
         tenant=asset.tenant,
-        entity_type='Asset',
-        entity_id=asset.id,
+        entity_type='WorkOrder' if work_order else 'Asset',
+        entity_id=work_order.id if work_order else asset.id,
         recipients=managers,
         title=title,
         message=message,
         link=link,
-        category='ASSET',
-        severity='CRITICAL',
+        category='WORK_ORDER' if work_order else 'ASSET',
+        severity=severity,
         is_actionable=True,
-        sla_minutes=15
+        sla_minutes=sla_val
     )
 
 

@@ -1006,9 +1006,6 @@
               } finally {
                   if (link) {
                       let targetLink = (link || '').trim();
-                      if (targetLink.startsWith('/portal/')) {
-                          targetLink = targetLink.replace(/^\/portal/, '');
-                      }
                       if (targetLink) {
                           // Safe navigation checking permission drift (Rule 9 / TC-DRIFT-01)
                           try {
