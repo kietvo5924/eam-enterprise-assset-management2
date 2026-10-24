@@ -10,7 +10,7 @@ from .constants import (
     DEFAULT_CROSSOVER_RATE, DEFAULT_MUTATION_RATE,
     CATACLYSMIC_MUTATION_RATE, TOURNAMENT_SIZE, HEURISTIC_SEEDING_RATIO
 )
-from algorithms.hungarian.cost_matrix import is_certification_satisfied
+from algorithms.hungarian.cost_matrix import is_certification_satisfied, is_skill_satisfied
 
 
 def repair_individual_constraints(individual: GAIndividual,
@@ -18,9 +18,9 @@ def repair_individual_constraints(individual: GAIndividual,
                                   technicians: List[Any],
                                   catalog: Dict[str, Any] = None) -> GAIndividual:
     """
-    Repair Operator: Enforces safety certifications and floorplan compatibility.
-    If a task requiring a safety cert is assigned to an uncertified tech,
-    re-assigns to a qualified tech or Virtual Tech N.
+    Repair Operator: Enforces safety certifications, required skills, min skill level, and floorplan compatibility.
+    If a task requiring a safety cert/skill is assigned to an uncertified or underqualified tech,
+    re-assigns to a qualified tech or Virtual Tech N (Backlog).
     If non-roving tech is assigned to a different floorplan, re-assigns appropriately.
     """
     n_techs = len(technicians)
@@ -34,23 +34,40 @@ def repair_individual_constraints(individual: GAIndividual,
         # 1. Certification check
         needs_repair = False
         if task.required_certification and not is_certification_satisfied(
-            task.required_certification, tech.certifications, catalog=catalog
+            task.required_certification, tech.certifications, tech_user=getattr(tech, 'user', None), catalog=catalog
         ):
             needs_repair = True
 
-        # 2. Floorplan mismatch check
+        # 2. Required Skill check
+        if task.required_skill and not is_skill_satisfied(
+            task.required_skill, tech.skills, catalog=catalog
+        ):
+            needs_repair = True
+
+        # 3. Minimum Skill Level check
+        req_level = getattr(task, 'min_skill_level', None) or 1
+        if getattr(tech, 'skill_level', 1) < req_level:
+            needs_repair = True
+
+        # 4. Floorplan mismatch check
         if not tech.is_roving and tech.floorplan_id and task.floorplan_id:
             if tech.floorplan_id != task.floorplan_id:
                 needs_repair = True
 
         if needs_repair:
-            # Find candidate technicians matching both cert and floorplan
+            # Find candidate technicians matching cert, skill, min level, and floorplan
             qualified_indices = []
             for t_idx, cand_tech in enumerate(technicians):
                 cand_ok = True
                 if task.required_certification and not is_certification_satisfied(
-                    task.required_certification, cand_tech.certifications, catalog=catalog
+                    task.required_certification, cand_tech.certifications, tech_user=getattr(cand_tech, 'user', None), catalog=catalog
                 ):
+                    cand_ok = False
+                if task.required_skill and not is_skill_satisfied(
+                    task.required_skill, cand_tech.skills, catalog=catalog
+                ):
+                    cand_ok = False
+                if getattr(cand_tech, 'skill_level', 1) < req_level:
                     cand_ok = False
                 if not cand_tech.is_roving and cand_tech.floorplan_id and task.floorplan_id:
                     if cand_tech.floorplan_id != task.floorplan_id:
@@ -88,13 +105,24 @@ def generate_greedy_seed(tasks: List[Any], technicians: List[Any], catalog=None)
         task = tasks[j]
         best_tech_idx = None
         min_load = float('inf')
+        req_level = getattr(task, 'min_skill_level', None) or 1
 
         # Find best eligible tech
         for t_idx, tech in enumerate(technicians):
             # Check certification
             if task.required_certification and not is_certification_satisfied(
-                task.required_certification, tech.certifications, catalog=catalog
+                task.required_certification, tech.certifications, tech_user=getattr(tech, 'user', None), catalog=catalog
             ):
+                continue
+
+            # Check required skill
+            if task.required_skill and not is_skill_satisfied(
+                task.required_skill, tech.skills, catalog=catalog
+            ):
+                continue
+
+            # Check minimum skill level
+            if getattr(tech, 'skill_level', 1) < req_level:
                 continue
 
             # Check floorplan

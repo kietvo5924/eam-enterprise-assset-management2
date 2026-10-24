@@ -81,8 +81,8 @@ def decompose_crew_slots(work_orders) -> List[WorkOrderSlot]:
             lead_level = max(4, wo.min_skill_level or 1)
             slots.append(WorkOrderSlot(wo, slot_role='LEAD', min_skill_level=lead_level))
 
-            # Assist Slot (Requires Supporting Level >= 2)
-            asst_level = max(2, min(wo.min_skill_level or 2, 2))
+            # Assist Slot (Requires Supporting Level: max(2, min_skill_level - 1))
+            asst_level = max(2, (wo.min_skill_level or 2) - 1)
             slots.append(WorkOrderSlot(wo, slot_role='ASSIST', min_skill_level=asst_level))
         else:
             slots.append(WorkOrderSlot(wo, slot_role='SOLO'))

@@ -42,12 +42,10 @@ class HungarianAssignmentService:
         """
         now = current_time or timezone.now()
 
-        # Step 1: Query Work Orders
-        wo_qs = WorkOrder.objects.filter(tenant=tenant)
+        # Step 1: Query Work Orders (Only CREATED work orders are eligible for auto-assignment)
+        wo_qs = WorkOrder.objects.filter(tenant=tenant, status='CREATED')
         if work_order_ids:
             wo_qs = wo_qs.filter(id__in=work_order_ids)
-        else:
-            wo_qs = wo_qs.filter(status='CREATED')
 
         from django.db.models import F
         all_work_orders = list(wo_qs.select_related('asset', 'depends_on_wo').order_by(F('deadline').asc(nulls_last=True), 'created_at'))
@@ -172,8 +170,20 @@ class HungarianAssignmentService:
             ))
             # Take top N slots for immediate dispatch; remainder stay in backlog
             n_techs = len(sorted_techs)
-            overflow_unassigned_slots = active_slots[n_techs:]
-            active_slots = active_slots[:n_techs]
+            cutoff = n_techs
+            # Ensure crew tasks remain atomic: do not split lead and assistant across cutoff
+            crew_counts = {}
+            for s in active_slots[:cutoff]:
+                if getattr(s, 'slot_role', 'SOLO') in ('LEAD', 'ASSIST'):
+                    crew_counts[s.original_id] = crew_counts.get(s.original_id, 0) + 1
+            for s in list(active_slots[:cutoff]):
+                if getattr(s, 'slot_role', 'SOLO') in ('LEAD', 'ASSIST'):
+                    if crew_counts.get(s.original_id, 0) < 2:
+                        cutoff -= 1
+                        crew_counts[s.original_id] = 0
+
+            overflow_unassigned_slots = active_slots[cutoff:]
+            active_slots = active_slots[:cutoff]
 
         # Step 7: Build Multi-Factor Cost Matrix
         from .cost_matrix import build_tenant_competency_catalog
@@ -371,36 +381,67 @@ class HungarianAssignmentService:
                     f"Kỹ thuật viên {get_user_display_name(tech.user)} hiện không khả dụng (Trạng thái: {tech.availability_status}, Trực: {tech.is_on_duty})."
                 )
 
+            # Re-validate hard constraints under concurrency lock (Rule 8 & Big-M safety)
+            from .cost_matrix import (
+                is_skill_satisfied, is_certification_satisfied,
+                calculate_shift_penalty, check_floorplan_hard_constraint,
+                build_tenant_competency_catalog
+            )
+            catalog = build_tenant_competency_catalog(tenant)
+
+            if wo.required_skill and not is_skill_satisfied(wo.required_skill, tech.skills, catalog=catalog):
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} thiếu chuyên môn '{wo.required_skill}' cho phiếu {wo.code}.")
+            if wo.required_certification and not is_certification_satisfied(
+                wo.required_certification, tech.certifications, tech_user=tech.user, catalog=catalog
+            ):
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} thiếu chứng chỉ an toàn '{wo.required_certification}' cho phiếu {wo.code}.")
+
+            role = item.get('slotRole', 'SOLO')
+            if role == 'LEAD' and getattr(tech, 'skill_level', 1) < max(4, wo.min_skill_level or 1):
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} bậc {tech.skill_level} không đạt yêu cầu bậc {max(4, wo.min_skill_level or 1)} cho vai trò Trưởng nhóm (LEAD).")
+            elif role == 'ASSIST' and getattr(tech, 'skill_level', 1) < max(2, (wo.min_skill_level or 2) - 1):
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} bậc {tech.skill_level} không đạt yêu cầu bậc {max(2, (wo.min_skill_level or 2) - 1)} cho vai trò Trợ tá (ASSIST).")
+
+            is_fp_hard, fp_reason = check_floorplan_hard_constraint(tech, wo, catalog=catalog)
+            if is_fp_hard:
+                raise ValidationError(f"Vi phạm mặt bằng: {fp_reason}")
+
+        # Group assignments by work order to apply LEAD/SOLO before ASSIST deterministically
+        assignments_by_wo = {}
+        for item in assignments_data:
+            assignments_by_wo.setdefault(str(item['workOrderId']), []).append(item)
+
         # Apply assignments
         now = timezone.now()
         applied_list = []
 
-        for item in assignments_data:
-            wo_id_str = str(item['workOrderId'])
-            tech_id_str = str(item['technicianId'])
-            role = item.get('slotRole', 'SOLO')
-
+        for wo_id_str, items in assignments_by_wo.items():
             wo = wos[wo_id_str]
-            tech = techs[tech_id_str]
+            # Ensure LEAD/SOLO is processed before ASSIST regardless of client list order
+            items.sort(key=lambda x: 0 if x.get('slotRole') in ('LEAD', 'SOLO') else 1)
 
-            if role == 'ASSIST' and wo.assigned_to:
-                # Add crew assist info to notes
-                wo.notes = f"{wo.notes or ''}\n[Crew Assist]: {get_user_display_name(tech.user)}".strip()
-            else:
-                wo.assigned_to = tech.user
-            
-            wo.assigned_at = now
-            wo.status = 'ASSIGNED'
-            wo.save()
+            for item in items:
+                tech_id_str = str(item['technicianId'])
+                role = item.get('slotRole', 'SOLO')
+                tech = techs[tech_id_str]
 
-            # Mark technician as BUSY
-            tech.availability_status = 'BUSY'
-            tech.save()
+                if role == 'ASSIST' and wo.assigned_to:
+                    # Add crew assist info to notes
+                    wo.notes = f"{wo.notes or ''}\n[Crew Assist]: {get_user_display_name(tech.user)}".strip()
+                else:
+                    wo.assigned_to = tech.user
 
-            # Tool Reservation Concurrency Handling
-            try:
-                from assets.models import Tool, ToolReservation, ToolInstance
+                wo.assigned_at = now
+                wo.status = 'ASSIGNED'
+                wo.save()
+
+                # Mark technician as BUSY
+                tech.availability_status = 'BUSY'
+                tech.save()
+
+                # Tool Reservation Concurrency Handling (Atomic stock reservation)
                 if wo.required_tools and isinstance(wo.required_tools, list):
+                    from assets.models import Tool, ToolReservation, ToolInstance
                     for tool_item in wo.required_tools:
                         if isinstance(tool_item, dict):
                             t_code = tool_item.get('code')
@@ -409,40 +450,45 @@ class HungarianAssignmentService:
                             t_code = str(tool_item)
                             req_qty = 1
 
+                        if not t_code:
+                            continue
+
                         tool_obj = Tool.objects.select_for_update().filter(tenant=tenant, code=t_code, is_active=True).first()
                         if tool_obj:
-                            inst = ToolInstance.objects.filter(tool=tool_obj, tenant=tenant, status='AVAILABLE').first()
+                            if tool_obj.available_quantity < req_qty:
+                                raise ValidationError(
+                                    f"Dụng cụ '{tool_obj.name}' ({t_code}) không đủ số lượng khả dụng (yêu cầu: {req_qty}, hiện có: {tool_obj.available_quantity})."
+                                )
+                            inst_list = list(ToolInstance.objects.filter(tool=tool_obj, tenant=tenant, status='AVAILABLE')[:req_qty])
+                            first_inst = inst_list[0] if inst_list else None
                             ToolReservation.objects.create(
                                 tenant=tenant,
                                 tool=tool_obj,
-                                tool_instance=inst,
+                                tool_instance=first_inst,
                                 work_order=wo,
                                 reserved_quantity=req_qty,
                                 status='RESERVED'
                             )
-                            if tool_obj.available_quantity >= req_qty:
-                                tool_obj.available_quantity -= req_qty
-                                tool_obj.save()
-                            if inst:
+                            tool_obj.available_quantity -= req_qty
+                            tool_obj.save()
+                            for inst in inst_list:
                                 inst.status = 'IN_USE'
                                 inst.save()
-            except Exception:
-                pass
 
-            # Dispatch notification
-            try:
-                notify_work_order_assigned(wo, assignee=tech.user, is_reassigned=False, sender=current_user)
-            except Exception:
-                pass  # Do not block transactional dispatch on non-critical notification failures
+                # Dispatch notification
+                try:
+                    notify_work_order_assigned(wo, assignee=tech.user, is_reassigned=False, sender=current_user)
+                except Exception:
+                    pass  # Do not block transactional dispatch on non-critical notification failures
 
-            applied_list.append({
-                "workOrderId": str(wo.id),
-                "workOrderCode": wo.code,
-                "technicianId": str(tech.user_id),
-                "technicianName": get_user_display_name(tech.user),
-                "slotRole": role,
-                "status": wo.status
-            })
+                applied_list.append({
+                    "workOrderId": str(wo.id),
+                    "workOrderCode": wo.code,
+                    "technicianId": str(tech.user_id),
+                    "technicianName": get_user_display_name(tech.user),
+                    "slotRole": role,
+                    "status": wo.status
+                })
 
         return {
             "appliedCount": len(applied_list),

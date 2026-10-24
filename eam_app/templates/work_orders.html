@@ -178,7 +178,7 @@
               </td>
               <td class="px-4 py-3 w-[250px] max-w-[250px]">
                 <div class="flex flex-col items-start">
-                  <strong onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}')" class="text-neutral-800 hover:text-primary cursor-pointer transition-colors truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
+                  <strong onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}', '{% if wo.created_by %}{{ wo.created_by.get_full_name|default:wo.created_by.username|escapejs }}{% else %}Hệ thống AI{% endif %}')" class="text-neutral-800 hover:text-primary cursor-pointer transition-colors truncate w-full block" title="{{ wo.title }}">{{ wo.title }}</strong>
                   <div class="flex gap-1 mt-1 flex-wrap w-full">
                     {% if wo.parent_id %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-bold truncate max-w-full" title="Kế thừa từ: {{ wo.parent_id.title }}">
@@ -224,7 +224,13 @@
                 {% if wo.assigned_to %}{{ wo.assigned_to.username }}{% else %}-{% endif %}
               </td>
               <td class="px-4 py-3 text-neutral-600">
-                {% if wo.created_by %}{{ wo.created_by.username }}{% else %}-{% endif %}
+                {% if wo.created_by %}
+                  <span class="font-medium text-neutral-800">{{ wo.created_by.get_full_name|default:wo.created_by.username }}</span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold whitespace-nowrap">
+                    <i class="ph-fill ph-cpu text-indigo-600"></i> Hệ thống AI
+                  </span>
+                {% endif %}
               </td>
               <td class="px-4 py-3 text-neutral-600">
                 {{ wo.deadline|date:'Y-m-d H:i'|default:'-' }}
@@ -235,7 +241,7 @@
               <td class="px-4 py-3 text-right">
                 <script type="application/json" id="checklists-{{ wo.id }}">{{ checklists_json|safe }}</script>
                 <div class="flex gap-2 items-center justify-end">
-                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}')" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button onclick="openWoDetailModal('{{ wo.id }}', '{{ wo.title|escapejs }}', '{{ wo.description|escapejs }}', '{{ wo.priority }}', '{{ wo.status }}', '{{ wo.asset_id|default:'' }}', '{{ wo.asset.name|default:''|escapejs }}', '{{ wo.assigned_to_id|default:'' }}', '{% if wo.assigned_to %}{{ wo.assigned_to.username|escapejs }}{% endif %}', '{{ wo.deadline|date:'Y-m-d' }}', '{% if wo.created_by %}{{ wo.created_by.get_full_name|default:wo.created_by.username|escapejs }}{% else %}Hệ thống AI{% endif %}')" title="Xem chi tiết" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-eye text-lg"></i>
                     </button>
                     
@@ -248,7 +254,7 @@
                     {% endif %}
 
                     {% if 'work_order:reassign' in user_permissions and wo.status != 'COMPLETED' and wo.status != 'CANCELLED' %}
-                    <button onclick="openAssignModal('{{ wo.id }}', '{{ wo.assigned_to_id|default:'' }}')" title="Phân công" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
+                    <button onclick="openAssignModal('{{ wo.id }}', '{{ wo.assigned_to_id|default:'' }}', '{{ wo.title|escapejs }}')" title="Phân công" class="w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-primary bg-neutral-50 hover:bg-primary-50 rounded-lg transition-colors">
                         <i class="ph-bold ph-user-switch text-lg"></i>
                     </button>
                     {% endif %}
@@ -329,6 +335,7 @@
         <input type="hidden" id="wo-id" />
         <input type="hidden" id="wo-parent-id" value="" />
         <input type="hidden" id="wo-type" value="CORRECTIVE" />
+        <input type="hidden" id="wo-alert-id" value="" />
         <div id="wo-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
 
         <!-- Follow-up Work Order Indicator -->
@@ -338,6 +345,15 @@
             <span>Phiếu sửa chữa khắc phục tiếp theo (Follow-up) của <b id="wo-parent-indicator-code" class="font-mono"></b></span>
           </div>
           <span class="px-2 py-0.5 rounded bg-amber-200/60 font-bold text-[10px] text-amber-900 uppercase">Corrective</span>
+        </div>
+
+        <!-- AI Anomaly Alert Recommendation Indicator -->
+        <div id="wo-anomaly-indicator" class="hidden p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 font-medium flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="ph-fill ph-sparkle text-base text-indigo-600"></i>
+            <span>Khởi tạo từ cảnh báo sớm AI Condition Monitoring. Đã tự động điền sẵn thông số và danh mục kiểm tra.</span>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-indigo-200/60 font-bold text-[10px] text-indigo-900 uppercase">AI Recommendation</span>
         </div>
 
         <div>
@@ -697,25 +713,108 @@
 </div>
 
 <!-- Assign Modal -->
-<div id="assign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+<div id="assign-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignModal()"></div>
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col relative z-10">
-    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-neutral-50">
-      <h3 class="font-bold text-lg text-neutral-800">Phân công người dùng</h3>
-      <button onclick="closeAssignModal()" class="text-neutral-400 hover:text-neutral-700 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col relative z-10 max-h-[90vh]">
+    <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/90">
+      <div>
+        <h3 class="font-bold text-lg text-neutral-800 flex items-center gap-2">
+          <i class="ph-bold ph-user-switch text-primary"></i> Phân công nhân viên
+        </h3>
+        <p class="text-xs text-neutral-500 mt-0.5" id="assign-modal-subtitle">Lựa chọn nhân sự phù hợp cho Work Order</p>
+      </div>
+      <button onclick="closeAssignModal()" class="text-neutral-400 hover:text-neutral-700 transition-colors p-1.5 rounded-lg hover:bg-neutral-100"><i class="ph-bold ph-x text-lg"></i></button>
     </div>
-    <div class="p-6">
-      <input type="hidden" id="assign-wo-id" />
-      <label class="block text-sm font-bold text-neutral-700 mb-1.5">Người được phân công</label>
-      <select id="assign-user" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-        <option value="">-- Bỏ phân công --</option>
-        {% for u in users %}
-        <option value="{{ u.id }}">{{ u.username }} - Bậc {{ u.technician_profile.skill_level|default:1 }}</option>
-        {% endfor %}
-      </select>
-      <div class="mt-6 flex justify-end gap-3">
-        <button onclick="closeAssignModal()" class="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-lg text-sm font-bold transition-colors">Hủy</button>
-        <button onclick="submitAssign()" class="px-5 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg text-sm font-bold transition-all shadow-sm shadow-primary/20">Lưu thay đổi</button>
+    
+    <!-- Banner cảnh báo tiêu chuẩn kỹ thuật Work Order yêu cầu -->
+    <div id="assign-wo-req-banner" class="hidden px-5 py-2.5 bg-blue-50/70 border-b border-blue-100 flex items-center justify-between text-xs text-blue-900">
+      <div class="flex items-center gap-2 min-w-0">
+        <i class="ph-fill ph-shield-check text-blue-600 text-sm flex-shrink-0"></i>
+        <div class="truncate" id="assign-wo-req-text"></div>
+      </div>
+      <label class="flex items-center gap-1.5 cursor-pointer flex-shrink-0 ml-3 font-semibold text-blue-800 select-none">
+        <input type="checkbox" id="assign-filter-match-only" onchange="filterAssignTechnicians()" class="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer">
+        Chỉ hiện đạt chuẩn
+      </label>
+    </div>
+
+    <!-- Bộ lọc tìm kiếm & tiêu chí -->
+    <div class="p-4 bg-white border-b border-neutral-100 space-y-3">
+      <!-- Thanh tìm kiếm nhanh -->
+      <div class="relative">
+        <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-sm"></i>
+        <input type="text" id="assign-filter-search" oninput="filterAssignTechnicians()" placeholder="Tìm kiếm theo tên nhân viên, username hoặc chuyên môn..." class="w-full pl-9 pr-8 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+        <button type="button" onclick="document.getElementById('assign-filter-search').value=''; filterAssignTechnicians();" class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 text-xs">
+          <i class="ph-bold ph-x-circle"></i>
+        </button>
+      </div>
+
+      <!-- Bộ lọc dropdown: Bậc, Chuyên môn, Bằng cấp, Trạng thái -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div>
+          <label class="block text-[11px] font-bold text-neutral-600 mb-1">Bậc kỹ thuật</label>
+          <select id="assign-filter-level" onchange="filterAssignTechnicians()" class="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+            <option value="0">Tất cả bậc</option>
+            <option value="1">Bậc 1 trở lên</option>
+            <option value="2">Bậc 2 trở lên</option>
+            <option value="3">Bậc 3 trở lên</option>
+            <option value="4">Bậc 4 trở lên</option>
+            <option value="5">Bậc 5 (Chuyên gia)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-neutral-600 mb-1">Chuyên môn</label>
+          <select id="assign-filter-skill" onchange="filterAssignTechnicians()" class="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+            <option value="">Tất cả chuyên môn</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-neutral-600 mb-1">Bằng cấp / Chứng chỉ</label>
+          <select id="assign-filter-cert" onchange="filterAssignTechnicians()" class="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+            <option value="">Tất cả chứng chỉ</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-neutral-600 mb-1">Trạng thái</label>
+          <select id="assign-filter-status" onchange="filterAssignTechnicians()" class="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-medium focus:outline-none focus:border-primary">
+            <option value="">Tất cả trạng thái</option>
+            <option value="AVAILABLE">Khả dụng (Sẵn sàng)</option>
+            <option value="BUSY">Đang làm việc</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between text-[11px] text-neutral-500 pt-0.5">
+        <span id="assign-filter-count">Hiển thị 0 nhân viên</span>
+        <button type="button" onclick="resetAssignFilters()" class="text-primary hover:underline font-semibold cursor-pointer">
+          Đặt lại bộ lọc
+        </button>
+      </div>
+    </div>
+
+    <!-- Danh sách nhân viên có thể chọn -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-neutral-50/50 min-h-[220px] max-h-[340px]" id="assign-tech-list">
+      <!-- Populated dynamically by JS -->
+    </div>
+
+    <!-- Hidden input để giữ giá trị cho submitAssign() -->
+    <input type="hidden" id="assign-wo-id" />
+    <input type="hidden" id="assign-user" />
+
+    <!-- Footer modal -->
+    <div class="p-4 border-t border-neutral-100 flex items-center justify-between bg-white">
+      <div class="text-xs text-neutral-600 truncate max-w-[260px] sm:max-w-xs">
+        <span class="font-bold text-neutral-800">Đang chọn: </span>
+        <span id="assign-selected-name" class="font-semibold text-primary">Chưa chọn</span>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeAssignModal()" class="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy</button>
+        <button onclick="submitAssign()" id="assign-submit-btn" class="px-5 py-2 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-primary/20 flex items-center gap-1.5">
+          <i class="ph-bold ph-check"></i> Lưu thay đổi
+        </button>
       </div>
     </div>
   </div>
@@ -724,34 +823,34 @@
 <!-- Detail Modal/Drawer -->
 <div id="wo-detail-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeWoDetailModal()"></div>
-  <div class="absolute right-0 top-0 bottom-0 w-[800px] max-w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white">
-      <div class="flex items-center gap-3">
-        <h3 class="font-black text-xl text-neutral-800 flex items-center gap-2" id="detail-title">
-          <i class="ph-fill ph-clipboard-text text-primary"></i> Work Order Details
+  <div class="absolute right-0 top-0 bottom-0 w-[880px] max-w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white gap-3">
+      <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+        <h3 class="font-black text-lg sm:text-xl text-neutral-800 flex items-center gap-2 truncate whitespace-nowrap" id="detail-title">
+          <i class="ph-fill ph-clipboard-text text-primary flex-shrink-0"></i> Work Order Details
         </h3>
-        <span id="detail-status" class="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold border border-neutral-200">Status</span>
+        <span id="detail-status" class="px-2.5 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold border border-neutral-200 whitespace-nowrap flex-shrink-0">Status</span>
       </div>
-      <div class="flex gap-2 items-center">
-        <button id="detail-btn-start" onclick="updateStatus(currentWo.id, 'IN_PROGRESS')" class="hidden px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+      <div class="flex gap-2 items-center flex-shrink-0">
+        <button id="detail-btn-start" onclick="updateStatus(currentWo.id, 'IN_PROGRESS')" class="hidden px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0 cursor-pointer">
           <i class="ph-fill ph-play-circle text-base"></i> Bắt đầu
         </button>
-        <button id="detail-btn-complete" onclick="openCompleteWoModal()" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+        <button id="detail-btn-complete" onclick="openCompleteWoModal()" class="hidden px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0 cursor-pointer">
           <i class="ph-bold ph-check-circle text-base"></i> Hoàn thành
         </button>
 
         {% if 'work_order:create' in user_permissions or is_system_admin or 'system:admin' in user_permissions %}
-        <button id="detail-btn-create-followup" onclick="createFollowUpFromCurrentWo()" class="px-3.5 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer" title="Tạo phiếu bảo trì/sửa chữa tiếp theo liên kết với phiếu này">
-          <i class="ph-bold ph-arrow-bend-down-right text-base text-sky-400"></i> Tạo Follow-up WO
+        <button id="detail-btn-create-followup" onclick="createFollowUpFromCurrentWo()" class="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-800 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow-sm cursor-pointer whitespace-nowrap flex-shrink-0" title="Tạo phiếu bảo trì/sửa chữa tiếp theo liên kết với phiếu này">
+          <i class="ph-bold ph-arrow-bend-down-right text-base text-sky-600"></i> Tạo Follow-up WO
         </button>
         {% endif %}
 
         {% if 'work_order:update' in user_permissions %}
-        <button onclick="editCurrentWo()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
+        <button onclick="editCurrentWo()" class="px-3.5 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-xs whitespace-nowrap flex-shrink-0 cursor-pointer">
           <i class="ph-bold ph-pencil-simple"></i> Sửa
         </button>
         {% endif %}
-        <button onclick="closeWoDetailModal()" class="w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50">
+        <button onclick="closeWoDetailModal()" class="w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50 flex-shrink-0 cursor-pointer">
           <i class="ph-bold ph-x text-lg"></i>
         </button>
       </div>
@@ -768,18 +867,29 @@
           </div>
         </div>
         
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6 bg-neutral-50 p-5 rounded-2xl border border-neutral-100">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 bg-neutral-50 p-5 rounded-2xl border border-neutral-100">
           <div>
-            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Asset</p>
-            <p class="font-medium text-neutral-800" id="detail-asset-name">-</p>
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Thiết bị</p>
+            <p class="font-semibold text-neutral-800 truncate" id="detail-asset-name">-</p>
           </div>
           <div>
-            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Assignee</p>
-            <p class="font-medium text-neutral-800" id="detail-assignee-name">-</p>
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Người yêu cầu</p>
+            <div id="detail-creator-name" class="font-semibold text-neutral-800">-</div>
           </div>
           <div>
-            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Deadline</p>
-            <p class="font-medium text-neutral-800" id="detail-deadline">-</p>
+            <div class="flex items-center gap-1.5 mb-1">
+              <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Người thực hiện</p>
+              {% if 'work_order:reassign' in user_permissions %}
+              <button onclick="if(currentWo) openAssignModal(currentWo.id, currentWo.assignee_id, currentWo.title)" class="text-[11px] text-primary hover:text-primary-700 font-bold cursor-pointer hover:underline" title="Thay đổi người thực hiện">
+                [Đổi]
+              </button>
+              {% endif %}
+            </div>
+            <p class="font-semibold text-neutral-800 truncate" id="detail-assignee-name">-</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Hạn chót</p>
+            <p class="font-semibold text-neutral-800" id="detail-deadline">-</p>
           </div>
         </div>
 
@@ -1824,8 +1934,8 @@
 <script>
   window.CURRENT_USER_ID = '{{ current_user_id|default:request.user.id }}';
   window.CURRENT_USER_NAME = '{{ request.user.username }}';
-  let currentWo = null;
   const ASSETS_MAP = {{ assets_json|default:'{}'|safe }};
+  window.ASSETS_MAP = ASSETS_MAP;
   const WO_METADATA = {{ wo_metadata_json|default:'{}'|safe }};
   const ALL_TECHNICIANS = {{ technicians_json|default:'[]'|safe }};
 
@@ -2294,6 +2404,115 @@
       }
       
       filterTable();
+
+      // Handle create_pm parameter from Condition Monitoring Anomaly Notification
+      if (urlParams.has('create_pm')) {
+          const assetId = urlParams.get('asset_id') || '';
+          const metric = urlParams.get('metric') || '';
+          const val = urlParams.get('val') || '';
+          const threshold = urlParams.get('threshold') || '';
+          const daysRem = urlParams.get('days_rem') || '';
+          const slope = urlParams.get('slope') || '';
+          const suggestedTech = urlParams.get('suggested_tech') || '';
+          const alertId = urlParams.get('alert_id') || '';
+          
+          let assetName = 'Thiết bị';
+          if (assetId && window.ASSETS_MAP && window.ASSETS_MAP[assetId] && window.ASSETS_MAP[assetId].name) {
+              assetName = window.ASSETS_MAP[assetId].name;
+          } else {
+              const opt = document.querySelector(`#wo-asset option[value="${assetId}"]`);
+              if (opt && opt.textContent) {
+                  const t = opt.textContent.trim();
+                  assetName = t.includes(' - ') ? t.split(' - ').slice(1).join(' - ').trim() : t;
+              }
+          }
+
+          let cleanMetric = (metric || '').replace(/[()]/g, '').trim();
+          const pmTitle = cleanMetric ? `Bảo trì dự phòng: ${assetName} - ${cleanMetric}` : `Bảo trì dự phòng: ${assetName}`;
+          
+          let pmDesc = `[Phát hiện bởi AI Condition Monitoring]\n`;
+          pmDesc += `• Chỉ số quan sát: ${metric}\n`;
+          pmDesc += `• Giá trị đo nhận: ${val} (Ngưỡng cảnh báo: ${threshold || 'ISO 10816 Zone C / OEM'})\n`;
+          if (daysRem) {
+              pmDesc += `• Dự kiến sự cố xảy ra sau: ${daysRem} ngày nếu không bảo dưỡng sớm\n`;
+          }
+          if (slope) {
+              pmDesc += `• Tốc độ trôi xu hướng (Theil-Sen): +${slope}/ngày\n`;
+          }
+          pmDesc += `• Đề xuất bảo trì: Kiểm tra độ cân bằng động, bôi trơn bạc đạn/ổ lăn, kiểm tra độ rơ cơ khí và siết lại bu-lông chân máy.\n`;
+          if (suggestedTech) {
+              pmDesc += `• Gợi ý phân công: Kỹ thuật viên ${suggestedTech} phù hợp nhất với kỹ năng và định mức ca.\n`;
+          }
+
+          // Compute deadline (default: now + daysRem or +7 days)
+          const targetDays = daysRem ? Math.max(1, parseInt(daysRem)) : 7;
+          const d = new Date();
+          d.setDate(d.getDate() + targetDays);
+          const deadlineStr = d.toISOString().split('T')[0];
+
+          // Determine skill based on metric
+          let requiredSkill = 'Cơ khí';
+          if (metric.toUpperCase().includes('CURRENT') || metric.toUpperCase().includes('VOLTAGE') || metric.toUpperCase().includes('AMPERE') || metric.toUpperCase().includes('ĐIỆN')) {
+              requiredSkill = 'Điện';
+          }
+
+          setTimeout(() => {
+              openWoModal(
+                  '', // new WO
+                  pmTitle,
+                  pmDesc,
+                  'HIGH', // Priority HIGH
+                  'CREATED',
+                  assetId,
+                  '', // assignee to be chosen by manager
+                  deadlineStr,
+                  '', // parentId
+                  'PREVENTIVE', // type PREVENTIVE
+                  alertId // alertId
+              );
+
+              // Set skill and skill level
+              const skillSelect = document.getElementById('wo-required-skill');
+              if (skillSelect) {
+                  for (let opt of skillSelect.options) {
+                      if (opt.value.toUpperCase() === requiredSkill.toUpperCase() || opt.text.toUpperCase().includes(requiredSkill.toUpperCase())) {
+                          skillSelect.value = opt.value;
+                          break;
+                      }
+                  }
+              }
+              const levelSelect = document.getElementById('wo-min-skill-level');
+              if (levelSelect) levelSelect.value = '1';
+
+              // Populate standard checklists for this PM inspection
+              const modalChkContainer = document.getElementById('wo-modal-checklists-container');
+              const modalChkEmpty = document.getElementById('wo-modal-checklists-empty');
+              if (modalChkContainer) {
+                  modalChkContainer.innerHTML = '';
+                  if (modalChkEmpty) modalChkEmpty.classList.add('hidden');
+                  
+                  const defaultChecklists = [
+                      { itemName: `Đo lại rung động / chỉ số ${metric} sau khi hiệu chỉnh`, inputType: 'NUMBER', expectedValue: val ? `< ${val}` : '', isMandatory: true },
+                      { itemName: 'Kiểm tra bôi trơn dầu/mỡ ổ bi và nhiệt độ gối đỡ', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: true },
+                      { itemName: 'Kiểm tra độ siết bu-lông chân máy và khớp nối', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: false },
+                      { itemName: 'Vệ sinh cánh quạt tản nhiệt và lưới chắn bụi', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: false }
+                  ];
+                  defaultChecklists.forEach(c => renderWoModalChecklistRow(c));
+              }
+
+              // Update URL to clean state without page reload
+              const cleanUrl = new URL(window.location);
+              cleanUrl.searchParams.delete('create_pm');
+              cleanUrl.searchParams.delete('metric');
+              cleanUrl.searchParams.delete('val');
+              cleanUrl.searchParams.delete('threshold');
+              cleanUrl.searchParams.delete('days_rem');
+              cleanUrl.searchParams.delete('slope');
+              cleanUrl.searchParams.delete('suggested_tech');
+              cleanUrl.searchParams.delete('alert_id');
+              window.history.replaceState({}, '', cleanUrl);
+          }, 200);
+      }
   });
 
   function toggleFilterDropdown(event, id) {
@@ -2381,7 +2600,7 @@
       filterTable();
   }
 
-  function openWoModal(id='', title='', desc='', priority='MEDIUM', status='CREATED', asset_id='', assignee_id='', deadline='', parentId='', woType='CORRECTIVE') {
+  function openWoModal(id='', title='', desc='', priority='MEDIUM', status='CREATED', asset_id='', assignee_id='', deadline='', parentId='', woType='CORRECTIVE', alertId='') {
       document.getElementById('wo-modal').classList.remove('hidden');
       document.getElementById('wo-id').value = id;
       document.getElementById('wo-title').value = title;
@@ -2393,6 +2612,16 @@
       document.getElementById('wo-deadline').value = deadline !== 'None' ? deadline : '';
       if (document.getElementById('wo-parent-id')) document.getElementById('wo-parent-id').value = parentId;
       if (document.getElementById('wo-type')) document.getElementById('wo-type').value = woType;
+      if (document.getElementById('wo-alert-id')) document.getElementById('wo-alert-id').value = alertId;
+
+      const anomalyIndicator = document.getElementById('wo-anomaly-indicator');
+      if (anomalyIndicator) {
+          if (alertId) {
+              anomalyIndicator.classList.remove('hidden');
+          } else {
+              anomalyIndicator.classList.add('hidden');
+          }
+      }
 
       const parentIndicator = document.getElementById('wo-parent-indicator');
       if (parentIndicator) {
@@ -2405,7 +2634,7 @@
           }
       }
       
-      document.getElementById('wo-modal-title').innerText = id ? 'Sửa Work Order' : (parentId ? 'Tạo Phiếu Sửa Chữa Tiếp Theo (Follow-up)' : 'Tạo Work Order');
+      document.getElementById('wo-modal-title').innerText = id ? 'Sửa Work Order' : (parentId ? 'Tạo Phiếu Sửa Chữa Tiếp Theo (Follow-up)' : (alertId ? 'Tạo Phiếu Bảo Trì Dự Phòng - AI Đề Xuất' : 'Tạo Work Order'));
       document.getElementById('wo-msg').classList.add('hidden');
 
       // Clear any previous error styling
@@ -2703,6 +2932,8 @@
       onWoFloorplanChanged(userRestrictedFp, '');
       const badge = document.getElementById('wo-asset-loc-badge');
       if (badge) badge.classList.add('hidden');
+      if (document.getElementById('wo-anomaly-indicator')) document.getElementById('wo-anomaly-indicator').classList.add('hidden');
+      if (document.getElementById('wo-alert-id')) document.getElementById('wo-alert-id').value = '';
   }
 
   function saveWo() {
@@ -2761,6 +2992,7 @@
           coords_x: parseFloat(document.getElementById('wo-coords-x')?.value || '0'),
           coords_y: parseFloat(document.getElementById('wo-coords-y')?.value || '0'),
           checklists: getModalChecklistsData(),
+          alert_id: document.getElementById('wo-alert-id')?.value || '',
       };
       
       const method = id ? 'PUT' : 'POST';
@@ -2834,9 +3066,131 @@
     });
   }
 
-  function openAssignModal(id, currentAssignee) {
+  let assignCurrentWoId = null;
+  let assignSelectedUserId = '';
+  let assignFilterOptionsPopulated = false;
+
+  const SKILL_NAME_MAP = {
+      'MECHANICAL': 'Cơ khí',
+      'ELECTRICAL': 'Điện công nghiệp',
+      'HYDRAULIC': 'Thủy lực',
+      'AUTOMATION': 'Tự động hóa',
+      'HVAC': 'Điện lạnh / HVAC',
+      'CLEANROOM': 'Phòng sạch',
+      'BATTERY': 'Pin công nghiệp',
+      'ROBOT': 'Robot công nghiệp',
+      'GENERAL': 'Bảo trì chung'
+  };
+
+  const CERT_NAME_MAP = {
+      'CERT_SAFETY_L1': 'An toàn lao động L1',
+      'CERT_SAFETY_L2': 'An toàn lao động L2',
+      'CERT_HIGH_VOLTAGE': 'An toàn điện >1kV',
+      'CERT_PLC_EXPERT': 'Chuyên gia PLC',
+      'CERT_BATTERY_SAFETY': 'An toàn Pin EV/Pack',
+  };
+
+  function getSkillDisplay(skillCode) {
+      if (!skillCode) return '';
+      const code = String(skillCode).trim().toUpperCase();
+      return SKILL_NAME_MAP[code] || skillCode;
+  }
+
+  function getCertDisplay(certCode) {
+      if (!certCode) return '';
+      const code = String(certCode).trim().toUpperCase();
+      return CERT_NAME_MAP[code] || certCode;
+  }
+
+  function populateAssignFilterDropdowns() {
+      if (assignFilterOptionsPopulated) return;
+      const skillSelect = document.getElementById('assign-filter-skill');
+      const certSelect = document.getElementById('assign-filter-cert');
+      if (!skillSelect || !certSelect) return;
+
+      const allSkills = new Set();
+      const allCerts = new Set();
+
+      if (Array.isArray(ALL_TECHNICIANS)) {
+          ALL_TECHNICIANS.forEach(t => {
+              (t.skills || []).forEach(s => { if (s) allSkills.add(String(s).trim().toUpperCase()); });
+              (t.certifications || []).forEach(c => { if (c) allCerts.add(String(c).trim().toUpperCase()); });
+          });
+      }
+
+      skillSelect.innerHTML = '<option value="">Tất cả chuyên môn</option>';
+      Array.from(allSkills).sort().forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s;
+          opt.innerText = getSkillDisplay(s);
+          skillSelect.appendChild(opt);
+      });
+
+      certSelect.innerHTML = '<option value="">Tất cả chứng chỉ</option>';
+      Array.from(allCerts).sort().forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.innerText = getCertDisplay(c);
+          certSelect.appendChild(opt);
+      });
+
+      assignFilterOptionsPopulated = true;
+  }
+
+  function openAssignModal(id, currentAssignee, title = '') {
+      assignCurrentWoId = id;
+      assignSelectedUserId = currentAssignee || '';
+      
       document.getElementById('assign-wo-id').value = id;
-      document.getElementById('assign-user').value = currentAssignee;
+      document.getElementById('assign-user').value = assignSelectedUserId;
+      
+      const subtitleEl = document.getElementById('assign-modal-subtitle');
+      if (subtitleEl) {
+          subtitleEl.innerText = title ? `Work Order: ${title}` : 'Lựa chọn nhân sự phù hợp cho Work Order';
+      }
+
+      populateAssignFilterDropdowns();
+
+      // Kiểm tra tiêu chuẩn kỹ thuật của WO từ WO_METADATA
+      const meta = (typeof WO_METADATA !== 'undefined' && WO_METADATA[id]) ? WO_METADATA[id] : {};
+      const reqSkill = (meta.required_skill || '').trim().toUpperCase();
+      const minLevel = parseInt(meta.min_skill_level || '0', 10);
+      const reqCert = (meta.required_certification || '').trim().toUpperCase();
+
+      const banner = document.getElementById('assign-wo-req-banner');
+      const bannerText = document.getElementById('assign-wo-req-text');
+      const matchOnlyCb = document.getElementById('assign-filter-match-only');
+      
+      if (banner && bannerText) {
+          const reqParts = [];
+          if (reqSkill) reqParts.push(`Chuyên môn: <strong class="font-bold">${getSkillDisplay(reqSkill)}</strong>`);
+          if (minLevel > 0) reqParts.push(`Bậc tối thiểu: <strong class="font-bold">Bậc ${minLevel}</strong>`);
+          if (reqCert) reqParts.push(`Chứng chỉ: <strong class="font-bold">${getCertDisplay(reqCert)}</strong>`);
+
+          if (reqParts.length > 0) {
+              bannerText.innerHTML = `Work Order yêu cầu: ${reqParts.join(' &bull; ')}`;
+              banner.classList.remove('hidden');
+          } else {
+              banner.classList.add('hidden');
+          }
+      }
+      if (matchOnlyCb) matchOnlyCb.checked = false;
+
+      // Đặt lại các trường lọc
+      const searchInput = document.getElementById('assign-filter-search');
+      if (searchInput) searchInput.value = '';
+      const levelSelect = document.getElementById('assign-filter-level');
+      if (levelSelect) levelSelect.value = '0';
+      const skillSelect = document.getElementById('assign-filter-skill');
+      if (skillSelect) skillSelect.value = '';
+      const certSelect = document.getElementById('assign-filter-cert');
+      if (certSelect) certSelect.value = '';
+      const statusSelect = document.getElementById('assign-filter-status');
+      if (statusSelect) statusSelect.value = '';
+
+      updateAssignSelectedLabel();
+      filterAssignTechnicians();
+
       document.getElementById('assign-modal').classList.remove('hidden');
   }
 
@@ -2844,11 +3198,251 @@
       document.getElementById('assign-modal').classList.add('hidden');
   }
 
+  function updateAssignSelectedLabel() {
+      const label = document.getElementById('assign-selected-name');
+      if (!label) return;
+      if (!assignSelectedUserId) {
+          label.innerText = '-- Bỏ phân công (Chưa giao) --';
+          label.className = 'font-semibold text-neutral-500';
+          return;
+      }
+      const tech = Array.isArray(ALL_TECHNICIANS) ? ALL_TECHNICIANS.find(t => String(t.id) === String(assignSelectedUserId)) : null;
+      if (tech) {
+          label.innerText = `${tech.full_name || tech.username} (Bậc ${tech.skill_level || 1})`;
+          label.className = 'font-semibold text-primary';
+      } else {
+          label.innerText = 'Đã chọn nhân viên #' + assignSelectedUserId.substring(0, 8);
+          label.className = 'font-semibold text-primary';
+      }
+  }
+
+  function selectAssignTech(id, name) {
+      assignSelectedUserId = id || '';
+      document.getElementById('assign-user').value = assignSelectedUserId;
+      updateAssignSelectedLabel();
+
+      const cards = document.querySelectorAll('.assign-tech-card');
+      cards.forEach(card => {
+          const cardId = card.getAttribute('data-id') || '';
+          const indicator = card.querySelector('.radio-indicator');
+          if (cardId === assignSelectedUserId) {
+              card.classList.add('border-primary', 'bg-primary-50/20', 'ring-2', 'ring-primary/20');
+              card.classList.remove('border-neutral-200', 'border-neutral-300');
+              if (indicator) {
+                  indicator.className = 'radio-indicator w-5 h-5 rounded-full border border-primary bg-primary text-white flex items-center justify-center';
+                  indicator.innerHTML = '<i class="ph-bold ph-check text-xs"></i>';
+              }
+          } else {
+              card.classList.remove('border-primary', 'bg-primary-50/20', 'ring-2', 'ring-primary/20');
+              card.classList.add(cardId === '' ? 'border-neutral-300' : 'border-neutral-200');
+              if (indicator) {
+                  indicator.className = 'radio-indicator w-5 h-5 rounded-full border border-neutral-300 bg-white flex items-center justify-center';
+                  indicator.innerHTML = '';
+              }
+          }
+      });
+  }
+
+  function resetAssignFilters() {
+      const search = document.getElementById('assign-filter-search');
+      if (search) search.value = '';
+      const level = document.getElementById('assign-filter-level');
+      if (level) level.value = '0';
+      const skill = document.getElementById('assign-filter-skill');
+      if (skill) skill.value = '';
+      const cert = document.getElementById('assign-filter-cert');
+      if (cert) cert.value = '';
+      const status = document.getElementById('assign-filter-status');
+      if (status) status.value = '';
+      const matchOnly = document.getElementById('assign-filter-match-only');
+      if (matchOnly) matchOnly.checked = false;
+      filterAssignTechnicians();
+  }
+
+  function filterAssignTechnicians() {
+      const container = document.getElementById('assign-tech-list');
+      const countEl = document.getElementById('assign-filter-count');
+      if (!container) return;
+
+      const search = (document.getElementById('assign-filter-search')?.value || '').trim().toLowerCase();
+      const minLevel = parseInt(document.getElementById('assign-filter-level')?.value || '0', 10);
+      const filterSkill = (document.getElementById('assign-filter-skill')?.value || '').trim().toUpperCase();
+      const filterCert = (document.getElementById('assign-filter-cert')?.value || '').trim().toUpperCase();
+      const filterStatus = (document.getElementById('assign-filter-status')?.value || '').trim().toUpperCase();
+      const matchOnly = document.getElementById('assign-filter-match-only')?.checked || false;
+
+      // Tiêu chuẩn của WO
+      const meta = (typeof WO_METADATA !== 'undefined' && assignCurrentWoId && WO_METADATA[assignCurrentWoId]) ? WO_METADATA[assignCurrentWoId] : {};
+      const woReqSkill = (meta.required_skill || '').trim().toUpperCase();
+      const woMinLevel = parseInt(meta.min_skill_level || '0', 10);
+      const woReqCert = (meta.required_certification || '').trim().toUpperCase();
+
+      let matchedList = [];
+
+      if (Array.isArray(ALL_TECHNICIANS)) {
+          ALL_TECHNICIANS.forEach(t => {
+              const tLevel = t.skill_level || 1;
+              const tSkills = (t.skills || []).map(s => String(s).trim().toUpperCase());
+              const tCerts = (t.certifications || []).map(c => String(c).trim().toUpperCase());
+              const tStatus = String(t.availability_status || 'AVAILABLE').toUpperCase();
+              const tName = (t.full_name || '').toLowerCase();
+              const tUser = (t.username || '').toLowerCase();
+
+              let meetsWo = true;
+              if (woMinLevel > 0 && tLevel < woMinLevel) meetsWo = false;
+              if (woReqSkill && !tSkills.includes(woReqSkill) && !tSkills.some(s => s.includes(woReqSkill) || woReqSkill.includes(s))) meetsWo = false;
+              if (woReqCert && !tCerts.includes(woReqCert) && !tCerts.some(c => c.includes(woReqCert) || woReqCert.includes(c))) meetsWo = false;
+
+              if (matchOnly && !meetsWo) return;
+              if (minLevel > 0 && tLevel < minLevel) return;
+              if (filterSkill && !tSkills.includes(filterSkill) && !tSkills.some(s => s.includes(filterSkill) || filterSkill.includes(s))) return;
+              if (filterCert && !tCerts.includes(filterCert) && !tCerts.some(c => c.includes(filterCert) || filterCert.includes(c))) return;
+              if (filterStatus && tStatus !== filterStatus) return;
+
+              if (search) {
+                  const skillTexts = tSkills.map(s => getSkillDisplay(s).toLowerCase()).join(' ');
+                  const certTexts = tCerts.map(c => getCertDisplay(c).toLowerCase()).join(' ');
+                  const matchSearch = tName.includes(search) || tUser.includes(search) || skillTexts.includes(search) || certTexts.includes(search);
+                  if (!matchSearch) return;
+              }
+
+              matchedList.push({
+                  tech: t,
+                  meetsWo: meetsWo
+              });
+          });
+      }
+
+      // Sắp xếp: Ai đang được chọn lên đầu, tiếp theo ai đạt chuẩn WO, bậc kỹ năng cao hơn, và khả dụng
+      matchedList.sort((a, b) => {
+          const aSelected = String(a.tech.id) === String(assignSelectedUserId) ? 1 : 0;
+          const bSelected = String(b.tech.id) === String(assignSelectedUserId) ? 1 : 0;
+          if (aSelected !== bSelected) return bSelected - aSelected;
+
+          if (a.meetsWo !== b.meetsWo) return b.meetsWo ? 1 : -1;
+          if (b.tech.skill_level !== a.tech.skill_level) return (b.tech.skill_level || 1) - (a.tech.skill_level || 1);
+          const aAvail = (a.tech.availability_status || 'AVAILABLE') === 'AVAILABLE' ? 1 : 0;
+          const bAvail = (b.tech.availability_status || 'AVAILABLE') === 'AVAILABLE' ? 1 : 0;
+          return bAvail - aAvail;
+      });
+
+      if (countEl) {
+          const totalCount = Array.isArray(ALL_TECHNICIANS) ? ALL_TECHNICIANS.length : 0;
+          countEl.innerText = `Hiển thị ${matchedList.length} / ${totalCount} nhân viên`;
+      }
+
+      let html = '';
+
+      // Tùy chọn Bỏ phân công ở đầu
+      const isUnassignSelected = !assignSelectedUserId;
+      html += `
+        <div onclick="selectAssignTech('', '-- Bỏ phân công --')" 
+             class="assign-tech-card p-3 rounded-xl border border-dashed transition-all cursor-pointer bg-white hover:border-neutral-400 flex items-center gap-3 ${isUnassignSelected ? 'border-primary bg-primary-50/20 ring-2 ring-primary/20' : 'border-neutral-300'}"
+             data-id="">
+          <div class="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-500 flex items-center justify-center font-bold text-sm shrink-0">
+            <i class="ph-bold ph-user-minus text-lg"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <span class="font-bold text-sm text-neutral-700">-- Bỏ phân công --</span>
+            <p class="text-xs text-neutral-400">Không giao việc cho ai (chuyển phiếu về chưa phân công)</p>
+          </div>
+          <div class="shrink-0">
+            <div class="radio-indicator w-5 h-5 rounded-full border flex items-center justify-center ${isUnassignSelected ? 'border-primary bg-primary text-white' : 'border-neutral-300 bg-white'}">
+              ${isUnassignSelected ? '<i class="ph-bold ph-check text-xs"></i>' : ''}
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (matchedList.length === 0) {
+          html += `
+            <div class="p-8 text-center bg-white rounded-xl border border-neutral-200 text-neutral-400">
+              <i class="ph-bold ph-user-focus text-3xl mb-2 text-neutral-300 block"></i>
+              <p class="font-semibold text-neutral-600">Không tìm thấy nhân viên phù hợp</p>
+              <p class="text-xs mt-1">Hãy thử xóa bớt tiêu chí lọc hoặc tìm kiếm khác</p>
+            </div>
+          `;
+      } else {
+          matchedList.forEach(item => {
+              const t = item.tech;
+              const isSelected = String(t.id) === String(assignSelectedUserId);
+              const isAvail = (t.availability_status || 'AVAILABLE').toUpperCase() === 'AVAILABLE';
+              
+              const lvl = t.skill_level || 1;
+              const lvlColor = lvl >= 4 ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                               lvl === 3 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                               'bg-blue-100 text-blue-700 border border-blue-200';
+              
+              const statusBadge = isAvail
+                  ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Khả dụng</span>`
+                  : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Đang bận</span>`;
+
+              const skillsArr = (t.skills || []).map(s => `
+                <span class="px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-medium text-[10px] border border-neutral-200">
+                  ${getSkillDisplay(s)}
+                </span>
+              `).join('');
+
+              const certsArr = (t.certifications || []).map(c => `
+                <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-medium text-[10px] border border-amber-200/80">
+                  <i class="ph-bold ph-certificate text-amber-600 mr-0.5"></i>${getCertDisplay(c)}
+                </span>
+              `).join('');
+
+              const displayName = t.full_name || t.username;
+              const safeDisplayName = displayName.replace(/'/g, "\\'");
+              const initials = displayName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'U';
+
+              html += `
+                <div onclick="selectAssignTech('${t.id}', '${safeDisplayName}')" 
+                     class="assign-tech-card p-3 rounded-xl border transition-all cursor-pointer bg-white hover:border-primary/50 hover:shadow-sm flex items-start gap-3 relative ${isSelected ? 'border-primary bg-primary-50/20 ring-2 ring-primary/20' : 'border-neutral-200'}"
+                     data-id="${t.id}">
+                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-neutral-100 to-neutral-200 text-neutral-700 flex items-center justify-center font-black text-xs shrink-0 shadow-xs border border-neutral-200">
+                    ${initials}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                      <span class="font-bold text-sm text-neutral-800 truncate">${displayName}</span>
+                      <span class="text-xs text-neutral-400">(@${t.username})</span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold ${lvlColor}">Bậc ${lvl}</span>
+                      ${statusBadge}
+                      ${item.meetsWo && (woReqSkill || woMinLevel > 0 || woReqCert) ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1"><i class="ph-bold ph-check"></i> Đạt chuẩn WO</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap text-[11px] mt-1">
+                      <span class="text-neutral-400 text-[10px] font-bold uppercase tracking-wider shrink-0">Kỹ năng:</span>
+                      ${skillsArr || '<span class="text-neutral-400 text-[10px] italic">Chưa khai báo</span>'}
+                    </div>
+                    ${certsArr ? `
+                    <div class="flex items-center gap-1.5 flex-wrap text-[11px] mt-1">
+                      <span class="text-neutral-400 text-[10px] font-bold uppercase tracking-wider shrink-0">Chứng chỉ:</span>
+                      ${certsArr}
+                    </div>` : ''}
+                  </div>
+                  <div class="shrink-0 pt-1">
+                    <div class="radio-indicator w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-primary bg-primary text-white' : 'border-neutral-300 bg-white'}">
+                      ${isSelected ? '<i class="ph-bold ph-check text-xs"></i>' : ''}
+                    </div>
+                  </div>
+                </div>
+              `;
+          });
+      }
+
+      container.innerHTML = html;
+  }
+
   function submitAssign() {
       const id = document.getElementById('assign-wo-id').value;
       const assigned_to_id = document.getElementById('assign-user').value;
+      const btn = document.getElementById('assign-submit-btn');
       
-      // Update assigned_to_id by fetching the existing data (for parity, partial put)
+      if (!id) return;
+      
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Đang lưu...`;
+      }
+      
       fetch('{% url "portal_work_orders" %}', {
           method: 'PUT',
           headers: {
@@ -2862,7 +3456,19 @@
           if(data.success) {
               window.location.reload();
           } else {
-              alert(data.error);
+              alert(data.error || 'Có lỗi xảy ra khi phân công nhân viên');
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = `<i class="ph-bold ph-check"></i> Lưu thay đổi`;
+              }
+          }
+      })
+      .catch(err => {
+          console.error(err);
+          alert('Không thể kết nối đến máy chủ.');
+          if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = `<i class="ph-bold ph-check"></i> Lưu thay đổi`;
           }
       });
   }
@@ -2871,8 +3477,8 @@
   let currentAnomalyForWo = null;
 
   // Checklists & Condition Monitoring logic
-  function openWoDetailModal(id, title, desc, priority, status, asset_id, asset_name, assignee_id, assignee_name, deadline, checklists) {
-      currentWo = { id, title, desc, priority, status, asset_id, asset_name, assignee_id, assignee_name, deadline };
+  function openWoDetailModal(id, title, desc, priority, status, asset_id, asset_name, assignee_id, assignee_name, deadline, creator_name, checklists) {
+      currentWo = { id, title, desc, priority, status, asset_id, asset_name, assignee_id, assignee_name, deadline, creator_name };
       document.getElementById('wo-detail-modal').classList.remove('hidden');
       
       const woTag = `#${id.substring(0,8)}`;
@@ -2889,6 +3495,16 @@
       document.getElementById('detail-priority').innerText = priority;
       
       document.getElementById('detail-asset-name').innerText = asset_id ? (asset_name || 'Thiết bị') : 'Không có';
+      
+      const creatorEl = document.getElementById('detail-creator-name');
+      if (creatorEl) {
+          if (!creator_name || creator_name === 'Hệ thống AI' || creator_name === 'None' || creator_name === '-') {
+              creatorEl.innerHTML = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold whitespace-nowrap"><i class="ph-fill ph-cpu text-indigo-600"></i> Hệ thống AI</span>`;
+          } else {
+              creatorEl.innerText = creator_name;
+          }
+      }
+
       document.getElementById('detail-assignee-name').innerText = assignee_id ? assignee_name : 'Chưa phân công';
       document.getElementById('detail-deadline').innerText = deadline && deadline !== 'None' ? deadline : 'Chưa thiết lập';
       
@@ -2898,13 +3514,13 @@
       
       const btnStart = document.getElementById('detail-btn-start');
       if (btnStart) {
-          if (status === 'ASSIGNED' && (isAssignee || isSystemAdmin) && canExecute) btnStart.classList.remove('hidden');
+          if (status === 'ASSIGNED' && isAssignee && canExecute) btnStart.classList.remove('hidden');
           else btnStart.classList.add('hidden');
       }
 
       const btnComplete = document.getElementById('detail-btn-complete');
       if (btnComplete) {
-          if (status === 'IN_PROGRESS' && (isAssignee || isSystemAdmin) && canExecute) btnComplete.classList.remove('hidden');
+          if (status === 'IN_PROGRESS' && isAssignee && canExecute) btnComplete.classList.remove('hidden');
           else btnComplete.classList.add('hidden');
       }
 

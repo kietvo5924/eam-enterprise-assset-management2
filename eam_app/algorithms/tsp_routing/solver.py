@@ -150,7 +150,7 @@ class TieredATSPSolver:
                 total_penalty += penalty
 
             service_start = current_time
-            duration = node.estimated_duration_minutes if node.work_order else 0.0
+            duration = float(getattr(node, 'estimated_duration_minutes', 0.0) or 0.0)
             departure_time = service_start + duration
             current_time = departure_time
 

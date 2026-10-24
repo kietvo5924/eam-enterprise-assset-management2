@@ -648,7 +648,7 @@ def notify_spare_part_requested(spare_part, work_order, quantity_requested, requ
     )
 
 
-def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, severity='CRITICAL', work_order=None, suggested_technician=None):
+def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, severity='CRITICAL', work_order=None, suggested_technician=None, alert_id=None, days_remaining=None, slope=None):
     """Event 11: SENSOR_ANOMALY_DETECTED"""
     managers = NotificationRouter.get_maintenance_managers(asset.tenant_id)
     
@@ -669,20 +669,41 @@ def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, se
             message = f"Cảm biến phát hiện {anomaly_type} bất thường tại thiết bị '{asset.name}': {metric_value} (Ngưỡng: {threshold_value})."
         
         sla_val = 15
+        link = f"/portal/work-orders/?wo_id={work_order.id}" if work_order else f"/portal/assets/{asset.id}/"
     else:
-        title = f"Cảnh báo theo dõi thiết bị: {asset.name}"
+        title = f"CẢNH BÁO HIGH: Bất thường cảm biến tại {asset.name}"
         tech_note = f" (Đề xuất phân công: {suggested_technician})" if suggested_technician else ""
         if work_order:
             message = (
                 f"Cảnh báo {anomaly_type} tại '{asset.name}': {metric_value} (Ngưỡng: {threshold_value}). "
                 f"Đã tạo bản thảo phiếu {work_order.code}{tech_note}."
             )
+            link = f"/portal/work-orders/?wo_id={work_order.id}"
         else:
-            message = f"Cảnh báo {anomaly_type} tại '{asset.name}': {metric_value} (Ngưỡng: {threshold_value})."
+            message = (
+                f"Cảnh báo {anomaly_type} tại '{asset.name}': Giá trị đo {metric_value} (Ngưỡng: {threshold_value}). "
+                f"Bấm vào đây để mở biểu mẫu và tạo phiếu bảo trì WO với thông tin được điền sẵn{tech_note}."
+            )
+            import urllib.parse
+            params = {
+                'create_pm': '1',
+                'asset_id': str(asset.id),
+                'metric': str(anomaly_type),
+                'val': str(metric_value),
+                'threshold': str(threshold_value)
+            }
+            if alert_id:
+                params['alert_id'] = str(alert_id)
+            if days_remaining is not None:
+                params['days_rem'] = str(days_remaining)
+            if slope:
+                params['slope'] = str(slope)
+            if suggested_technician:
+                params['suggested_tech'] = str(suggested_technician)
+            
+            link = f"/portal/work-orders/?{urllib.parse.urlencode(params)}"
         
         sla_val = 120
-
-    link = f"/portal/work-orders/?wo_id={work_order.id}" if work_order else f"/portal/assets/{asset.id}/"
 
     return dispatch_event_notification(
         event_type='SENSOR_ANOMALY_DETECTED',
@@ -693,7 +714,7 @@ def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, se
         title=title,
         message=message,
         link=link,
-        category='WORK_ORDER' if work_order else 'ASSET',
+        category='WORK_ORDER' if (work_order or 'create_pm=1' in link) else 'ASSET',
         severity=severity,
         is_actionable=True,
         sla_minutes=sla_val

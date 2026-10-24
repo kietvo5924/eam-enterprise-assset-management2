@@ -161,10 +161,11 @@ class SingleReadingItemSerializer(serializers.Serializer):
         val = attrs.get('value')
         if val is None:
             val = attrs.get('readingValue')
-        if val is not None:
-            import math
-            if math.isnan(val) or math.isinf(val):
-                raise serializers.ValidationError("Giá trị đo không được là NaN hoặc vô cực.")
+        if val is None:
+            raise serializers.ValidationError("Giá trị đo (value hoặc readingValue) là bắt buộc.")
+        import math
+        if math.isnan(val) or math.isinf(val):
+            raise serializers.ValidationError("Giá trị đo không được là NaN hoặc vô cực.")
         return attrs
 
 class MeterReadingCreateSerializer(serializers.Serializer):
@@ -201,10 +202,13 @@ class MeterReadingCreateSerializer(serializers.Serializer):
         return cleaned
 
     def validate(self, attrs):
-        val = attrs.get('value')
-        if val is None:
-            val = attrs.get('readingValue')
-        if val is not None:
+        readings = attrs.get('readings')
+        if not readings:
+            val = attrs.get('value')
+            if val is None:
+                val = attrs.get('readingValue')
+            if val is None:
+                raise serializers.ValidationError("Giá trị đo (value hoặc readingValue) là bắt buộc khi không có danh sách readings.")
             import math
             if math.isnan(val) or math.isinf(val):
                 raise serializers.ValidationError("Giá trị đo không được là NaN hoặc vô cực.")

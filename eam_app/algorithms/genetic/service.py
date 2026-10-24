@@ -61,7 +61,7 @@ class GASchedulingService:
             active_workers = app.control.ping(timeout=0.3)
             if active_workers:
                 from workorders.tasks import run_ga_optimization_task
-                run_ga_optimization_task.delay(str(job.id))
+                run_ga_optimization_task.delay(str(job.id), population_size=population_size)
                 dispatched_celery = True
         except Exception as ex:
             logger.warning(f"Celery ping or dispatch warning: {ex}")
@@ -72,7 +72,7 @@ class GASchedulingService:
                 logger.info(f"Dispatching GA job {job.id} via background daemon thread.")
                 thread = threading.Thread(
                     target=cls.execute_job_sync,
-                    args=(str(job.id),),
+                    args=(str(job.id), population_size),
                     daemon=True
                 )
                 thread.start()
@@ -82,7 +82,7 @@ class GASchedulingService:
         return job
 
     @classmethod
-    def execute_job_sync(cls, job_id: str):
+    def execute_job_sync(cls, job_id: str, population_size: Optional[int] = None):
         """
         Executes GA optimization pipeline for the given job ID.
         Can be invoked by Celery worker or background daemon thread.
@@ -145,7 +145,7 @@ class GASchedulingService:
 
                 if not eligible_wos:
                     job.status = 'COMPLETED'
-                    job.best_fitness = 100.0
+                    job.best_fitness = 0.0
                     job.pareto_solutions = []
                     job.error_message = "Không có phiếu công việc nào cần phân công."
                     job.save()
@@ -274,7 +274,7 @@ class GASchedulingService:
                     technicians=filtered_techs,
                     config={
                         'maxGenerations': job.max_generations,
-                        'populationSize': 50 if job.max_generations <= 60 else 100
+                        'populationSize': population_size or (50 if job.max_generations <= 60 else 100)
                     },
                     catalog=competency_catalog,
                     warehouse_coords=warehouse_coords,
@@ -357,10 +357,29 @@ class GASchedulingService:
                     f"Phiếu công việc {wo.code} đang xử lý ({wo.status}), đã hoàn tất hoặc bị hủy, không thể phân công đè."
                 )
 
-            if not tech.is_on_duty or tech.availability_status == 'ON_LEAVE':
+            if not tech.is_on_duty or tech.availability_status != 'AVAILABLE':
                 raise ConcurrencyConflictError(
                     f"Kỹ thuật viên {get_user_display_name(tech.user)} hiện không khả dụng (Trực: {tech.is_on_duty}, Trạng thái: {tech.availability_status})."
                 )
+
+            # Re-validate hard constraints under concurrency lock
+            from algorithms.hungarian.cost_matrix import (
+                is_skill_satisfied, is_certification_satisfied,
+                check_floorplan_hard_constraint, build_tenant_competency_catalog
+            )
+            catalog = build_tenant_competency_catalog(tenant)
+            if wo.required_skill and not is_skill_satisfied(wo.required_skill, tech.skills, catalog=catalog):
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} thiếu chuyên môn '{wo.required_skill}' cho phiếu {wo.code}.")
+            if wo.required_certification and not is_certification_satisfied(
+                wo.required_certification, tech.certifications, tech_user=tech.user, catalog=catalog
+            ):
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} thiếu chứng chỉ an toàn '{wo.required_certification}' cho phiếu {wo.code}.")
+            req_min_level = getattr(wo, 'min_skill_level', 1) or 1
+            if getattr(tech, 'skill_level', 1) < req_min_level:
+                raise ValidationError(f"Kỹ thuật viên {get_user_display_name(tech.user)} bậc {tech.skill_level} không đạt yêu cầu bậc {req_min_level} cho phiếu {wo.code}.")
+            is_fp_hard, fp_reason = check_floorplan_hard_constraint(tech, wo, catalog=catalog)
+            if is_fp_hard:
+                raise ValidationError(f"Vi phạm mặt bằng: {fp_reason}")
 
         # Apply assignments
         now = timezone.now()
@@ -382,37 +401,41 @@ class GASchedulingService:
             tech.availability_status = 'BUSY'
             tech.save()
 
-            # Tool Reservation Concurrency Handling
-            try:
+            # Tool Reservation Concurrency Handling (Atomic stock reservation)
+            if wo.required_tools and isinstance(wo.required_tools, list):
                 from assets.models import Tool, ToolReservation, ToolInstance
-                if wo.required_tools and isinstance(wo.required_tools, list):
-                    for tool_item in wo.required_tools:
-                        if isinstance(tool_item, dict):
-                            t_code = tool_item.get('code')
-                            req_qty = int(tool_item.get('quantity', 1))
-                        else:
-                            t_code = str(tool_item)
-                            req_qty = 1
+                for tool_item in wo.required_tools:
+                    if isinstance(tool_item, dict):
+                        t_code = tool_item.get('code')
+                        req_qty = int(tool_item.get('quantity', 1))
+                    else:
+                        t_code = str(tool_item)
+                        req_qty = 1
 
-                        tool_obj = Tool.objects.select_for_update().filter(tenant=tenant, code=t_code, is_active=True).first()
-                        if tool_obj:
-                            inst = ToolInstance.objects.filter(tool=tool_obj, tenant=tenant, status='AVAILABLE').first()
-                            ToolReservation.objects.create(
-                                tenant=tenant,
-                                tool=tool_obj,
-                                tool_instance=inst,
-                                work_order=wo,
-                                reserved_quantity=req_qty,
-                                status='RESERVED'
+                    if not t_code:
+                        continue
+
+                    tool_obj = Tool.objects.select_for_update().filter(tenant=tenant, code=t_code, is_active=True).first()
+                    if tool_obj:
+                        if tool_obj.available_quantity < req_qty:
+                            raise ValidationError(
+                                f"Dụng cụ '{tool_obj.name}' ({t_code}) không đủ số lượng khả dụng (yêu cầu: {req_qty}, hiện có: {tool_obj.available_quantity})."
                             )
-                            if tool_obj.available_quantity >= req_qty:
-                                tool_obj.available_quantity -= req_qty
-                                tool_obj.save()
-                            if inst:
-                                inst.status = 'IN_USE'
-                                inst.save()
-            except Exception as ex:
-                logger.warning(f"GA Tool reservation warning for WO {wo.code}: {ex}")
+                        inst_list = list(ToolInstance.objects.filter(tool=tool_obj, tenant=tenant, status='AVAILABLE')[:req_qty])
+                        first_inst = inst_list[0] if inst_list else None
+                        ToolReservation.objects.create(
+                            tenant=tenant,
+                            tool=tool_obj,
+                            tool_instance=first_inst,
+                            work_order=wo,
+                            reserved_quantity=req_qty,
+                            status='RESERVED'
+                        )
+                        tool_obj.available_quantity -= req_qty
+                        tool_obj.save()
+                        for inst in inst_list:
+                            inst.status = 'IN_USE'
+                            inst.save()
 
             # Dispatch notification
             try:

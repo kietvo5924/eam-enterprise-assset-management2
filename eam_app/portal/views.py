@@ -1767,6 +1767,18 @@ def portal_work_orders(request):
                             is_completed=False
                         )
 
+                # Link to AssetAnomalyAlert if created from anomaly alert
+                alert_id = data.get('alert_id')
+                if alert_id:
+                    try:
+                        from assets.models import AssetAnomalyAlert
+                        alert_obj = AssetAnomalyAlert.objects.filter(id=alert_id, tenant_id=tenant_id).first()
+                        if alert_obj:
+                            alert_obj.draft_work_order = wo
+                            alert_obj.save(update_fields=['draft_work_order'])
+                    except Exception:
+                        pass
+
                 return JsonResponse({'success': True, 'id': str(wo.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -2131,13 +2143,16 @@ def portal_work_orders(request):
     technicians_data = []
     for u in technicians:
         tp = getattr(u, 'technician_profile', None)
+        f_name = u.get_full_name() if hasattr(u, 'get_full_name') and u.get_full_name() else u.username
         technicians_data.append({
             'id': str(u.id),
             'username': u.username,
-            'full_name': u.username,
+            'full_name': f_name,
             'skill_level': tp.skill_level if tp else 1,
             'skills': tp.skills if (tp and tp.skills) else [],
             'certifications': tp.certifications if (tp and tp.certifications) else [],
+            'availability_status': getattr(tp, 'availability_status', 'AVAILABLE') if tp else 'AVAILABLE',
+            'is_on_duty': getattr(tp, 'is_on_duty', True) if tp else True,
         })
 
     from assets.models import Tool, SparePart

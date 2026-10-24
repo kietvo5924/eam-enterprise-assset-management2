@@ -262,7 +262,7 @@ class SensorAnomalyDetectionTestCase(TestCase):
         initial_alerts_count = AssetAnomalyAlert.objects.filter(asset=self.pump_asset).count()
         initial_pm_count = WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE').count()
         self.assertEqual(initial_alerts_count, 1)
-        self.assertEqual(initial_pm_count, 1)
+        self.assertEqual(initial_pm_count, 0)
 
         alert1 = AssetAnomalyAlert.objects.filter(asset=self.pump_asset).first()
         self.assertEqual(alert1.occurrence_count, 1)
@@ -276,12 +276,12 @@ class SensorAnomalyDetectionTestCase(TestCase):
         self.assertEqual(res2.status_code, status.HTTP_200_OK)
         res2_data = res2.json()['data']
 
-        # Alert Throttling: Cảnh báo cũ được cập nhật, KHÔNG sinh Draft PM mới!
+        # Alert Throttling: Cảnh báo cũ được cập nhật, KHÔNG sinh cảnh báo trùng lặp!
         alert1.refresh_from_db()
         self.assertEqual(alert1.occurrence_count, 2)
         self.assertEqual(AssetAnomalyAlert.objects.filter(asset=self.pump_asset).count(), 1)
-        self.assertEqual(WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE').count(), 1)
-        self.assertEqual(res2_data['analysisSummary']['draftWorkOrderAction'], "UPDATED_EXISTING_DRAFT")
+        self.assertEqual(WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE').count(), 0)
+        self.assertEqual(res2_data['analysisSummary']['draftWorkOrderAction'], "ALERT_LOGGED_AWAITING_MANAGER")
 
     def test_tc_anom_06_frozen_sensor_detection(self):
         """
@@ -484,15 +484,14 @@ class SensorAnomalyDetectionTestCase(TestCase):
         self.assertIsNotNone(trend_drift['daysRemaining'])
         self.assertLessEqual(trend_drift['daysRemaining'], 7)
 
-        # Kiểm tra bản thảo Draft PM đã được tự động tạo
-        draft_wo = WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE', status='CREATED').first()
-        self.assertIsNotNone(draft_wo)
-        self.assertIn("Bản thảo PM", draft_wo.title)
-
-        # Kiểm tra liên kết giữa Alert và Draft PM
+        # Kiểm tra Alert WARNING đã được ghi nhận và gửi thông báo, không auto-tạo WO
         alert = AssetAnomalyAlert.objects.filter(asset=self.pump_asset, status='OPEN').first()
         self.assertIsNotNone(alert)
-        self.assertEqual(alert.draft_work_order, draft_wo)
+        self.assertEqual(alert.severity, 'WARNING')
+        self.assertIsNone(alert.draft_work_order)
+
+        draft_wo = WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE').first()
+        self.assertIsNone(draft_wo)
 
     def test_tc_anom_13_work_order_meter_reading_and_followup(self):
         """
@@ -818,20 +817,18 @@ class SensorAnomalyDetectionTestCase(TestCase):
         light_summary = res_light.json()['data']['analysisSummary']
         self.assertEqual(light_summary['highestSeverity'], 'WARNING')
 
-        # Kiểm tra Draft PM Work Order được tạo ở trạng thái CREATED
+        # Kiểm tra WARNING: Không auto-tạo Draft PM Work Order
         draft_wo = WorkOrder.objects.filter(asset=self.pump_asset, type='PREVENTIVE').first()
-        self.assertIsNotNone(draft_wo)
-        self.assertEqual(draft_wo.status, 'CREATED')
-        self.assertIn("Gợi ý Hungarian", draft_wo.description)
+        self.assertIsNone(draft_wo)
 
-        # Kiểm tra Notification WARNING được gửi tới Manager
+        # Kiểm tra Notification WARNING được gửi tới Manager kèm link tạo WO
         notif_light = Notification.objects.filter(
             recipient=manager,
             severity='WARNING',
             event_type='SENSOR_ANOMALY_DETECTED'
         ).first()
         self.assertIsNotNone(notif_light)
-        self.assertIn(draft_wo.code, notif_light.message)
+        self.assertIn("create_pm=1", notif_light.link)
 
         # === 2. KIỂM THỬ TRƯỜNG HỢP NẶNG (CRITICAL - 8.5 mm/s, ISO Zone D) ===
         url_heavy = f"/api/v1/assets/{pump_heavy.id}/meter-readings/"

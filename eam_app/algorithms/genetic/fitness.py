@@ -18,28 +18,28 @@ from algorithms.hungarian.cost_matrix import is_skill_satisfied, is_certificatio
 
 def calculate_task_skill_score(task, tech, catalog=None) -> float:
     """Evaluates skill compatibility on a scale of 0 to 100."""
-    if not task.required_skill:
-        return 100.0
-
     # Safety Certification Hard Check: Missing required cert incurs 0 score
     if task.required_certification and not is_certification_satisfied(
-        task.required_certification, tech.certifications, catalog=catalog
+        task.required_certification, tech.certifications, tech_user=getattr(tech, 'user', None), catalog=catalog
     ):
         return 0.0
 
-    # Skill match check
+    if not task.required_skill:
+        return 100.0
+
+    # Skill match check: Missing required skill is a hard violation (score 0.0)
     if not is_skill_satisfied(task.required_skill, tech.skills, catalog=catalog):
-        return 20.0  # Basic effort score for unskilled work
+        return 0.0
 
     # Skill level delta: Level_tech - Level_req
-    delta = tech.skill_level - task.min_skill_level
+    req_level = getattr(task, 'min_skill_level', None) or 1
+    delta = getattr(tech, 'skill_level', 1) - req_level
     if delta >= 0:
         # Perfectly qualified or overqualified
         return max(80.0, 100.0 - (delta * 5.0))
     else:
-        # Underqualified
-        gap = abs(delta)
-        return max(30.0, 100.0 - (gap * 25.0))
+        # Underqualified fails hard constraint (score 0.0)
+        return 0.0
 
 
 def evaluate_individual_fitness(individual,

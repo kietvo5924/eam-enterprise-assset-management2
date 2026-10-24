@@ -834,10 +834,10 @@
                           <i class="ph ph-eye text-[11px]"></i> Chi tiết
                         </button>
                         ${hasLink ? `
-                          <button type="button" class="btn-goto-item text-[11px] font-medium text-neutral-500 hover:text-primary hover:underline flex items-center gap-0.5"
+                          <button type="button" class="btn-goto-item text-[11px] font-medium ${item.link && item.link.includes('create_pm=1') ? 'text-primary font-bold hover:text-primary-700' : 'text-neutral-500 hover:text-primary'} hover:underline flex items-center gap-0.5"
                                   onclick="event.stopPropagation(); window.NotificationBell.markAsRead('${item.id}', '${item.link}');"
-                                  title="Chuyển ngay tới trang đối tượng liên kết">
-                            <i class="ph ph-arrow-square-out text-[11px]"></i> Xem ↗
+                                  title="${item.link && item.link.includes('create_pm=1') ? 'Mở biểu mẫu tạo phiếu bảo trì WO' : 'Chuyển ngay tới trang đối tượng liên kết'}">
+                            <i class="${item.link && item.link.includes('create_pm=1') ? 'ph-bold ph-plus-circle' : 'ph ph-arrow-square-out'} text-[11px]"></i> ${item.link && item.link.includes('create_pm=1') ? 'Tạo phiếu WO ↗' : 'Xem ↗'}
                           </button>
                         ` : ''}
                       </div>
@@ -964,6 +964,13 @@
               if (linkBtn) {
                   if (item.link) {
                       linkBtn.classList.remove('hidden');
+                      if (item.link.includes('create_pm=1')) {
+                          linkBtn.innerHTML = `<span>Tạo phiếu bảo trì WO</span> <i class="ph-bold ph-plus-circle text-sm"></i>`;
+                          linkBtn.className = 'px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm shadow-indigo-200 flex items-center gap-1.5';
+                      } else {
+                          linkBtn.innerHTML = `<span>Đi đến trang liên kết</span> <i class="ph ph-arrow-square-out text-sm"></i>`;
+                          linkBtn.className = 'px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-600 rounded-lg transition-colors shadow-sm shadow-primary/20 flex items-center gap-1.5';
+                      }
                       linkBtn.onclick = () => {
                           modal.classList.add('hidden');
                           window.NotificationBell.markAsRead(notificationId, item.link);

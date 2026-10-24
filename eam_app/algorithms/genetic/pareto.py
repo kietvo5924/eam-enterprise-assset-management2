@@ -1,11 +1,25 @@
 """
-Pareto Front Extraction & Managerial Strategy Synthesis for Task 11.2 GA.
-Implements Rule 9: Extracts Top 3 Multi-Objective Pareto Solutions
-(Balanced, Skill-Focused, and Min-Travel).
+Pareto Front Strategy Alternatives & Managerial Strategy Synthesis for Task 11.2 GA.
+Implements Rule 9: Synthesizes Top 3 Multi-Objective Strategy Alternatives
+(Balanced, Skill-Focused, and Min-Travel) ensuring non-dominated candidate selection.
 """
 from typing import List, Dict, Any, Tuple
 from .constants import WEIGHTS_BALANCED, WEIGHTS_SKILL_FOCUSED, WEIGHTS_MIN_TRAVEL
 from .fitness import evaluate_individual_fitness
+
+
+def is_pareto_dominated(candidate, baseline) -> bool:
+    """Returns True if candidate is strictly dominated by baseline across all 3 objectives."""
+    c_skill = getattr(candidate, 'skill_score', 0.0)
+    c_work = getattr(candidate, 'workload_score', 0.0)
+    c_trav = getattr(candidate, 'travel_score', 0.0)
+    b_skill = getattr(baseline, 'skill_score', 0.0)
+    b_work = getattr(baseline, 'workload_score', 0.0)
+    b_trav = getattr(baseline, 'travel_score', 0.0)
+
+    dominated_or_equal = (b_skill >= c_skill and b_work >= c_work and b_trav >= c_trav)
+    strictly_better = (b_skill > c_skill or b_work > c_work or b_trav > c_trav)
+    return dominated_or_equal and strictly_better
 
 
 def format_solution_response(strategy_code: str, label: str,
@@ -48,7 +62,7 @@ def extract_pareto_front_solutions(population,
                                   warehouse_coords=None,
                                   current_time=None) -> List[Dict[str, Any]]:
     """
-    Extracts Top 3 trade-off solutions representing:
+    Extracts Top 3 non-dominated managerial strategy alternatives representing:
     1. Balanced Strategy (Recommended)
     2. Skill-Focused Strategy
     3. Min-Travel Strategy

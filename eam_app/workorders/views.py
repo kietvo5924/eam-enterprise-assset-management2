@@ -485,7 +485,7 @@ class WorkOrderChecklistView(APIView):
         item.save()
 
         # Tự động đồng bộ số đo cảm biến vào Condition Monitoring nếu là loại NUMBER
-        if item.input_type == 'NUMBER' and item.actual_value and wo.asset:
+        if item.input_type == 'NUMBER' and item.actual_value is not None and str(item.actual_value).strip() != '' and wo.asset:
             try:
                 num_val = float(str(item.actual_value).strip().replace(',', '.'))
                 lower_name = item.item_name.lower()
@@ -501,8 +501,16 @@ class WorkOrderChecklistView(APIView):
                     metric_code = 'CURRENT'
                     unit_str = 'A'
 
-                from algorithms.condition_monitoring import ConditionMonitoringEngine
+                from algorithms.anomaly_detection import ConditionMonitoringEngine
                 from django.utils import timezone
+                mach_state = data.get('machineState') or getattr(wo.asset, 'status', 'RUNNING') or 'RUNNING'
+                amb_temp = data.get('ambientTemperature')
+                if amb_temp is not None:
+                    try:
+                        amb_temp = float(amb_temp)
+                    except (ValueError, TypeError):
+                        amb_temp = None
+
                 ConditionMonitoringEngine.process_readings(
                     asset=wo.asset,
                     readings_data=[{
@@ -511,14 +519,15 @@ class WorkOrderChecklistView(APIView):
                         'unit': unit_str,
                         'remarks': f"Ghi nhận từ phiếu bảo trì {wo.code or wo.title} - mục {item.item_name}"
                     }],
-                    machine_state='RUNNING',
+                    machine_state=mach_state,
+                    ambient_temperature=amb_temp,
                     recorded_at=timezone.now(),
                     recorded_by=request.user if request.user and request.user.is_authenticated else None,
                     tenant=wo.tenant,
                     work_order=wo
                 )
-            except Exception:
-                pass
+            except Exception as ex:
+                logger.warning(f"Lỗi khi đồng bộ chỉ số checklist vào condition monitoring: {ex}")
         
         return success_response(WorkOrderChecklistItemSerializer(item).data)
 

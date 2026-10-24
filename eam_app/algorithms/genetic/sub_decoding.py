@@ -30,8 +30,11 @@ def to_local_vn_time(dt: Optional[datetime]) -> Optional[datetime]:
 def calculate_spatial_distance_meters(x1: float, y1: float, f1: int,
                                       x2: float, y2: float, f2: int) -> float:
     """Calculates Multi-Floor Manhattan distance in meters."""
-    if (x1 == 0.0 and y1 == 0.0) or (x2 == 0.0 and y2 == 0.0):
-        return 0.0
+    if x1 is None or y1 is None or x2 is None or y2 is None:
+        if x1 is None and x2 is None:
+            return 0.0
+        dz = abs(int(f1 or 1) - int(f2 or 1))
+        return 50.0 + (FLOOR_PENALTY_METERS * dz)
     dx = abs(float(x1) - float(x2))
     dy = abs(float(y1) - float(y2))
     dz = abs(int(f1 or 1) - int(f2 or 1))
@@ -174,10 +177,16 @@ def simulate_technician_timeline(tech, ordered_tasks: List[Any],
 
         # Lunch Break check (12:00 - 13:00 window)
         task_start_dt = current_dt
-        if not has_taken_lunch and task_start_dt.hour >= 12:
-            current_dt += timedelta(minutes=SHIFT_LUNCH_BREAK_MINUTES)
-            task_start_dt = current_dt
-            has_taken_lunch = True
+        if not has_taken_lunch and start_dt.hour < 13:
+            task_est_finish = task_start_dt + timedelta(minutes=task.estimated_duration_minutes)
+            crosses_lunch = (
+                (task_start_dt.hour == 12) or
+                (task_start_dt.hour < 12 and (task_est_finish.hour > 12 or (task_est_finish.hour == 12 and task_est_finish.minute >= 30)))
+            )
+            if crosses_lunch and task_start_dt.hour <= 13:
+                current_dt += timedelta(minutes=SHIFT_LUNCH_BREAK_MINUTES)
+                task_start_dt = current_dt
+                has_taken_lunch = True
 
         # Repair work execution
         repair_mins = task.estimated_duration_minutes
@@ -236,7 +245,8 @@ def simulate_technician_timeline(tech, ordered_tasks: List[Any],
         curr_floor = task.floor_level
         curr_zone = task.zone_id
 
-    total_shift_time_mins = int(round(total_repair_mins + total_travel_mins + total_warehouse_mins))
+    in_prog_remaining = getattr(tech, 'in_progress_remaining_minutes', 0) or 0
+    total_shift_time_mins = int(round(total_repair_mins + total_travel_mins + total_warehouse_mins + in_prog_remaining))
     overload_mins = max(0, total_shift_time_mins - tech.max_shift_minutes)
 
     return {
@@ -247,6 +257,7 @@ def simulate_technician_timeline(tech, ordered_tasks: List[Any],
         "repairMinutes": total_repair_mins,
         "travelMinutes": round(total_travel_mins, 1),
         "warehouseMinutes": total_warehouse_mins,
+        "inProgressMinutes": in_prog_remaining,
         "totalDistanceMeters": round(total_distance_meters, 1),
         "overloadMinutes": overload_mins,
         "zoneHops": zone_hops,

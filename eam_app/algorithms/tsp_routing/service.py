@@ -346,13 +346,13 @@ class TSPRoutingService:
                 nodes=nodes,
                 dist_matrix=dist_matrix,
                 start_time_minutes=start_time_minutes + (dist_matrix[0][wh_idx] / self.solver.walking_speed),
-                return_to_depot=return_to_depot,
+                return_to_depot=False,
                 precedence_map=precedence_map,
             )
             # Prepend current position (index 0)
             overall_tour = [0] + [s['nodeIndex'] for s in sub_eval.schedule]
             eval_result = self.solver.evaluate_tour(
-                overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=False, precedence_map=precedence_map
+                overall_tour, nodes, dist_matrix, start_time_minutes, return_to_depot=return_to_depot, precedence_map=precedence_map
             )
         else:
             wo_indices = list(range(1, len(nodes)))

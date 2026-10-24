@@ -95,9 +95,9 @@ def get_static_asset_checklist(asset) -> dict:
         "assetName": asset.name if asset else "",
         "message": "Tài sản tĩnh: Áp dụng phiếu kiểm tra ngoại quan định tính (Pass/Fail). Không kích hoạt mô hình AI rung/nhiệt.",
         "checklist": [
-            {"id": "CHK_01", "name": "Kiểm tra ngoại quan, trầy xước, móp méo", "status": "PASS"},
-            {"id": "CHK_02", "name": "Độ vững chắc của kết cấu và chân đế", "status": "PASS"},
-            {"id": "CHK_03", "name": "Vệ sinh công nghiệp và môi trường xung quanh", "status": "PASS"},
-            {"id": "CHK_04", "name": "Tem nhãn tài sản & mã QR nhận diện", "status": "PASS"},
+            {"id": "CHK_01", "name": "Kiểm tra ngoại quan, trầy xước, móp méo", "status": "PENDING"},
+            {"id": "CHK_02", "name": "Độ vững chắc của kết cấu và chân đế", "status": "PENDING"},
+            {"id": "CHK_03", "name": "Vệ sinh công nghiệp và môi trường xung quanh", "status": "PENDING"},
+            {"id": "CHK_04", "name": "Tem nhãn tài sản & mã QR nhận diện", "status": "PENDING"},
         ]
     }

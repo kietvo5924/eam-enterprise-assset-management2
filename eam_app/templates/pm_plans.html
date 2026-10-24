@@ -391,12 +391,12 @@
           <!-- Assets Checklist Box -->
           <div id="pm-assets-checklist" class="max-h-44 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
             {% for a in assets %}
-            <label class="flex items-center justify-between p-2 rounded-xl hover:bg-neutral-50 cursor-pointer border border-neutral-100 transition-colors pm-modal-asset-item" data-asset-id="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}">
+            <label class="flex items-center justify-between p-2 rounded-xl hover:bg-neutral-50 cursor-pointer border border-neutral-100 transition-colors pm-modal-asset-item" data-asset-id="{{ a.id }}" data-floorplan-id="{% if a.location.parent_id %}{{ a.location.parent_id }}{% else %}{{ a.location_id|default:'' }}{% endif %}">
               <div class="flex items-center gap-2.5">
                 <input type="checkbox" value="{{ a.id }}" class="pm-asset-checkbox rounded text-primary focus:ring-primary w-4 h-4 cursor-pointer" onchange="updatePmSelectedAssetsCount()" />
                 <span class="text-xs font-bold text-neutral-800">{{ a.name }}</span>
               </div>
-              <span class="text-[11px] text-neutral-400 font-medium">{{ a.zone_id|default:a.location.code|default:'' }}</span>
+              <span class="text-[11px] text-neutral-400 font-medium">{% if a.zone_id %}{{ a.zone_id }}{% elif a.location %}{{ a.location.code|default:'' }}{% endif %}</span>
             </label>
             {% empty %}
             <p class="text-xs text-neutral-400 text-center py-4">Chưa có thiết bị nào trong khu vực này</p>
@@ -500,7 +500,7 @@
             <select id="new-assign-asset" class="flex-1 px-3.5 py-2 bg-white border border-neutral-200 rounded-lg text-xs focus:outline-none focus:border-primary transition-all font-medium truncate">
                 <option value="">-- Chọn thiết bị --</option>
                 {% for a in assets %}
-                <option value="{{ a.id }}" data-floorplan-id="{{ a.location.parent_id|default:a.location_id|default:'' }}" data-zone="{{ a.zone_id|default:'' }}">{{ a.name }}{% if a.zone_id %} - {{ a.zone_id }}{% endif %}</option>
+                <option value="{{ a.id }}" data-floorplan-id="{% if a.location.parent_id %}{{ a.location.parent_id }}{% else %}{{ a.location_id|default:'' }}{% endif %}" data-zone="{{ a.zone_id|default:'' }}">{{ a.name }}{% if a.zone_id %} - {{ a.zone_id }}{% endif %}</option>
                 {% endfor %}
             </select>
             <button onclick="addAssignment()" class="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-bold shadow-sm shadow-primary/20 transition-all flex items-center gap-1.5 shrink-0">

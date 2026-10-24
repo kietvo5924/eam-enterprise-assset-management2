@@ -743,14 +743,43 @@
   }
 
   window.addEventListener('DOMContentLoaded', () => {
-    expandedNodes.forEach(id => {
-      const children = document.getElementById(`children-${id}`);
-      const caret = document.getElementById(`caret-${id}`);
-      if (children) {
-        children.classList.remove('hidden');
-        if (caret) caret.classList.remove('-rotate-90');
+    if (!expandedNodes || expandedNodes.length === 0) {
+      // Auto expand root factory nodes so user sees zones immediately
+      document.querySelectorAll('#left-pane-content > div.overflow-y-auto > .tree-node').forEach(node => {
+        const id = node.getAttribute('data-node-id');
+        if (id) {
+          const children = document.getElementById(`children-${id}`);
+          const caret = document.getElementById(`caret-${id}`);
+          if (children) {
+            children.classList.remove('hidden');
+            if (caret) caret.classList.remove('-rotate-90');
+            expandedNodes.push(id);
+          }
+        }
+      });
+      // Also expand the first child zone with assets
+      const firstChildZone = document.querySelector('#left-pane-content [id^="children-"] .tree-node');
+      if (firstChildZone) {
+        const fId = firstChildZone.getAttribute('data-node-id');
+        const fChildren = document.getElementById(`children-${fId}`);
+        const fCaret = document.getElementById(`caret-${fId}`);
+        if (fChildren) {
+          fChildren.classList.remove('hidden');
+          if (fCaret) fCaret.classList.remove('-rotate-90');
+          expandedNodes.push(fId);
+        }
       }
-    });
+      localStorage.setItem('assetTreeExpandedNodes', JSON.stringify(expandedNodes));
+    } else {
+      expandedNodes.forEach(id => {
+        const children = document.getElementById(`children-${id}`);
+        const caret = document.getElementById(`caret-${id}`);
+        if (children) {
+          children.classList.remove('hidden');
+          if (caret) caret.classList.remove('-rotate-90');
+        }
+      });
+    }
   });
   
   function toggleLeftPane() {
@@ -1247,23 +1276,6 @@
   let meterReadingsData = [];
 
   function filterMeterReadings() {
-    const query = document.getElementById('meter-search').value.toLowerCase();
-    const timeline = document.getElementById('meter-timeline');
-    const items = timeline.querySelectorAll('.timeline-item');
-    let hasVisible = false;
-    items.forEach(item => {
-      const text = item.innerText.toLowerCase();
-      if (text.includes(query)) {
-        item.style.display = 'block';
-        hasVisible = true;
-      } else {
-        item.style.display = 'none';
-      }
-    });
-    if (!hasVisible && meterReadingsData.length > 0) {
-      // Could show a "no results" state here
-    }
-  function filterMeterReadings() {
     renderMeterReadings();
   }
 
@@ -1756,13 +1768,13 @@
                   <div class="mt-2.5 pt-2 border-t ${isCritical ? 'border-rose-200/70' : 'border-amber-200/70'} flex flex-wrap items-center justify-between gap-2">
                     <div class="flex items-center gap-1.5 text-xs">
                       <i class="${isCritical ? 'ph-bold ph-lightning text-rose-600' : 'ph-bold ph-file-text text-amber-600'}"></i>
-                      <span class="font-bold">${isCritical ? 'Phiếu sự cố khẩn cấp:' : 'Bản thảo PM (Hungarian đề xuất):'}</span>
+                      <span class="font-bold">${isCritical ? 'Phiếu sự cố khẩn cấp:' : 'Phiếu WO đề xuất:'}</span>
                       <a href="/portal/work-orders/?wo_id=${alert.draftWorkOrderId}" class="font-extrabold underline ${isCritical ? 'text-rose-700 hover:text-rose-900' : 'text-amber-700 hover:text-amber-900'}">${alert.draftWorkOrderCode || 'Xem chi tiết'}</a>
                       ${alert.assignedTechnicianName ? `<span class="px-1.5 py-0.5 rounded bg-white/80 border border-neutral-200 text-neutral-700 font-semibold text-[11px]"><i class="ph-bold ph-user-check text-emerald-600"></i> ${alert.assignedTechnicianName}</span>` : ''}
                       ${alert.draftWorkOrderStatus ? `<span class="px-1.5 py-0.5 rounded ${alert.draftWorkOrderStatus === 'ASSIGNED' ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-neutral-700'} font-bold text-[10px] uppercase">${alert.draftWorkOrderStatus}</span>` : ''}
                     </div>
                     <a href="/portal/work-orders/?wo_id=${alert.draftWorkOrderId}" class="px-2.5 py-1 ${isCritical ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'} rounded-lg text-xs font-bold shadow-xs transition-all flex items-center gap-1">
-                      <span>${isCritical ? 'Mở Phiếu Khẩn Cấp' : 'Duyệt Bản Thảo'}</span>
+                      <span>${isCritical ? 'Mở Phiếu Khẩn Cấp' : 'Mở Phiếu WO'}</span>
                       <i class="ph-bold ph-arrow-up-right text-[10px]"></i>
                     </a>
                   </div>
@@ -2118,15 +2130,37 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has('assetId')) {
-      const id = params.get('assetId');
-      if (assetsData[id]) {
-        setTimeout(() => {
-          selectAsset(id);
-          const el = document.getElementById('asset-item-' + id);
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
+    let targetAssetId = params.get('assetId');
+    if (!targetAssetId) {
+      // If no assetId in URL, auto select the first available asset in tree
+      const firstAssetEl = document.querySelector('.asset-item');
+      if (firstAssetEl) {
+        targetAssetId = firstAssetEl.id.replace('asset-item-', '');
       }
+    }
+    if (targetAssetId && assetsData[targetAssetId]) {
+      setTimeout(() => {
+        const el = document.getElementById('asset-item-' + targetAssetId);
+        if (el) {
+          let parentNode = el.closest('.tree-node');
+          while (parentNode) {
+            const pId = parentNode.getAttribute('data-node-id');
+            if (pId) {
+              const pChildren = document.getElementById(`children-${pId}`);
+              const pCaret = document.getElementById(`caret-${pId}`);
+              if (pChildren) pChildren.classList.remove('hidden');
+              if (pCaret) pCaret.classList.remove('-rotate-90');
+              if (!expandedNodes.includes(pId)) expandedNodes.push(pId);
+            }
+            parentNode = parentNode.parentElement ? parentNode.parentElement.closest('.tree-node') : null;
+          }
+          localStorage.setItem('assetTreeExpandedNodes', JSON.stringify(expandedNodes));
+          selectAsset(targetAssetId);
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          selectAsset(targetAssetId);
+        }
+      }, 100);
     }
   });
 

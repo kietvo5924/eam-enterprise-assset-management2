@@ -9,7 +9,7 @@ from notifications.services import notify_sensor_anomaly
 
 from .physical_bounds import validate_physical_bounds, is_static_asset, get_static_asset_checklist
 from .iso_standards import evaluate_iso_10816
-from .z_score_detector import detect_z_score_anomaly
+from .z_score_detector import detect_z_score_anomaly, OEM_STATIC_LIMITS
 from .theil_sen_drift import evaluate_trend_drift
 from .isolation_forest_detector import MultivariateIsolationForestDetector
 
@@ -61,7 +61,12 @@ class ConditionMonitoringEngine:
             saved_records = []
             for item in readings_data:
                 metric = item.get('metricCode') or item.get('metric_code') or 'GENERAL'
-                val = item.get('value', item.get('readingValue', 0.0))
+                val = item.get('value')
+                if val is None:
+                    val = item.get('readingValue')
+                if val is None:
+                    val = item.get('reading_value', 0.0)
+                val = float(val) if val is not None else 0.0
                 unit = item.get('unit', '')
                 remarks = item.get('remarks', '')
                 rec = MeterReading.objects.create(
@@ -91,7 +96,12 @@ class ConditionMonitoringEngine:
         saved_records = []
         for item in readings_data:
             metric = str(item.get('metricCode') or item.get('metric_code') or 'VIBRATION').upper().strip()
-            val = float(item.get('value', item.get('readingValue', 0.0)))
+            val = item.get('value')
+            if val is None:
+                val = item.get('readingValue')
+            if val is None:
+                val = item.get('reading_value', 0.0)
+            val = float(val) if val is not None else 0.0
             unit = item.get('unit', '')
             remarks = item.get('remarks', '')
             rec = MeterReading.objects.create(
@@ -160,9 +170,12 @@ class ConditionMonitoringEngine:
         draft_pm_action = None
 
         # Đánh giá từng chỉ số đơn lẻ
+        anomalous_records = []
         for rec in saved_records:
             metric = rec.metric_code
             val = float(rec.reading_value)
+            rec_has_anomaly = False
+            rec_severity = 'NORMAL'
 
             # Lấy lịch sử đo hợp lệ (chỉ lấy RUNNING, không pre_repair, không suppressed)
             historical_readings = list(
@@ -186,8 +199,10 @@ class ConditionMonitoringEngine:
 
             if z_res.get('has_anomaly'):
                 has_anomaly = True
-                if z_res.get('severity') == 'CRITICAL' or highest_severity != 'CRITICAL':
-                    highest_severity = z_res.get('severity', 'WARNING')
+                rec_has_anomaly = True
+                rec_severity = z_res.get('severity', 'WARNING')
+                if rec_severity == 'CRITICAL' or highest_severity != 'CRITICAL':
+                    highest_severity = rec_severity
                 z_score_alert_info = {
                     "metric": metric,
                     "zScore": z_res.get('z_score'),
@@ -200,9 +215,14 @@ class ConditionMonitoringEngine:
                 iso_status_info = evaluate_iso_10816('VIBRATION', val)
                 if iso_status_info and iso_status_info.get('severity') == 'CRITICAL':
                     has_anomaly = True
+                    rec_has_anomaly = True
+                    rec_severity = 'CRITICAL'
                     highest_severity = 'CRITICAL'
                 elif iso_status_info and iso_status_info.get('severity') == 'WARNING' and highest_severity == 'NORMAL':
                     has_anomaly = True
+                    rec_has_anomaly = True
+                    if rec_severity != 'CRITICAL':
+                        rec_severity = 'WARNING'
                     highest_severity = 'WARNING'
 
             # 3. Theil-Sen Robust Drift (Cấp độ 3, Quy Tắc 3, Quy Tắc 7, TC-ANOM-03, TC-ANOM-07)
@@ -211,7 +231,15 @@ class ConditionMonitoringEngine:
             if len(all_for_trend) >= 5:
                 t_list = [r.reading_date for r in all_for_trend]
                 v_list = [float(r.reading_value) for r in all_for_trend]
-                limit_v = 7.1 if metric == 'VIBRATION' else (90.0 if metric == 'TEMPERATURE' else 25.0)
+                oem_entry = OEM_STATIC_LIMITS.get(metric)
+                if oem_entry and 'critical' in oem_entry:
+                    limit_v = float(oem_entry['critical'])
+                elif metric == 'VIBRATION':
+                    limit_v = 7.1
+                elif metric == 'TEMPERATURE':
+                    limit_v = 90.0
+                else:
+                    limit_v = 25.0
                 
                 drift_res = evaluate_trend_drift(
                     timestamps=t_list,
@@ -223,32 +251,43 @@ class ConditionMonitoringEngine:
                     trend_drift_info = drift_res
                     if drift_res.get('shouldTriggerDraftPM'):
                         has_anomaly = True
+                        rec_has_anomaly = True
+                        if rec_severity != 'CRITICAL':
+                            rec_severity = 'WARNING'
                         if highest_severity == 'NORMAL':
                             highest_severity = 'WARNING'
 
-        # 4. Multivariate Isolation Forest (Cấp độ 2, Quy Tắc 4, TC-ANOM-04)
-        multi_detector = MultivariateIsolationForestDetector()
-        vib_val = 2.0
-        temp_val = 65.0
-        press_val = 2.5
-        curr_val = 15.0
+            if rec_has_anomaly:
+                anomalous_records.append((rec, rec_severity))
 
+        # 4. Multivariate Isolation Forest (Cấp độ 2, Quy Tắc 4, TC-ANOM-04, Audit #7)
+        multi_detector = MultivariateIsolationForestDetector()
+        channel_vals = {}
         for r in saved_records:
-            if r.metric_code == 'VIBRATION':
-                vib_val = float(r.reading_value)
-            elif r.metric_code == 'TEMPERATURE':
-                temp_val = float(r.reading_value)
-            elif r.metric_code == 'PRESSURE':
-                press_val = float(r.reading_value)
-            elif r.metric_code == 'CURRENT':
-                curr_val = float(r.reading_value)
+            channel_vals[r.metric_code] = float(r.reading_value)
+
+        # Fallback to latest historical reading if channel not in current batch
+        for ch, default_val in [('VIBRATION', 2.0), ('TEMPERATURE', 65.0), ('PRESSURE', 2.5), ('CURRENT', 15.0)]:
+            if ch not in channel_vals:
+                hist_ch = MeterReading.objects.filter(
+                    asset=asset,
+                    metric_code=ch,
+                    machine_state='RUNNING',
+                    is_pre_repair=False,
+                    is_suppressed=False,
+                    reading_date__lt=rec_time
+                ).order_by('-reading_date').first()
+                if hist_ch and hist_ch.reading_value is not None:
+                    channel_vals[ch] = float(hist_ch.reading_value)
+                else:
+                    channel_vals[ch] = default_val
 
         current_vec = multi_detector.build_vector(
-            vibration=vib_val,
-            temperature=temp_val,
+            vibration=channel_vals['VIBRATION'],
+            temperature=channel_vals['TEMPERATURE'],
             ambient_temperature=ambient_temperature,
-            pressure=press_val,
-            current=curr_val
+            pressure=channel_vals['PRESSURE'],
+            current=channel_vals['CURRENT']
         )
         multi_res = multi_detector.evaluate(current_vec)
         if multi_res.get('has_anomaly'):
@@ -263,45 +302,35 @@ class ConditionMonitoringEngine:
                 status='OPEN'
             ).order_by('-last_detected_at').first()
 
-            # Kiểm tra xem có Draft Work Order nào đang tồn tại chưa hoàn thành
+            # Kiểm tra xem có Draft Work Order nào đang tồn tại chưa hoàn thành gắn với alert hiện tại
             existing_draft_wo = None
             if existing_open_alert and existing_open_alert.draft_work_order:
                 if existing_open_alert.draft_work_order.status not in ('COMPLETED', 'CANCELLED'):
                     existing_draft_wo = existing_open_alert.draft_work_order
-            else:
-                existing_draft_wo = WorkOrder.objects.filter(
-                    asset=asset,
-                    type='PREVENTIVE',
-                    status='CREATED'
-                ).first()
 
-            primary_rec = saved_records[0]
-            primary_metric = primary_rec.metric_code
+            # Audit #9: Attribute alert to the actual failing metric, or MULTIVARIATE
+            crit_recs = [r for r, s in anomalous_records if s == 'CRITICAL']
+            if crit_recs:
+                primary_rec = crit_recs[0]
+            elif anomalous_records:
+                primary_rec = anomalous_records[0][0]
+            else:
+                primary_rec = saved_records[0]
+
+            is_multivariate_only = multi_res.get('has_anomaly') and not anomalous_records
+            primary_metric = 'MULTIVARIATE' if is_multivariate_only else primary_rec.metric_code
+            metric_type = 'MULTIVARIATE' if is_multivariate_only else 'SINGLE_METRIC'
             primary_val = float(primary_rec.reading_value)
 
-            if existing_open_alert or existing_draft_wo:
-                # Đã có cảnh báo mở hoặc Draft PM: Chỉ tăng occurrence_count, KHÔNG tạo Draft PM mới!
+            if existing_open_alert:
+                # Đã có cảnh báo mở: Cập nhật thông số cảnh báo hiện tại
                 target_alert = existing_open_alert
-                if not target_alert:
-                    # Tạo alert gắn với existing_draft_wo
-                    target_alert = AssetAnomalyAlert.objects.create(
-                        tenant=cur_tenant,
-                        asset=asset,
-                        reading=primary_rec,
-                        metric_type='SINGLE_METRIC',
-                        metric_code=primary_metric,
-                        current_value=primary_val,
-                        severity=highest_severity,
-                        status='OPEN',
-                        occurrence_count=1,
-                        draft_work_order=existing_draft_wo
-                    )
-                else:
-                    target_alert.occurrence_count += 1
-                    target_alert.current_value = primary_val
-                    target_alert.severity = highest_severity
-                    target_alert.last_detected_at = timezone.now()
-                    target_alert.save()
+                target_alert.occurrence_count += 1
+                target_alert.current_value = primary_val
+                if highest_severity == 'CRITICAL':
+                    target_alert.severity = 'CRITICAL'
+                target_alert.last_detected_at = timezone.now()
+                target_alert.save()
 
                 draft_pm_action = "UPDATED_EXISTING_DRAFT"
                 created_or_updated_alert = target_alert
@@ -318,7 +347,7 @@ class ConditionMonitoringEngine:
                     tenant=cur_tenant,
                     asset=asset,
                     reading=primary_rec,
-                    metric_type='SINGLE_METRIC',
+                    metric_type=metric_type,
                     metric_code=primary_metric,
                     current_value=primary_val,
                     z_score=z_val,
@@ -331,23 +360,28 @@ class ConditionMonitoringEngine:
                     occurrence_count=1,
                     message=z_score_alert_info.get('message') if z_score_alert_info else (multi_res.get('message') if multi_res.get('has_anomaly') else None)
                 )
-
                 created_or_updated_alert = new_alert
 
-                # === CƠ CHẾ ĐIỀU PHỐI PHÂN CẤP HYBRID (CRITICAL vs WARNING) ===
-                if highest_severity == 'CRITICAL':
-                    # 1. TRƯỜNG HỢP NẶNG (Sự cố Đỏ / CRITICAL / ISO Zone D / Z-Score >= 3.0):
-                    # Tự động tạo Work Order khẩn cấp (CORRECTIVE/URGENT) và điều phối tức thời qua Hungarian
+            # === CƠ CHẾ ĐIỀU PHỐI PHÂN CẤP HYBRID (CRITICAL vs WARNING) ===
+            active_alert = created_or_updated_alert
+            slope = trend_drift_info.get('slopePerDay') if trend_drift_info else None
+            days_rem = trend_drift_info.get('daysRemaining') if trend_drift_info else None
+
+            if highest_severity == 'CRITICAL':
+                # 1. TRƯỜNG HỢP NẶNG (Sự cố Đỏ / CRITICAL / ISO Zone D / Z-Score >= 3.0):
+                # Tự động tạo Work Order khẩn cấp nếu chưa có phiếu khẩn cấp
+                needs_critical_wo = not active_alert.draft_work_order or active_alert.draft_work_order.priority != 'URGENT'
+                if needs_critical_wo:
                     crit_deadline = timezone.now() + timedelta(hours=4)
                     critical_wo = WorkOrder.objects.create(
                         tenant=cur_tenant,
                         asset=asset,
                         parent_id=work_order,
-                        title=f"Sự cố khẩn cấp: {asset.name} ({primary_metric} vượt ngưỡng)",
+                        title=f"Sự cố khẩn cấp: {asset.name} - {primary_metric} vượt ngưỡng",
                         description=(
                             f"Tự động tạo bởi AI Condition Monitoring khi phát hiện chỉ số {primary_metric} "
                             f"({primary_val} {primary_rec.unit or ''}) chạm ngưỡng nguy hiểm CRITICAL.\n"
-                            f"Chi tiết: {new_alert.message or 'Vượt ngưỡng an toàn OEM / ISO 10816 Zone D.'}"
+                            f"Chi tiết: {active_alert.message or 'Vượt ngưỡng an toàn OEM / ISO 10816 Zone D.'}"
                         ),
                         type='CORRECTIVE',
                         priority='URGENT',
@@ -360,12 +394,11 @@ class ConditionMonitoringEngine:
                         floor_level=getattr(asset, 'floor_level', 1) or 1,
                         zone_id=getattr(asset, 'zone_id', '') or ''
                     )
-                    new_alert.draft_work_order = critical_wo
-                    new_alert.save(update_fields=['draft_work_order'])
+                    active_alert.draft_work_order = critical_wo
+                    active_alert.save(update_fields=['draft_work_order'])
                     draft_pm_action = "CREATED_CRITICAL_WO"
 
                     # Điều phối tức thời bằng giải thuật Hungarian (Auto-dispatch)
-                    assigned_tech_name = None
                     try:
                         from algorithms.hungarian.service import HungarianAssignmentService
                         preview = HungarianAssignmentService.preview(tenant=cur_tenant, work_order_ids=[str(critical_wo.id)])
@@ -373,7 +406,6 @@ class ConditionMonitoringEngine:
                         if assignments:
                             top_assignment = assignments[0]
                             tech_id = top_assignment['technicianId']
-                            assigned_tech_name = top_assignment.get('technicianName')
                             HungarianAssignmentService.apply(
                                 tenant=cur_tenant,
                                 assignments_data=[{
@@ -396,7 +428,7 @@ class ConditionMonitoringEngine:
                     try:
                         notify_sensor_anomaly(
                             asset=asset,
-                            anomaly_type=f"{primary_metric} (CRITICAL)",
+                            anomaly_type=f"{primary_metric} - Khẩn cấp",
                             metric_value=f"{primary_val} {primary_rec.unit or ''}",
                             threshold_value="Ngưỡng nguy hiểm OEM / ISO 10816 Zone D",
                             severity='CRITICAL',
@@ -405,59 +437,39 @@ class ConditionMonitoringEngine:
                     except Exception:
                         pass
 
-                elif (days_rem is not None and days_rem <= 7) or highest_severity == 'WARNING':
-                    # 2. TRƯỜNG HỢP NHẸ (Cảnh báo sớm / WARNING / Trend Drift / ISO Zone C):
-                    # Tự động tạo Bản thảo PM Work Order + Chạy Hungarian ở chế độ PREVIEW gợi ý thợ + Gửi thông báo
-                    draft_deadline = timezone.now() + timedelta(days=days_rem if days_rem is not None else 7)
-                    draft_wo = WorkOrder.objects.create(
-                        tenant=cur_tenant,
-                        asset=asset,
-                        parent_id=work_order,
-                        title=f"Bản thảo PM: Dự phòng sự cố {asset.name} ({primary_metric})",
-                        description=(
-                            f"Tự động tạo bởi AI Condition Monitoring. "
-                            f"{f'Tốc độ suy thoái: {slope}/ngày. Dự kiến sự cố sau {days_rem} ngày.' if slope else 'Phát hiện bất thường cảnh báo sớm.'}"
-                        ),
-                        type='PREVENTIVE',
-                        priority='HIGH',
-                        status='CREATED',
-                        deadline=draft_deadline,
-                        required_skill='Cơ khí' if primary_metric == 'VIBRATION' else ('Điện' if primary_metric in ('CURRENT', 'VOLTAGE') else None),
-                        min_skill_level=1,
-                        coords_x=getattr(asset, 'coords_x', None),
-                        coords_y=getattr(asset, 'coords_y', None),
-                        floor_level=getattr(asset, 'floor_level', 1) or 1,
-                        zone_id=getattr(asset, 'zone_id', '') or ''
-                    )
-                    new_alert.draft_work_order = draft_wo
-                    new_alert.save(update_fields=['draft_work_order'])
-                    draft_pm_action = "CREATED_NEW_DRAFT"
+            elif (days_rem is not None and days_rem <= 7) or highest_severity == 'WARNING':
+                # 2. TRƯỜNG HỢP CẢNH BÁO SỚM / WARNING / HIGH (Trend Drift / ISO Zone C):
+                # Không tự động tạo phiếu trong DB; AI tạo AssetAnomalyAlert và bắn thông báo tới Quản đốc
+                # kèm đường dẫn điền sẵn toàn bộ thông tin để Quản đốc mở form và tạo phiếu trực tiếp.
+                suggested_tech_name = None
+                try:
+                    from users.models import User
+                    req_skill = 'Cơ khí' if primary_metric == 'VIBRATION' else ('Điện' if primary_metric in ('CURRENT', 'VOLTAGE') else None)
+                    tech_qs = User.objects.filter(tenant=cur_tenant, is_active=True, status='ACTIVE')
+                    if req_skill:
+                        tech_qs = tech_qs.filter(skill_records__skill__name__icontains=req_skill)
+                    tech_cand = tech_qs.first()
+                    if tech_cand:
+                        suggested_tech_name = tech_cand.get_full_name() or tech_cand.username
+                except Exception:
+                    pass
 
-                    # Chạy Hungarian PREVIEW để gợi ý kỹ thuật viên tối ưu
-                    suggested_tech_name = None
-                    try:
-                        from algorithms.hungarian.service import HungarianAssignmentService
-                        preview = HungarianAssignmentService.preview(tenant=cur_tenant, work_order_ids=[str(draft_wo.id)])
-                        assignments = preview.get('assignments', [])
-                        if assignments:
-                            top_assignment = assignments[0]
-                            suggested_tech_name = top_assignment.get('technicianName')
-                            cost = top_assignment.get('cost')
-                            draft_wo.description = (draft_wo.description or '') + f"\n\n[Gợi ý Hungarian]: Đề xuất phân công cho thợ {suggested_tech_name} (Chi phí tối ưu: {cost}). Quản đốc có thể phê duyệt 1-click."
-                            draft_wo.save(update_fields=['description'])
-                    except Exception:
-                        pass
+                draft_pm_action = "ALERT_LOGGED_AWAITING_MANAGER"
 
-                    # Bắn thông báo WARNING tới Quản lý bảo trì
+                # Nếu chưa có phiếu nào được tạo cho alert này, gửi notification kèm link pre-fill
+                if not active_alert.draft_work_order:
                     try:
                         notify_sensor_anomaly(
                             asset=asset,
-                            anomaly_type=f"{primary_metric} (WARNING)",
+                            anomaly_type=f"{primary_metric} - Cảnh báo sớm",
                             metric_value=f"{primary_val} {primary_rec.unit or ''}",
                             threshold_value="Ngưỡng cảnh báo OEM / ISO 10816 Zone C",
                             severity='WARNING',
-                            work_order=draft_wo,
-                            suggested_technician=suggested_tech_name
+                            work_order=None,
+                            suggested_technician=suggested_tech_name,
+                            alert_id=active_alert.id if active_alert else None,
+                            days_remaining=days_rem,
+                            slope=slope
                         )
                     except Exception:
                         pass
