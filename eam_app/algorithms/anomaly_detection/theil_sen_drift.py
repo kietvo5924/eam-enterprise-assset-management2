@@ -27,39 +27,52 @@ def compute_theil_sen_drift(
     if len(values) < 5 or len(timestamps) != len(values):
         return None, None
 
-    # Chuyển đổi timestamp sang datetime nếu cần
-    dt_list = []
+    # Chuyển đổi timestamp sang datetime và chuẩn hóa
+    from django.utils import timezone as dj_timezone
+    from datetime import timezone as dt_timezone
+    raw_dt_list = []
     for t in timestamps:
         if isinstance(t, datetime):
-            dt_list.append(t)
+            raw_dt_list.append(t if dj_timezone.is_aware(t) else dj_timezone.make_aware(t, dt_timezone.utc))
         elif hasattr(t, 'isoformat'):
-            dt_list.append(t)
+            raw_dt_list.append(t if dj_timezone.is_aware(t) else dj_timezone.make_aware(t, dt_timezone.utc))
         elif isinstance(t, str):
             try:
-                dt_list.append(datetime.fromisoformat(t.replace('Z', '+00:00')))
+                parsed = datetime.fromisoformat(t.replace('Z', '+00:00'))
+                raw_dt_list.append(parsed if dj_timezone.is_aware(parsed) else dj_timezone.make_aware(parsed, dt_timezone.utc))
             except Exception:
-                dt_list.append(datetime.now())
+                raw_dt_list.append(dj_timezone.now())
         else:
-            dt_list.append(datetime.now())
+            raw_dt_list.append(dj_timezone.now())
 
-    t0 = dt_list[0]
-    # Quy Tắc 7: Tính số ngày thực tế trôi qua (Elapsed Days)
-    X = np.array([(t - t0).total_seconds() / 86400.0 for t in dt_list]).reshape(-1, 1)
-    y = np.array(values, dtype=float)
+    # Sắp xếp theo trình tự thời gian tăng dần
+    combined = sorted(zip(raw_dt_list, values), key=lambda item: item[0])
+    dt_list = [c[0] for c in combined]
+    sorted_values = [float(c[1]) for c in combined]
+
+    t0_ts = dt_list[0].timestamp()
+    # Quy Tắc 7: Tính số ngày thực tế trôi qua (Elapsed Days) bằng Unix timestamp chống lỗi timezone
+    X = np.array([(t.timestamp() - t0_ts) / 86400.0 for t in dt_list]).reshape(-1, 1)
+    y = np.array(sorted_values, dtype=float)
 
     # Quy Tắc 3: Hồi quy Theil-Sen miễn nhiễm ngoại lai (TC-ANOM-03)
     reg = TheilSenRegressor(random_state=42).fit(X, y)
     slope = float(reg.coef_[0])  # Tốc độ suy thoái mỗi ngày
 
-    if slope <= 0.01:
-        return round(slope, 4), None  # Không có xu hướng tăng đáng kể
+    current_val = float(sorted_values[-1])
 
-    current_val = float(values[-1])
-    if current_val >= limit_value:
-        return round(slope, 4), 0  # Đã chạm hoặc vượt ngưỡng
-
-    days_remaining = int((limit_value - current_val) / slope)
-    return round(slope, 4), max(1, days_remaining)
+    # Hỗ trợ cả 2 chiều suy thoái: Tăng (rung, nhiệt) và Giảm (áp suất dầu, lưu lượng, điện áp)
+    if slope > 0.01:
+        if current_val >= limit_value:
+            return round(slope, 4), 0  # Đã chạm hoặc vượt ngưỡng
+        days_remaining = int((limit_value - current_val) / slope)
+        return round(slope, 4), max(1, days_remaining)
+    elif slope < -0.01 and limit_value < current_val:
+        # Xu hướng tụt giảm về ngưỡng tới hạn sàn
+        days_remaining = int((current_val - limit_value) / abs(slope))
+        return round(slope, 4), max(1, days_remaining)
+    else:
+        return round(slope, 4), None  # Không có xu hướng suy thoái đáng kể
 
 
 def evaluate_trend_drift(
@@ -71,12 +84,13 @@ def evaluate_trend_drift(
     """
     Đánh giá chi tiết xu hướng suy thoái và dự phóng ngày chạm ngưỡng.
     """
+    from django.utils import timezone as dj_timezone
     slope, days_remaining = compute_theil_sen_drift(timestamps, values, limit_value)
     
-    now = current_time or (timestamps[-1] if timestamps and isinstance(timestamps[-1], datetime) else datetime.now())
+    now = current_time or (timestamps[-1] if timestamps and isinstance(timestamps[-1], datetime) else dj_timezone.now())
     predicted_date = (now + timedelta(days=days_remaining)).strftime('%Y-%m-%d') if days_remaining is not None else None
 
-    is_drifting = slope is not None and slope > 0.01
+    is_drifting = slope is not None and abs(slope) > 0.01
     should_create_draft_pm = days_remaining is not None and days_remaining <= 7
 
     return {

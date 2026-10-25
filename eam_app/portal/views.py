@@ -1615,10 +1615,66 @@ def portal_work_orders(request):
                 if not check_perm(request, ('work_order:execute', 'work_order:update')):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:execute required'}, status=403)
                 item = WorkOrderChecklistItem.objects.get(id=data.get('item_id'), tenant_id=tenant_id)
-                item.is_completed = data.get('is_completed')
+                is_completed = bool(data.get('is_completed'))
+                actual_val = data.get('actual_value')
+                if actual_val is None:
+                    actual_val = item.actual_value
+
+                if is_completed and item.input_type == 'NUMBER':
+                    val_str = str(actual_val or '').strip().replace(',', '.')
+                    if not val_str:
+                        return JsonResponse({'success': False, 'error': f"Mục '{item.item_name}' yêu cầu phải nhập số liệu đo kiểm trước khi đánh dấu hoàn thành."}, status=400)
+                    try:
+                        float(val_str)
+                    except ValueError:
+                        return JsonResponse({'success': False, 'error': f"Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ."}, status=400)
+
+                item.is_completed = is_completed
                 if 'actual_value' in data:
                     item.actual_value = data.get('actual_value')
                 item.save()
+
+                if item.input_type == 'NUMBER' and item.actual_value and item.work_order and item.work_order.asset:
+                    try:
+                        num_val = float(str(item.actual_value).strip().replace(',', '.'))
+                        lower_name = item.item_name.lower()
+                        metric_code = 'VIBRATION'
+                        unit_str = 'mm/s'
+                        if 'nhiệt' in lower_name or 'temp' in lower_name:
+                            metric_code = 'TEMPERATURE'
+                            unit_str = '°C'
+                        elif 'áp' in lower_name or 'press' in lower_name:
+                            metric_code = 'PRESSURE'
+                            unit_str = 'bar'
+                        elif 'dòng' in lower_name or 'current' in lower_name:
+                            metric_code = 'CURRENT'
+                            unit_str = 'A'
+                        elif 'vòng' in lower_name or 'rpm' in lower_name or 'tốc độ' in lower_name or 'speed' in lower_name:
+                            metric_code = 'RPM'
+                            unit_str = 'RPM'
+                        elif 'rung' in lower_name or 'vibrat' in lower_name:
+                            metric_code = 'VIBRATION'
+                            unit_str = 'mm/s'
+
+                        from algorithms.anomaly_detection import ConditionMonitoringEngine
+                        ConditionMonitoringEngine.process_readings(
+                            asset=item.work_order.asset,
+                            readings_data=[{
+                                'metricCode': metric_code,
+                                'value': num_val,
+                                'unit': unit_str,
+                                'remarks': f"Ghi nhận từ phiếu bảo trì {item.work_order.code or item.work_order.title} - mục {item.item_name}"
+                            }],
+                            machine_state='RUNNING',
+                            ambient_temperature=None,
+                            recorded_at=timezone.now(),
+                            recorded_by=request.user if request.user and request.user.is_authenticated else None,
+                            tenant=item.work_order.tenant,
+                            work_order=item.work_order
+                        )
+                    except Exception:
+                        pass
+
                 return JsonResponse({'success': True})
                 
             elif action == 'add_checklist':
@@ -1836,14 +1892,22 @@ def portal_work_orders(request):
                         if str(wo.assigned_to_id) != str(request.user.id):
                             raise Exception("Only the assignee can complete the Work Order")
                             
-                        has_notes = wo.resolution_notes and wo.resolution_notes.strip()
-                        has_attachments = wo.attachments.exists()
-                        if not has_notes and not has_attachments:
-                            raise Exception("Vui lòng nhập ghi chú sửa chữa hoặc tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.")
-                            
                         for item in wo.checklists.all():
-                            if item.is_mandatory and not item.is_completed:
-                                raise Exception(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
+                            if item.is_mandatory:
+                                if not item.is_completed:
+                                    raise Exception(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
+                                if item.input_type == 'NUMBER':
+                                    val_str = str(item.actual_value or '').strip().replace(',', '.')
+                                    if not val_str:
+                                        raise Exception(f"Không thể hoàn thành: Mục bắt buộc '{item.item_name}' chưa có số liệu đo kiểm.")
+                                    try:
+                                        float(val_str)
+                                    except ValueError:
+                                        raise Exception(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
+
+                        has_attachments = wo.attachments.exists()
+                        if not has_attachments:
+                            raise Exception("Bắt buộc phải tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.")
                                 
                         wo.completed_at = timezone.now()
 
@@ -1899,6 +1963,32 @@ def portal_work_orders(request):
                     elif new_status in ['CANCELED', 'CANCELLED']:
                         if current_status == 'COMPLETED':
                             raise Exception("Cannot cancel a COMPLETED Work Order")
+                        if current_status not in ['CANCELED', 'CANCELLED']:
+                            from decimal import Decimal
+                            # Restore inventory stock for reserved materials
+                            for wm in wo.materials.select_related('spare_part').all():
+                                if wm.spare_part and wm.spare_part.quantity_in_stock is not None:
+                                    wm.spare_part.quantity_in_stock += Decimal(str(wm.quantity))
+                                    wm.spare_part.save()
+                            # Cancel tool reservations and release tools
+                            try:
+                                from assets.models import ToolReservation
+                                active_res = ToolReservation.objects.filter(
+                                    tenant_id=tenant_id,
+                                    work_order=wo,
+                                    status__in=['RESERVED', 'IN_USE']
+                                )
+                                for r in active_res:
+                                    r.status = 'CANCELLED'
+                                    r.save()
+                                    if r.tool:
+                                        r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
+                                        r.tool.save()
+                                    if r.tool_instance:
+                                        r.tool_instance.status = 'AVAILABLE'
+                                        r.tool_instance.save()
+                            except Exception:
+                                pass
                             
                     wo.status = new_status
                     wo.save()

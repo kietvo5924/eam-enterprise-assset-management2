@@ -73,6 +73,7 @@ class WorkOrder {
           'bgColor': const Color(0xFFf0fdf4),
           'textColor': const Color(0xFF15803d),
         };
+      case 'CANCELLED':
       case 'CANCELED':
         return {
           'label': 'Đã hủy',

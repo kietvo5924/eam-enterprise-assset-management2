@@ -34,6 +34,12 @@ class _HomeScreenState extends State<HomeScreen> {
             context.read<WorkOrderProvider>().fetchHomeWorkOrders();
           }
         },
+        onNotificationOpened: (_) {
+          _fetchUnreadCount();
+          if (mounted) {
+            context.read<WorkOrderProvider>().fetchHomeWorkOrders();
+          }
+        },
       );
     });
   }

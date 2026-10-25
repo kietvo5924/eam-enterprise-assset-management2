@@ -42,7 +42,7 @@ class WorkOrderProvider extends ChangeNotifier {
         _homeSub?.cancel();
         _homeSub = AppDatabase.instance.workOrderDao.watchMyWorkOrders(myUsername, tenantId).listen((entities) {
           final mapped = entities.map((e) => DatabaseMapper.fromWorkOrderEntity(e)).toList();
-          _homeWorkOrders = mapped.where((wo) => wo.status != 'COMPLETED' && wo.status != 'CANCELED').toList();
+          _homeWorkOrders = mapped.where((wo) => wo.status != 'COMPLETED' && wo.status != 'CANCELED' && wo.status != 'CANCELLED').toList();
           notifyListeners();
         });
       }

@@ -1,149 +1,301 @@
-# EAM (Enterprise Asset Management) System
+# Enterprise Asset Management (EAM) System
 
-The Enterprise Asset Management (EAM) system provides a multi-tenant architecture to manage assets, maintenance, work orders, and reports.
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/Django-5.2%20LTS-green.svg)](https://www.djangoproject.com/)
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791.svg)](https://www.postgresql.org/)
+[![MinIO](https://img.shields.io/badge/MinIO-S3%20Storage-C72C48.svg)](https://min.io/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D.svg)](https://redis.io/)
 
-> **Note**: This project has been modernized and rewritten from a legacy Spring Boot/React stack into a full-stack **Django** monolith to improve maintainability, development speed, and reduce infrastructure complexity.
+A modern, multi-tenant **Enterprise Asset Management (EAM / CMMS)** platform designed for industrial manufacturing, logistics, and plant operations. Built with a full-stack **Django monolith**, an **offline-first Flutter mobile application**, and containerized infrastructure.
 
-## Technology Stack
-- **Backend & Core**: Python 3.11, Django 4.8, PostgreSQL, Redis, MinIO
-- **Frontend**: Django Templates, TailwindCSS, Phosphor Icons, Vanilla JavaScript
-- **Mobile App**: Flutter, Dart, Dio, Provider, GoRouter
-- **Testing**: Pytest, Microsoft Playwright (End-to-End Testing)
-- **Infrastructure**: Docker, Docker Compose (for databases and object storage)
+> **Architecture Modernization**: This system has been consolidated from a legacy distributed stack into a unified, high-performance Django monolith with a Flutter mobile client, dramatically simplifying deployment, reducing operational overhead, and enhancing system reliability.
 
 ---
 
-## Local Setup Instructions
+## 🌟 Key Features & Capabilities
 
-The infrastructure (PostgreSQL, Redis, MinIO) is containerized with Docker Compose, while the Django application runs locally via a virtual environment.
+### 1. Multi-Tenant Architecture & Granular RBAC
+- Complete data isolation per organization/tenant (`TenantMiddleware`).
+- Strict Role-Based Access Control:
+  - **Super Administrator (`SUPER_ADMIN`)**: Global system management, tenant lifecycle, cross-tenant licensing.
+  - **Tenant Administrator (`TENANT_ADMIN`)**: Organization configuration, factory layout, user & role provisioning.
+  - **Maintenance Manager / Supervisor**: Planning, resource allocation, tool & spare parts approvals.
+  - **Field Technician (`TECHNICIAN` / `FIELD_TECHNICIAN`)**: Work order execution, checklist inspection, on-site measurements, direct camera proof upload.
+  - **Viewer**: Read-only dashboard and operational KPI monitoring.
 
-### Step 1: Environment Variables
-Open a terminal at the project root and create a `.env` file from the example:
+### 2. Intelligent Work Order Management
+- **Interactive Checklists**: Multi-type inspection steps (`PASS_FAIL`, `NUMBER`, `TEXT`).
+- **Real-Time Measurement Validation**: Strict validation on numeric measurements (temperature, vibration, pressure, etc.) preventing incomplete submissions.
+- **Mandatory Live Photo Proof**: Strict hardware camera requirement (`ImageSource.camera`) for technicians at machine sites.
+- **Automated Resource Lifecycle**: Automatic check-out/check-in of reserved tools (`ToolReservation`) and inventory spare parts stock adjustment on completion or cancellation.
+
+### 3. AI/ML Predictive Maintenance & Condition Monitoring
+- **Real-Time Sensor Anomaly Detection**:
+  - **Isolation Forest**: Multi-variate anomaly detection on telemetry streams.
+  - **Z-Score & Physical Bound Filtering**: Real-time threshold breach detection.
+  - **Theil-Sen Robust Linear Regression**: Long-term sensor drift analysis and trend degradation forecasting.
+- Automated anomaly event generation linking directly to corrective Work Orders.
+
+### 4. Advanced Operations Research & Factory Floor Navigation
+- **Hungarian Algorithm Dispatcher**: Optimal assignment of pending work orders to technicians based on skill levels, certifications, and distance.
+- **2D CAD Floorplan & TSP Routing**: Integrated factory layout routing navigating field technicians through optimal paths across machines and duty stations.
+
+### 5. Offline-First Mobile Application (Flutter)
+- Built for on-the-ground technicians in network-challenged industrial facilities.
+- **Local Embedded Database**: Drift (SQLite) storing work orders, checklists, and asset telemetry locally.
+- **Robust Background Sync Engine**: Automatic queue processing, conflict handling, deterministic error management, and tenant data isolation.
+
+---
+
+## 🛠 Technology Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Backend & Core** | Python 3.11+, Django 5.2 LTS, Django REST Framework, SimpleJWT, Celery |
+| **Algorithms & AI** | NumPy, SciPy, Scikit-learn (Isolation Forest, Theil-Sen, Hungarian algorithm) |
+| **Web Frontend** | Django Templates, TailwindCSS, Phosphor Icons, Modern Vanilla JavaScript |
+| **Mobile Client** | Flutter 3.x, Dart, Dio, Provider, GoRouter, Drift (SQLite), ImagePicker |
+| **Data Storage & Cache** | PostgreSQL 15, Redis 7 (Cache & Task Broker), MinIO (S3-compatible Object Storage) |
+| **Database Tooling** | pgAdmin 4 |
+| **Testing Framework** | Pytest, Microsoft Playwright (E2E), Django Test Runner, Flutter Test |
+| **Containerization** | Docker, Docker Compose |
+
+---
+
+## 📁 Repository Structure
+
+```text
+eam-enterprise-assset-management/
+├── docker-compose.yml          # Container configuration (PostgreSQL, Redis, MinIO, pgAdmin)
+├── requirements.txt            # Python dependencies for backend and testing
+├── .env.example                # Template for environment variables
+├── TEST_CREDENTIALS.md         # Comprehensive test credentials and tenant directory
+├── docs/                       # Architectural specs, migration guides, and idea documentation
+├── eam_app/                    # Core Django Backend Monolith
+│   ├── manage.py               # Django management CLI
+│   ├── config/                 # Settings, ASGI/WSGI, routing configurations
+│   ├── core/                   # Multi-tenant middleware, audit logging, base models
+│   ├── users/                  # Custom User model, technician profiles, RBAC
+│   ├── assets/                 # Asset hierarchy, sensors, tool reservations, spare parts
+│   ├── workorders/             # Work order lifecycle, checklists, attachments, dispatch
+│   ├── maintenance/            # Preventive maintenance schedules, PM triggers
+│   ├── algorithms/             # Anomaly detection, Hungarian dispatch, TSP routing
+│   ├── portal/                 # Web views, dashboards, CAD floorplan maps
+│   ├── templates/              # Server-rendered HTML templates with TailwindCSS
+│   └── static/                 # Static assets, JavaScript utilities, stylesheets
+├── mobile_app/                 # Offline-First Flutter Mobile App
+│   ├── lib/
+│   │   ├── core/               # Theme, database (Drift), network (Dio), security
+│   │   ├── features/           # Work orders, sync engine, CAD routing, auth, dashboard
+│   └── test/                   # Flutter unit and widget tests
+└── e2e_tests/                  # End-to-End Playwright test suite
+```
+
+---
+
+## 🚀 Getting Started (Step-by-Step)
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Docker Compose v2+)
+- [Python 3.11+](https://www.python.org/downloads/)
+- [Flutter SDK 3.x+](https://docs.flutter.dev/get-started/install) *(if developing on the mobile app)*
+- [Git](https://git-scm.com/)
+
+---
+
+### Step 1: Clone Repository & Configure Environment
 
 ```bash
-# On Linux/Mac:
-cp .env.example .env
+# Clone the repository
+git clone https://github.com/kietvo5924/eam-enterprise-assset-management2.git
+cd eam-enterprise-assset-management
 
+# Copy environment variable template
 # On Windows (PowerShell):
 Copy-Item .env.example -Destination .env
+Copy-Item .env.example -Destination eam_app\.env
+
+# On Linux / macOS:
+cp .env.example .env
+cp .env.example eam_app/.env
 ```
 
-Open the `.env` file and fill in your Resend API Key (used for system email notifications). You can get a free key at https://resend.com:
-```env
-RESEND_API_KEY=your_resend_api_key_here
-```
+Open `.env` (and `eam_app/.env`) to configure optional external services (such as `RESEND_API_KEY` for email notifications).
 
-### Step 2: Start the Infrastructure
-Run the following command to start PostgreSQL, pgAdmin, Redis, and MinIO in the background:
+---
+
+### Step 2: Launch Supporting Infrastructure via Docker
+
+Start PostgreSQL, Redis, MinIO, and pgAdmin in detached mode:
 
 ```bash
 docker-compose up -d
 ```
-> Note: The first run may take 2-5 minutes to download Docker images.
 
-### Step 3: Set up Virtual Environment & Dependencies
-Create a Python virtual environment and install the required dependencies:
+Verify that all containers are healthy:
+```bash
+docker-compose ps
+```
+
+---
+
+### Step 3: Set Up Python Virtual Environment
+
+Create and activate a virtual environment, then install dependencies:
 
 ```bash
 # Create Virtual Environment
 python -m venv venv
 
-# Activate (Windows PowerShell)
+# Activate (Windows PowerShell):
 .\venv\Scripts\activate
-# Activate (Mac/Linux)
+
+# Activate (Linux / macOS):
 source venv/bin/activate
 
-# Install dependencies
+# Install all backend and testing dependencies
 pip install -r requirements.txt
 ```
 
-### Step 4: Run Database Migrations
-Initialize the database schema and seed default data:
+---
+
+### Step 4: Apply Database Migrations & Seed Demo Data
+
+Navigate into the `eam_app` directory to execute Django management commands:
 
 ```bash
+cd eam_app
+
+# Run database schema migrations
 python manage.py migrate
+
+# Seed comprehensive factory, asset, technician, and work order demo data
+python manage.py seed_hungarian_demo
 ```
 
-### Step 5: Start the System
-Start the Django development server:
+---
+
+### Step 5: Start the Django Backend Server
 
 ```bash
-python manage.py runserver
+# Run server on all network interfaces (accessible to mobile emulators and LAN)
+python manage.py runserver 0.0.0.0:8000
 ```
 
----
-
-### Step 6: Access the System
-
-Once the server and containers are Running/Healthy, you can access the system at the following addresses:
-
-- **Web Portal (Django Admin/Frontend)**: http://localhost:8000
-  - Default login credentials (if seeded):
-    - Username/Email: `superadmin@eam.local`
-    - Password: `admin` (or your default seeded password)
-
-- **Database Management (pgAdmin)**: http://localhost:5050
-  - Email: `admin@admin.com`
-  - Password: `admin`
-  - To view the database, click "Add New Server" in pgAdmin and use these settings:
-    - General > Name: EAM Database
-    - Connection > Host name/address: `postgres`
-    - Connection > Port: `5432`
-    - Connection > Maintenance database: `eam_db`
-    - Connection > Username: `eam_user`
-    - Connection > Password: `eam_password`
-
-- **File/Object Storage (MinIO Console)**: http://localhost:9001
-  - Username: `minioadmin`
-  - Password: `minioadmin`
+The web application is now active at **http://localhost:8000**.
 
 ---
 
-### Step 7: Run the Mobile App (EAM Mobile)
+## 🌐 Service Endpoints & Default Credentials
 
-The EAM system includes a native mobile application for technicians and supervisors.
+| Service | Access URL | Credentials | Notes |
+| :--- | :--- | :--- | :--- |
+| **EAM Web Portal** | `http://localhost:8000` | Username: `superadmin@eam.local`<br>Password: `admin123` | Global System Super Admin (`SUPER_ADMIN`) |
+| **VinFast Tenant Admin** | `http://localhost:8000` | Username: `admin_vf@vinfast.vn`<br>Password: `password123` | Factory Tenant Admin (`VF_MFG`) |
+| **Field Technician** | Mobile App / Web | Username: `Le Thi Hoa`<br>Password: `admin123` | Field maintenance technician |
+| **pgAdmin 4 (Web UI)** | `http://localhost:5050` | Email: `admin@admin.com`<br>Password: `admin` | Web-based PostgreSQL browser |
+| **MinIO Console** | `http://localhost:9001` | Username: `minioadmin`<br>Password: `minioadmin` | Object storage bucket browser (S3 API: `9000`) |
+| **PostgreSQL Database** | `localhost:5433` | User: `eam_user`<br>Password: `eam_password`<br>DB: `eam_db` | Direct host connection (internal port: `5432`) |
 
-1. Ensure you have [Flutter SDK](https://docs.flutter.dev/get-started/install) installed on your machine.
-2. Open a new terminal and navigate to the `mobile_app` directory:
+> 📖 **Full Credentials Directory**: For a comprehensive table of all 20+ specialized technician accounts (electrical, hydraulic, PLC, robotics) and managers across all organizations, see **[TEST_CREDENTIALS.md](TEST_CREDENTIALS.md)**.
+
+### Connecting pgAdmin to PostgreSQL:
+When adding a new server in pgAdmin (`http://localhost:5050`):
+- **Host name/address**: `postgres` *(inside Docker container network)*
+- **Port**: `5432`
+- **Maintenance database**: `eam_db`
+- **Username**: `eam_user`
+- **Password**: `eam_password`
+
+*(Note: When connecting from desktop SQL tools like DBeaver or DataGrip on your host machine, use Host: `localhost` and Port: `5433`)*.
+
+---
+
+## 📱 Running the Mobile Application (Flutter)
+
+The mobile application is located in `mobile_app/` and supports Android and iOS.
+
+1. Ensure the backend server is running (`python manage.py runserver 0.0.0.0:8000`).
+2. Open a separate terminal and navigate to the mobile folder:
    ```bash
    cd mobile_app
    ```
-3. Get the dependencies:
+3. Fetch Flutter packages:
    ```bash
    flutter pub get
    ```
-4. Run the app on a connected device or emulator:
+4. Run on a connected device or Android Emulator:
    ```bash
    flutter run
    ```
-> Note: The mobile application connects to the local backend API. For Android emulators, it will map to `10.0.2.2`, while iOS simulators will use `localhost`. You can log in using the same credentials as the Web Portal.
+
+> **Network Note for Emulators**:
+> - **Android Emulator**: Automatically routes to the host machine backend via `http://10.0.2.2:8000`.
+> - **iOS Simulator**: Connects directly via `http://localhost:8000`.
+> - **Physical Devices**: Configure the server IP address to match your computer's local Wi-Fi LAN IP in `mobile_app/lib/core/constants/api_constants.dart`.
 
 ---
 
-## Testing (End-to-End)
+## 🧪 Testing Suite
 
-This project utilizes **Pytest** and **Playwright** to run comprehensive End-to-End (E2E) tests simulating real user interactions on a Chromium browser.
-
-To run the full test suite:
+### 1. Backend Unit & Integration Tests
 ```bash
-# Make sure your virtual environment is activated
+cd eam_app
+
+# Run all work orders tests
+python manage.py test workorders.tests
+
+# Run sensor anomaly detection & algorithm tests
+pytest algorithms/tests/ -v
+```
+
+### 2. End-to-End (E2E) Browser Tests (Playwright)
+```bash
+# From project root with virtual environment activated:
 pytest -v e2e_tests
+
+# If running Playwright for the first time:
+playwright install chromium
 ```
-*(If you are using playwright for the first time, you may need to install the browser binaries: `playwright install chromium`)*
+
+### 3. Flutter Mobile Unit Tests
+```bash
+cd mobile_app
+flutter test
+```
 
 ---
 
-## Troubleshooting
+## 🔧 Common Troubleshooting
 
-1. **Port Conflict (Port is already allocated)**
-If you encounter port errors (e.g., 5433, 5050, 8000), ensure no local services are using these ports, or change the mapped ports in `docker-compose.yml`.
+1. **Port Conflicts (`5433`, `5050`, `6379`, `8000`, `9001`)**
+   - Check if existing services or old Docker containers are occupying the ports:
+     ```bash
+     docker ps
+     ```
+   - Update host port bindings in `docker-compose.yml` if necessary.
 
-2. **Missing Module Errors**
-If you see `ModuleNotFoundError`, ensure your virtual environment is activated (`.\venv\Scripts\activate`) and all dependencies are installed.
+2. **Mobile App Cannot Connect to Backend**
+   - Ensure the Django server was started with `0.0.0.0:8000` (not `127.0.0.1:8000`), allowing external interface binding.
+   - For Android emulators, ensure you are using `10.0.2.2:8000`.
 
-3. **Full System Reset (Wipe all data)**
-If you want to completely clean up the databases and start fresh as a new installation, use the following command:
-```bash
-docker-compose down -v --rmi all
-```
-Warning: This command will permanently delete all database records and uploaded files in MinIO/PostgreSQL.
+3. **Complete Environment Reset (Wipe Data & Start Fresh)**
+   ```bash
+   # Stop and purge all container volumes
+   docker-compose down -v
+
+   # Relaunch containers
+   docker-compose up -d
+
+   # Reapply migrations and seed data
+   cd eam_app
+   python manage.py migrate
+   python manage.py seed_hungarian_demo
+   ```
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

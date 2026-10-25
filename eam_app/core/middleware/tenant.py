@@ -23,25 +23,34 @@ class TenantMiddleware:
         is_exempt = any(m.match(path) for m in self.exempt_urls)
         
         if not is_exempt:
-            # We will read tenant_id from user if authenticated via session
-            # For JWT, we parse the token directly
-            tenant_id = request.headers.get('X-Tenant-Id')
-            
-            if not tenant_id:
-                auth_header = request.headers.get('Authorization')
-                if auth_header and auth_header.startswith('Bearer '):
-                    token = auth_header.split(' ')[1]
-                    try:
-                        from rest_framework_simplejwt.tokens import AccessToken
-                        access_token = AccessToken(token)
-                        tenant_id = access_token.get('tenantId')
-                    except Exception:
-                        pass
+            header_tenant_id = request.headers.get('X-Tenant-Id')
+            jwt_tenant_id = None
+            jwt_is_superuser = False
 
-            if not tenant_id:
-                forced_user = getattr(request, '_force_auth_user', None) or (request.user if hasattr(request, 'user') and request.user.is_authenticated else None)
-                if forced_user and hasattr(forced_user, 'tenant_id'):
-                    tenant_id = forced_user.tenant_id
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.split(' ')[1]
+                try:
+                    from rest_framework_simplejwt.tokens import AccessToken
+                    access_token = AccessToken(token)
+                    jwt_tenant_id = access_token.get('tenantId')
+                    jwt_is_superuser = access_token.get('is_superuser', False)
+                except Exception:
+                    pass
+
+            forced_user = getattr(request, '_force_auth_user', None) or (request.user if hasattr(request, 'user') and request.user.is_authenticated else None)
+            auth_tenant_id = jwt_tenant_id or (getattr(forced_user, 'tenant_id', None) if forced_user else None)
+            is_super = jwt_is_superuser or (getattr(forced_user, 'is_superuser', False) if forced_user else False)
+
+            # Security check: if user is authenticated and attempts to access another tenant
+            if header_tenant_id and auth_tenant_id and not is_super:
+                if str(header_tenant_id) != str(auth_tenant_id):
+                    return JsonResponse(
+                        {'error': 'Forbidden: You do not have access to this tenant.'},
+                        status=403
+                    )
+
+            tenant_id = header_tenant_id or auth_tenant_id
 
             if not tenant_id:
                 if path.startswith('/api/'):

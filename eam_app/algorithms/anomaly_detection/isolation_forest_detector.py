@@ -45,10 +45,10 @@ class MultivariateIsolationForestDetector:
         if len(historical_vectors) >= 10:
             X_train = np.array(historical_vectors)
         else:
-            # Sinh baseline tham chiếu chuẩn công nghiệp nếu chưa đủ dữ liệu hiện trường
-            np.random.seed(42)
+            # Sinh baseline tham chiếu chuẩn công nghiệp nếu chưa đủ dữ liệu hiện trường (Local RandomState)
+            rng = np.random.RandomState(42)
             n_samples = max(30, len(historical_vectors))
-            X_train = np.random.normal(
+            X_train = rng.normal(
                 loc=DEFAULT_BASELINE_CENTERS,
                 scale=DEFAULT_BASELINE_SCALES,
                 size=(n_samples, 4)

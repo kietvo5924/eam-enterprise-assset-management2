@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from django.core.exceptions import ValidationError
+from rest_framework.exceptions import NotFound
 from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart, Asset, MeterReading, AssetAnomalyAlert
 from assets.serializers import (
     LocationSerializer, LocationCreateUpdateSerializer,
@@ -149,7 +150,7 @@ class LocationDetailView(APIView):
         try:
             location = Location.objects.get(id=location_id)
         except Location.DoesNotExist:
-            raise ValidationError("Location not found")
+            raise NotFound("Location not found")
             
         location.is_active = False
         location.save()
@@ -325,7 +326,7 @@ class AssetCategoryDetailView(APIView):
         try:
             category = AssetCategory.objects.get(id=category_id)
         except AssetCategory.DoesNotExist:
-            raise ValidationError("Asset category not found")
+            raise NotFound("Asset category not found")
             
         return success_response(AssetCategorySerializer(category).data)
 
@@ -337,7 +338,7 @@ class AssetCategoryDetailView(APIView):
         try:
             category = AssetCategory.objects.get(id=category_id)
         except AssetCategory.DoesNotExist:
-            raise ValidationError("Asset category not found")
+            raise NotFound("Asset category not found")
             
         serializer = AssetCategoryCreateUpdateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -451,7 +452,7 @@ class HierarchyTemplateDetailView(APIView):
         try:
             template = HierarchyTemplate.objects.get(id=template_id)
         except HierarchyTemplate.DoesNotExist:
-            raise ValidationError("Hierarchy template not found")
+            raise NotFound("Hierarchy template not found")
             
         serializer = HierarchyTemplateCreateUpdateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -490,7 +491,7 @@ class HierarchyTemplateDetailView(APIView):
         try:
             template = HierarchyTemplate.objects.get(id=template_id)
         except HierarchyTemplate.DoesNotExist:
-            raise ValidationError("Hierarchy template not found")
+            raise NotFound("Hierarchy template not found")
             
         template.is_active = False
         template.save()
@@ -539,7 +540,7 @@ class SparePartDetailView(APIView):
         try:
             part = SparePart.objects.get(id=part_id)
         except SparePart.DoesNotExist:
-            raise ValidationError("Spare part not found")
+            raise NotFound("Spare part not found")
             
         serializer = SparePartCreateUpdateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -661,7 +662,7 @@ class AssetDetailView(APIView):
         try:
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
-            raise ValidationError("Asset not found")
+            raise NotFound("Asset not found")
             
         return success_response(AssetSerializer(asset).data)
 
@@ -673,7 +674,7 @@ class AssetDetailView(APIView):
         try:
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
-            raise ValidationError("Asset not found")
+            raise NotFound("Asset not found")
             
         serializer = AssetCreateUpdateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -735,7 +736,7 @@ class AssetDetailView(APIView):
         try:
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
-            raise ValidationError("Asset not found")
+            raise NotFound("Asset not found")
             
         asset.is_active = False
         asset.save()
@@ -749,7 +750,7 @@ class MeterReadingListView(APIView):
         try:
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
-            raise ValidationError("Asset not found")
+            raise NotFound("Asset not found")
             
         readings = MeterReading.objects.filter(asset=asset).order_by('-reading_date')
         serializer = MeterReadingSerializer(readings, many=True)
@@ -763,7 +764,7 @@ class MeterReadingListView(APIView):
         try:
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
-            raise ValidationError("Asset not found")
+            raise NotFound("Asset not found")
 
         serializer = MeterReadingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -821,7 +822,7 @@ class AssetAnomalyHistoryView(APIView):
         try:
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
-            raise ValidationError("Asset not found")
+            raise NotFound("Asset not found")
 
         readings = MeterReading.objects.filter(asset=asset).order_by('-reading_date')[:50]
         alerts = AssetAnomalyAlert.objects.filter(asset=asset).order_by('-last_detected_at')[:20]
@@ -868,8 +869,12 @@ class ConditionMonitoringAlertFeedbackView(APIView):
         if not (HasPermission('asset:update')().has_permission(request, self) or HasPermission('work_order:update')().has_permission(request, self)):
             self.permission_denied(request)
 
+        user_tenant = getattr(request.user, 'tenant', None)
         try:
-            alert = AssetAnomalyAlert.objects.get(id=alert_id)
+            if user_tenant and not getattr(request.user, 'is_superuser', False):
+                alert = AssetAnomalyAlert.objects.get(id=alert_id, tenant=user_tenant)
+            else:
+                alert = AssetAnomalyAlert.objects.get(id=alert_id)
         except AssetAnomalyAlert.DoesNotExist:
             raise ValidationError("Alert not found")
 

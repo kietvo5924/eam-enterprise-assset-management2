@@ -15,8 +15,8 @@ import json
 from core.models import Tenant
 from core.tenant_context import clear_current_tenant
 from users.models import Role, Permission
-from assets.models import Location, AssetCategory, Asset, MeterReading, AssetAnomalyAlert
-from workorders.models import WorkOrder, WorkOrderChecklistItem
+from assets.models import Location, AssetCategory, Asset, MeterReading, AssetAnomalyAlert, Tool, ToolInstance, ToolReservation, SparePart
+from workorders.models import WorkOrder, WorkOrderChecklistItem, WorkOrderMaterial
 
 from algorithms.anomaly_detection import (
     validate_physical_bounds,
@@ -630,11 +630,32 @@ class SensorAnomalyDetectionTestCase(TestCase):
         self.assertEqual(res_fail.status_code, 400)
         self.assertIn("Chưa hoàn thành bước bắt buộc", res_fail.json().get('error', ''))
 
-        # 4. Nhập số liệu đo kiểm thực tế vào checklist
+        # 4a. Cố hoàn thành khi đã tick nhưng chưa nhập số liệu đo kiểm -> bị chặn
+        vib_chk.actual_value = ""
+        vib_chk.is_completed = True
+        vib_chk.save()
+        res_fail_num = self.client.put(f"/portal/work-orders/?id={wo_id}", data=json.dumps(complete_payload), content_type="application/json")
+        self.assertEqual(res_fail_num.status_code, 400)
+        self.assertIn("chưa có số liệu đo kiểm", res_fail_num.json().get('error', ''))
+
+        # 4b. Nhập số liệu đo kiểm nhưng chưa có ảnh minh chứng -> bị chặn
         vib_chk.actual_value = "3.2"
         vib_chk.is_completed = True
         vib_chk.save()
+        res_fail_photo = self.client.put(f"/portal/work-orders/?id={wo_id}", data=json.dumps(complete_payload), content_type="application/json")
+        self.assertEqual(res_fail_photo.status_code, 400)
+        self.assertIn("hình ảnh minh chứng", res_fail_photo.json().get('error', ''))
 
+        # 4c. Thêm ảnh minh chứng -> hoàn thành thành công
+        from workorders.models import WorkOrderAttachment
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url='/media/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=102400
+        )
         res_ok = self.client.put(f"/portal/work-orders/?id={wo_id}", data=json.dumps(complete_payload), content_type="application/json")
         self.assertEqual(res_ok.status_code, 200)
         self.assertTrue(res_ok.json().get('success'))
@@ -856,5 +877,216 @@ class SensorAnomalyDetectionTestCase(TestCase):
         ).first()
         self.assertIsNotNone(notif_crit)
         self.assertIn(crit_wo.code, notif_crit.message)
+
+    def test_regression_multi_metric_isolation_on_same_asset(self):
+        """
+        REGRESSION: Đảm bảo 2 cảm biến khác nhau (VIBRATION và TEMPERATURE) trên cùng một thiết bị
+        được theo dõi độc lập, không bị đè cảnh báo (Alert Hijacking).
+        """
+        now = timezone.now()
+        # 1. Ghi nhận cảnh báo RUNG ĐỘNG (WARNING)
+        for i in range(5):
+            MeterReading.objects.create(
+                tenant=self.tenant,
+                asset=self.pump_asset,
+                metric_code='VIBRATION',
+                reading_value=4.0 + (i * 0.5),
+                reading_date=now - timedelta(days=6 - i),
+                machine_state='RUNNING',
+                unit='mm/s'
+            )
+        url = f"/api/v1/assets/{self.pump_asset.id}/meter-readings/"
+        res_vib = self.client.post(url, data={
+            "machineState": "RUNNING",
+            "readings": [{"metricCode": "VIBRATION", "value": 6.5, "unit": "mm/s"}]
+        }, format='json')
+        self.assertEqual(res_vib.status_code, status.HTTP_200_OK)
+
+        vib_alert = AssetAnomalyAlert.objects.filter(asset=self.pump_asset, metric_code='VIBRATION', status='OPEN').first()
+        self.assertIsNotNone(vib_alert)
+        self.assertEqual(vib_alert.occurrence_count, 1)
+
+        # 2. Ghi nhận cảnh báo NHIỆT ĐỘ (CRITICAL - 98°C)
+        res_temp = self.client.post(url, data={
+            "machineState": "RUNNING",
+            "readings": [{"metricCode": "TEMPERATURE", "value": 98.0, "unit": "°C"}]
+        }, format='json')
+        self.assertEqual(res_temp.status_code, status.HTTP_200_OK)
+
+        temp_alert = AssetAnomalyAlert.objects.filter(asset=self.pump_asset, metric_code='TEMPERATURE', status='OPEN').first()
+        self.assertIsNotNone(temp_alert)
+
+        # Cảnh báo Rung động ban đầu KHÔNG bị ghi đè thành Nhiệt độ
+        vib_alert.refresh_from_db()
+        self.assertEqual(vib_alert.metric_code, 'VIBRATION')
+        self.assertEqual(vib_alert.occurrence_count, 1)
+        self.assertEqual(AssetAnomalyAlert.objects.filter(asset=self.pump_asset, status='OPEN').count(), 2)
+
+    def test_regression_tenant_header_spoofing_prevention(self):
+        """
+        REGRESSION: Kiểm tra middleware chặn giả mạo Header X-Tenant-Id trái phép (trả về 403 Forbidden).
+        """
+        other_tenant = Tenant.objects.create(name="Rival Corp", tenant_code="T-RC-02")
+        url = f"/api/v1/assets/{self.pump_asset.id}/"
+
+        # Người dùng thường thuộc tenant khác cố tình truyền X-Tenant-Id của tenant ngoài
+        res = self.client.get(url, HTTP_X_TENANT_ID=str(other_tenant.id))
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Superuser được phép truyền X-Tenant-Id để debug / quản trị
+        superuser = User.objects.create_superuser(
+            username="superadmin_sec",
+            email="superadmin@corp.com",
+            password="password123",
+            tenant=self.tenant
+        )
+        self.client.force_authenticate(user=superuser)
+        res_super = self.client.get(url, HTTP_X_TENANT_ID=str(self.tenant.id))
+        self.assertNotEqual(res_super.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Trả lại client auth bình thường
+        self.client.force_authenticate(user=self.user)
+
+    def test_regression_workorder_completion_auto_returns_tool_reservation(self):
+        """
+        REGRESSION: Kiểm tra khi hoàn thành Work Order qua API status, ToolReservation tự động được trả lại.
+        """
+        tool = Tool.objects.create(
+            tenant=self.tenant,
+            code="TOOL-FLK-810",
+            name="Máy đo độ rung Laser Fluke 810",
+            available_quantity=4
+        )
+        tool_inst = ToolInstance.objects.create(
+            tenant=self.tenant,
+            tool=tool,
+            serial_number="FLK-810-001",
+            status='IN_USE'
+        )
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            title="Sửa chữa máy bơm P-101",
+            type="CORRECTIVE",
+            priority="HIGH",
+            status="IN_PROGRESS",
+            assigned_to=self.user
+        )
+        reservation = ToolReservation.objects.create(
+            tenant=self.tenant,
+            tool=tool,
+            tool_instance=tool_inst,
+            work_order=wo,
+            reserved_quantity=1,
+            status='IN_USE'
+        )
+
+        # Thêm ảnh minh chứng bắt buộc
+        from workorders.models import WorkOrderAttachment
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url='/media/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=102400
+        )
+
+        # Đổi trạng thái sang COMPLETED qua API
+        url = f"/api/v1/work-orders/{wo.id}/status"
+        res = self.client.put(url, data={
+            "status": "COMPLETED",
+            "resolutionNotes": "Đã thay phớt cơ khí và cân chỉnh trục thành công."
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Kiểm tra ToolReservation được đánh dấu RETURNED và hoàn trả số lượng khả dụng
+        reservation.refresh_from_db()
+        self.assertEqual(reservation.status, 'RETURNED')
+        tool.refresh_from_db()
+        self.assertEqual(tool.available_quantity, 5)
+        tool_inst.refresh_from_db()
+        self.assertEqual(tool_inst.status, 'AVAILABLE')
+
+    def test_regression_workorder_cancellation_restores_inventory(self):
+        """
+        REGRESSION: Kiểm tra khi huỷ Work Order qua API status, vật tư phụ tùng dự lưu được hoàn kho.
+        """
+        part = SparePart.objects.create(
+            tenant=self.tenant,
+            name="Vòng bi SKF 6205",
+            part_number="SKF-6205-2RSH",
+            quantity_in_stock=25
+        )
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            title="Thay thế vòng bi P-101",
+            type="CORRECTIVE",
+            priority="MEDIUM",
+            status="ASSIGNED",
+            assigned_to=self.user
+        )
+        WorkOrderMaterial.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=part,
+            quantity=5
+        )
+
+        # Huỷ Work Order qua API status
+        url = f"/api/v1/work-orders/{wo.id}/status"
+        res = self.client.put(url, data={"status": "CANCELLED"}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        # Tồn kho được hoàn trả từ 25 lên 30
+        part.refresh_from_db()
+        self.assertEqual(part.quantity_in_stock, 30)
+
+    def test_regression_physical_bounds_zero_vibration_allowed(self):
+        """
+        REGRESSION: Giá trị độ rung 0.0 mm/s (khi thiết bị tắt hoặc triệt tiêu rung động) phải hợp lệ.
+        Giá trị âm (< 0) ném ngoại lệ ValidationError.
+        """
+        from rest_framework.exceptions import ValidationError
+        self.assertTrue(validate_physical_bounds('VIBRATION', 0.0))
+        self.assertTrue(validate_physical_bounds('VIBRATION', 3.5))
+        with self.assertRaises(ValidationError):
+            validate_physical_bounds('VIBRATION', -0.1)
+
+        # Kiểm tra nhiệt độ kho lạnh (-40°C hợp lệ, -55°C vi phạm ngưỡng tuyệt đối [-50, 250])
+        self.assertTrue(validate_physical_bounds('TEMPERATURE', -40.0))
+        with self.assertRaises(ValidationError):
+            validate_physical_bounds('TEMPERATURE', -55.0)
+
+    def test_regression_closed_alert_on_workorder_completed(self):
+        """
+        REGRESSION: Khi Work Order hoàn thành, tín hiệu work_order_status_change_hook
+        phải tự động cập nhật trạng thái AssetAnomalyAlert sang RESOLVED.
+        """
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            title="Xử lý cảnh báo rung lắc P-101",
+            type="CORRECTIVE",
+            priority="HIGH",
+            status="IN_PROGRESS",
+            assigned_to=self.user
+        )
+        alert = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            metric_code='VIBRATION',
+            current_value=8.0,
+            status='OPEN',
+            draft_work_order=wo,
+            severity='CRITICAL'
+        )
+
+        wo.status = 'COMPLETED'
+        wo.save()
+
+        alert.refresh_from_db()
+        self.assertEqual(alert.status, 'RESOLVED')
 
 

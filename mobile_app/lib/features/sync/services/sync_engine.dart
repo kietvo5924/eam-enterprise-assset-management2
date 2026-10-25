@@ -51,7 +51,10 @@ class SyncEngine {
       final pendingTasks = await AppDatabase.instance.syncQueueDao.getPendingSyncs();
       
       for (final task in pendingTasks) {
-        if (task.tenantId != tenantId) continue;
+        if (task.tenantId != tenantId) {
+          await AppDatabase.instance.syncQueueDao.deleteSyncTask(task.id);
+          continue;
+        }
         if (task.status == 'CONFLICT') continue; // Skip conflicted records
 
         // Ensure we are not retrying too fast.
@@ -145,12 +148,19 @@ class SyncEngine {
 
   Future<bool> _syncChecklist(Map<String, dynamic> payload, Options options) async {
     final String woId = payload['woId'];
+    final data = <String, dynamic>{
+      'itemName': payload['itemName'],
+      'isCompleted': payload['isCompleted'] ?? false,
+    };
+    if (payload.containsKey('id') && payload['id'] != null) data['id'] = payload['id'];
+    if (payload.containsKey('actualValue')) data['actualValue'] = payload['actualValue'];
+    if (payload.containsKey('inputType')) data['inputType'] = payload['inputType'];
+    if (payload.containsKey('expectedValue')) data['expectedValue'] = payload['expectedValue'];
+    if (payload.containsKey('isMandatory')) data['isMandatory'] = payload['isMandatory'];
+
     final response = await _dio.post(
       '/api/v1/work-orders/$woId/checklists',
-      data: {
-        'itemName': payload['itemName'],
-        'isCompleted': payload['isCompleted'],
-      },
+      data: data,
       options: options,
     );
     return response.statusCode == 200 && response.data['success'] == true;

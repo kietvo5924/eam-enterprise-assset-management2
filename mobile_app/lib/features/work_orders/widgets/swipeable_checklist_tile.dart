@@ -44,7 +44,30 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
     _isCompleted = widget.initialCompleted;
   }
 
+  @override
+  void didUpdateWidget(covariant SwipeableChecklistTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCompleted != widget.initialCompleted) {
+      setState(() {
+        _isCompleted = widget.initialCompleted;
+      });
+    }
+  }
+
   void _toggleComplete() {
+    if (!_isCompleted && widget.inputType == 'NUMBER') {
+      final val = (widget.actualValue ?? '').trim().replaceAll(',', '.');
+      if (val.isEmpty || double.tryParse(val) == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng nhập số liệu đo kiểm hợp lệ trước khi đánh dấu hoàn thành!'),
+            backgroundColor: AppTheme.dangerColor,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+    }
     setState(() {
       _isCompleted = !_isCompleted;
     });
@@ -75,33 +98,34 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
               ),
             ],
           ),
-          child: GestureDetector(
-            onTap: widget.onChanged == null ? null : _toggleComplete,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.transparent),
-                // Left border effect
-                boxShadow: [
-                  BoxShadow(
-                    color: _isCompleted ? AppTheme.successColor : AppTheme.primaryColor,
-                    offset: const Offset(-4, 0),
-                  ),
-                  const BoxShadow(
-                    color: Color(0x08000000),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Checkbox
-                  AnimatedContainer(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.transparent),
+              // Left border effect
+              boxShadow: [
+                BoxShadow(
+                  color: _isCompleted ? AppTheme.successColor : AppTheme.primaryColor,
+                  offset: const Offset(-4, 0),
+                ),
+                const BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Checkbox
+                GestureDetector(
+                  onTap: widget.onChanged == null ? null : _toggleComplete,
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 24,
                     height: 24,
@@ -118,12 +142,16 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                         ? Icon(PhosphorIcons.check(PhosphorIconsStyle.bold), color: Colors.white, size: 14)
                         : null,
                   ),
-                  // Content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
+                ),
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: widget.onChanged == null ? null : _toggleComplete,
+                        behavior: HitTestBehavior.opaque,
+                        child: Wrap(
                           spacing: 6,
                           runSpacing: 4,
                           crossAxisAlignment: WrapCrossAlignment.center,
@@ -175,7 +203,8 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                               ),
                           ],
                         ),
-                        if (widget.subtitle != null && !_isCompleted) ...[
+                      ),
+                      if (widget.subtitle != null && !_isCompleted) ...[
                           const SizedBox(height: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -230,10 +259,22 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                               ),
                             ),
                             onChanged: (val) {
-                              if (val.trim().isNotEmpty && !_isCompleted) {
+                              final trimmed = val.trim().replaceAll(',', '.');
+                              final isValid = widget.inputType == 'NUMBER' ? double.tryParse(trimmed) != null : trimmed.isNotEmpty;
+                              if (isValid && !_isCompleted) {
                                 setState(() {
                                   _isCompleted = true;
                                 });
+                                if (widget.onChanged != null) {
+                                  widget.onChanged!(true);
+                                }
+                              } else if (trimmed.isEmpty && _isCompleted) {
+                                setState(() {
+                                  _isCompleted = false;
+                                });
+                                if (widget.onChanged != null) {
+                                  widget.onChanged!(false);
+                                }
                               }
                               if (widget.onValueChanged != null) {
                                 widget.onValueChanged!(val);
@@ -264,8 +305,7 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
               ),
             ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
   }
 }

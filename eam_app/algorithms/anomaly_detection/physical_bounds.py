@@ -2,11 +2,11 @@ from rest_framework.exceptions import ValidationError
 
 # Giới hạn vật lý khả thi cho các chỉ số đo đạc công nghiệp (Quy Tắc 10 & TC-ANOM-09)
 PHYSICAL_BOUNDS = {
-    'TEMPERATURE': (0.0, 180.0),      # °C
-    'VIBRATION': (0.01, 50.0),        # mm/s
-    'PRESSURE': (0.0, 30.0),          # bar
-    'CURRENT': (0.0, 500.0),          # A
-    'VOLTAGE': (0.0, 1000.0),         # V
+    'TEMPERATURE': (-50.0, 250.0),    # °C (hỗ trợ cả kho lạnh âm sâu và máy sấy công nghiệp)
+    'VIBRATION': (0.0, 50.0),         # mm/s (hỗ trợ máy dừng nghỉ hoặc cân bằng chuẩn 0.0 mm/s)
+    'PRESSURE': (-1.0, 100.0),        # bar (hỗ trợ áp suất chân không và áp suất cao)
+    'CURRENT': (0.0, 1000.0),         # A
+    'VOLTAGE': (0.0, 1000.0),         # V (hạ thế / động cơ công nghiệp tiêu chuẩn)
     'RPM': (0.0, 50000.0),            # v/p
     'FLOW_RATE': (0.0, 10000.0),      # m³/h
     'OIL_LEVEL': (0.0, 100.0),        # %
@@ -23,17 +23,19 @@ STATIC_CATEGORY_KEYWORDS = [
     'furniture',
     'static',
     'fixtures',
-    'office'
+    'office furniture',
+    'văn phòng phẩm'
 ]
 
 
-def validate_physical_bounds(metric_code: str, value: float) -> None:
+def validate_physical_bounds(metric_code: str, value: float) -> bool:
     """
     Kiểm tra tính hợp lệ về mặt vật lý của giá trị đo (Quy Tắc 10).
     Nếu vượt quá ngưỡng vật lý khả thi, ném ngoại lệ ValidationError (HTTP 400 Bad Request).
+    Trả về True nếu giá trị hợp lệ.
     """
     if metric_code is None:
-        return
+        return True
 
     code = str(metric_code).strip().upper()
     try:
@@ -50,6 +52,8 @@ def validate_physical_bounds(metric_code: str, value: float) -> None:
             raise ValidationError(
                 f"Giá trị đo {val} vượt giới hạn vật lý khả thi cho chỉ số {code} [{min_val}, {max_val}]."
             )
+
+    return True
 
 
 def is_static_asset(asset) -> bool:

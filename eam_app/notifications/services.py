@@ -72,7 +72,11 @@ def check_and_apply_deduplication(tenant_id, event_type, entity_id, recipient_id
     if not entity_id or not recipient_id:
         return None, False
 
-    cache_key = f"notif_dedup:{tenant_id}:{event_type}:{entity_id}:{recipient_id}"
+    clean_entity_str = str(entity_id)
+    if ' ' in clean_entity_str or any(ord(c) > 127 for c in clean_entity_str):
+        import hashlib
+        clean_entity_str = hashlib.md5(clean_entity_str.encode('utf-8')).hexdigest()
+    cache_key = f"notif_dedup:{tenant_id}:{event_type}:{clean_entity_str}:{recipient_id}"
     existing_notif_id = cache.get(cache_key)
 
     if existing_notif_id:
@@ -191,7 +195,9 @@ def send_notification(
         if async_channels:
             try:
                 from notifications.tasks import async_dispatch_notification_channels
-                async_dispatch_notification_channels.delay(str(notification.id))
+                from django.db import transaction
+                notif_id_str = str(notification.id)
+                transaction.on_commit(lambda: async_dispatch_notification_channels.delay(notif_id_str))
             except Exception as ex:
                 logger.debug(f"Celery dispatch queued inline or skipped in eager mode: {ex}")
 
@@ -705,11 +711,12 @@ def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, se
         
         sla_val = 120
 
+    dedup_entity_id = f"{work_order.id}:{anomaly_type}" if work_order else f"{asset.id}:{anomaly_type}"
     return dispatch_event_notification(
         event_type='SENSOR_ANOMALY_DETECTED',
         tenant=asset.tenant,
         entity_type='WorkOrder' if work_order else 'Asset',
-        entity_id=work_order.id if work_order else asset.id,
+        entity_id=dedup_entity_id,
         recipients=managers,
         title=title,
         message=message,

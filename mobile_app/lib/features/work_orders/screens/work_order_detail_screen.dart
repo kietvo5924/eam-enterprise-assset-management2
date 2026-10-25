@@ -61,11 +61,17 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
     bool isCompleted,
     [String? actualValue]
   ) async {
+    final finalVal = actualValue ?? item.actualValue;
+    setState(() {
+      item.isCompleted = isCompleted;
+      item.actualValue = finalVal;
+    });
+
     final success = await _service.updateChecklist(
       widget.workOrderId,
       item.itemName,
       isCompleted,
-      actualValue ?? item.actualValue,
+      finalVal,
     );
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -589,6 +595,18 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
               backgroundColor: AppTheme.successColor,
             ),
           );
+          if (_workOrder != null) {
+            setState(() {
+              _workOrder!.attachments.add(
+                WorkOrderAttachment(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  fileUrl: image.path,
+                  fileName: image.name,
+                  isLocal: true,
+                ),
+              );
+            });
+          }
           _fetchWorkOrderDetails(); // Refresh to show new image
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -900,6 +918,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   if (mounted) {
                     if (success) {
                       _fetchWorkOrderDetails();
+                      return true;
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -907,34 +926,46 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                           backgroundColor: AppTheme.dangerColor,
                         ),
                       );
+                      return false;
                     }
                   }
+                  return success;
                 } else {
-                  final missingMandatory = _workOrder?.checklists.any((c) => c.isMandatory && !c.isCompleted) ?? false;
-                  final hasNotes = _workOrder?.resolutionNotes != null && _workOrder!.resolutionNotes!.trim().isNotEmpty;
-                  final hasAttachments = _workOrder?.attachments.isNotEmpty ?? false;
+                  final missingMandatory = _workOrder?.checklists.any((c) {
+                    if (!c.isMandatory) return false;
+                    if (!c.isCompleted) return true;
+                    if (c.inputType == 'NUMBER') {
+                      final val = (c.actualValue ?? '').trim().replaceAll(',', '.');
+                      if (val.isEmpty || double.tryParse(val) == null) {
+                        return true;
+                      }
+                    }
+                    return false;
+                  }) ?? false;
 
                   if (missingMandatory) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Chưa hoàn thành các bước bắt buộc (*) đo kiểm trước khi đóng phiếu!'),
+                          content: Text('Chưa hoàn thành hoặc thiếu số liệu đo kiểm bắt buộc (*) trước khi đóng phiếu!'),
                           backgroundColor: AppTheme.dangerColor,
                         ),
                       );
                     }
-                    return;
+                    return false;
                   }
-                  if (!hasNotes && !hasAttachments) {
+
+                  final hasAttachments = _workOrder?.attachments.isNotEmpty ?? false;
+                  if (!hasAttachments) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Vui lòng nhập ghi chú sửa chữa hoặc tải lên ít nhất một ảnh minh chứng!'),
+                          content: Text('Bắt buộc phải chụp ít nhất 1 ảnh minh chứng trực tiếp từ camera trước khi hoàn thành!'),
                           backgroundColor: AppTheme.dangerColor,
                         ),
                       );
                     }
-                    return;
+                    return false;
                   }
 
                   final success = await _service.updateStatus(
@@ -944,6 +975,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   if (mounted) {
                     if (success) {
                       context.pop(); // Go back to Home
+                      return true;
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -951,8 +983,10 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                           backgroundColor: AppTheme.dangerColor,
                         ),
                       );
+                      return false;
                     }
                   }
+                  return success;
                 }
               },
             ),
@@ -1204,34 +1238,39 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          // ignore: deprecated_member_use
-                          color: AppTheme.primaryColor.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          PhosphorIcons.checkSquareOffset(
-                            PhosphorIconsStyle.fill,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            // ignore: deprecated_member_use
+                            color: AppTheme.primaryColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
                           ),
-                          color: AppTheme.primaryColor,
-                          size: 14,
+                          child: Icon(
+                            PhosphorIcons.checkSquareOffset(
+                              PhosphorIconsStyle.fill,
+                            ),
+                            color: AppTheme.primaryColor,
+                            size: 14,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Các bước thực hiện',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.neutral800,
+                        const SizedBox(width: 8),
+                        const Flexible(
+                          child: Text(
+                            'Các bước thực hiện',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.neutral800,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   if (_workOrder!.status != 'COMPLETED')
                     Row(
@@ -1297,11 +1336,18 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                         ? null
                         : (val) {
                             chk.actualValue = val;
+                            final trimmed = val.trim().replaceAll(',', '.');
+                            final isValid = chk.inputType == 'NUMBER'
+                                ? double.tryParse(trimmed) != null
+                                : trimmed.isNotEmpty;
+                            if (isValid) {
+                              chk.isCompleted = true;
+                            }
                             if (_debounceTimers.containsKey(chk.id)) {
                               _debounceTimers[chk.id]!.cancel();
                             }
                             _debounceTimers[chk.id] = Timer(const Duration(milliseconds: 500), () {
-                              _handleChecklistToggle(chk, val.isNotEmpty || chk.isCompleted, val);
+                              _handleChecklistToggle(chk, isValid || chk.isCompleted, val);
                             });
                           },
                     onDelete: _workOrder!.status == 'COMPLETED'
@@ -1613,7 +1659,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
 }
 
 class _SlideToComplete extends StatefulWidget {
-  final Future<void> Function() onCompleted;
+  final Future<bool> Function() onCompleted;
   final bool isAlreadyCompleted;
   final String actionType;
 
@@ -1727,11 +1773,16 @@ class _SlideToCompleteState extends State<_SlideToComplete> {
                         _dragPosition = maxDrag;
                         _isLoading = true;
                       });
-                      await widget.onCompleted();
+                      final success = await widget.onCompleted();
                       if (mounted) {
                         setState(() {
-                          _isCompleted = true;
                           _isLoading = false;
+                          if (success) {
+                            _isCompleted = true;
+                          } else {
+                            _dragPosition = 0.0;
+                            _isCompleted = false;
+                          }
                         });
                       }
                     } else {

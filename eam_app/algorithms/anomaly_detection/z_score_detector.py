@@ -148,12 +148,45 @@ def detect_z_score_anomaly(
 
     if sigma_w < 1e-6:
         # Độ lệch chuẩn tiệm cận 0, so sánh ngưỡng OEM
+        if oem_limits:
+            warn_lim = oem_limits.get('warning')
+            crit_lim = oem_limits.get('critical')
+            if crit_lim is not None and current_reading_value >= crit_lim:
+                return {
+                    "has_anomaly": True,
+                    "is_cold_start": False,
+                    "severity": "CRITICAL",
+                    "status": "SPIKE",
+                    "metric": metric,
+                    "current_value": current_reading_value,
+                    "z_score": 99.0,
+                    "window_mean": round(mu_w, 2),
+                    "window_std": 0.0,
+                    "message": f"Đột biến vượt ngưỡng nguy hiểm OEM ({metric}: {current_reading_value} >= {crit_lim})"
+                }
+            elif warn_lim is not None and current_reading_value >= warn_lim:
+                return {
+                    "has_anomaly": True,
+                    "is_cold_start": False,
+                    "severity": "WARNING",
+                    "status": "ELEVATED",
+                    "metric": metric,
+                    "current_value": current_reading_value,
+                    "z_score": 99.0,
+                    "window_mean": round(mu_w, 2),
+                    "window_std": 0.0,
+                    "message": f"Cảnh báo vượt ngưỡng OEM ({metric}: {current_reading_value} >= {warn_lim})"
+                }
         z = 0.0
     else:
         z = float((current_reading_value - mu_w) / sigma_w)
 
-    abs_z = abs(z)
-    if abs_z >= 3.0:
+    # Với rung động và nhiệt độ, giá trị giảm sâu sau sửa chữa là trạng thái tốt, không xem là hư hỏng
+    is_unidirectional_high = metric in ('VIBRATION', 'TEMPERATURE')
+    is_critical = (z >= 3.0) if is_unidirectional_high else (abs(z) >= 3.0)
+    is_warning = (z >= 2.0) if is_unidirectional_high else (abs(z) >= 2.0)
+
+    if is_critical:
         return {
             "has_anomaly": True,
             "is_cold_start": False,
@@ -166,7 +199,7 @@ def detect_z_score_anomaly(
             "window_std": round(sigma_w, 2),
             "message": f"Đột biến nghiêm trọng ({metric}: Z = {round(z, 2)} >= 3.0)"
         }
-    elif abs_z >= 2.0:
+    elif is_warning:
         return {
             "has_anomaly": True,
             "is_cold_start": False,

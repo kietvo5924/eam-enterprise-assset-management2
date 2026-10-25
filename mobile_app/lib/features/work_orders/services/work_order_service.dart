@@ -370,9 +370,12 @@ class WorkOrderService {
     try {
       // Priority 1: If there are pending sync tasks for this WO, the local DB has the latest un-synced state.
       // We must NOT fetch from the server, otherwise we will overwrite the UI with stale data.
+      final prefs = await SharedPreferences.getInstance();
+      final tenantId = prefs.getString('tenantId') ?? '';
       final pendingTasks = await AppDatabase.instance.syncQueueDao
           .getPendingSyncs();
       final hasPendingForThisWO = pendingTasks.any((t) {
+        if (tenantId.isNotEmpty && t.tenantId != tenantId) return false;
         try {
           final payload = jsonDecode(t.payload);
           return payload['woId'] == id;
@@ -553,6 +556,22 @@ class WorkOrderService {
           );
           if (response.statusCode == 200 && response.data['success'] == true) {
             apiSuccess = true;
+            final attData = response.data['data'];
+            final woEntity = await AppDatabase.instance.workOrderDao.getWorkOrderById(woId);
+            if (woEntity != null && attData != null) {
+              List<dynamic> attachments = List.from(woEntity.attachments);
+              attachments.add({
+                'id': attData['id'],
+                'fileUrl': attData['fileUrl'] ?? attData['file_url'],
+                'fileName': attData['fileName'] ?? attData['file_name'],
+                'fileType': attData['fileType'] ?? attData['file_type'],
+                'fileSize': attData['fileSize'] ?? attData['file_size'],
+                'isLocal': false,
+              });
+              await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
+                woEntity.copyWith(attachments: attachments),
+              );
+            }
           }
         } catch (e) {
           if (_isDeterministicError(e)) return false;
@@ -563,7 +582,6 @@ class WorkOrderService {
       }
 
       if (apiSuccess) {
-        _updateLocalWorkOrder(woId);
         return true;
       } else {
         // Safe File Caching
@@ -620,16 +638,24 @@ class WorkOrderService {
           bool missingMandatory = false;
           for (var item in wo.checklists) {
             final isMandatory = item['isMandatory'] == true || item['is_mandatory'] == true;
-            if (isMandatory && item['completed'] != true) {
-              missingMandatory = true;
-              break;
+            if (isMandatory) {
+              final isCompleted = item['completed'] == true;
+              final inputType = item['inputType'] ?? item['input_type'] ?? 'PASS_FAIL';
+              final actualValue = (item['actualValue'] ?? item['actual_value'] ?? '').toString().trim().replaceAll(',', '.');
+              if (!isCompleted) {
+                missingMandatory = true;
+                break;
+              }
+              if (inputType == 'NUMBER' && (actualValue.isEmpty || double.tryParse(actualValue) == null)) {
+                missingMandatory = true;
+                break;
+              }
             }
           }
-          final hasNotes = wo.resolutionNotes != null && wo.resolutionNotes!.trim().isNotEmpty;
           final hasAttachments = wo.attachments.isNotEmpty;
-          if (missingMandatory || (!hasNotes && !hasAttachments)) {
+          if (missingMandatory || !hasAttachments) {
             debugPrint(
-              'Local validation failed: Missing notes/attachments or incomplete mandatory checklists.',
+              'Local validation failed: Missing attachments or incomplete mandatory checklists/measurements.',
             );
             return false;
           }

@@ -19,3 +19,14 @@ def on_work_order_completed(sender, instance, **kwargs):
             asset_id=instance.asset_id,
             reading_date__lte=completed_time
         ).update(is_pre_repair=True)
+
+        # Đóng vòng đời AssetAnomalyAlert sang RESOLVED khi phiếu sửa chữa hoàn thành
+        from assets.models import AssetAnomalyAlert
+        from django.db.models import Q
+        AssetAnomalyAlert.objects.filter(
+            asset_id=instance.asset_id,
+            status__in=['OPEN', 'ACKNOWLEDGED'],
+            created_at__lte=completed_time
+        ).filter(
+            Q(draft_work_order=instance) | Q(draft_work_order__isnull=True)
+        ).update(status='RESOLVED')

@@ -1,11 +1,15 @@
+import logging
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
+from rest_framework.exceptions import NotFound
 from django.db import transaction, models
 from workorders.models import WorkOrder
+
+logger = logging.getLogger(__name__)
 from workorders.serializers import (
     WorkOrderSerializer, WorkOrderCreateSerializer,
     WorkOrderAssignSerializer, WorkOrderStatusUpdateSerializer,
@@ -133,11 +137,20 @@ class WorkOrderListView(APIView):
         materials = data.get('materials', [])
         for pm in materials:
             part = get_object_or_404(SparePart, id=pm.get('sparePartId'), tenant_id=wo.tenant_id)
+            from decimal import Decimal
             req_qty = pm.get('quantity')
+            if req_qty is None:
+                raise ValidationError(f"Số lượng yêu cầu cho vật tư {part.name} không được để trống.")
+            try:
+                dec_qty = Decimal(str(req_qty))
+            except Exception:
+                raise ValidationError(f"Số lượng yêu cầu không hợp lệ: {req_qty}")
+            if dec_qty <= Decimal('0'):
+                raise ValidationError(f"Số lượng yêu cầu cho vật tư {part.name} phải lớn hơn 0.")
             if part.quantity_in_stock is not None:
-                if part.quantity_in_stock < req_qty:
+                if part.quantity_in_stock < dec_qty:
                     raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name}")
-                part.quantity_in_stock -= req_qty
+                part.quantity_in_stock -= dec_qty
                 part.save()
                 from notifications.services import notify_spare_part_low_stock
                 notify_spare_part_low_stock(part)
@@ -145,7 +158,7 @@ class WorkOrderListView(APIView):
             WorkOrderMaterial.objects.create(
                 work_order=wo,
                 spare_part=part,
-                quantity=req_qty
+                quantity=dec_qty
             )
         
         # Mock Async Event
@@ -165,7 +178,7 @@ class WorkOrderDetailView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         return success_response(WorkOrderSerializer(wo).data)
         
@@ -177,7 +190,7 @@ class WorkOrderDetailView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         if wo.status not in ['CREATED', 'ASSIGNED']:
             raise ValidationError('Cannot edit a Work Order that is in progress, completed or canceled')
@@ -248,7 +261,7 @@ class WorkOrderDetailView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         if wo.status not in ['CREATED', 'ASSIGNED']:
             raise ValidationError('Only CREATED or ASSIGNED Work Orders can be deleted')
@@ -275,7 +288,7 @@ class WorkOrderAssignView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         if wo.status in ['COMPLETED', 'CANCELLED']:
             raise ValidationError('Cannot reassign a completed or canceled work order')
@@ -327,7 +340,7 @@ class WorkOrderStatusView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         serializer = WorkOrderStatusUpdateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -376,22 +389,50 @@ class WorkOrderStatusView(APIView):
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can complete the Work Order')
                 
-            resolution_notes = data.get('resolutionNotes')
+            resolution_notes = (data.get('resolutionNotes') or '').strip()
             
-            has_notes = bool(resolution_notes) or bool(wo.resolution_notes and wo.resolution_notes.strip())
-            has_attachments = wo.attachments.exists()
-            
-            if not has_notes and not has_attachments:
-                raise ValidationError('Vui lòng nhập ghi chú sửa chữa hoặc tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.')
-                
             for item in wo.checklists.all():
-                if item.is_mandatory and not item.is_completed:
-                    raise ValidationError(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
+                if item.is_mandatory:
+                    if not item.is_completed:
+                        raise ValidationError(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
+                    if item.input_type == 'NUMBER':
+                        val_str = str(item.actual_value or '').strip().replace(',', '.')
+                        if not val_str:
+                            raise ValidationError(f"Không thể hoàn thành: Mục bắt buộc '{item.item_name}' chưa có số liệu đo kiểm.")
+                        try:
+                            float(val_str)
+                        except ValueError:
+                            raise ValidationError(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
+
+            has_attachments = wo.attachments.exists()
+            if not has_attachments:
+                raise ValidationError('Bắt buộc phải tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.')
                 
             if resolution_notes:
                 wo.resolution_notes = resolution_notes
             wo.actual_duration_minutes = data.get('actualDurationMinutes')
             wo.completed_at = timezone.now()
+
+            # Auto-return any active ToolReservation for this work order
+            try:
+                from assets.models import ToolReservation
+                active_res = ToolReservation.objects.filter(
+                    tenant=wo.tenant,
+                    work_order=wo,
+                    status__in=['RESERVED', 'IN_USE']
+                )
+                for r in active_res:
+                    r.status = 'RETURNED'
+                    r.returned_at = timezone.now()
+                    r.save()
+                    if r.tool:
+                        r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
+                        r.tool.save()
+                    if r.tool_instance:
+                        r.tool_instance.status = 'AVAILABLE'
+                        r.tool_instance.save()
+            except Exception:
+                pass
 
             # Event-based technician positioning: return tech to duty zone station
             assigned_user = wo.assigned_to or request.user
@@ -422,9 +463,36 @@ class WorkOrderStatusView(APIView):
             except Exception:
                 pass
             
-        if new_status == 'CANCELLED':
+        if new_status in ['CANCELLED', 'CANCELED']:
             if wo.status == 'COMPLETED':
                 raise ValidationError('Cannot cancel a COMPLETED Work Order')
+            if wo.status in ['CANCELLED', 'CANCELED']:
+                return success_response(WorkOrderSerializer(wo).data)
+            from decimal import Decimal
+            # Restore inventory stock for reserved materials
+            for wm in wo.materials.select_related('spare_part').all():
+                if wm.spare_part and wm.spare_part.quantity_in_stock is not None:
+                    wm.spare_part.quantity_in_stock += Decimal(str(wm.quantity))
+                    wm.spare_part.save()
+            # Cancel tool reservations and release tools
+            try:
+                from assets.models import ToolReservation
+                active_res = ToolReservation.objects.filter(
+                    tenant=wo.tenant,
+                    work_order=wo,
+                    status__in=['RESERVED', 'IN_USE']
+                )
+                for r in active_res:
+                    r.status = 'CANCELLED'
+                    r.save()
+                    if r.tool:
+                        r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
+                        r.tool.save()
+                    if r.tool_instance:
+                        r.tool_instance.status = 'AVAILABLE'
+                        r.tool_instance.save()
+            except Exception:
+                pass
                 
         wo.status = new_status
         wo.save()
@@ -450,8 +518,11 @@ class WorkOrderChecklistView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
+        if wo.status in ['COMPLETED', 'CANCELLED', 'CANCELED']:
+            raise ValidationError("Không thể chỉnh sửa danh mục kiểm tra của phiếu bảo trì đã hoàn thành hoặc đã huỷ.")
+
         if wo.assigned_to_id != request.user.id and not has_upd:
             self.permission_denied(request)
             
@@ -462,7 +533,13 @@ class WorkOrderChecklistView(APIView):
         data = serializer.validated_data
         
         from workorders.models import WorkOrderChecklistItem
-        item = wo.checklists.filter(item_name=data['itemName']).first()
+        item_id = data.get('id')
+        item = None
+        if item_id:
+            item = wo.checklists.filter(id=item_id).first()
+        if not item:
+            item = wo.checklists.filter(item_name=data['itemName']).first()
+
         if not item:
             item = WorkOrderChecklistItem(
                 work_order=wo,
@@ -479,7 +556,18 @@ class WorkOrderChecklistView(APIView):
             if 'isMandatory' in data:
                 item.is_mandatory = data['isMandatory']
             
-        item.is_completed = data['isCompleted']
+        is_completed = data.get('isCompleted', item.is_completed)
+        actual_val = data.get('actualValue', item.actual_value)
+        if is_completed and item.input_type == 'NUMBER':
+            val_str = str(actual_val or '').strip().replace(',', '.')
+            if not val_str:
+                raise ValidationError(f"Mục '{item.item_name}' yêu cầu phải nhập số liệu đo kiểm trước khi đánh dấu hoàn thành.")
+            try:
+                float(val_str)
+            except ValueError:
+                raise ValidationError(f"Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
+
+        item.is_completed = is_completed
         if 'actualValue' in data:
             item.actual_value = data['actualValue']
         item.save()
@@ -500,10 +588,28 @@ class WorkOrderChecklistView(APIView):
                 elif 'dòng' in lower_name or 'current' in lower_name:
                     metric_code = 'CURRENT'
                     unit_str = 'A'
+                elif 'vòng' in lower_name or 'rpm' in lower_name or 'tốc độ' in lower_name or 'speed' in lower_name:
+                    metric_code = 'RPM'
+                    unit_str = 'RPM'
+                elif 'lưu lượng' in lower_name or 'flow' in lower_name:
+                    metric_code = 'FLOW_RATE'
+                    unit_str = 'm3/h'
+                elif 'điện áp' in lower_name or 'volt' in lower_name:
+                    metric_code = 'VOLTAGE'
+                    unit_str = 'V'
+                elif 'dầu' in lower_name or 'oil' in lower_name:
+                    metric_code = 'OIL_LEVEL'
+                    unit_str = '%'
+                elif 'ồn' in lower_name or 'noise' in lower_name:
+                    metric_code = 'NOISE'
+                    unit_str = 'dB'
+                elif 'rung' in lower_name or 'vibrat' in lower_name:
+                    metric_code = 'VIBRATION'
+                    unit_str = 'mm/s'
 
                 from algorithms.anomaly_detection import ConditionMonitoringEngine
                 from django.utils import timezone
-                mach_state = data.get('machineState') or getattr(wo.asset, 'status', 'RUNNING') or 'RUNNING'
+                mach_state = data.get('machineState') or 'RUNNING'
                 amb_temp = data.get('ambientTemperature')
                 if amb_temp is not None:
                     try:
@@ -544,8 +650,11 @@ class WorkOrderChecklistDeleteView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
+        if wo.status in ['COMPLETED', 'CANCELLED', 'CANCELED']:
+            raise ValidationError("Không thể xoá danh mục kiểm tra của phiếu bảo trì đã hoàn thành hoặc đã huỷ.")
+
         if wo.assigned_to_id != request.user.id and not has_upd:
             self.permission_denied(request)
             
@@ -583,7 +692,7 @@ class WorkOrderNoteUpdateView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         if wo.assigned_to_id != request.user.id and not has_upd:
             self.permission_denied(request)
@@ -610,7 +719,7 @@ class WorkOrderAttachmentView(APIView):
         try:
             wo = WorkOrder.objects.get(id=wo_id)
         except WorkOrder.DoesNotExist:
-            raise ValidationError("Work Order not found")
+            raise NotFound("Work Order not found")
             
         if wo.assigned_to_id != request.user.id and not has_upd:
             self.permission_denied(request)

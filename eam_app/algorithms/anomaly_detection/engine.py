@@ -297,17 +297,6 @@ class ConditionMonitoringEngine:
 
         # 5. Alert Throttling & De-duplication (Quy Tắc 5, TC-ANOM-05, TC-ANOM-12)
         if has_anomaly:
-            existing_open_alert = AssetAnomalyAlert.objects.filter(
-                asset=asset,
-                status='OPEN'
-            ).order_by('-last_detected_at').first()
-
-            # Kiểm tra xem có Draft Work Order nào đang tồn tại chưa hoàn thành gắn với alert hiện tại
-            existing_draft_wo = None
-            if existing_open_alert and existing_open_alert.draft_work_order:
-                if existing_open_alert.draft_work_order.status not in ('COMPLETED', 'CANCELLED'):
-                    existing_draft_wo = existing_open_alert.draft_work_order
-
             # Audit #9: Attribute alert to the actual failing metric, or MULTIVARIATE
             crit_recs = [r for r, s in anomalous_records if s == 'CRITICAL']
             if crit_recs:
@@ -322,13 +311,31 @@ class ConditionMonitoringEngine:
             metric_type = 'MULTIVARIATE' if is_multivariate_only else 'SINGLE_METRIC'
             primary_val = float(primary_rec.reading_value)
 
+            # Khóa dòng và lọc chính xác theo tài sản, chỉ số và trạng thái OPEN
+            existing_open_alert = AssetAnomalyAlert.objects.select_for_update().filter(
+                asset=asset,
+                metric_code=primary_metric,
+                status='OPEN'
+            ).order_by('-last_detected_at').first()
+
+            # Kiểm tra xem có Draft Work Order nào đang tồn tại chưa hoàn thành gắn với alert hiện tại
+            existing_draft_wo = None
+            if existing_open_alert and existing_open_alert.draft_work_order:
+                if existing_open_alert.draft_work_order.status not in ('COMPLETED', 'CANCELLED'):
+                    existing_draft_wo = existing_open_alert.draft_work_order
+
             if existing_open_alert:
-                # Đã có cảnh báo mở: Cập nhật thông số cảnh báo hiện tại
+                # Đã có cảnh báo mở cho cùng chỉ số: Cập nhật thông số cảnh báo hiện tại
                 target_alert = existing_open_alert
                 target_alert.occurrence_count += 1
                 target_alert.current_value = primary_val
+                target_alert.reading = primary_rec
                 if highest_severity == 'CRITICAL':
                     target_alert.severity = 'CRITICAL'
+                if z_score_alert_info and z_score_alert_info.get('message'):
+                    target_alert.message = z_score_alert_info.get('message')
+                elif multi_res.get('has_anomaly') and multi_res.get('message'):
+                    target_alert.message = multi_res.get('message')
                 target_alert.last_detected_at = timezone.now()
                 target_alert.save()
 
@@ -421,7 +428,9 @@ class ConditionMonitoringEngine:
                             critical_wo.description = (critical_wo.description or '') + "\n\n[Tự động điều phối Hungarian]: Không có kỹ thuật viên khả dụng đang trực trong ca. Chờ Quản đốc phân công khẩn cấp."
                             critical_wo.save(update_fields=['description'])
                     except Exception as e:
-                        critical_wo.description = (critical_wo.description or '') + f"\n\n[Tự động điều phối Hungarian]: Lỗi giải thuật: {str(e)}"
+                        import logging
+                        logging.getLogger(__name__).error(f"Hungarian dispatch error for WO {critical_wo.id}: {e}", exc_info=True)
+                        critical_wo.description = (critical_wo.description or '') + "\n\n[Tự động điều phối Hungarian]: Chưa thể phân công tự động do xung đột ca trực hoặc lịch làm việc. Chờ Quản đốc phân công thủ công."
                         critical_wo.save(update_fields=['description'])
 
                     # Bắn thông báo CRITICAL tới Quản lý bảo trì

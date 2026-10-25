@@ -117,6 +117,8 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     actualDurationMinutes = serializers.IntegerField(required=False, allow_null=True)
     
 class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
+    id = serializers.UUIDField(required=False, allow_null=True)
+    itemId = serializers.UUIDField(required=False, allow_null=True)
     itemName = serializers.CharField(max_length=255, required=False)
     item_name = serializers.CharField(max_length=255, required=False)
     isCompleted = serializers.BooleanField(required=False)
@@ -130,6 +132,9 @@ class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
     is_mandatory = serializers.BooleanField(required=False, allow_null=True)
 
     def validate(self, attrs):
+        item_id = attrs.get('id') or attrs.get('itemId')
+        if item_id:
+            attrs['id'] = item_id
         name = attrs.get('itemName') or attrs.get('item_name')
         if not name:
             raise serializers.ValidationError("itemName or item_name is required")
