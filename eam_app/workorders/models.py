@@ -19,6 +19,13 @@ class WorkOrder(BaseTenantModel):
         ('PREVENTIVE', 'Preventive'),
         ('EMERGENCY', 'Emergency'),
         ('BREAKDOWN', 'Breakdown'),
+        ('PREDICTIVE_PM', 'Predictive PM'),
+    )
+
+    MAINTENANCE_ACTION_CHOICES = (
+        ('GENERAL', 'General Maintenance / Bảo dưỡng thông thường'),
+        ('MICRO_MAINTENANCE', 'Micro Maintenance / Bôi trơn, siết ốc, hiệu chỉnh nhỏ'),
+        ('CORE_REPLACEMENT', 'Core Replacement / Đại tu thay thế phụ tùng cốt lõi'),
     )
 
     PRIORITY_CHOICES = (
@@ -35,6 +42,11 @@ class WorkOrder(BaseTenantModel):
     type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='CORRECTIVE', db_index=True)
     priority = models.CharField(max_length=50, choices=PRIORITY_CHOICES)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='CREATED')
+    maintenance_action = models.CharField(max_length=32, choices=MAINTENANCE_ACTION_CHOICES, default='GENERAL', db_index=True)
+    completion_processed_at = models.DateTimeField(null=True, blank=True, help_text='Thời điểm hoàn tất xử lý chuyển trạng thái và hậu kỳ Work Order')
+    post_repair_vibration = models.FloatField(null=True, blank=True, help_text='Độ rung nghiệm thu sau sửa chữa (mm/s RMS)')
+    post_repair_temperature = models.FloatField(null=True, blank=True, help_text='Nhiệt độ ổ trục nghiệm thu sau sửa chữa (°C)')
+    post_repair_load_factor = models.FloatField(null=True, blank=True, default=1.0, help_text='Hệ số phụ tải lúc đo nghiệm thu')
     
     deadline = models.DateTimeField(null=True, blank=True)
     assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_work_orders')

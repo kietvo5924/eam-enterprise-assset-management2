@@ -116,6 +116,7 @@ class WorkOrderListView(APIView):
             incident_location_id=data.get('incidentLocationId'),
             maintenance_window_start=data.get('maintenanceWindowStart'),
             maintenance_window_end=data.get('maintenanceWindowEnd'),
+            maintenance_action=data.get('maintenanceAction', 'GENERAL'),
         )
         
         # Save Checklists
@@ -384,85 +385,29 @@ class WorkOrderStatusView(APIView):
                 pass
             
         if new_status == 'COMPLETED':
-            if wo.status != 'IN_PROGRESS':
-                raise ValidationError('Work Order can only be completed from IN_PROGRESS state')
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can complete the Work Order')
-                
-            resolution_notes = (data.get('resolutionNotes') or '').strip()
-            
-            for item in wo.checklists.all():
-                if item.is_mandatory:
-                    if not item.is_completed:
-                        raise ValidationError(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
-                    if item.input_type == 'NUMBER':
-                        val_str = str(item.actual_value or '').strip().replace(',', '.')
-                        if not val_str:
-                            raise ValidationError(f"Không thể hoàn thành: Mục bắt buộc '{item.item_name}' chưa có số liệu đo kiểm.")
-                        try:
-                            float(val_str)
-                        except ValueError:
-                            raise ValidationError(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
 
-            has_attachments = wo.attachments.exists()
-            if not has_attachments:
-                raise ValidationError('Bắt buộc phải tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.')
-                
-            if resolution_notes:
-                wo.resolution_notes = resolution_notes
-            wo.actual_duration_minutes = data.get('actualDurationMinutes')
-            wo.completed_at = timezone.now()
+            post_repair_payload = None
+            if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor')):
+                post_repair_payload = {
+                    'vibration': data.get('postRepairVibration'),
+                    'temperature': data.get('postRepairTemperature'),
+                    'load_factor': data.get('postRepairLoadFactor', 1.0),
+                }
 
-            # Auto-return any active ToolReservation for this work order
-            try:
-                from assets.models import ToolReservation
-                active_res = ToolReservation.objects.filter(
-                    tenant=wo.tenant,
-                    work_order=wo,
-                    status__in=['RESERVED', 'IN_USE']
-                )
-                for r in active_res:
-                    r.status = 'RETURNED'
-                    r.returned_at = timezone.now()
-                    r.save()
-                    if r.tool:
-                        r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
-                        r.tool.save()
-                    if r.tool_instance:
-                        r.tool_instance.status = 'AVAILABLE'
-                        r.tool_instance.save()
-            except Exception:
-                pass
+            from workorders.services import WorkOrderTransitionService
+            wo = WorkOrderTransitionService.complete_work_order(
+                work_order_id=wo.id,
+                user=request.user,
+                resolution_notes=data.get('resolutionNotes', ''),
+                maintenance_action=data.get('maintenanceAction') or wo.maintenance_action or 'GENERAL',
+                actual_duration_minutes=data.get('actualDurationMinutes'),
+                post_repair_data=post_repair_payload,
+                tenant_id=request.user.tenant_id
+            )
+            return success_response(WorkOrderSerializer(wo).data)
 
-            # Event-based technician positioning: return tech to duty zone station
-            assigned_user = wo.assigned_to or request.user
-            if hasattr(assigned_user, 'technician_profile'):
-                tp = assigned_user.technician_profile
-                tp.availability_status = 'AVAILABLE'
-                from users.models import TechnicianSchedule
-                from assets.models import Location
-                today_sched = TechnicianSchedule.objects.filter(
-                    tenant=wo.tenant,
-                    user=assigned_user,
-                    work_date=timezone.now().date(),
-                    status='ON_DUTY'
-                ).first()
-                if today_sched and today_sched.duty_zone_id:
-                    loc = Location.objects.filter(tenant=wo.tenant, code=today_sched.duty_zone_id).first()
-                    if loc:
-                        tp.zone_id = loc.code
-                        tp.coords_x = loc.center_x or 25.0
-                        tp.coords_y = loc.center_y or 20.0
-                        tp.floor_level = loc.floor_level or 1
-                tp.save()
-
-            # Dispatch real-time notification to supervisor / creator
-            try:
-                from notifications.services import notify_work_order_completed
-                notify_work_order_completed(wo, technician=assigned_user)
-            except Exception:
-                pass
-            
         if new_status in ['CANCELLED', 'CANCELED']:
             if wo.status == 'COMPLETED':
                 raise ValidationError('Cannot cancel a COMPLETED Work Order')
@@ -504,6 +449,42 @@ class WorkOrderStatusView(APIView):
             logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}")
             
         return success_response(WorkOrderSerializer(wo).data)
+
+class WorkOrderReportIncidentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, wo_id):
+        try:
+            wo = WorkOrder.objects.get(id=wo_id)
+        except WorkOrder.DoesNotExist:
+            raise NotFound("Work Order not found")
+
+        tenant_id = getattr(request.user, 'tenant_id', None)
+        if tenant_id and str(wo.tenant_id) != str(tenant_id):
+            return Response({'success': False, 'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        description = str(request.data.get('description', '') or '').strip()
+        if not description:
+            return Response({'success': False, 'error': 'Vui lòng nhập mô tả chi tiết tình trạng sự cố phát sinh.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        proposed_action = request.data.get('proposedAction') or request.data.get('proposed_action') or 'CORE_REPLACEMENT'
+        priority = request.data.get('priority') or 'HIGH'
+
+        from notifications.services import notify_work_order_incident_reported
+        notifs = notify_work_order_incident_reported(
+            work_order=wo,
+            technician=request.user,
+            incident_description=description,
+            proposed_action=proposed_action,
+            priority=priority
+        )
+
+        return success_response({
+            'message': 'Đã gửi báo cáo phát sinh sự cố tới Quản đốc bảo trì thành công.',
+            'notifications_sent': len(notifs) if isinstance(notifs, list) else 1
+        })
+
 
 class WorkOrderChecklistView(APIView):
     permission_classes = [IsAuthenticated]
@@ -630,7 +611,10 @@ class WorkOrderChecklistView(APIView):
                     recorded_at=timezone.now(),
                     recorded_by=request.user if request.user and request.user.is_authenticated else None,
                     tenant=wo.tenant,
-                    work_order=wo
+                    work_order=wo,
+                    checklist_item=item,
+                    measurement_phase='PRE_REPAIR_DIAGNOSTIC' if wo.status == 'IN_PROGRESS' else 'ROUTINE',
+                    round_id=data.get('roundId')
                 )
             except Exception as ex:
                 logger.warning(f"Lỗi khi đồng bộ chỉ số checklist vào condition monitoring: {ex}")

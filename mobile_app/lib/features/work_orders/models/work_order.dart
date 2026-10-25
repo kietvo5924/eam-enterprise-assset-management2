@@ -14,6 +14,7 @@ class WorkOrder {
   final String? resolutionNotes;
 
   final String? code;
+  final String? maintenanceAction;
   final double? coordsX;
   final double? coordsY;
   final int? floorLevel;
@@ -29,6 +30,7 @@ class WorkOrder {
     required this.status,
     this.code,
     this.priority,
+    this.maintenanceAction,
     this.assetId,
     this.assetName,
     this.assetLocation,
@@ -101,6 +103,17 @@ class WorkOrder {
     return '$h:$min - $d/$m';
   }
 
+  String getMaintenanceActionLabel() {
+    switch (maintenanceAction) {
+      case 'MICRO_MAINTENANCE':
+        return 'Bảo trì vi mô';
+      case 'CORE_REPLACEMENT':
+        return 'Đại tu cốt lõi';
+      default:
+        return 'Bảo dưỡng định kỳ';
+    }
+  }
+
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
     final String rawId = (json['id'] ?? '').toString();
     final String defaultCode = rawId.length >= 8 ? 'WO-${rawId.substring(0, 8).toUpperCase()}' : 'WO';
@@ -111,6 +124,7 @@ class WorkOrder {
       description: json['description'] ?? '',
       status: json['status'] ?? 'UNKNOWN',
       priority: json['priority'],
+      maintenanceAction: json['maintenanceAction'] ?? json['maintenance_action'] ?? 'GENERAL',
       assetId: json['asset']?['id'] ?? json['assetId'],
       assetName: json['asset']?['name'] ?? 'Chưa gán thiết bị',
       assetLocation: json['asset']?['locationName'] ?? 'Không rõ vị trí',

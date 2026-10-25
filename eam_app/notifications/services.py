@@ -1035,3 +1035,45 @@ def notify_work_order_completed(work_order, technician=None, sender=None):
         is_actionable=False
     )
 
+
+def notify_work_order_incident_reported(work_order, technician, incident_description, proposed_action='CORE_REPLACEMENT', priority='HIGH'):
+    """
+    Event: WO_INCIDENT_REPORTED (Field incident anomaly reported by technician requiring supervisor review & Follow-up Work Order)
+    """
+    import urllib.parse
+    tenant = work_order.tenant
+    asset = work_order.asset
+    tech_user = technician or work_order.assigned_to
+    tech_name = getattr(tech_user, 'full_name', '') or getattr(tech_user, 'username', 'KTV') if tech_user else 'KTV'
+
+    recipients = list(NotificationRouter.get_maintenance_managers(tenant.id))
+    if work_order.created_by and work_order.created_by not in recipients and work_order.created_by != tech_user:
+        recipients.append(work_order.created_by)
+
+    if not recipients:
+        return []
+
+    asset_name = asset.name if asset else "Thiết bị"
+    title = f"Phát sinh sự cố: {asset_name} cần đại tu"
+    message = (
+        f"Kỹ thuật viên {tech_name} báo cáo sự cố tại phiếu {work_order.code} ({work_order.title}): {incident_description}"
+    )
+    encoded_note = urllib.parse.quote(f"[Báo cáo từ KTV {tech_name}]: {incident_description}")
+    link = f"/portal/work-orders/?create_followup=1&parent_id={work_order.id}&asset_id={work_order.asset_id}&maintenance_action={proposed_action}&priority={priority}&ref_code={work_order.code}&incident_note={encoded_note}"
+
+    return dispatch_event_notification(
+        event_type='WO_INCIDENT_REPORTED',
+        tenant=tenant,
+        entity_type='WorkOrder',
+        entity_id=work_order.id,
+        recipients=recipients,
+        title=title,
+        message=message,
+        link=link,
+        sender=tech_user,
+        category='WORK_ORDER',
+        severity='URGENT',
+        is_actionable=True
+    )
+
+

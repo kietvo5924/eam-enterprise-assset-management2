@@ -95,13 +95,29 @@
                     <i class="ph ph-checks text-sm"></i> Đọc tất cả
                   </button>
                 </div>
-                <!-- 3 Filter Tabs (Rule 7 & Spec 4.3) -->
-                <div class="flex items-center gap-1 border-t border-neutral-200/60 pt-2 text-xs font-medium" id="notification-tabs">
-                  <button type="button" class="notif-tab px-2.5 py-1 rounded-md text-neutral-700 hover:bg-neutral-200/70 font-semibold active-tab bg-white shadow-xs" data-tab="all">Tất cả</button>
-                  <button type="button" class="notif-tab px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70" data-tab="unread">Chưa đọc</button>
-                  <button type="button" class="notif-tab px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 flex items-center gap-1" data-tab="actionable">
-                    <span>Cần hành động</span>
+                <!-- Expanded Filter Tabs (All, Unread, Actionable, Urgent, Incident, Work Order, Inventory) with Drag-to-Scroll -->
+                <div class="flex items-center gap-1.5 border-t border-neutral-200/60 pt-2 text-[11px] font-medium overflow-x-auto no-scrollbar pb-0.5 cursor-grab select-none active:cursor-grabbing" id="notification-tabs" style="scrollbar-width: none; -ms-overflow-style: none;">
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-700 hover:bg-neutral-200/70 font-semibold active-tab bg-white shadow-xs select-none cursor-pointer" data-tab="all">Tất cả</button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors select-none cursor-pointer" data-tab="unread">Chưa đọc</button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="actionable">
+                    <span>Cần xử lý</span>
                     <span id="notification-actionable-badge" class="hidden w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  </button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="urgent" title="Thông báo khẩn cấp hoặc cấp bách">
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    <span>Khẩn cấp</span>
+                  </button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="incident" title="Báo cáo sự cố phát sinh tại hiện trường">
+                    <i class="ph ph-warning-octagon text-xs text-amber-600"></i>
+                    <span>Sự cố</span>
+                  </button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="work_order" title="Phiếu công việc bảo trì sửa chữa">
+                    <i class="ph ph-wrench text-xs text-blue-600"></i>
+                    <span>Phiếu WO</span>
+                  </button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="inventory" title="Cảnh báo tồn kho & xuất vật tư">
+                    <i class="ph ph-package text-xs text-emerald-600"></i>
+                    <span>Vật tư kho</span>
                   </button>
                 </div>
               </div>
@@ -703,11 +719,19 @@
               if (emptyEl) emptyEl.classList.add('hidden');
               this.isLoading = true;
 
-              let endpoint = '/api/v1/notifications/?size=20';
+              let endpoint = '/api/v1/notifications/?size=30';
               if (this.currentTab === 'unread') {
                   endpoint += '&is_read=false';
               } else if (this.currentTab === 'actionable') {
                   endpoint += '&is_actionable=true&action_status=PENDING';
+              } else if (this.currentTab === 'urgent') {
+                  endpoint += '&severity=CRITICAL,URGENT';
+              } else if (this.currentTab === 'incident') {
+                  endpoint += '&event_type=WO_INCIDENT_REPORTED,WO_EMERGENCY_CREATED,WO_ESCALATED,ANOMALY_DETECTED';
+              } else if (this.currentTab === 'work_order') {
+                  endpoint += '&category=WORK_ORDER';
+              } else if (this.currentTab === 'inventory') {
+                  endpoint += '&category=INVENTORY';
               }
 
               try {
@@ -1141,7 +1165,65 @@
           });
       }
 
-      // Bind 3 Filter Tabs (All, Unread, Actionable)
+      // Bind Filter Tabs and Mouse Drag-to-Scroll (Kéo qua lại bằng chuột)
+      const tabsContainer = document.getElementById('notification-tabs');
+      if (tabsContainer) {
+          let isDown = false;
+          let startX = 0;
+          let scrollLeft = 0;
+          let hasMoved = false;
+
+          tabsContainer.addEventListener('mousedown', (e) => {
+              isDown = true;
+              hasMoved = false;
+              tabsContainer.classList.add('cursor-grabbing');
+              tabsContainer.classList.remove('cursor-grab');
+              startX = e.pageX - tabsContainer.offsetLeft;
+              scrollLeft = tabsContainer.scrollLeft;
+          });
+
+          tabsContainer.addEventListener('mouseleave', () => {
+              if (!isDown) return;
+              isDown = false;
+              tabsContainer.classList.remove('cursor-grabbing');
+              tabsContainer.classList.add('cursor-grab');
+          });
+
+          tabsContainer.addEventListener('mouseup', () => {
+              isDown = false;
+              tabsContainer.classList.remove('cursor-grabbing');
+              tabsContainer.classList.add('cursor-grab');
+          });
+
+          tabsContainer.addEventListener('mousemove', (e) => {
+              if (!isDown) return;
+              e.preventDefault();
+              const x = e.pageX - tabsContainer.offsetLeft;
+              const walk = (x - startX) * 1.2;
+              if (Math.abs(walk) > 4) {
+                  hasMoved = true;
+              }
+              tabsContainer.scrollLeft = scrollLeft - walk;
+          });
+
+          // Mouse wheel horizontal scroll support
+          tabsContainer.addEventListener('wheel', (e) => {
+              if (e.deltaY !== 0) {
+                  e.preventDefault();
+                  tabsContainer.scrollLeft += e.deltaY;
+              }
+          }, { passive: false });
+
+          // Intercept click on children if dragging occurred
+          tabsContainer.addEventListener('click', (e) => {
+              if (hasMoved) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  hasMoved = false;
+              }
+          }, true);
+      }
+
       const tabButtons = document.querySelectorAll('#notification-tabs .notif-tab');
       tabButtons.forEach(btn => {
           btn.addEventListener('click', (e) => {

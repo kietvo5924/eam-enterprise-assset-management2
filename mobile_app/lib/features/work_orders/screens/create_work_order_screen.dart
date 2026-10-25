@@ -20,6 +20,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
   String _title = '';
   String _description = '';
   String _priority = 'MEDIUM';
+  String _maintenanceAction = 'GENERAL';
   DateTime _deadline = DateTime.now().add(const Duration(days: 1));
   
   String? _selectedAssetId;
@@ -162,6 +163,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
       'title': _title,
       'description': _description,
       'priority': _priority,
+      'maintenanceAction': _maintenanceAction,
       'deadline': _deadline.toUtc().toIso8601String(),
       'assetId': _selectedAssetId,
       'checklists': _checklists,
@@ -434,6 +436,54 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                     onChanged: (newValue) {
                       setState(() {
                         _priority = newValue!;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Cấp độ can thiệp bảo trì
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.neutral900.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _maintenanceAction,
+                    decoration: InputDecoration(
+                      icon: Icon(PhosphorIcons.wrench(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+                      border: InputBorder.none,
+                      labelText: 'Cấp độ can thiệp bảo trì',
+                      labelStyle: const TextStyle(color: AppTheme.neutral500),
+                    ),
+                    items: const [
+                      DropdownMenuItem<String>(
+                        value: 'GENERAL',
+                        child: Text('Bảo dưỡng định kỳ / Vệ sinh', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                      DropdownMenuItem<String>(
+                        value: 'MICRO_MAINTENANCE',
+                        child: Text('Bảo trì vi mô (Bơm mỡ, siết bu-lông)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                      DropdownMenuItem<String>(
+                        value: 'CORE_REPLACEMENT',
+                        child: Text('Đại tu cốt lõi (Thay vòng bi/rô-to)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ],
+                    onChanged: (newValue) {
+                      setState(() {
+                        _maintenanceAction = newValue ?? 'GENERAL';
                       });
                     },
                   ),

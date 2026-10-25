@@ -101,6 +101,7 @@ def evaluate_triggers():
                     type="PREVENTIVE",
                     priority="MEDIUM",
                     status="CREATED",
+                    maintenance_action=getattr(pm_plan, 'maintenance_action', 'GENERAL'),
                     deadline=next_due_date,
                     estimated_duration_minutes=pm_plan.estimated_duration_minutes,
                     source_reference=source_reference,
@@ -111,6 +112,7 @@ def evaluate_triggers():
                     zone_id=zone_id,
                     required_skill='GENERAL',
                     min_skill_level=1,
+                    required_tools=getattr(pm_plan, 'required_tools', []) or [],
                     required_spare_parts=spare_part_ids
                 )
                 

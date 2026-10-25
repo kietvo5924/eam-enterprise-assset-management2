@@ -440,6 +440,21 @@
             </div>
           </div>
         </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i class="ph-fill ph-wrench text-primary text-sm"></i>
+              <span>Cấp độ can thiệp bảo trì</span> <span class="text-danger">*</span>
+            </span>
+            <span class="text-[11px] text-neutral-400 font-normal">Quy chuẩn dữ liệu RUL AI</span>
+          </label>
+          <select id="wo-maintenance-action" class="w-full px-3.5 py-2.5 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-800 focus:outline-none focus:border-primary focus:bg-white transition-all cursor-pointer">
+            <option value="GENERAL">Bảo dưỡng định kỳ / Vệ sinh / Hiệu chỉnh thông thường</option>
+            <option value="MICRO_MAINTENANCE">Bảo trì vi mô (Bơm mỡ, bôi trơn, siết bulông - Giữ chuỗi đo)</option>
+            <option value="CORE_REPLACEMENT">Đại tu cốt lõi (Thay mới vòng bi/rô-to - Tái lập mốc tuổi thọ RUL)</option>
+          </select>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Priority</label>
@@ -838,6 +853,9 @@
         <button id="detail-btn-complete" onclick="openCompleteWoModal()" class="hidden px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0 cursor-pointer">
           <i class="ph-bold ph-check-circle text-base"></i> Hoàn thành
         </button>
+        <button id="detail-btn-report-incident" onclick="openReportIncidentModal()" class="hidden px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0 cursor-pointer" title="Báo cáo phát sinh sự cố tại hiện trường cần đại tu / thay thế phụ tùng">
+          <i class="ph-bold ph-warning-octagon text-base"></i> Báo cáo phát sinh
+        </button>
 
         {% if 'work_order:create' in user_permissions or is_system_admin or 'system:admin' in user_permissions %}
         <button id="detail-btn-create-followup" onclick="createFollowUpFromCurrentWo()" class="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-800 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow-sm cursor-pointer whitespace-nowrap flex-shrink-0" title="Tạo phiếu bảo trì/sửa chữa tiếp theo liên kết với phiếu này">
@@ -867,29 +885,45 @@
           </div>
         </div>
         
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 bg-neutral-50 p-5 rounded-2xl border border-neutral-100">
-          <div>
-            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Thiết bị</p>
-            <p class="font-semibold text-neutral-800 truncate" id="detail-asset-name">-</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4 mb-6 bg-neutral-50/90 p-4 sm:p-5 rounded-2xl border border-neutral-100">
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 truncate flex items-center gap-1">
+              <i class="ph ph-cpu text-xs"></i> Thiết bị
+            </p>
+            <p class="font-semibold text-neutral-800 text-xs sm:text-sm truncate" id="detail-asset-name" title="">-</p>
           </div>
-          <div>
-            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Người yêu cầu</p>
-            <div id="detail-creator-name" class="font-semibold text-neutral-800">-</div>
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 truncate flex items-center gap-1">
+              <i class="ph ph-shield-check text-xs"></i> Cấp độ can thiệp
+            </p>
+            <span id="detail-maintenance-action-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-neutral-100 text-neutral-700 max-w-full">
+              <i class="ph-bold ph-wrench shrink-0"></i> <span id="detail-maintenance-action-text" class="truncate">Bảo dưỡng chung</span>
+            </span>
           </div>
-          <div>
-            <div class="flex items-center gap-1.5 mb-1">
-              <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Người thực hiện</p>
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 truncate flex items-center gap-1">
+              <i class="ph ph-user text-xs"></i> Người yêu cầu
+            </p>
+            <div id="detail-creator-name" class="font-semibold text-neutral-800 text-xs sm:text-sm truncate" title="">-</div>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider truncate flex items-center gap-1">
+                <i class="ph ph-wrench text-xs"></i> Người thực hiện
+              </p>
               {% if 'work_order:reassign' in user_permissions %}
-              <button onclick="if(currentWo) openAssignModal(currentWo.id, currentWo.assignee_id, currentWo.title)" class="text-[11px] text-primary hover:text-primary-700 font-bold cursor-pointer hover:underline" title="Thay đổi người thực hiện">
+              <button onclick="if(currentWo) openAssignModal(currentWo.id, currentWo.assignee_id, currentWo.title)" class="text-[10px] text-primary hover:text-primary-700 font-bold cursor-pointer hover:underline shrink-0" title="Thay đổi người thực hiện">
                 [Đổi]
               </button>
               {% endif %}
             </div>
-            <p class="font-semibold text-neutral-800 truncate" id="detail-assignee-name">-</p>
+            <p class="font-semibold text-neutral-800 text-xs sm:text-sm truncate" id="detail-assignee-name" title="">-</p>
           </div>
-          <div>
-            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">Hạn chót</p>
-            <p class="font-semibold text-neutral-800" id="detail-deadline">-</p>
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 truncate flex items-center gap-1">
+              <i class="ph ph-calendar text-xs"></i> Hạn chót
+            </p>
+            <p class="font-semibold text-neutral-800 text-xs sm:text-sm truncate" id="detail-deadline">-</p>
           </div>
         </div>
 
@@ -922,11 +956,58 @@
           <!-- Populated by JS -->
         </div>
         {% if 'work_order:update' in user_permissions %}
-        <div class="flex gap-2">
-            <input type="text" id="new-checklist-item" placeholder="Tên công việc cần làm..." class="flex-1 px-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
-            <button onclick="addChecklistItem()" class="bg-primary hover:bg-primary-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm shadow-primary/20 transition-colors flex items-center gap-2">
-              <i class="ph-bold ph-plus"></i> Thêm
-            </button>
+        <div class="bg-neutral-50 border border-neutral-200/80 rounded-2xl p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between flex-wrap gap-1">
+            <span class="text-xs font-bold text-neutral-700 flex items-center gap-1.5">
+              <i class="ph-bold ph-plus-circle text-primary"></i> Thêm bước kiểm tra / đo lường
+            </span>
+            <!-- Quick Presets -->
+            <div class="flex items-center gap-1 flex-wrap">
+              <span class="text-[10px] text-neutral-400 font-semibold mr-0.5">Mẫu:</span>
+              <button type="button" onclick="setDrawerChecklistPreset('VIBRATION')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 rounded-md text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1">
+                <i class="ph-bold ph-wave-sine"></i> Rung ISO
+              </button>
+              <button type="button" onclick="setDrawerChecklistPreset('TEMPERATURE')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 rounded-md text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1">
+                <i class="ph-bold ph-thermometer"></i> Nhiệt độ
+              </button>
+              <button type="button" onclick="setDrawerChecklistPreset('PRESSURE')" class="px-2 py-0.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200/60 rounded-md text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1">
+                <i class="ph-bold ph-gauge"></i> Áp suất
+              </button>
+              <button type="button" onclick="setDrawerChecklistPreset('CURRENT')" class="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/60 rounded-md text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1">
+                <i class="ph-bold ph-lightning"></i> Dòng điện
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <input type="text" id="new-checklist-item" placeholder="Tên công việc / mục đo kiểm (VD: Đo rung bệ bơm)..." class="w-full px-3.5 py-2 bg-white border border-neutral-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all">
+
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+              <div class="sm:col-span-5">
+                <select id="new-checklist-type" onchange="onDrawerChkTypeChange(this.value)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-xl text-xs font-medium text-neutral-800 focus:outline-none focus:border-primary">
+                  <option value="PASS_FAIL">Đạt / Không đạt (Pass/Fail)</option>
+                  <option value="NUMBER">Số liệu đo lường (Number)</option>
+                  <option value="TEXT">Ghi chú hiện trường (Text)</option>
+                </select>
+              </div>
+              <div class="sm:col-span-5">
+                <input type="text" id="new-checklist-expected" placeholder="Giá trị chuẩn (VD: < 2.8 mm/s)" class="w-full px-2.5 py-1.5 bg-white border border-neutral-200 rounded-xl text-xs text-neutral-800 focus:outline-none focus:border-primary">
+              </div>
+              <div class="sm:col-span-2 flex justify-end">
+                <button type="button" onclick="addChecklistItem()" class="w-full bg-primary hover:bg-primary-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm shadow-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                  <i class="ph-bold ph-plus"></i> Thêm
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+              <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                <input type="checkbox" id="new-checklist-mandatory" class="rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer">
+                <span class="text-[11px] font-bold text-neutral-700">Bắt buộc thực hiện trước khi hoàn thành phiếu</span>
+              </label>
+              <span id="new-checklist-type-hint" class="text-[10px] text-neutral-400 font-medium">Loại: Pass/Fail</span>
+            </div>
+          </div>
         </div>
         {% endif %}
       </div>
@@ -1042,12 +1123,74 @@
         <label class="block text-xs font-bold text-neutral-700 mb-1">Ghi chú sửa chữa / Kết quả hoàn thành <span class="text-danger">*</span></label>
         <textarea id="wo-complete-notes" rows="3" placeholder="Mô tả công việc đã thực hiện, nguyên nhân sự cố hoặc kết quả kiểm tra..." class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary font-medium"></textarea>
       </div>
+
       <div id="wo-complete-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
     <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
       <button type="button" onclick="closeCompleteWoModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-confirm-complete-wo" onclick="confirmCompleteWo()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-check"></i> Xác nhận hoàn thành
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Báo Cáo Sự Cố Phát Sinh Tại Hiện Trường (Tình huống B) -->
+<div id="report-incident-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-5 bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 text-white flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-amber-200">
+          <i class="ph-bold ph-warning-octagon"></i>
+        </div>
+        <div>
+          <h3 class="font-black text-base m-0">Báo Cáo Sự Cố Phát Sinh Tại Hiện Trường</h3>
+          <p class="text-xs text-amber-100 m-0" id="report-incident-wo-text">WO</p>
+        </div>
+      </div>
+      <button onclick="closeReportIncidentModal()" class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+    
+    <div class="p-5 space-y-4">
+      <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+        <div class="font-bold flex items-center gap-1.5 mb-1 text-amber-800">
+          <i class="ph-fill ph-info"></i> Quy trình xử lý phát sinh tại chỗ:
+        </div>
+        Kỹ thuật viên hoàn tất phiếu hiện tại (giữ nguyên dữ liệu đo lường). Hệ thống sẽ gửi thông báo khẩn cấp đến Quản đốc/Quản lý để phê duyệt xuất vật tư, dừng máy và tạo Work Order Đại tu tiếp theo (Follow-up).
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Mức can thiệp đề xuất <span class="text-danger">*</span></label>
+        <select id="report-incident-action" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-800 focus:outline-none focus:border-primary">
+          <option value="CORE_REPLACEMENT" selected>Đại tu cốt lõi (Thay mới vòng bi/rô-to - Tái lập mốc tuổi thọ RUL)</option>
+          <option value="MICRO_MAINTENANCE">Bảo trì vi mô bổ sung (Cần can thiệp sửa chữa phụ trợ)</option>
+          <option value="GENERAL">Bảo dưỡng mở rộng ngoài danh mục kiểm tra</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Mức độ ưu tiên đề xuất</label>
+        <select id="report-incident-priority" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-800 focus:outline-none focus:border-primary">
+          <option value="URGENT" selected>Khẩn cấp (URGENT) - Nguy cơ dừng chuyền</option>
+          <option value="HIGH">Cao (HIGH) - Cần khắc phục trong ca</option>
+          <option value="MEDIUM">Trung bình (MEDIUM)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Mô tả chi tiết sự cố phát hiện <span class="text-danger">*</span></label>
+        <textarea id="report-incident-notes" rows="3" placeholder="Mô tả hiện trạng bất thường tại chỗ (rung lắc mạnh, nhiệt độ tăng đột ngột, mẻ răng hộp số...)" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary font-medium"></textarea>
+      </div>
+
+      <div id="report-incident-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
+    </div>
+
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+      <button type="button" onclick="closeReportIncidentModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
+      <button type="button" id="btn-submit-report-incident" onclick="submitReportIncident()" class="px-5 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+        <i class="ph-bold ph-paper-plane-tilt"></i> Gửi Báo Cáo Lên Quản Đốc
       </button>
     </div>
   </div>
@@ -1946,6 +2089,36 @@
       document.getElementById('wo-asset')?.addEventListener('change', function() {
           this.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
       });
+
+      // Handle follow-up creation deep-link from incident notification
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('create_followup') === '1' || urlParams.get('create_followup') === 'true') {
+          const parentId = urlParams.get('parent_id') || '';
+          const assetId = urlParams.get('asset_id') || '';
+          const proposedAction = urlParams.get('action') || 'CORE_REPLACEMENT';
+          const parentCode = parentId ? `#${parentId.substring(0,8).toUpperCase()}` : '';
+          const title = `[Follow-up] Đại tu / Thay thế phụ tùng từ sự cố phát sinh ${parentCode}`;
+          const desc = `Khởi tạo từ báo cáo sự cố phát sinh hiện trường của phiếu ${parentCode}. Cần phê duyệt đại tu/thay thế phụ tùng cốt lõi.`;
+          
+          setTimeout(() => {
+              if (typeof openWoModal === 'function') {
+                  openWoModal(
+                      '',
+                      title,
+                      desc,
+                      'HIGH',
+                      'CREATED',
+                      assetId,
+                      '',
+                      '',
+                      parentId,
+                      'CORRECTIVE',
+                      '',
+                      proposedAction
+                  );
+              }
+          }, 350);
+      }
   });
 
   function filterAssignableEmployees(targetUserId = '') {
@@ -2600,7 +2773,7 @@
       filterTable();
   }
 
-  function openWoModal(id='', title='', desc='', priority='MEDIUM', status='CREATED', asset_id='', assignee_id='', deadline='', parentId='', woType='CORRECTIVE', alertId='') {
+  function openWoModal(id='', title='', desc='', priority='MEDIUM', status='CREATED', asset_id='', assignee_id='', deadline='', parentId='', woType='CORRECTIVE', alertId='', maintenanceAction='GENERAL') {
       document.getElementById('wo-modal').classList.remove('hidden');
       document.getElementById('wo-id').value = id;
       document.getElementById('wo-title').value = title;
@@ -2645,6 +2818,7 @@
 
       // Populate optimization fields from WO_METADATA if editing
       const meta = (id && window.WO_METADATA && window.WO_METADATA[id]) ? window.WO_METADATA[id] : {
+          maintenance_action: 'GENERAL',
           required_skill: '',
           min_skill_level: '',
           required_certification: '',
@@ -2657,6 +2831,10 @@
           coords_x: 0.0,
           coords_y: 0.0
       };
+
+      if (document.getElementById('wo-maintenance-action')) {
+          document.getElementById('wo-maintenance-action').value = (id && meta.maintenance_action) ? meta.maintenance_action : (maintenanceAction || 'GENERAL');
+      }
 
       if (document.getElementById('wo-min-skill-level')) {
           document.getElementById('wo-min-skill-level').value = (id && meta.min_skill_level) ? meta.min_skill_level : '';
@@ -2872,7 +3050,7 @@
           renderWoModalChecklistRow({
               item_name: 'Đo vận tốc rung hiệu dụng RMS',
               input_type: 'NUMBER',
-              expected_value: '< 4.5 mm/s (ISO Zone A/B)',
+              expected_value: '< 2.8 mm/s (ISO 10816-3 Zone A/B)',
               is_mandatory: true
           });
       } else if (metricType === 'TEMPERATURE') {
@@ -2976,6 +3154,7 @@
           status: document.getElementById('wo-status').value,
           parent_id: document.getElementById('wo-parent-id')?.value || '',
           type: document.getElementById('wo-type')?.value || 'CORRECTIVE',
+          maintenance_action: document.getElementById('wo-maintenance-action')?.value || 'GENERAL',
           asset_id: asset_id,
           assigned_to_id: document.getElementById('wo-assignee').value,
           deadline: document.getElementById('wo-deadline').value,
@@ -3494,34 +3673,78 @@
       document.getElementById('detail-priority').className = `px-3 py-1 border rounded-full text-xs font-bold uppercase tracking-wider ${pColor}`;
       document.getElementById('detail-priority').innerText = priority;
       
-      document.getElementById('detail-asset-name').innerText = asset_id ? (asset_name || 'Thiết bị') : 'Không có';
+      const assetEl = document.getElementById('detail-asset-name');
+      if (assetEl) {
+          const aText = asset_id ? (asset_name || 'Thiết bị') : 'Không có';
+          assetEl.innerText = aText;
+          assetEl.title = aText;
+      }
       
       const creatorEl = document.getElementById('detail-creator-name');
       if (creatorEl) {
           if (!creator_name || creator_name === 'Hệ thống AI' || creator_name === 'None' || creator_name === '-') {
-              creatorEl.innerHTML = `<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold whitespace-nowrap"><i class="ph-fill ph-cpu text-indigo-600"></i> Hệ thống AI</span>`;
+              creatorEl.innerHTML = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-semibold truncate"><i class="ph-fill ph-cpu text-indigo-600 shrink-0"></i> Hệ thống AI</span>`;
+              creatorEl.title = 'Hệ thống AI';
           } else {
               creatorEl.innerText = creator_name;
+              creatorEl.title = creator_name;
           }
       }
 
-      document.getElementById('detail-assignee-name').innerText = assignee_id ? assignee_name : 'Chưa phân công';
-      document.getElementById('detail-deadline').innerText = deadline && deadline !== 'None' ? deadline : 'Chưa thiết lập';
+      const assigneeEl = document.getElementById('detail-assignee-name');
+      if (assigneeEl) {
+          const assText = assignee_id ? assignee_name : 'Chưa phân công';
+          assigneeEl.innerText = assText;
+          assigneeEl.title = assText;
+      }
+
+      const deadlineEl = document.getElementById('detail-deadline');
+      if (deadlineEl) {
+          deadlineEl.innerText = deadline && deadline !== 'None' ? deadline : 'Chưa thiết lập';
+      }
       
-      const canExecute = {% if 'work_order:execute' in user_permissions or 'work_order:update' in user_permissions %}true{% else %}false{% endif %};
+      const canExecute = {% if 'work_order:execute' in user_permissions or 'work_order:update' in user_permissions or is_system_admin %}true{% else %}false{% endif %};
       const isSystemAdmin = {% if is_system_admin or 'system:admin' in user_permissions %}true{% else %}false{% endif %};
       const isAssignee = assignee_id && String(assignee_id).toLowerCase() === String(currentUserId).toLowerCase();
       
       const btnStart = document.getElementById('detail-btn-start');
       if (btnStart) {
-          if (status === 'ASSIGNED' && isAssignee && canExecute) btnStart.classList.remove('hidden');
+          if (status === 'ASSIGNED' && (isAssignee || isSystemAdmin) && canExecute) btnStart.classList.remove('hidden');
           else btnStart.classList.add('hidden');
       }
 
       const btnComplete = document.getElementById('detail-btn-complete');
       if (btnComplete) {
-          if (status === 'IN_PROGRESS' && isAssignee && canExecute) btnComplete.classList.remove('hidden');
+          if (status === 'IN_PROGRESS' && (isAssignee || isSystemAdmin) && canExecute) btnComplete.classList.remove('hidden');
           else btnComplete.classList.add('hidden');
+      }
+
+      const meta = (id && window.WO_METADATA && window.WO_METADATA[id]) ? window.WO_METADATA[id] : {};
+      currentWo.maintenance_action = meta.maintenance_action || 'GENERAL';
+
+      const actionTextEl = document.getElementById('detail-maintenance-action-text');
+      const actionBadgeEl = document.getElementById('detail-maintenance-action-badge');
+      if (actionTextEl && actionBadgeEl) {
+          const act = currentWo.maintenance_action;
+          if (act === 'CORE_REPLACEMENT') {
+              actionTextEl.innerText = 'Đại tu cốt lõi';
+              actionBadgeEl.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200';
+          } else if (act === 'MICRO_MAINTENANCE') {
+              actionTextEl.innerText = 'Bảo trì vi mô';
+              actionBadgeEl.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200';
+          } else {
+              actionTextEl.innerText = 'Bảo dưỡng chung';
+              actionBadgeEl.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200';
+          }
+      }
+
+      const btnReportIncident = document.getElementById('detail-btn-report-incident');
+      if (btnReportIncident) {
+          if ((status === 'IN_PROGRESS' || status === 'ASSIGNED') && (isAssignee || isSystemAdmin) && canExecute) {
+              btnReportIncident.classList.remove('hidden');
+          } else {
+              btnReportIncident.classList.add('hidden');
+          }
       }
 
       // Cập nhật phần Condition Monitoring
@@ -3763,7 +3986,9 @@
           '',
           '',
           parentId,
-          'CORRECTIVE'
+          'CORRECTIVE',
+          '',
+          'CORE_REPLACEMENT'
       );
   }
 
@@ -3822,6 +4047,70 @@
           btn.disabled = false;
           btn.innerHTML = '<i class="ph-bold ph-check"></i> Xác nhận hoàn thành';
       });
+  }
+
+  function openReportIncidentModal() {
+      if (!currentWo) return;
+      document.getElementById('report-incident-wo-text').innerText = `Mã phiếu: #${currentWo.id.substring(0,8).toUpperCase()} - ${currentWo.title}`;
+      document.getElementById('report-incident-notes').value = '';
+      document.getElementById('report-incident-action').value = 'CORE_REPLACEMENT';
+      document.getElementById('report-incident-priority').value = 'URGENT';
+      document.getElementById('report-incident-error').classList.add('hidden');
+      document.getElementById('report-incident-modal').classList.remove('hidden');
+  }
+
+  function closeReportIncidentModal() {
+      document.getElementById('report-incident-modal').classList.add('hidden');
+  }
+
+  async function submitReportIncident() {
+      if (!currentWo) return;
+      const notes = document.getElementById('report-incident-notes').value.trim();
+      const action = document.getElementById('report-incident-action').value;
+      const priority = document.getElementById('report-incident-priority').value;
+      const errEl = document.getElementById('report-incident-error');
+      const btn = document.getElementById('btn-submit-report-incident');
+
+      if (!notes) {
+          errEl.innerText = 'Vui lòng nhập mô tả chi tiết sự cố phát sinh tại hiện trường.';
+          errEl.classList.remove('hidden');
+          return;
+      }
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Đang gửi báo cáo...';
+
+      try {
+          const res = await fetch('{% url "portal_work_orders" %}', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({
+                  action: 'report_incident',
+                  work_order_id: currentWo.id,
+                  id: currentWo.id,
+                  description: notes,
+                  proposed_action: action,
+                  priority: priority
+              })
+          });
+          const data = await res.json();
+          if (data.success) {
+              closeReportIncidentModal();
+              alert(data.message || 'Đã gửi báo cáo sự cố thành công đến Quản đốc/Quản lý!');
+          } else {
+              errEl.innerText = data.error || 'Có lỗi xảy ra khi gửi báo cáo sự cố.';
+              errEl.classList.remove('hidden');
+          }
+      } catch (e) {
+          errEl.innerText = 'Lỗi kết nối mạng: ' + e.message;
+          errEl.classList.remove('hidden');
+      } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="ph-bold ph-paper-plane-tilt"></i> Gửi Báo Cáo Lên Quản Đốc';
+      }
   }
 
   function renderChecklists(wo_id, checklists) {
@@ -3966,23 +4255,89 @@
       .then(() => window.location.reload());
   }
 
+  function onDrawerChkTypeChange(val) {
+      const hint = document.getElementById('new-checklist-type-hint');
+      const mandatory = document.getElementById('new-checklist-mandatory');
+      const expected = document.getElementById('new-checklist-expected');
+      if (val === 'NUMBER') {
+          if (hint) hint.innerText = 'Loại: Nhập số liệu đo';
+          if (mandatory) mandatory.checked = true;
+          if (expected && !expected.value) expected.placeholder = 'VD: < 2.8 mm/s';
+      } else if (val === 'TEXT') {
+          if (hint) hint.innerText = 'Loại: Ghi chú văn bản';
+          if (expected) expected.placeholder = 'Ghi chú chuẩn (nếu có)';
+      } else {
+          if (hint) hint.innerText = 'Loại: Đạt / Không đạt';
+          if (expected) expected.placeholder = 'Giá trị chuẩn (Tùy chọn)';
+      }
+  }
+
+  function setDrawerChecklistPreset(metricType) {
+      const nameInput = document.getElementById('new-checklist-item');
+      const typeSelect = document.getElementById('new-checklist-type');
+      const expectedInput = document.getElementById('new-checklist-expected');
+      const mandatoryCb = document.getElementById('new-checklist-mandatory');
+
+      if (metricType === 'VIBRATION') {
+          if (nameInput) nameInput.value = 'Đo vận tốc rung hiệu dụng RMS';
+          if (typeSelect) typeSelect.value = 'NUMBER';
+          if (expectedInput) expectedInput.value = '< 2.8 mm/s (ISO 10816-3 Zone A/B)';
+          if (mandatoryCb) mandatoryCb.checked = true;
+          onDrawerChkTypeChange('NUMBER');
+      } else if (metricType === 'TEMPERATURE') {
+          if (nameInput) nameInput.value = 'Đo nhiệt độ ổ bi / cuộn dây';
+          if (typeSelect) typeSelect.value = 'NUMBER';
+          if (expectedInput) expectedInput.value = '< 75.0 °C';
+          if (mandatoryCb) mandatoryCb.checked = true;
+          onDrawerChkTypeChange('NUMBER');
+      } else if (metricType === 'PRESSURE') {
+          if (nameInput) nameInput.value = 'Đo áp suất hút / xả';
+          if (typeSelect) typeSelect.value = 'NUMBER';
+          if (expectedInput) expectedInput.value = '2.5 - 4.0 bar';
+          if (mandatoryCb) mandatoryCb.checked = true;
+          onDrawerChkTypeChange('NUMBER');
+      } else if (metricType === 'CURRENT') {
+          if (nameInput) nameInput.value = 'Đo dòng điện tải động cơ';
+          if (typeSelect) typeSelect.value = 'NUMBER';
+          if (expectedInput) expectedInput.value = '< 18.5 A';
+          if (mandatoryCb) mandatoryCb.checked = true;
+          onDrawerChkTypeChange('NUMBER');
+      }
+  }
+
   function addChecklistItem() {
-      const name = document.getElementById('new-checklist-item').value;
+      const name = document.getElementById('new-checklist-item')?.value?.trim();
       if(!name || !currentWo) return;
-      
+
+      const inputType = document.getElementById('new-checklist-type')?.value || 'PASS_FAIL';
+      const expectedVal = document.getElementById('new-checklist-expected')?.value?.trim() || null;
+      const isMandatory = document.getElementById('new-checklist-mandatory')?.checked || false;
+
       fetch('{% url "portal_work_orders" %}', {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json',
               'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
           },
-          body: JSON.stringify({action: 'add_checklist', work_order_id: currentWo.id, item_name: name})
+          body: JSON.stringify({
+              action: 'add_checklist',
+              work_order_id: currentWo.id,
+              item_name: name,
+              input_type: inputType,
+              expected_value: expectedVal,
+              is_mandatory: isMandatory
+          })
       })
       .then(res => res.json())
       .then(data => {
           if(data.success) {
               window.location.reload(); 
+          } else {
+              alert(data.error || 'Có lỗi xảy ra khi thêm bước kiểm tra.');
           }
+      })
+      .catch(err => {
+          alert('Lỗi kết nối máy chủ: ' + err.message);
       });
   }
 

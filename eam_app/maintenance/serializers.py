@@ -52,6 +52,7 @@ class PmPlanSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'triggerType', 'intervalValue',
             'intervalUnit', 'isActive', 'isFloatingSchedule', 'suppressIfPending',
             'leadTimeDays', 'estimatedDurationMinutes', 'assigneeId', 'assignee',
+            'maintenanceAction',
             'checklists', 'materials', 'created_at', 'updated_at'
         ]
         
@@ -63,6 +64,7 @@ class PmPlanSerializer(serializers.ModelSerializer):
     suppressIfPending = serializers.BooleanField(source='suppress_if_pending')
     leadTimeDays = serializers.IntegerField(source='lead_time_days')
     estimatedDurationMinutes = serializers.IntegerField(source='estimated_duration_minutes', required=False, allow_null=True)
+    maintenanceAction = serializers.CharField(source='maintenance_action', read_only=True)
 
 
 class PmPlanCreateUpdateSerializer(serializers.Serializer):
@@ -77,6 +79,7 @@ class PmPlanCreateUpdateSerializer(serializers.Serializer):
     leadTimeDays = serializers.IntegerField(default=0)
     estimatedDurationMinutes = serializers.IntegerField(required=False, allow_null=True)
     assigneeId = serializers.UUIDField(required=False, allow_null=True)
+    maintenanceAction = serializers.CharField(required=False, default='GENERAL')
     
     checklists = serializers.ListField(child=serializers.DictField(), required=False)
     materials = serializers.ListField(child=serializers.DictField(), required=False)

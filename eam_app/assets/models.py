@@ -112,6 +112,8 @@ class SparePart(BaseTenantModel):
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='spare_parts')
     quantity_in_stock = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
     unit_cost = models.DecimalField(max_digits=19, decimal_places=2, null=True, blank=True)
+    lead_time_days = models.IntegerField(default=7, help_text='Thời gian chờ nhập hàng (ngày)')
+    min_stock_level = models.DecimalField(max_digits=19, decimal_places=2, default=1.00, help_text='Mức tồn kho an toàn tối thiểu')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -160,6 +162,29 @@ class Asset(BaseTenantModel):
     coords_y = models.FloatField(default=0.0, null=True, blank=True)
     floor_level = models.SmallIntegerField(default=1)
     zone_id = models.CharField(max_length=64, blank=True, default='')
+
+    # Phase 11.5: Deep Learning LSTM RUL Fields
+    RUL_RISK_CHOICES = (
+        ('HEALTHY', 'Healthy'),
+        ('WARNING', 'Warning'),
+        ('CRITICAL', 'Critical'),
+        ('CALIBRATING', 'Calibrating'),
+        ('STANDBY', 'Standby'),
+        ('UNHEALTHY_BASELINE', 'Unhealthy Baseline'),
+    )
+    primary_spare_part = models.ForeignKey(
+        'assets.SparePart',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='primary_assets',
+        help_text='Vật tư / Vòng bi phụ tùng cốt lõi chính của tài sản'
+    )
+    current_rul_days = models.FloatField(null=True, blank=True, help_text='Thời gian hoạt động hữu ích còn lại dự đoán (ngày)')
+    rul_risk_level = models.CharField(max_length=20, choices=RUL_RISK_CHOICES, default='HEALTHY', db_index=True)
+    is_phantom_recovery = models.BooleanField(default=False, help_text='Cờ phát hiện bẫy hồi phục ảo sau bôi trơn/siết ốc')
+    last_core_overhaul_at = models.DateTimeField(null=True, blank=True, help_text='Thời điểm đại tu / thay thế cụm cốt lõi gần nhất')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
@@ -203,16 +228,36 @@ class MeterReading(BaseTenantModel):
         ('RUNNING', 'Running'),
         ('WARM_UP', 'Warm-Up'),
         ('IDLE', 'Idle'),
+        ('STANDBY', 'Standby'),
+    )
+
+    MEASUREMENT_PHASE_CHOICES = (
+        ('ROUTINE', 'Routine / Giám sát tuần tra định kỳ'),
+        ('PRE_REPAIR_DIAGNOSTIC', 'Pre-Repair Diagnostic / Đo chẩn đoán ban đầu'),
+        ('POST_REPAIR_ACCEPTANCE', 'Post-Repair Acceptance / Đo nghiệm thu sau sửa chữa'),
     )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    round_id = models.UUIDField(null=True, blank=True, db_index=True, help_text='Mã UUID phiên đo đồng bộ đa kênh')
+    checklist_item = models.ForeignKey(
+        'workorders.WorkOrderChecklistItem',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='meter_readings',
+        help_text='Mục checklist liên kết sinh ra số đo này'
+    )
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='meter_readings')
     metric_code = models.CharField(max_length=64, default='VIBRATION')
     reading_value = models.DecimalField(max_digits=19, decimal_places=2)
     reading_date = models.DateTimeField()
     unit = models.CharField(max_length=50, null=True, blank=True)
     ambient_temperature = models.FloatField(null=True, blank=True)
+    load_factor = models.FloatField(default=1.0, null=True, blank=True, help_text='Hệ số phụ tải của máy tại thời điểm đo (0.0 - 2.0, định mức 1.0)')
+    motor_current_amp = models.FloatField(null=True, blank=True, help_text='Dòng điện động cơ đo được (Ampe)')
+    shaft_rpm = models.FloatField(null=True, blank=True, help_text='Tốc độ vòng quay trục (RPM)')
     machine_state = models.CharField(max_length=20, choices=MACHINE_STATE_CHOICES, default='RUNNING')
+    measurement_phase = models.CharField(max_length=32, choices=MEASUREMENT_PHASE_CHOICES, default='ROUTINE', db_index=True)
     is_pre_repair = models.BooleanField(default=False)
     is_suppressed = models.BooleanField(default=False)
     recorded_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_meter_readings')
@@ -225,6 +270,8 @@ class MeterReading(BaseTenantModel):
         indexes = [
             models.Index(fields=['tenant', 'asset', 'metric_code', 'reading_date']),
             models.Index(fields=['tenant', 'asset', 'machine_state']),
+            models.Index(fields=['tenant', 'asset', 'round_id']),
+            models.Index(fields=['tenant', 'asset', 'measurement_phase']),
         ]
 
     def __str__(self):

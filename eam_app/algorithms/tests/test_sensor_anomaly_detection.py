@@ -156,6 +156,7 @@ class SensorAnomalyDetectionTestCase(TestCase):
             asset=self.pump_asset,
             title="Thay thế cụm vòng bi trục chính",
             type='CORRECTIVE',
+            maintenance_action='CORE_REPLACEMENT',
             status='IN_PROGRESS',
             priority='HIGH'
         )

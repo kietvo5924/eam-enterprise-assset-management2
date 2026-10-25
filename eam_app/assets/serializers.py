@@ -92,12 +92,18 @@ class AssetSerializer(serializers.ModelSerializer):
     zoneId = serializers.CharField(source='zone_id', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
-    
+    primarySparePartId = serializers.UUIDField(source='primary_spare_part.id', read_only=True, allow_null=True)
+    currentRulDays = serializers.FloatField(source='current_rul_days', read_only=True)
+    rulRiskLevel = serializers.CharField(source='rul_risk_level', read_only=True)
+    isPhantomRecovery = serializers.BooleanField(source='is_phantom_recovery', read_only=True)
+    lastCoreOverhaulAt = serializers.DateTimeField(source='last_core_overhaul_at', read_only=True)
+
     class Meta:
         model = Asset
         fields = ['id', 'categoryId', 'categoryName', 'parentId', 'name', 'serialNumber', 'model', 'manufacturer', 
                   'purchaseDate', 'value', 'status', 'locationId', 'locationName', 'hierarchyTemplateId', 
                   'hierarchyTemplateName', 'qrCode', 'isActive', 'coordsX', 'coordsY', 'floorLevel', 'zoneId',
+                  'primarySparePartId', 'currentRulDays', 'rulRiskLevel', 'isPhantomRecovery', 'lastCoreOverhaulAt',
                   'createdAt', 'updatedAt']
 
 class AssetCreateUpdateSerializer(serializers.Serializer):
@@ -121,13 +127,19 @@ class MeterReadingSerializer(serializers.ModelSerializer):
     assetId = serializers.UUIDField(source='asset.id', read_only=True)
     workOrderId = serializers.UUIDField(source='work_order.id', read_only=True, allow_null=True)
     workOrderCode = serializers.CharField(source='work_order.code', read_only=True, allow_null=True)
+    roundId = serializers.UUIDField(source='round_id', read_only=True, allow_null=True)
+    checklistItemId = serializers.UUIDField(source='checklist_item.id', read_only=True, allow_null=True)
     metricCode = serializers.CharField(source='metric_code', read_only=True)
     readingValue = serializers.DecimalField(source='reading_value', read_only=True, max_digits=19, decimal_places=2)
     value = serializers.DecimalField(source='reading_value', read_only=True, max_digits=19, decimal_places=2)
     readingDate = serializers.DateTimeField(source='reading_date', read_only=True)
     recordedAt = serializers.DateTimeField(source='reading_date', read_only=True)
     machineState = serializers.CharField(source='machine_state', read_only=True)
+    measurementPhase = serializers.CharField(source='measurement_phase', read_only=True)
     ambientTemperature = serializers.FloatField(source='ambient_temperature', read_only=True)
+    loadFactor = serializers.FloatField(source='load_factor', read_only=True)
+    motorCurrentAmp = serializers.FloatField(source='motor_current_amp', read_only=True)
+    shaftRpm = serializers.FloatField(source='shaft_rpm', read_only=True)
     isPreRepair = serializers.BooleanField(source='is_pre_repair', read_only=True)
     isSuppressed = serializers.BooleanField(source='is_suppressed', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
@@ -135,10 +147,11 @@ class MeterReadingSerializer(serializers.ModelSerializer):
     class Meta:
         model = MeterReading
         fields = [
-            'id', 'assetId', 'workOrderId', 'workOrderCode', 'metricCode', 'value', 'readingValue',
-            'readingDate', 'recordedAt', 'unit', 'machineState',
-            'ambientTemperature', 'isPreRepair', 'isSuppressed',
-            'remarks', 'createdAt'
+            'id', 'assetId', 'workOrderId', 'workOrderCode', 'roundId', 'checklistItemId',
+            'metricCode', 'value', 'readingValue',
+            'readingDate', 'recordedAt', 'unit', 'machineState', 'measurementPhase',
+            'ambientTemperature', 'loadFactor', 'motorCurrentAmp', 'shaftRpm',
+            'isPreRepair', 'isSuppressed', 'remarks', 'createdAt'
         ]
 
 class SingleReadingItemSerializer(serializers.Serializer):
@@ -187,6 +200,12 @@ class MeterReadingCreateSerializer(serializers.Serializer):
     # Liên kết với Work Order đang thực thi (nếu có)
     workOrderId = serializers.UUIDField(required=False, allow_null=True)
     work_order_id = serializers.UUIDField(required=False, allow_null=True)
+    roundId = serializers.UUIDField(required=False, allow_null=True)
+    checklistItemId = serializers.UUIDField(required=False, allow_null=True)
+    measurementPhase = serializers.CharField(max_length=32, required=False, default='ROUTINE')
+    loadFactor = serializers.FloatField(required=False, default=1.0)
+    motorCurrentAmp = serializers.FloatField(required=False, allow_null=True)
+    shaftRpm = serializers.FloatField(required=False, allow_null=True)
 
     # Ngữ cảnh kiểm tra hiện trường (Quy Tắc 1 & Quy Tắc 4)
     machineState = serializers.CharField(max_length=20, required=False, default='RUNNING')

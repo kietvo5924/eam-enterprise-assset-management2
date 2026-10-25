@@ -880,6 +880,220 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
     );
   }
 
+  void _showReportIncidentBottomSheet(BuildContext context) {
+    String notes = '';
+    String proposedAction = 'CORE_REPLACEMENT';
+    String priority = 'URGENT';
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 20,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFfef3c7),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(PhosphorIcons.warningOctagon(PhosphorIconsStyle.bold), color: const Color(0xFFd97706), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Báo Cáo Sự Cố Phát Sinh',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              Text(
+                                'Đề xuất Đại tu / Thay thế phụ tùng cốt lõi',
+                                style: TextStyle(color: AppTheme.neutral500, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(modalCtx).pop(),
+                          icon: const Icon(Icons.close, color: AppTheme.neutral400),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFfffbeb),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFfde68a)),
+                      ),
+                      child: const Text(
+                        'Thông báo khẩn sẽ gửi đến Quản đốc/Quản lý để phê duyệt xuất vật tư và tạo Work Order Đại tu tiếp theo (Follow-up). Bạn vẫn hoàn tất phiếu kiểm tra hiện tại như bình thường.',
+                        style: TextStyle(color: Color(0xFF92400e), fontSize: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Mức can thiệp đề xuất *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: proposedAction,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'CORE_REPLACEMENT',
+                          child: Text('Đại tu cốt lõi (Thay vòng bi/rô-to)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'MICRO_MAINTENANCE',
+                          child: Text('Bảo trì vi mô bổ sung', style: TextStyle(fontSize: 13)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'GENERAL',
+                          child: Text('Bảo dưỡng mở rộng', style: TextStyle(fontSize: 13)),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        setModalState(() {
+                          proposedAction = val ?? 'CORE_REPLACEMENT';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Mức độ ưu tiên đề xuất', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: priority,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'URGENT',
+                          child: Text('Khẩn cấp (URGENT) - Nguy cơ dừng máy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.red)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'HIGH',
+                          child: Text('Cao (HIGH) - Cần xử lý trong ca', style: TextStyle(fontSize: 13)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'MEDIUM',
+                          child: Text('Trung bình (MEDIUM)', style: TextStyle(fontSize: 13)),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        setModalState(() {
+                          priority = val ?? 'URGENT';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('Mô tả chi tiết sự cố phát sinh *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Mô tả hiện trạng hư hỏng tại chỗ (nứt vỡ vòng bi, quá nhiệt, rò rỉ dầu...)...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.all(12),
+                      ),
+                      onChanged: (val) => notes = val,
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (notes.trim().isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Vui lòng nhập mô tả sự cố phát sinh.'),
+                                      backgroundColor: AppTheme.dangerColor,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                setModalState(() => isSubmitting = true);
+                                final ok = await _service.reportIncident(
+                                  widget.workOrderId,
+                                  description: notes.trim(),
+                                  proposedAction: proposedAction,
+                                  priority: priority,
+                                );
+                                if (modalCtx.mounted) {
+                                  Navigator.of(modalCtx).pop();
+                                }
+                                if (context.mounted) {
+                                  if (ok) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Đã gửi báo cáo sự cố thành công đến Quản đốc/Quản lý!'),
+                                        backgroundColor: AppTheme.successColor,
+                                      ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Không thể gửi báo cáo sự cố. Vui lòng thử lại.'),
+                                        backgroundColor: AppTheme.dangerColor,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                        icon: isSubmitting
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : Icon(PhosphorIcons.paperPlaneTilt(PhosphorIconsStyle.bold), color: Colors.white, size: 18),
+                        label: Text(
+                          isSubmitting ? 'ĐANG GỬI BÁO CÁO...' : 'GỬI BÁO CÁO LÊN QUẢN ĐỐC',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFd97706),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -905,11 +1119,34 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: _SlideToComplete(
-              key: ValueKey('${_workOrder!.status}_${_workOrder!.id}'),
-              isAlreadyCompleted: _workOrder!.status == 'COMPLETED',
-              actionType: (_workOrder!.status == 'IN_PROGRESS' || _workOrder!.status == 'COMPLETED') ? 'COMPLETE' : 'START',
-              onCompleted: () async {
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_workOrder!.status == 'IN_PROGRESS' || _workOrder!.status == 'ASSIGNED') ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showReportIncidentBottomSheet(context),
+                      icon: Icon(PhosphorIcons.warningOctagon(PhosphorIconsStyle.bold), color: const Color(0xFFd97706), size: 18),
+                      label: const Text(
+                        'Báo cáo phát sinh sự cố tại hiện trường',
+                        style: TextStyle(color: Color(0xFFb45309), fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFfde68a)),
+                        backgroundColor: const Color(0xFFfffbeb),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _SlideToComplete(
+                  key: ValueKey('${_workOrder!.status}_${_workOrder!.id}'),
+                  isAlreadyCompleted: _workOrder!.status == 'COMPLETED',
+                  actionType: (_workOrder!.status == 'IN_PROGRESS' || _workOrder!.status == 'COMPLETED') ? 'COMPLETE' : 'START',
+                  onCompleted: () async {
                 if (_workOrder!.status != 'IN_PROGRESS' && _workOrder!.status != 'COMPLETED') {
                   final success = await _service.updateStatus(
                     widget.workOrderId,
@@ -990,10 +1227,12 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 }
               },
             ),
-          ),
+          ],
         ),
       ),
-      appBar: AppBar(
+    ),
+  ),
+  appBar: AppBar(
         backgroundColor: AppTheme.neutral100,
         elevation: 0,
         leading: IconButton(
@@ -1147,6 +1386,12 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
                       'Thiết bị',
                       '${_workOrder!.assetName ?? 'Không có thiết bị'} - ${_workOrder!.assetLocation ?? 'Không rõ vị trí'}',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      PhosphorIcons.wrench(PhosphorIconsStyle.fill),
+                      'Cấp độ can thiệp',
+                      _workOrder!.getMaintenanceActionLabel(),
                     ),
                     if (_workOrder!.coordsX != null || _workOrder!.zoneId != null || _workOrder!.assetLocation != null) ...[
                       const SizedBox(height: 12),

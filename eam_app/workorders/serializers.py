@@ -73,6 +73,12 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     attachments = WorkOrderAttachmentSerializer(many=True, read_only=True)
     materials = WorkOrderMaterialSerializer(many=True, read_only=True)
 
+    maintenanceAction = serializers.CharField(source='maintenance_action', read_only=True)
+    completionProcessedAt = serializers.DateTimeField(source='completion_processed_at', read_only=True)
+    postRepairVibration = serializers.FloatField(source='post_repair_vibration', read_only=True)
+    postRepairTemperature = serializers.FloatField(source='post_repair_temperature', read_only=True)
+    postRepairLoadFactor = serializers.FloatField(source='post_repair_load_factor', read_only=True)
+
     class Meta:
         model = WorkOrder
         fields = [
@@ -84,6 +90,8 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'completedAt', 'resolutionNotes', 'coordsX', 'coordsY',
             'floorLevel', 'zoneId', 'incidentLocationId',
             'maintenanceWindowStart', 'maintenanceWindowEnd',
+            'maintenanceAction', 'completionProcessedAt',
+            'postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor',
             'created_at', 'updated_at',
             'asset', 'checklists', 'attachments', 'materials'
         ]
@@ -107,6 +115,13 @@ class WorkOrderCreateSerializer(serializers.Serializer):
     materials = serializers.ListField(
         child=serializers.DictField(), required=False
     )
+    requiredTools = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    requiredSpareParts = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    maintenanceAction = serializers.CharField(required=False, default='GENERAL')
 
 class WorkOrderAssignSerializer(serializers.Serializer):
     assignedTo = serializers.UUIDField()
@@ -115,6 +130,14 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=WorkOrder.STATUS_CHOICES)
     resolutionNotes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     actualDurationMinutes = serializers.IntegerField(required=False, allow_null=True)
+    maintenanceAction = serializers.ChoiceField(
+        choices=WorkOrder.MAINTENANCE_ACTION_CHOICES,
+        required=False,
+        default='GENERAL'
+    )
+    postRepairVibration = serializers.FloatField(required=False, allow_null=True)
+    postRepairTemperature = serializers.FloatField(required=False, allow_null=True)
+    postRepairLoadFactor = serializers.FloatField(required=False, allow_null=True, default=1.0)
     
 class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
     id = serializers.UUIDField(required=False, allow_null=True)

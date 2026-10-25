@@ -1610,7 +1610,26 @@ def portal_work_orders(request):
         try:
             data = json.loads(request.body)
             action = data.get('action')
-            
+            if action == 'report_incident':
+                wo_id = data.get('work_order_id') or data.get('id') or data.get('wo_id')
+                wo = WorkOrder.objects.filter(id=wo_id, tenant_id=tenant_id).first()
+                if not wo:
+                    return JsonResponse({'success': False, 'error': 'Work Order không tồn tại'}, status=404)
+                description = str(data.get('description', '') or '').strip()
+                if not description:
+                    return JsonResponse({'success': False, 'error': 'Vui lòng nhập mô tả chi tiết sự cố phát sinh.'}, status=400)
+                proposed_action = data.get('proposed_action') or data.get('proposedAction') or 'CORE_REPLACEMENT'
+                priority = data.get('priority') or 'HIGH'
+                from notifications.services import notify_work_order_incident_reported
+                notifs = notify_work_order_incident_reported(
+                    work_order=wo,
+                    technician=request.user,
+                    incident_description=description,
+                    proposed_action=proposed_action,
+                    priority=priority
+                )
+                return JsonResponse({'success': True, 'message': 'Đã gửi báo cáo phát sinh sự cố tới Quản đốc bảo trì thành công.', 'count': len(notifs) if isinstance(notifs, list) else 1})
+
             if action == 'toggle_checklist':
                 if not check_perm(request, ('work_order:execute', 'work_order:update')):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:execute required'}, status=403)
@@ -1670,7 +1689,9 @@ def portal_work_orders(request):
                             recorded_at=timezone.now(),
                             recorded_by=request.user if request.user and request.user.is_authenticated else None,
                             tenant=item.work_order.tenant,
-                            work_order=item.work_order
+                            work_order=item.work_order,
+                            checklist_item=item,
+                            measurement_phase='PRE_REPAIR_DIAGNOSTIC' if item.work_order and item.work_order.status == 'IN_PROGRESS' else 'ROUTINE'
                         )
                     except Exception:
                         pass
@@ -1778,6 +1799,7 @@ def portal_work_orders(request):
                     priority=priority_val,
                     status=data.get('status', 'CREATED'),
                     type=data.get('type', 'CORRECTIVE'),
+                    maintenance_action=data.get('maintenance_action') or data.get('maintenanceAction') or 'GENERAL',
                     parent_id_id=data.get('parent_id') if data.get('parent_id') else None,
                     asset_id=asset_id,
                     assigned_to_id=assigned_to_id if assigned_to_id else None,
@@ -1847,7 +1869,7 @@ def portal_work_orders(request):
             from django.utils import timezone
             
             # 1. Update Status Action
-            if 'status' in data and (len(data) == 2 or ('resolution_notes' in data and len(data) <= 4)):
+            if 'status' in data and data.get('status') in ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'CANCELLED']:
                 if not check_perm(request, ('work_order:execute', 'work_order:update')):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:execute required'}, status=403)
                 new_status = data.get('status')
@@ -1887,78 +1909,27 @@ def portal_work_orders(request):
                             pass
 
                     elif new_status == 'COMPLETED':
-                        if current_status != 'IN_PROGRESS':
-                            raise Exception("Work Order can only be completed from IN_PROGRESS state")
-                        if str(wo.assigned_to_id) != str(request.user.id):
+                        if str(wo.assigned_to_id) != str(request.user.id) and not check_perm(request, 'work_order:update'):
                             raise Exception("Only the assignee can complete the Work Order")
-                            
-                        for item in wo.checklists.all():
-                            if item.is_mandatory:
-                                if not item.is_completed:
-                                    raise Exception(f"Không thể hoàn thành: Chưa hoàn thành bước bắt buộc '{item.item_name}'")
-                                if item.input_type == 'NUMBER':
-                                    val_str = str(item.actual_value or '').strip().replace(',', '.')
-                                    if not val_str:
-                                        raise Exception(f"Không thể hoàn thành: Mục bắt buộc '{item.item_name}' chưa có số liệu đo kiểm.")
-                                    try:
-                                        float(val_str)
-                                    except ValueError:
-                                        raise Exception(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
 
-                        has_attachments = wo.attachments.exists()
-                        if not has_attachments:
-                            raise Exception("Bắt buộc phải tải lên ít nhất một hình ảnh minh chứng trước khi hoàn thành công việc.")
-                                
-                        wo.completed_at = timezone.now()
+                        post_repair_payload = None
+                        if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor', 'post_repair_vibration', 'post_repair_temperature')):
+                            post_repair_payload = {
+                                'vibration': data.get('postRepairVibration') or data.get('post_repair_vibration'),
+                                'temperature': data.get('postRepairTemperature') or data.get('post_repair_temperature'),
+                                'load_factor': data.get('postRepairLoadFactor') or data.get('post_repair_load_factor') or 1.0,
+                            }
 
-                        # Auto-return any active ToolReservation for this work order (BUG-TOOL-006)
-                        try:
-                            from assets.models import ToolReservation
-                            active_res = ToolReservation.objects.filter(
-                                tenant_id=tenant_id,
-                                work_order=wo,
-                                status__in=['RESERVED', 'IN_USE']
-                            )
-                            for r in active_res:
-                                r.status = 'RETURNED'
-                                r.returned_at = timezone.now()
-                                r.save()
-                                if r.tool:
-                                    r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
-                                    r.tool.save()
-                                if r.tool_instance:
-                                    r.tool_instance.status = 'AVAILABLE'
-                                    r.tool_instance.save()
-                        except Exception:
-                            pass
-
-                        # Event-based technician positioning: return tech to duty zone station
-                        if hasattr(request.user, 'technician_profile'):
-                            tp = request.user.technician_profile
-                            tp.availability_status = 'AVAILABLE'
-                            from users.models import TechnicianSchedule
-                            from assets.models import Location
-                            today_sched = TechnicianSchedule.objects.filter(
-                                tenant_id=tenant_id,
-                                user=request.user,
-                                work_date=timezone.now().date(),
-                                status='ON_DUTY'
-                            ).first()
-                            if today_sched and today_sched.duty_zone_id:
-                                loc = Location.objects.filter(tenant_id=tenant_id, code=today_sched.duty_zone_id).first()
-                                if loc:
-                                    tp.zone_id = loc.code
-                                    tp.coords_x = loc.center_x or 25.0
-                                    tp.coords_y = loc.center_y or 20.0
-                                    tp.floor_level = loc.floor_level or 1
-                            tp.save()
-
-                        # Dispatch real-time notification to supervisor / creator
-                        try:
-                            from notifications.services import notify_work_order_completed
-                            notify_work_order_completed(wo, technician=request.user)
-                        except Exception:
-                            pass
+                        from workorders.services import WorkOrderTransitionService
+                        wo = WorkOrderTransitionService.complete_work_order(
+                            work_order_id=wo.id,
+                            user=request.user,
+                            resolution_notes=data.get('resolution_notes', '') or data.get('resolutionNotes', ''),
+                            maintenance_action=data.get('maintenance_action') or data.get('maintenanceAction') or wo.maintenance_action or 'GENERAL',
+                            actual_duration_minutes=data.get('actual_duration_minutes') or data.get('actualDurationMinutes'),
+                            post_repair_data=post_repair_payload,
+                            tenant_id=tenant_id
+                        )
 
                     elif new_status in ['CANCELED', 'CANCELLED']:
                         if current_status == 'COMPLETED':
@@ -1995,7 +1966,7 @@ def portal_work_orders(request):
                 return JsonResponse({'success': True})
                 
             # 2. Assign Action
-            elif len(data) == 2 and 'assigned_to_id' in data:
+            elif 'assigned_to_id' in data and 'title' not in data:
                 if not check_perm(request, ('work_order:reassign', 'work_order:update')):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:reassign required'}, status=403)
                 if wo.status in ['COMPLETED', 'CANCELED', 'CANCELLED']:
@@ -2082,6 +2053,8 @@ def portal_work_orders(request):
                             pass
                     else:
                         wo.maintenance_window_end = None
+                if 'maintenance_action' in data or 'maintenanceAction' in data:
+                    wo.maintenance_action = data.get('maintenance_action') or data.get('maintenanceAction') or wo.maintenance_action
 
                 wo.save()
 
@@ -2183,6 +2156,7 @@ def portal_work_orders(request):
 
         wo_metadata[str(wo.id)] = {
             'checklists': checklists,
+            'maintenance_action': getattr(wo, 'maintenance_action', 'GENERAL') or 'GENERAL',
             'required_skill': wo.required_skill or '',
             'min_skill_level': wo.min_skill_level if wo.min_skill_level is not None else '',
             'required_certification': wo.required_certification or '',
@@ -2324,6 +2298,7 @@ def portal_work_orders(request):
         'user_floorplan_id': user_fp_id or '',
         'user_floorplan_name': user_fp_name or '',
         'user_is_restricted_floorplan': user_is_restricted_floorplan,
+        'is_system_admin': is_admin,
         'current_user_id': str(request.user.id),
     })
 
@@ -2462,6 +2437,8 @@ def portal_pm_plans(request):
                     suppress_if_pending=data.get('suppress_if_pending', True),
                     lead_time_days=data.get('lead_time_days', 0),
                     estimated_duration_minutes=data.get('estimated_duration_minutes') or None,
+                    maintenance_action=data.get('maintenance_action') or data.get('maintenanceAction') or 'GENERAL',
+                    required_tools=data.get('required_tools', []) or [],
                     assignee_id=None
                 )
                 
@@ -2519,6 +2496,10 @@ def portal_pm_plans(request):
                 pm.suppress_if_pending = data.get('suppress_if_pending', True)
                 pm.lead_time_days = data.get('lead_time_days', 0)
                 pm.estimated_duration_minutes = data.get('estimated_duration_minutes') or None
+                if 'maintenance_action' in data or 'maintenanceAction' in data:
+                    pm.maintenance_action = data.get('maintenance_action') or data.get('maintenanceAction') or pm.maintenance_action
+                if 'required_tools' in data:
+                    pm.required_tools = data.get('required_tools', []) or []
                 pm.assignee_id = None
                 pm.save()
                 
@@ -2640,13 +2621,19 @@ def portal_pm_plans(request):
     is_admin = request.user.is_superuser or request.user.roles.filter(permissions__id='system:admin').exists()
     user_is_restricted_floorplan = bool(user_fp_id) and not is_admin
 
-    from assets.models import Asset, SparePart, Location
+    from assets.models import Asset, SparePart, Location, Tool
     from django.db.models import Q
+    from django.utils import timezone
+    today = timezone.now().date()
     assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True).select_related('location')
     floorplans_list = list(Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True).values('id', 'name', 'code'))
     if user_is_restricted_floorplan:
         assets = assets.filter(Q(location__parent_id=user_fp_id) | Q(location_id=user_fp_id))
         floorplans_list = [fp for fp in floorplans_list if str(fp['id']) == user_fp_id]
+
+    zones_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).exclude(zone_type='FLOORPLAN').values('id', 'name', 'code', 'parent_id').order_by('name'))
+    if user_is_restricted_floorplan:
+        zones_list = [z for z in zones_list if str(z.get('parent_id') or '') == user_fp_id]
 
     pm_plans_data = []
     for pm in pm_plans.prefetch_related('checklists', 'materials', 'assignments__asset'):
@@ -2658,6 +2645,7 @@ def portal_pm_plans(request):
             'assigned_asset_ids_json': json.dumps(assigned_asset_ids),
             'assigned_assets_names': assigned_assets_names,
             'assigned_count': len(assigned_asset_ids),
+            'required_tools_json': json.dumps(getattr(pm, 'required_tools', []) or []),
             'checklists_json': json.dumps([
                 {
                     'id': str(c.id),
@@ -2676,13 +2664,44 @@ def portal_pm_plans(request):
             ])
         })
 
-    spare_parts = SparePart.objects.filter(tenant_id=tenant_id)
+    tools_qs = Tool.objects.filter(tenant_id=tenant_id, is_active=True).select_related('location').prefetch_related('instances')
+    tools = []
+    for t in tools_qs:
+        instances = list(t.instances.all())
+        is_expired = False
+        if instances:
+            has_valid = any(
+                inst.inspection_status != 'EXPIRED' and
+                (not inst.calibration_due_date or inst.calibration_due_date >= today)
+                for inst in instances
+            )
+            is_expired = not has_valid
+
+        tools.append({
+            'id': str(t.id),
+            'code': t.code,
+            'name': t.name,
+            'available_quantity': t.available_quantity,
+            'is_disabled': (t.available_quantity <= 0) or is_expired,
+            'is_expired': is_expired,
+            'location_id': str(t.location_id) if t.location_id else '',
+            'location__name': t.location.name if t.location else '',
+            'location__code': t.location.code if t.location else '',
+            'location__floor_level': t.location.floor_level if t.location else None
+        })
+
+    spare_parts = list(SparePart.objects.filter(tenant_id=tenant_id).values('id', 'name', 'part_number', 'quantity_in_stock', 'location_id', 'location__name', 'location__code', 'location__floor_level'))
+    for sp in spare_parts:
+        sp['id'] = str(sp['id'])
+        sp['quantity_in_stock'] = float(sp['quantity_in_stock'])
 
     return render(request, 'pm_plans.html', {
         'pm_plans_data': pm_plans_data,
         'kpis': kpis,
         'assets': assets,
         'floorplans_list': floorplans_list,
+        'zones_list': zones_list,
+        'tools': tools,
         'spare_parts': spare_parts,
         'user_floorplan_id': user_fp_id or '',
         'user_floorplan_name': user_fp_name or '',

@@ -8,17 +8,23 @@ from assets.models import MeterReading
 @receiver(post_save, sender=WorkOrder)
 def on_work_order_completed(sender, instance, **kwargs):
     """
-    Quy Tắc 2 & Mục 11.2: Post-Repair Window Reset Guardrail.
-    Khi một Work Order loại CORRECTIVE hoặc PREVENTIVE trên thiết bị chuyển sang trạng thái COMPLETED,
-    hệ thống tự động kích hoạt Cắt tỉa & Tái lập cửa sổ trượt (Sliding Window Reset / Pruning).
-    Toàn bộ các lần đo trước thời điểm hoàn thành sửa chữa bị đánh dấu đóng băng (is_pre_repair = True).
+    Post-Repair Window Reset Guardrail.
+    Chỉ khi WorkOrder hoàn thành là loại CORE_REPLACEMENT (đại tu / thay thế cụm cốt lõi)
+    mới kích hoạt đóng băng các lần đo cũ để tái lập cửa sổ trượt.
+    Tuyệt đối KHÔNG đóng băng số đo nghiệm thu (POST_REPAIR_ACCEPTANCE) và KHÔNG đóng băng
+    khi bảo trì nhỏ (MICRO_MAINTENANCE / GENERAL).
     """
-    if instance.status == 'COMPLETED' and instance.type in ('CORRECTIVE', 'PREVENTIVE') and instance.asset_id:
+    if instance.status == 'COMPLETED' and instance.asset_id:
         completed_time = instance.completed_at or timezone.now()
-        MeterReading.objects.filter(
-            asset_id=instance.asset_id,
-            reading_date__lte=completed_time
-        ).update(is_pre_repair=True)
+
+        # CHỈ đóng băng dữ liệu cũ khi người dùng xác nhận là CORE_REPLACEMENT
+        if instance.maintenance_action == 'CORE_REPLACEMENT':
+            MeterReading.objects.filter(
+                asset_id=instance.asset_id,
+                reading_date__lte=completed_time
+            ).exclude(
+                measurement_phase='POST_REPAIR_ACCEPTANCE'
+            ).update(is_pre_repair=True)
 
         # Đóng vòng đời AssetAnomalyAlert sang RESOLVED khi phiếu sửa chữa hoàn thành
         from assets.models import AssetAnomalyAlert

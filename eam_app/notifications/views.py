@@ -50,15 +50,32 @@ class NotificationListView(APIView):
         if action_status_param:
             qs = qs.filter(action_status=action_status_param)
 
-        # Filter by category
+        # Filter by category (single or comma-separated)
         category_param = request.query_params.get('category', '').strip().upper()
         if category_param:
-            qs = qs.filter(category=category_param)
+            categories = [c.strip() for c in category_param.split(',') if c.strip()]
+            if len(categories) == 1:
+                qs = qs.filter(category=categories[0])
+            elif len(categories) > 1:
+                qs = qs.filter(category__in=categories)
 
-        # Filter by severity
+        # Filter by severity (single or comma-separated)
         severity_param = request.query_params.get('severity', '').strip().upper()
         if severity_param:
-            qs = qs.filter(severity=severity_param)
+            severities = [s.strip() for s in severity_param.split(',') if s.strip()]
+            if len(severities) == 1:
+                qs = qs.filter(severity=severities[0])
+            elif len(severities) > 1:
+                qs = qs.filter(severity__in=severities)
+
+        # Filter by event_type (single or comma-separated)
+        event_type_param = request.query_params.get('event_type', '').strip()
+        if event_type_param:
+            events = [e.strip() for e in event_type_param.split(',') if e.strip()]
+            if len(events) == 1:
+                qs = qs.filter(event_type=events[0])
+            elif len(events) > 1:
+                qs = qs.filter(event_type__in=events)
 
         # Calculate unread count for badge indicators
         unread_count = Notification.objects.filter(

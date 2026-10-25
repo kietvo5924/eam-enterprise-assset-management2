@@ -27,9 +27,23 @@ class PmPlan(BaseTenantModel):
     is_active = models.BooleanField(default=True)
     is_floating_schedule = models.BooleanField(default=False)
     suppress_if_pending = models.BooleanField(default=True)
+    MAINTENANCE_ACTION_CHOICES = (
+        ('GENERAL', 'General Maintenance / Bảo dưỡng thông thường'),
+        ('MICRO_MAINTENANCE', 'Micro Maintenance / Bôi trơn, siết ốc, hiệu chỉnh nhỏ'),
+        ('CORE_REPLACEMENT', 'Core Replacement / Đại tu thay thế phụ tùng cốt lõi'),
+    )
+
     lead_time_days = models.IntegerField(default=0)
     estimated_duration_minutes = models.IntegerField(null=True, blank=True)
     assignee = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_pm_plans')
+    maintenance_action = models.CharField(
+        max_length=32,
+        choices=MAINTENANCE_ACTION_CHOICES,
+        default='GENERAL',
+        db_index=True,
+        help_text='Cấp độ can thiệp bảo trì mặc định áp dụng cho các Work Order tự động sinh ra'
+    )
+    required_tools = models.JSONField(default=list, blank=True, help_text='Danh mục mã dụng cụ chuyên dụng cần thiết')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)

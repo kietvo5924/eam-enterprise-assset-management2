@@ -829,4 +829,29 @@ class WorkOrderService {
       return false;
     }
   }
+
+  Future<bool> reportIncident(
+    String woId, {
+    required String description,
+    String proposedAction = 'CORE_REPLACEMENT',
+    String priority = 'HIGH',
+  }) async {
+    try {
+      if (NetworkService().isOnline) {
+        final response = await _dio.post(
+          '/api/v1/work-orders/$woId/report-incident/',
+          data: {
+            'description': description,
+            'proposed_action': proposedAction,
+            'priority': priority,
+          },
+        );
+        return response.statusCode == 200 && response.data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('reportIncident API error: $e');
+      return false;
+    }
+  }
 }

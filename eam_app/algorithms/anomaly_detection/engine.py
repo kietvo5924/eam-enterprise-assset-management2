@@ -41,11 +41,19 @@ class ConditionMonitoringEngine:
         recorded_at: Optional[datetime] = None,
         recorded_by = None,
         tenant = None,
-        work_order = None
+        work_order = None,
+        round_id = None,
+        checklist_item = None,
+        measurement_phase = 'ROUTINE',
+        load_factor = None,
+        motor_current_amp = None,
+        shaft_rpm = None
     ) -> Dict[str, Any]:
+        import uuid
         rec_time = recorded_at or timezone.now()
         cur_tenant = tenant or getattr(asset, 'tenant', None)
         norm_machine_state = str(machine_state or 'RUNNING').upper().strip()
+        cur_round_id = round_id or uuid.uuid4()
 
         # Bước 1: Kiểm tra giới hạn vật lý (Sanity Bounds Check - Quy Tắc 10 & TC-ANOM-09)
         for item in readings_data:
@@ -57,7 +65,7 @@ class ConditionMonitoringEngine:
 
         # Bước 2: Phân luồng tài sản tĩnh (Quy Tắc 10 & TC-ANOM-10)
         if is_static_asset(asset):
-            # Lưu các chỉ số (nếu có) nhưng không chạy AI rung nhiệt
+            # Lưu hoặc cập nhật các chỉ số (nếu có) nhưng không chạy AI rung nhiệt
             saved_records = []
             for item in readings_data:
                 metric = item.get('metricCode') or item.get('metric_code') or 'GENERAL'
@@ -69,19 +77,36 @@ class ConditionMonitoringEngine:
                 val = float(val) if val is not None else 0.0
                 unit = item.get('unit', '')
                 remarks = item.get('remarks', '')
-                rec = MeterReading.objects.create(
-                    tenant=cur_tenant,
-                    asset=asset,
-                    work_order=work_order,
-                    metric_code=metric,
-                    reading_value=val,
-                    reading_date=rec_time,
-                    unit=unit,
-                    ambient_temperature=ambient_temperature,
-                    machine_state=norm_machine_state,
-                    recorded_by=recorded_by,
-                    remarks=remarks
-                )
+                chk_item = item.get('checklistItem') or item.get('checklist_item') or checklist_item
+                r_id = item.get('roundId') or item.get('round_id') or cur_round_id
+
+                rec = None
+                if chk_item:
+                    rec = MeterReading.objects.filter(checklist_item=chk_item, tenant=cur_tenant).first()
+
+                if rec:
+                    rec.reading_value = val
+                    rec.reading_date = rec_time
+                    if unit: rec.unit = unit
+                    if remarks: rec.remarks = remarks
+                    rec.save()
+                else:
+                    rec = MeterReading.objects.create(
+                        tenant=cur_tenant,
+                        asset=asset,
+                        work_order=work_order,
+                        checklist_item=chk_item,
+                        round_id=r_id,
+                        measurement_phase='ROUTINE',
+                        metric_code=metric,
+                        reading_value=val,
+                        reading_date=rec_time,
+                        unit=unit,
+                        ambient_temperature=ambient_temperature,
+                        machine_state=norm_machine_state,
+                        recorded_by=recorded_by,
+                        remarks=remarks
+                    )
                 saved_records.append(rec)
 
             checklist_data = get_static_asset_checklist(asset)
@@ -92,7 +117,7 @@ class ConditionMonitoringEngine:
                 "workOrderId": str(work_order.id) if work_order else None
             }
 
-        # Bước 3: Lưu các bản ghi MeterReading vào cơ sở dữ liệu
+        # Bước 3: Lưu hoặc cập nhật các bản ghi MeterReading vào cơ sở dữ liệu
         saved_records = []
         for item in readings_data:
             metric = str(item.get('metricCode') or item.get('metric_code') or 'VIBRATION').upper().strip()
@@ -104,19 +129,50 @@ class ConditionMonitoringEngine:
             val = float(val) if val is not None else 0.0
             unit = item.get('unit', '')
             remarks = item.get('remarks', '')
-            rec = MeterReading.objects.create(
-                tenant=cur_tenant,
-                asset=asset,
-                work_order=work_order,
-                metric_code=metric,
-                reading_value=val,
-                reading_date=rec_time,
-                unit=unit,
-                ambient_temperature=ambient_temperature,
-                machine_state=norm_machine_state,
-                recorded_by=recorded_by,
-                remarks=remarks
-            )
+            chk_item = item.get('checklistItem') or item.get('checklist_item') or checklist_item
+            phase = item.get('measurementPhase') or item.get('measurement_phase') or measurement_phase or 'ROUTINE'
+            lf = item.get('loadFactor') or item.get('load_factor') or load_factor or 1.0
+            cur_amp = item.get('motorCurrentAmp') or item.get('motor_current_amp') or motor_current_amp
+            rpm_val = item.get('shaftRpm') or item.get('shaft_rpm') or shaft_rpm
+            r_id = item.get('roundId') or item.get('round_id') or cur_round_id
+
+            rec = None
+            if chk_item:
+                rec = MeterReading.objects.filter(checklist_item=chk_item, tenant=cur_tenant).first()
+
+            if rec:
+                rec.reading_value = val
+                rec.reading_date = rec_time
+                if unit: rec.unit = unit
+                if ambient_temperature is not None: rec.ambient_temperature = ambient_temperature
+                if lf is not None: rec.load_factor = float(lf)
+                if cur_amp is not None: rec.motor_current_amp = float(cur_amp)
+                if rpm_val is not None: rec.shaft_rpm = float(rpm_val)
+                rec.machine_state = norm_machine_state
+                rec.measurement_phase = phase
+                rec.round_id = r_id
+                if remarks: rec.remarks = remarks
+                rec.save()
+            else:
+                rec = MeterReading.objects.create(
+                    tenant=cur_tenant,
+                    asset=asset,
+                    work_order=work_order,
+                    checklist_item=chk_item,
+                    round_id=r_id,
+                    measurement_phase=phase,
+                    load_factor=float(lf) if lf is not None else 1.0,
+                    motor_current_amp=float(cur_amp) if cur_amp is not None else None,
+                    shaft_rpm=float(rpm_val) if rpm_val is not None else None,
+                    metric_code=metric,
+                    reading_value=val,
+                    reading_date=rec_time,
+                    unit=unit,
+                    ambient_temperature=ambient_temperature,
+                    machine_state=norm_machine_state,
+                    recorded_by=recorded_by,
+                    remarks=remarks
+                )
             saved_records.append(rec)
 
         # Bước 4: Lọc ngữ cảnh trạng thái máy (Quy Tắc 1 & TC-ANOM-01)
@@ -380,6 +436,27 @@ class ConditionMonitoringEngine:
                 needs_critical_wo = not active_alert.draft_work_order or active_alert.draft_work_order.priority != 'URGENT'
                 if needs_critical_wo:
                     crit_deadline = timezone.now() + timedelta(hours=4)
+
+                    # Gợi ý dụng cụ hợp lệ từ kho của tenant
+                    suggested_tools = []
+                    try:
+                        from assets.models import Tool
+                        tool_codes_needed = ['VIB_METER', 'TORQUE_WRENCH'] if primary_metric == 'VIBRATION' else ['MULTIMETER']
+                        valid_tools = Tool.objects.filter(
+                            tenant=cur_tenant,
+                            code__in=tool_codes_needed,
+                            is_active=True,
+                            available_quantity__gt=0
+                        )
+                        suggested_tools = list(valid_tools.values_list('code', flat=True))
+                    except Exception:
+                        suggested_tools = []
+
+                    # Gợi ý phụ tùng vào required_spare_parts (dạng ID metadata tham khảo, TUYỆT ĐỐI KHÔNG tự tạo WorkOrderMaterial làm trừ kho)
+                    suggested_parts = []
+                    if getattr(asset, 'primary_spare_part_id', None):
+                        suggested_parts.append(str(asset.primary_spare_part_id))
+
                     critical_wo = WorkOrder.objects.create(
                         tenant=cur_tenant,
                         asset=asset,
@@ -396,6 +473,8 @@ class ConditionMonitoringEngine:
                         deadline=crit_deadline,
                         required_skill='Cơ khí' if primary_metric == 'VIBRATION' else ('Điện' if primary_metric in ('CURRENT', 'VOLTAGE') else None),
                         min_skill_level=2,
+                        required_tools=suggested_tools,
+                        required_spare_parts=suggested_parts,
                         coords_x=getattr(asset, 'coords_x', None),
                         coords_y=getattr(asset, 'coords_y', None),
                         floor_level=getattr(asset, 'floor_level', 1) or 1,
