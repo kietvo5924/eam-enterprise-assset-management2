@@ -2014,6 +2014,17 @@
               <i class="ph-bold ph-tree-structure"></i> <span>Cây Tô-pô</span>
             </button>
 
+            <!-- Dimension Switcher: 2D vs 3D -->
+            <div id="tsp-dim-switcher" class="flex items-center bg-slate-950/90 border border-slate-700/80 rounded-lg p-0.5 ml-1 shadow-xs">
+              <button type="button" id="tab-btn-tsp-2d" onclick="switchTSPDimension('2d')" class="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer shadow-xs" title="Chế độ sơ đồ mặt phẳng 2D CAD">
+                <i class="ph-bold ph-square"></i> <span>2D</span>
+              </button>
+              <button type="button" id="tab-btn-tsp-3d" onclick="switchTSPDimension('3d')" class="px-2.5 py-1 rounded-md text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition cursor-pointer" title="Chế độ phối cảnh 3D Digital Twin (Xuyên tầng)">
+                <i class="ph-bold ph-cube"></i> <span>3D</span>
+                <span class="px-1 py-0.2 rounded text-[9px] font-extrabold bg-sky-500/20 text-sky-300 border border-sky-400/30">PRO</span>
+              </button>
+            </div>
+
             <!-- Stepper Navigation & Playback -->
             <div id="tsp-stepper-control" class="hidden sm:flex items-center gap-0.5 bg-slate-950/80 border border-slate-800 rounded-lg p-0.5 ml-1 shadow-xs">
               <button type="button" onclick="stepTSPStop(-1)" class="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer" title="Chặng trước">
@@ -2084,6 +2095,51 @@
             <g id="tsp-svg-routes-layer"></g>
             <g id="tsp-svg-stops-layer"></g>
           </svg>
+
+          <!-- 3D Digital Twin Viewport (WebGL Canvas) -->
+          <div id="tsp-3d-viewport" class="hidden absolute inset-0 w-full h-full bg-slate-950 overflow-hidden select-none">
+            <canvas id="tsp-3d-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+            <!-- 3D Camera & View Controls Toolbar -->
+            <div class="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2 pointer-events-auto">
+              <!-- Preset Camera Angles -->
+              <div class="flex items-center bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1 shadow-2xl gap-1">
+                <button type="button" id="btn-cam-iso" onclick="setTSP3DCameraView('iso')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer" title="Góc nhìn đẳng cự Isometric (45°)">
+                  <i class="ph-bold ph-perspective"></i> <span>Isometric</span>
+                </button>
+                <button type="button" id="btn-cam-persp" onclick="setTSP3DCameraView('perspective')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Phối cảnh góc nhìn 3D">
+                  <i class="ph-bold ph-buildings"></i> <span>Phối cảnh</span>
+                </button>
+                <button type="button" id="btn-cam-top" onclick="setTSP3DCameraView('top')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Nhìn thẳng từ trên xuống">
+                  <i class="ph-bold ph-arrows-in-cardinal"></i> <span>Từ trên</span>
+                </button>
+              </div>
+
+              <!-- Exploded View Toggle -->
+              <button type="button" id="btn-tsp-3d-exploded" onclick="toggleTSP3DExplodedView()" class="px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 text-[11px] font-bold text-sky-400 hover:bg-slate-800 transition flex items-center gap-1.5 shadow-2xl cursor-pointer" title="Kéo tách các tầng trong không gian 3D để quan sát các tầng bên dưới">
+                <i class="ph-bold ph-stack"></i> <span id="label-tsp-3d-exploded">Tách tầng 3D</span>
+              </button>
+
+              <!-- Reset Camera -->
+              <button type="button" onclick="resetTSP3DCamera()" class="w-7 h-7 rounded-xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center text-xs font-bold shadow-2xl cursor-pointer" title="Đặt lại góc nhìn camera">
+                <i class="ph-bold ph-arrows-clockwise"></i>
+              </button>
+            </div>
+
+            <!-- 3D Legend & Interaction Guide -->
+            <div class="absolute bottom-3 left-3 z-20 hidden md:flex items-center gap-3 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-xl text-[10px] text-slate-300 shadow-2xl pointer-events-none">
+              <span class="flex items-center gap-1.5 text-amber-400 font-bold"><span class="w-2 h-2 rounded-full bg-amber-500 shadow-xs"></span> Ống lộ trình 3D</span>
+              <span class="flex items-center gap-1.5 text-emerald-400 font-bold"><span class="w-2 h-2 rounded-full bg-emerald-500 shadow-xs"></span> Máy bình thường</span>
+              <span class="flex items-center gap-1.5 text-red-400 font-bold"><span class="w-2 h-2 rounded-full bg-red-500 shadow-xs animate-pulse"></span> Máy có sự cố</span>
+              <span class="text-slate-400 ml-1 border-l border-slate-700 pl-2">Kéo chuột trái: Xoay 360° • Cuộn: Zoom • Phải: Di chuyển</span>
+            </div>
+
+            <!-- 3D Tooltip for Hovered Node / Machine -->
+            <div id="tsp-3d-tooltip" class="hidden absolute z-30 pointer-events-none bg-slate-900/95 backdrop-blur-md border border-sky-400/50 text-white px-3 py-2 rounded-xl text-xs shadow-2xl max-w-xs transition-opacity duration-150">
+              <div id="tsp-3d-tooltip-title" class="font-bold text-amber-400 truncate">Trạm công việc</div>
+              <div id="tsp-3d-tooltip-sub" class="text-[10px] text-slate-300 truncate mt-0.5">Vị trí</div>
+            </div>
+          </div>
 
           <!-- Floating CAD Zoom Controls Widget (Phóng to / Thu nhỏ / Mặc định) -->
           <div id="tsp-map-zoom-toolbar" class="absolute bottom-4 right-4 z-20 flex flex-col items-center bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl p-1 shadow-2xl gap-1 select-none pointer-events-auto">
@@ -5840,6 +5896,9 @@
       if (!modal) return;
       modal.classList.remove('hidden');
       if (typeof resetTSPSvgZoom === 'function') resetTSPSvgZoom();
+      if (tspActiveDimension === '3d' && typeof initOrUpdateTSP3D === 'function') {
+          setTimeout(() => initOrUpdateTSP3D(), 60);
+      }
 
       // Check if any work orders are checked in the main table
       const checkedBoxes = document.querySelectorAll('.wo-select-cb:checked, .wo-row-cb:checked');
@@ -5857,6 +5916,7 @@
           if (iconPlay) iconPlay.className = 'ph-bold ph-play text-xs';
           if (btnPlay) btnPlay.title = 'Tự động chạy hành trình';
       }
+      if (typeof stopTSP3DAnimation === 'function') stopTSP3DAnimation();
       if (typeof resetTSPSvgZoom === 'function') resetTSPSvgZoom();
       const modal = document.getElementById('modal-tsp-routing');
       if (modal) modal.classList.add('hidden');
@@ -5871,6 +5931,7 @@
       const viewInfo = document.getElementById('tsp-view-info');
       const stepper = document.getElementById('tsp-stepper-control');
       const btnMachines = document.getElementById('btn-toggle-tsp-machines');
+      const dimSwitcher = document.getElementById('tsp-dim-switcher');
 
       if (tabName === 'map') {
           if (btnMap) {
@@ -5883,8 +5944,15 @@
           if (contentTree) contentTree.classList.add('hidden');
           if (stepper) stepper.classList.remove('hidden');
           if (btnMachines) btnMachines.classList.remove('hidden');
-          if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
-              renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+          if (dimSwitcher) dimSwitcher.classList.remove('hidden');
+
+          if (tspActiveDimension === '3d') {
+              switchTSPDimension('3d');
+          } else {
+              switchTSPDimension('2d');
+              if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+                  renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+              }
           }
       } else {
           if (btnTree) {
@@ -5897,6 +5965,8 @@
           if (contentMap) contentMap.classList.add('hidden');
           if (stepper) stepper.classList.add('hidden');
           if (btnMachines) btnMachines.classList.add('hidden');
+          if (dimSwitcher) dimSwitcher.classList.add('hidden');
+          if (typeof stopTSP3DAnimation === 'function') stopTSP3DAnimation();
           if (viewInfo) viewInfo.innerText = 'Cây Tô-pô: Tòa nhà > Tầng > Phòng';
       }
   }
@@ -6153,6 +6223,9 @@
       renderTSPTimeline(data.orderedStops || []);
       renderTSPSvgRoute(data.orderedStops || []);
       renderTSPTree(data.orderedStops || []);
+      if (tspActiveDimension === '3d' && typeof initOrUpdateTSP3D === 'function') {
+          initOrUpdateTSP3D();
+      }
 
       if (data.orderedStops && data.orderedStops.length > 0) {
           setTimeout(() => {
@@ -6445,7 +6518,11 @@
               btn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700/80 flex items-center gap-1.5 transition shadow-sm cursor-pointer';
           }
       }
-      if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+      if (tspActiveDimension === '3d') {
+          if (typeof updateTSP3DMachinesVisibility === 'function') {
+              updateTSP3DMachinesVisibility();
+          }
+      } else if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
           renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
       }
   }
@@ -6629,6 +6706,9 @@
 
       // 3. Highlight pin trạm trên bản đồ
       highlightTSPStopPin(index);
+      if (tspActiveDimension === '3d' && typeof focusTSP3DStop === 'function') {
+          focusTSP3DStop(index);
+      }
 
       // Tự động căn tâm tới trạm nếu sơ đồ đang được phóng to
       if (window.tspSvgZoomState && window.tspSvgZoomState.zoom > 1.15) {
@@ -7308,6 +7388,762 @@
       });
 
       container.innerHTML = html;
+  }
+
+  // =========================================================================
+  // TASK: 3D DIGITAL TWIN FACTORY FLOORPLAN & TSP VISUALIZER (Three.js)
+  // =========================================================================
+  let tspActiveDimension = '2d'; // '2d' or '3d'
+  let tsp3DScene = null;
+  let tsp3DCamera = null;
+  let tsp3DRenderer = null;
+  let tsp3DControls = null;
+  let tsp3DAnimId = null;
+  let tsp3DRaycaster = null;
+  let tsp3DMouse = null;
+  let tsp3DWorldGroup = null;
+  let tsp3DMachinesGroup = null;
+  let tsp3DRouteGroup = null;
+  let tsp3DPinsGroup = null;
+  let tsp3DInteractables = [];
+  let tsp3DExploded = false;
+  let tsp3DRouteCurve = null;
+  let tsp3DTravelOrb = null;
+  let tsp3DClock = null;
+
+  // Fixed architectural constants (Cố định chiều cao và khoảng cách sàn chuẩn BIM/CAD)
+  const TSP3D_WALL_HEIGHT = 4.0;       // Chiều cao tầng: cố định 4.0m
+  const TSP3D_FLOOR_SPACING = 8.5;     // Khoảng cách cao độ giữa các tầng: cố định 8.5m
+  const TSP3D_SLAB_THICKNESS = 0.4;    // Độ dày sàn bê tông: cố định 0.4m
+  const TSP3D_EXPLODED_EXTRA = 12.0;   // Khoảng cách giãn tách tầng khi bật Exploded View: 12.0m
+
+  function switchTSPDimension(dim) {
+      tspActiveDimension = dim;
+      const btn2D = document.getElementById('tab-btn-tsp-2d');
+      const btn3D = document.getElementById('tab-btn-tsp-3d');
+      const svgMap = document.getElementById('tsp-route-svg');
+      const viewport3D = document.getElementById('tsp-3d-viewport');
+      const zoomToolbar = document.getElementById('tsp-map-zoom-toolbar');
+      const floorSwitcher = document.getElementById('tsp-floor-switcher');
+      const viewInfo = document.getElementById('tsp-view-info');
+
+      if (dim === '3d') {
+          if (btn3D) {
+              btn3D.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer shadow-xs';
+          }
+          if (btn2D) {
+              btn2D.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition cursor-pointer';
+          }
+          if (svgMap) svgMap.classList.add('hidden');
+          if (viewport3D) viewport3D.classList.remove('hidden');
+          if (zoomToolbar) zoomToolbar.classList.add('hidden');
+          if (floorSwitcher) floorSwitcher.classList.add('hidden');
+
+          if (viewInfo) {
+              viewInfo.innerHTML = '<span class="text-amber-400 font-bold">🏢 Phối cảnh 3D Digital Twin</span> (Xuyên tầng liên thông)';
+          }
+
+          setTimeout(() => initOrUpdateTSP3D(), 40);
+      } else {
+          if (btn2D) {
+              btn2D.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer shadow-xs';
+          }
+          if (btn3D) {
+              btn3D.className = 'px-2.5 py-1 rounded-md text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 flex items-center gap-1.5 transition cursor-pointer';
+          }
+          if (viewport3D) viewport3D.classList.add('hidden');
+          if (svgMap) svgMap.classList.remove('hidden');
+          if (zoomToolbar) zoomToolbar.classList.remove('hidden');
+          if (floorSwitcher) floorSwitcher.classList.remove('hidden');
+
+          stopTSP3DAnimation();
+
+          if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+              renderTSPSvgRoute(tspCurrentRouteData.orderedStops);
+          }
+      }
+  }
+
+  function getTSPStopCoordsM(stop) {
+      let mx = 110.0, my = 62.0;
+      if (stop && stop.coords) {
+          if (typeof stop.coords.x === 'number') { mx = stop.coords.x; my = stop.coords.y; }
+          else if (Array.isArray(stop.coords)) { mx = stop.coords[0]; my = stop.coords[1]; }
+          else if (typeof stop.coords.x === 'string') { mx = parseFloat(stop.coords.x) || 110; my = parseFloat(stop.coords.y) || 62; }
+      } else if (stop && stop.assetName && window.ASSETS_MAP) {
+          const ast = Object.values(window.ASSETS_MAP).find(a => a.name === stop.assetName);
+          if (ast && ast.coords_x > 0 && ast.coords_y > 0) { mx = ast.coords_x; my = ast.coords_y; }
+      } else if (stop && stop.locationId && Array.isArray(LOCATIONS_LIST)) {
+          const loc = LOCATIONS_LIST.find(l => String(l.id) === String(stop.locationId));
+          if (loc && loc.center_x > 0 && loc.center_y > 0) { mx = loc.center_x; my = loc.center_y; }
+      }
+      return { x: parseFloat(mx) || 110.0, y: parseFloat(my) || 62.0 };
+  }
+
+  function initOrUpdateTSP3D() {
+      if (typeof THREE === 'undefined') {
+          console.warn('Three.js library is not loaded yet.');
+          return;
+      }
+      const viewport = document.getElementById('tsp-3d-viewport');
+      const canvas = document.getElementById('tsp-3d-canvas');
+      if (!viewport || !canvas) return;
+
+      const width = Math.max(viewport.clientWidth, 640);
+      const height = Math.max(viewport.clientHeight, 440);
+
+      if (!tsp3DScene) {
+          tsp3DScene = new THREE.Scene();
+          tsp3DScene.background = new THREE.Color(0x0a1020);
+          tsp3DScene.fog = new THREE.FogExp2(0x0a1020, 0.0028);
+
+          tsp3DCamera = new THREE.PerspectiveCamera(45, width / height, 0.5, 3000);
+          tsp3DCamera.position.set(130, 115, 140);
+
+          tsp3DRenderer = new THREE.WebGLRenderer({
+              canvas: canvas,
+              antialias: true,
+              alpha: true,
+              powerPreference: 'high-performance'
+          });
+          tsp3DRenderer.setSize(width, height);
+          tsp3DRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+          if (THREE.OrbitControls) {
+              tsp3DControls = new THREE.OrbitControls(tsp3DCamera, tsp3DRenderer.domElement);
+              tsp3DControls.enableDamping = true;
+              tsp3DControls.dampingFactor = 0.08;
+              tsp3DControls.maxPolarAngle = Math.PI / 2 - 0.02;
+              tsp3DControls.minDistance = 15;
+              tsp3DControls.maxDistance = 750;
+              tsp3DControls.target.set(-15, 8, -5);
+              tsp3DControls.update();
+          }
+
+          const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+          tsp3DScene.add(ambientLight);
+
+          const sunLight = new THREE.DirectionalLight(0x38bdf8, 2.2);
+          sunLight.position.set(120, 180, 100);
+          tsp3DScene.add(sunLight);
+
+          const warmFill = new THREE.DirectionalLight(0xf59e0b, 1.3);
+          warmFill.position.set(-100, 130, -90);
+          tsp3DScene.add(warmFill);
+
+          const grid = new THREE.GridHelper(360, 36, 0x1e293b, 0x0f172a);
+          grid.position.y = -0.5;
+          tsp3DScene.add(grid);
+
+          tsp3DWorldGroup = new THREE.Group();
+          tsp3DScene.add(tsp3DWorldGroup);
+
+          tsp3DRaycaster = new THREE.Raycaster();
+          tsp3DMouse = new THREE.Vector2();
+
+          canvas.addEventListener('mousemove', onTSP3DMouseMove);
+          canvas.addEventListener('click', onTSP3DMouseClick);
+          window.addEventListener('resize', onTSP3DResize);
+      } else {
+          tsp3DCamera.aspect = width / height;
+          tsp3DCamera.updateProjectionMatrix();
+          tsp3DRenderer.setSize(width, height);
+      }
+
+      tsp3DClock = new THREE.Clock();
+
+      try {
+          buildTSP3DSceneGraph();
+      } catch (err) {
+          console.error('Error building 3D scene graph:', err);
+      }
+      startTSP3DAnimation();
+  }
+
+  function buildTSP3DSceneGraph() {
+      if (!tsp3DWorldGroup) return;
+
+      while (tsp3DWorldGroup.children.length > 0) {
+          const child = tsp3DWorldGroup.children[0];
+          tsp3DWorldGroup.remove(child);
+      }
+      tsp3DInteractables = [];
+
+      let activeFpId = window.tspActiveFloorplanId;
+      let activeFp = null;
+      if (activeFpId && Array.isArray(FLOORPLANS_LIST)) {
+          activeFp = FLOORPLANS_LIST.find(f => String(f.id) === String(activeFpId));
+      }
+      if (!activeFp && Array.isArray(FLOORPLANS_LIST) && FLOORPLANS_LIST.length > 0) {
+          activeFp = FLOORPLANS_LIST[0];
+      }
+      const { width: factoryW, height: factoryH } = getBuildingDimensions(activeFp);
+      const cx0 = factoryW / 2;
+      const cz0 = factoryH / 2;
+
+      const allChildZones = activeFp
+          ? (Array.isArray(LOCATIONS_LIST) ? LOCATIONS_LIST : []).filter(l => l.zone_type !== 'FLOORPLAN' && String(l.parent_id) === String(activeFp.id) && isZonePlaced(l))
+          : [];
+
+      const floors = [1, 2];
+
+      floors.forEach(F => {
+          const floorGroup = new THREE.Group();
+          const baseY = (F - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+
+          // 1. Concrete Floor Slab
+          const slabGeo = new THREE.BoxGeometry(factoryW, TSP3D_SLAB_THICKNESS, factoryH);
+          const slabMat = new THREE.MeshStandardMaterial({
+              color: 0x1e293b,
+              roughness: 0.65,
+              metalness: 0.25
+          });
+          const slabMesh = new THREE.Mesh(slabGeo, slabMat);
+          slabMesh.position.set(0, baseY - TSP3D_SLAB_THICKNESS / 2, 0);
+          floorGroup.add(slabMesh);
+
+          const slabEdges = new THREE.LineSegments(
+              new THREE.EdgesGeometry(slabGeo),
+              new THREE.LineBasicMaterial({ color: 0x0ea5e9, linewidth: 2 })
+          );
+          slabEdges.position.copy(slabMesh.position);
+          floorGroup.add(slabEdges);
+
+          // 2. Glass Curtain Wall Wireframe
+          const wallH = TSP3D_WALL_HEIGHT;
+          const railPts = [
+              new THREE.Vector3(-cx0, baseY + wallH, -cz0),
+              new THREE.Vector3(cx0, baseY + wallH, -cz0),
+              new THREE.Vector3(cx0, baseY + wallH, cz0),
+              new THREE.Vector3(-cx0, baseY + wallH, cz0),
+              new THREE.Vector3(-cx0, baseY + wallH, -cz0)
+          ];
+          const railGeo = new THREE.BufferGeometry().setFromPoints(railPts);
+          const railLine = new THREE.Line(railGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 }));
+          floorGroup.add(railLine);
+
+          // 3. Floor Badge
+          const floorBadge = createTSP3DTextSprite(`TẦNG ${F} ${F === 1 ? '• XƯỞNG SẢN XUẤT' : '• KHU LẮP RÁP & VĂN PHÒNG'}`, {
+              bgColor: 'rgba(15, 23, 42, 0.94)',
+              borderColor: '#38bdf8',
+              textColor: '#38bdf8',
+              isBadge: true
+          });
+          floorBadge.position.set(-cx0 + 26, baseY + wallH + 1.2, -cz0 + 8);
+          floorGroup.add(floorBadge);
+
+          // 4. Extruded Room/Zone Volumes
+          const floorZones = allChildZones.filter(z => (parseInt(z.floor_level) || 1) === F);
+          floorZones.forEach(zone => {
+              const pts = getParsedZonePoints(zone);
+              if (!pts || pts.length < 3) return;
+
+              let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+              pts.forEach(p => {
+                  if (p.x < minX) minX = p.x;
+                  if (p.x > maxX) maxX = p.x;
+                  if (p.y < minY) minY = p.y;
+                  if (p.y > maxY) maxY = p.y;
+              });
+              const zw = Math.max(4, maxX - minX);
+              const zh = Math.max(4, maxY - minY);
+              const zcx = (minX + maxX) / 2;
+              const zcz = (minY + maxY) / 2;
+              const roomH = TSP3D_WALL_HEIGHT * 0.72;
+
+              let themeColor = 0x0284c7;
+              let hexColor = '#38bdf8';
+              if (zone.zone_type === 'CLEANROOM') { themeColor = 0x06b6d4; hexColor = '#06b6d4'; }
+              else if (zone.zone_type === 'WAREHOUSE') { themeColor = 0xf59e0b; hexColor = '#f59e0b'; }
+              else if (zone.zone_type === 'STAIRS') { themeColor = 0x8b5cf6; hexColor = '#a855f7'; }
+              else if (zone.zone_type === 'OFFICE') { themeColor = 0x10b981; hexColor = '#10b981'; }
+
+              const roomGeo = new THREE.BoxGeometry(zw, roomH, zh);
+              const roomMat = new THREE.MeshStandardMaterial({
+                  color: themeColor,
+                  transparent: true,
+                  opacity: 0.32,
+                  roughness: 0.3,
+                  metalness: 0.2
+              });
+              const roomMesh = new THREE.Mesh(roomGeo, roomMat);
+              roomMesh.position.set(zcx - cx0, baseY + roomH / 2, zcz - cz0);
+              floorGroup.add(roomMesh);
+
+              const roomEdges = new THREE.LineSegments(
+                  new THREE.EdgesGeometry(roomGeo),
+                  new THREE.LineBasicMaterial({ color: themeColor, linewidth: 1.5 })
+              );
+              roomEdges.position.copy(roomMesh.position);
+              floorGroup.add(roomEdges);
+
+              // 3D Room label sprite
+              const roomLabel = createTSP3DTextSprite(zone.name || zone.code, {
+                  textColor: hexColor,
+                  bgColor: 'rgba(10, 15, 30, 0.9)',
+                  borderColor: hexColor,
+                  fontSize: 22
+              });
+              roomLabel.position.set(zcx - cx0, baseY + roomH + 1.2, zcz - cz0);
+              floorGroup.add(roomLabel);
+          });
+
+          tsp3DWorldGroup.add(floorGroup);
+      });
+
+      // 5. Central 3D Physical Staircase at (110m, 62m)
+      const stairBaseY1 = 0;
+      const stairBaseY2 = TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0);
+      const stairSteps = 16;
+      const sx = 110 - cx0;
+      const sz = 62 - cz0;
+      const stairGroup = new THREE.Group();
+
+      for (let s = 0; s < stairSteps; s++) {
+          const frac = s / (stairSteps - 1);
+          const curY = stairBaseY1 + frac * stairBaseY2;
+          const stepZ = sz - 9 + frac * 18;
+          const stepGeo = new THREE.BoxGeometry(4.8, 0.35, 1.2);
+          const stepMat = new THREE.MeshStandardMaterial({
+              color: 0x8b5cf6,
+              emissive: 0x6d28d9,
+              emissiveIntensity: 0.4,
+              roughness: 0.35
+          });
+          const stepMesh = new THREE.Mesh(stepGeo, stepMat);
+          stepMesh.position.set(sx, curY, stepZ);
+          stairGroup.add(stepMesh);
+      }
+      const railLeftPts = [
+          new THREE.Vector3(sx - 2.4, stairBaseY1 + 1.2, sz - 9),
+          new THREE.Vector3(sx - 2.4, stairBaseY2 + 1.2, sz + 9)
+      ];
+      const railRightPts = [
+          new THREE.Vector3(sx + 2.4, stairBaseY1 + 1.2, sz - 9),
+          new THREE.Vector3(sx + 2.4, stairBaseY2 + 1.2, sz + 9)
+      ];
+      stairGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(railLeftPts), new THREE.LineBasicMaterial({ color: 0xa855f7, linewidth: 2.5 })));
+      stairGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(railRightPts), new THREE.LineBasicMaterial({ color: 0xa855f7, linewidth: 2.5 })));
+
+      const stairLabel = createTSP3DTextSprite('🪜 CẦU THANG BỘ XUYÊN TẦNG', {
+          textColor: '#c084fc',
+          bgColor: 'rgba(46, 16, 101, 0.92)',
+          borderColor: '#a855f7',
+          isBadge: true
+      });
+      stairLabel.position.set(sx, (stairBaseY1 + stairBaseY2) / 2 + 3.2, sz);
+      stairGroup.add(stairLabel);
+      tsp3DWorldGroup.add(stairGroup);
+
+      // 6. 3D Machinery Group
+      tsp3DMachinesGroup = new THREE.Group();
+      tsp3DMachinesGroup.visible = !!window.tspShowMachines;
+
+      if (window.ASSETS_MAP) {
+          const activeWoAssetIds = new Set();
+          if (tspCurrentRouteData && tspCurrentRouteData.orderedStops) {
+              tspCurrentRouteData.orderedStops.forEach(s => {
+                  if (s.assetId) activeWoAssetIds.add(String(s.assetId));
+              });
+          }
+
+          Object.values(window.ASSETS_MAP).forEach(ast => {
+              if (!ast.coords_x || !ast.coords_y) return;
+              const astFloor = parseInt(ast.floor_level) || 1;
+              const astBaseY = (astFloor - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+              const hasIssue = activeWoAssetIds.has(String(ast.id));
+
+              const mGroup = new THREE.Group();
+              const mGeo = new THREE.BoxGeometry(2.6, 1.8, 1.8);
+              const mMat = new THREE.MeshStandardMaterial({
+                  color: 0x334155,
+                  roughness: 0.5,
+                  metalness: 0.5
+              });
+              const mMesh = new THREE.Mesh(mGeo, mMat);
+              mMesh.position.set(ast.coords_x - cx0, astBaseY + 0.9, ast.coords_y - cz0);
+              mGroup.add(mMesh);
+
+              const mEdge = new THREE.LineSegments(
+                  new THREE.EdgesGeometry(mGeo),
+                  new THREE.LineBasicMaterial({ color: hasIssue ? 0xef4444 : 0x38bdf8, linewidth: 1.5 })
+              );
+              mEdge.position.copy(mMesh.position);
+              mGroup.add(mEdge);
+
+              const beaconGeo = new THREE.SphereGeometry(0.4, 12, 12);
+              const beaconMat = new THREE.MeshBasicMaterial({ color: hasIssue ? 0xef4444 : 0x10b981 });
+              const beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+              beaconMesh.position.set(ast.coords_x - cx0, astBaseY + 2.1, ast.coords_y - cz0);
+              beaconMesh.userData = { isBeacon: true, hasIssue: hasIssue };
+              mGroup.add(beaconMesh);
+
+              mMesh.userData = {
+                  type: 'MACHINE',
+                  title: `Thiết bị: ${ast.name}`,
+                  sub: `Tầng ${astFloor} • Tọa độ: (${ast.coords_x}m, ${ast.coords_y}m) • Trạng thái: ${hasIssue ? 'CÓ SỰ CỐ / ĐANG BẢO TRÌ' : 'HOẠT ĐỘNG BÌNH THƯỜNG'}`,
+                  asset: ast
+              };
+              tsp3DInteractables.push(mMesh);
+
+              tsp3DMachinesGroup.add(mGroup);
+          });
+      }
+      tsp3DWorldGroup.add(tsp3DMachinesGroup);
+
+      // 7. 3D Glowing TSP Route Tube & 3D Stop Pins
+      tsp3DRouteGroup = new THREE.Group();
+      tsp3DPinsGroup = new THREE.Group();
+      tsp3DRouteCurve = null;
+      tsp3DTravelOrb = null;
+
+      if (tspCurrentRouteData && tspCurrentRouteData.orderedStops && tspCurrentRouteData.orderedStops.length > 0) {
+          const stops = tspCurrentRouteData.orderedStops;
+          const curvePoints = [];
+
+          stops.forEach((stop, idx) => {
+              const sFloor = parseInt(stop.floorNumber || stop.floor_level) || 1;
+              const sBaseY = (sFloor - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+              const stopM = getTSPStopCoordsM(stop);
+              const stopX = stopM.x - cx0;
+              const stopZ = stopM.y - cz0;
+
+              if (idx > 0) {
+                  const prevStop = stops[idx - 1];
+                  const pFloor = parseInt(prevStop.floorNumber || prevStop.floor_level) || 1;
+                  if (pFloor !== sFloor) {
+                      const pBaseY = (pFloor - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+                      curvePoints.push(new THREE.Vector3(110 - cx0, pBaseY + 1.2, 62 - cz0));
+                      curvePoints.push(new THREE.Vector3(110 - cx0, (pBaseY + sBaseY) / 2 + 1.2, 62 - cz0));
+                      curvePoints.push(new THREE.Vector3(110 - cx0, sBaseY + 1.2, 62 - cz0));
+                  }
+              }
+
+              const curPt = new THREE.Vector3(stopX, sBaseY + 1.2, stopZ);
+              if (curvePoints.length === 0 || curPt.distanceTo(curvePoints[curvePoints.length - 1]) > 0.1) {
+                  curvePoints.push(curPt);
+              }
+
+              // 3D Pin (Scaled for 220m factory visibility)
+              const pinGroup = new THREE.Group();
+              pinGroup.userData = { baseY: sBaseY + 3.8, stopIndex: idx, stop: stop };
+
+              const isUrgent = stop.priority === 'URGENT' || stop.priority === 'EMERGENCY';
+              const isStart = stop.type === 'DEPOT' || stop.type === 'CURRENT_LOCATION';
+              const isWh = stop.type === 'WAREHOUSE';
+              const isTool = stop.action === 'PICKUP_TOOLS' || (stop.name && stop.name.toLowerCase().includes('dụng cụ'));
+
+              let pinColor = 0xf59e0b;
+              let pinHex = '#f59e0b';
+              if (isUrgent) { pinColor = 0xef4444; pinHex = '#ef4444'; }
+              else if (isStart) { pinColor = 0x10b981; pinHex = '#10b981'; }
+              else if (isTool) { pinColor = 0x8b5cf6; pinHex = '#8b5cf6'; }
+              else if (isWh) { pinColor = 0xf97316; pinHex = '#f97316'; }
+
+              const pinGeo = new THREE.ConeGeometry(2.4, 4.8, 12);
+              pinGeo.rotateX(Math.PI);
+              const pinMat = new THREE.MeshStandardMaterial({
+                  color: pinColor,
+                  emissive: pinColor,
+                  emissiveIntensity: 0.85,
+                  roughness: 0.2,
+                  metalness: 0.3
+              });
+              const pinMesh = new THREE.Mesh(pinGeo, pinMat);
+              pinMesh.position.set(0, 0, 0);
+              pinGroup.add(pinMesh);
+
+              const pinBadge = createTSP3DTextSprite(`${idx}`, {
+                  textColor: '#ffffff',
+                  bgColor: pinHex,
+                  borderColor: '#ffffff',
+                  fontSize: 34,
+                  isBadge: true
+              });
+              pinBadge.position.set(0, 4.0, 0);
+              pinGroup.add(pinBadge);
+
+              const groundCircleGeo = new THREE.RingGeometry(1.6, 2.8, 20);
+              groundCircleGeo.rotateX(-Math.PI / 2);
+              const groundCircleMat = new THREE.MeshBasicMaterial({ color: pinColor, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+              const groundCircle = new THREE.Mesh(groundCircleGeo, groundCircleMat);
+              groundCircle.position.set(stopX, sBaseY + 0.1, stopZ);
+              tsp3DPinsGroup.add(groundCircle);
+
+              pinGroup.position.set(stopX, sBaseY + 3.8, stopZ);
+              pinMesh.userData = {
+                  type: 'STOP',
+                  stopIndex: idx,
+                  title: `Trạm #${idx}: ${stop.name}`,
+                  sub: `Tầng ${sFloor} • Dự kiến: ${stop.estimatedArrival || '--'} • Ưu tiên: ${stop.priority || 'Bình thường'}`,
+                  stop: stop
+              };
+              tsp3DInteractables.push(pinMesh);
+
+              tsp3DPinsGroup.add(pinGroup);
+          });
+
+          if (curvePoints.length >= 2) {
+              tsp3DRouteCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.15);
+              const tubeGeo = new THREE.TubeGeometry(tsp3DRouteCurve, Math.max(160, curvePoints.length * 28), 1.1, 12, false);
+              const tubeMat = new THREE.MeshStandardMaterial({
+                  color: 0xf59e0b,
+                  emissive: 0xf59e0b,
+                  emissiveIntensity: 1.0,
+                  roughness: 0.15,
+                  metalness: 0.3,
+                  transparent: true,
+                  opacity: 0.95
+              });
+              const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+              tsp3DRouteGroup.add(tubeMesh);
+
+              const orbGeo = new THREE.SphereGeometry(2.2, 16, 16);
+              const orbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+              tsp3DTravelOrb = new THREE.Mesh(orbGeo, orbMat);
+              const orbLight = new THREE.PointLight(0xf59e0b, 4.0, 28);
+              tsp3DTravelOrb.add(orbLight);
+              tsp3DTravelOrb.position.copy(curvePoints[0]);
+              tsp3DRouteGroup.add(tsp3DTravelOrb);
+          }
+      }
+
+      tsp3DWorldGroup.add(tsp3DRouteGroup);
+      tsp3DWorldGroup.add(tsp3DPinsGroup);
+  }
+
+  function startTSP3DAnimation() {
+      if (tsp3DAnimId) cancelAnimationFrame(tsp3DAnimId);
+      function animate() {
+          tsp3DAnimId = requestAnimationFrame(animate);
+          const time = tsp3DClock ? tsp3DClock.getElapsedTime() : performance.now() * 0.001;
+
+          if (tsp3DControls) tsp3DControls.update();
+
+          if (tsp3DRouteCurve && tsp3DTravelOrb) {
+              const loopDuration = 10;
+              const progress = (time / loopDuration) % 1.0;
+              const pos = tsp3DRouteCurve.getPointAt(progress);
+              if (pos) tsp3DTravelOrb.position.copy(pos);
+          }
+
+          if (tsp3DPinsGroup && tsp3DPinsGroup.children) {
+              tsp3DPinsGroup.children.forEach(child => {
+                  if (child.userData && child.userData.baseY !== undefined) {
+                      const idx = child.userData.stopIndex || 0;
+                      child.position.y = child.userData.baseY + Math.sin(time * 3 + idx) * 0.24;
+                  }
+              });
+          }
+
+          if (tsp3DMachinesGroup) {
+              tsp3DMachinesGroup.traverse(node => {
+                  if (node.userData && node.userData.isBeacon && node.userData.hasIssue) {
+                      const s = 1.0 + Math.sin(time * 6) * 0.35;
+                      node.scale.set(s, s, s);
+                  }
+              });
+          }
+
+          if (tsp3DRenderer && tsp3DScene && tsp3DCamera) {
+              tsp3DRenderer.render(tsp3DScene, tsp3DCamera);
+          }
+      }
+      animate();
+  }
+
+  function stopTSP3DAnimation() {
+      if (tsp3DAnimId) {
+          cancelAnimationFrame(tsp3DAnimId);
+          tsp3DAnimId = null;
+      }
+  }
+
+  function createTSP3DTextSprite(text, options = {}) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+
+      const bgColor = options.bgColor || 'rgba(15, 23, 42, 0.9)';
+      const borderColor = options.borderColor || '#38bdf8';
+      const textColor = options.textColor || '#ffffff';
+      const fontSize = options.fontSize || 28;
+
+      ctx.clearRect(0, 0, 512, 128);
+
+      ctx.fillStyle = bgColor;
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 4;
+      
+      const r = options.isBadge ? 60 : 20;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(10, 10, 492, 108, r);
+      } else {
+          ctx.rect(10, 10, 492, 108);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = textColor;
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const spriteMat = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthTest: false
+      });
+      const sprite = new THREE.Sprite(spriteMat);
+      const aspect = canvas.width / canvas.height;
+      const baseHeight = options.isBadge ? 3.2 : 4.0;
+      sprite.scale.set(baseHeight * aspect, baseHeight, 1);
+      return sprite;
+  }
+
+  function setTSP3DCameraView(viewType) {
+      if (!tsp3DCamera || !tsp3DControls) return;
+
+      const btnIso = document.getElementById('btn-cam-iso');
+      const btnPersp = document.getElementById('btn-cam-persp');
+      const btnTop = document.getElementById('btn-cam-top');
+
+      [btnIso, btnPersp, btnTop].forEach(b => {
+          if (b) b.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer';
+      });
+
+      if (viewType === 'iso') {
+          if (btnIso) btnIso.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
+          tsp3DCamera.position.set(130, 115, 140);
+          tsp3DControls.target.set(-15, 8, -5);
+      } else if (viewType === 'perspective') {
+          if (btnPersp) btnPersp.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
+          tsp3DCamera.position.set(150, 75, 120);
+          tsp3DControls.target.set(-15, 5, -5);
+      } else if (viewType === 'top') {
+          if (btnTop) btnTop.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
+          tsp3DCamera.position.set(-15, 220, -5.01);
+          tsp3DControls.target.set(-15, 0, -5);
+      }
+      tsp3DControls.update();
+  }
+
+  function resetTSP3DCamera() {
+      setTSP3DCameraView('iso');
+  }
+
+  function toggleTSP3DExplodedView() {
+      tsp3DExploded = !tsp3DExploded;
+      const label = document.getElementById('label-tsp-3d-exploded');
+      const btn = document.getElementById('btn-tsp-3d-exploded');
+      if (label) {
+          label.innerText = tsp3DExploded ? 'Thu gọn tầng' : 'Tách tầng 3D';
+      }
+      if (btn) {
+          if (tsp3DExploded) {
+              btn.className = 'px-3 py-1.5 rounded-xl bg-sky-500/20 text-sky-300 border border-sky-400/50 text-[11px] font-bold transition flex items-center gap-1.5 shadow-2xl cursor-pointer';
+          } else {
+              btn.className = 'px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 text-[11px] font-bold text-sky-400 hover:bg-slate-800 transition flex items-center gap-1.5 shadow-2xl cursor-pointer';
+          }
+      }
+      buildTSP3DSceneGraph();
+  }
+
+  function updateTSP3DMachinesVisibility() {
+      if (tsp3DMachinesGroup) {
+          tsp3DMachinesGroup.visible = !!window.tspShowMachines;
+      }
+  }
+
+  function focusTSP3DStop(index) {
+      if (!tsp3DCamera || !tsp3DControls || !tspCurrentRouteData || !tspCurrentRouteData.orderedStops) return;
+      const stop = tspCurrentRouteData.orderedStops[index];
+      if (!stop) return;
+
+      const activeFp = window.tspActiveFloorplanId && Array.isArray(FLOORPLANS_LIST)
+          ? FLOORPLANS_LIST.find(f => String(f.id) === String(window.tspActiveFloorplanId))
+          : (Array.isArray(FLOORPLANS_LIST) ? FLOORPLANS_LIST[0] : null);
+      const { width: factoryW, height: factoryH } = getBuildingDimensions(activeFp);
+      const cx0 = factoryW / 2;
+      const cz0 = factoryH / 2;
+
+      const sFloor = parseInt(stop.floorNumber || stop.floor_level) || 1;
+      const sBaseY = (sFloor - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+      const stopM = getTSPStopCoordsM(stop);
+      const stopX = stopM.x - cx0;
+      const stopZ = stopM.y - cz0;
+
+      tsp3DControls.target.set(stopX, sBaseY + 2, stopZ);
+      tsp3DControls.update();
+  }
+
+  function onTSP3DMouseMove(event) {
+      const canvas = document.getElementById('tsp-3d-canvas');
+      const tooltip = document.getElementById('tsp-3d-tooltip');
+      const titleEl = document.getElementById('tsp-3d-tooltip-title');
+      const subEl = document.getElementById('tsp-3d-tooltip-sub');
+      if (!canvas || !tooltip || !tsp3DCamera || !tsp3DRaycaster) return;
+
+      const rect = canvas.getBoundingClientRect();
+      tsp3DMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      tsp3DMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      tsp3DRaycaster.setFromCamera(tsp3DMouse, tsp3DCamera);
+      const intersects = tsp3DRaycaster.intersectObjects(tsp3DInteractables, false);
+
+      if (intersects.length > 0) {
+          const hit = intersects[0].object;
+          if (hit.userData && hit.userData.title) {
+              if (titleEl) titleEl.innerText = hit.userData.title;
+              if (subEl) subEl.innerText = hit.userData.sub;
+
+              const mouseX = event.clientX - rect.left;
+              const mouseY = event.clientY - rect.top;
+              tooltip.style.left = `${Math.min(rect.width - 240, mouseX + 15)}px`;
+              tooltip.style.top = `${Math.min(rect.height - 80, mouseY + 15)}px`;
+              tooltip.classList.remove('hidden');
+              canvas.style.cursor = 'pointer';
+              return;
+          }
+      }
+      tooltip.classList.add('hidden');
+      canvas.style.cursor = 'grab';
+  }
+
+  function onTSP3DMouseClick(event) {
+      const canvas = document.getElementById('tsp-3d-canvas');
+      if (!canvas || !tsp3DCamera || !tsp3DRaycaster) return;
+
+      const rect = canvas.getBoundingClientRect();
+      tsp3DMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      tsp3DMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      tsp3DRaycaster.setFromCamera(tsp3DMouse, tsp3DCamera);
+      const intersects = tsp3DRaycaster.intersectObjects(tsp3DInteractables, false);
+
+      if (intersects.length > 0) {
+          const hit = intersects[0].object;
+          if (hit.userData && hit.userData.type === 'STOP' && hit.userData.stopIndex !== undefined) {
+              focusTSPStop(hit.userData.stopIndex);
+          }
+      }
+  }
+
+  function onTSP3DResize() {
+      const viewport = document.getElementById('tsp-3d-viewport');
+      if (!viewport || !tsp3DCamera || !tsp3DRenderer) return;
+      const width = viewport.clientWidth;
+      const height = viewport.clientHeight;
+      if (width > 0 && height > 0) {
+          tsp3DCamera.aspect = width / height;
+          tsp3DCamera.updateProjectionMatrix();
+          tsp3DRenderer.setSize(width, height);
+      }
   }
 </script>
 {% endblock %}
