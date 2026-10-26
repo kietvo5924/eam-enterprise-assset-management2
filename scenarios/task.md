@@ -269,20 +269,20 @@
     - `[ ]` Task 11.3.3 — Build Routing REST APIs: Initial optimization and dynamic mid-shift re-routing (`re-route-mid-shift`) with warehouse pit-stops.
     - `[ ]` Task 11.3.4 — Web & Mobile UI Integration: Route visualizer, Scan-to-Relocate QR code, and offline mobile route cache.
     - `[ ]` Task 11.3.5 — Unit tests & benchmarks covering No-map topological routing, Movable assets, Tiered URGENT clusters, Time windows, and Tenant feature toggle.
-  - `[ ]` **11.4 — Condition Monitoring & Inspection Anomaly Detection (Sliding Z-score & Isolation Forest)** *(Đề Cương Mục 3.1.3 & 100)*
-    - `[ ]` Task 11.4.1 — Data pipeline: Inspection logging (`MeterReading`) with Machine State Context (`RUNNING`, `WARM_UP`, `IDLE`) and Ambient Temperature.
-    - `[ ]` Task 11.4.2 — Implement Daily Sliding-Window Dynamic Z-score with Post-Repair Window Reset (baseline pruning upon WorkOrder completion).
-    - `[ ]` Task 11.4.3 — Implement Multivariate Isolation Forest model on differential $\Delta T$ and multi-metric vectors.
-    - `[ ]` Task 11.4.4 — Build Theil-Sen Robust Trend Drift Engine (immune to measurement slip-ups) & Alert Throttling to prevent duplicate draft PMs.
-    - `[ ]` Task 11.4.5 — Early Warning Alert trigger with ISO 10816-3 vibration severity zones and Human Feedback loop for false positive suppression.
-    - `[ ]` Task 11.4.6 — Web & Mobile UI: Condition monitoring telemetry chart with ISO bands, Theil-Sen robust forecast line, and False Alarm feedback action.
-  - `[ ]` **11.5 — Deep Learning Predictive Maintenance (LSTM for Remaining Useful Life - RUL)** *(Đề Cương Mục 3.1.3 & 101)*
-    - `[ ]` Task 11.5.1 — Dataset preparation & 4-feature pipeline: Integrate FEMTO/PRONOSTIA & UCI AI4I with 4-feature vector (Vibration, $\Delta T$, Pressure, Load Factor) and Piece-wise linear target ($RUL \le 125$).
-    - `[ ]` Task 11.5.2 — Lightweight CPU inference service & Monte Carlo Dropout ($M=20$) for 90% confidence intervals and uncertainty estimation.
-    - `[ ]` Task 11.5.3 — Cold start bypass engine (skip LSTM & show `CALIBRATING` when samples $<15$), Standby/Idle filtering, and Operating Days to Calendar Days converter.
-    - `[ ]` Task 11.5.4 — Phantom Recovery Clamp (freeze RUL on micro-maintenance jump $>30\%$) and Monotonic Degradation Filter.
-    - `[ ]` Task 11.5.5 — Dynamic Lead-Time Aware Risk Matrix, two-stage alert consolidation (11.4 $\rightarrow$ 11.5), and automated predictive PM draft creation.
-    - `[ ]` Task 11.5.6 — Web Portal UI: RUL Health Gauge with uncertainty band, Phantom Recovery Warning banner, and full 12 test cases (`TC-RUL-01` to `TC-RUL-12`).
+  - `[x]` **11.4 — Condition Monitoring & Inspection Anomaly Detection (Sliding Z-score & Isolation Forest)** *(Đề Cương Mục 3.1.3 & 100)*
+    - `[x]` Task 11.4.1 — Data pipeline: Inspection logging (`MeterReading`) with Machine State Context (`RUNNING`, `WARM_UP`, `IDLE`) and Ambient Temperature.
+    - `[x]` Task 11.4.2 — Implement Daily Sliding-Window Dynamic Z-score with Post-Repair Window Reset (baseline pruning upon WorkOrder completion).
+    - `[x]` Task 11.4.3 — Implement Multivariate Isolation Forest model on differential $\Delta T$ and multi-metric vectors.
+    - `[x]` Task 11.4.4 — Build Theil-Sen Robust Trend Drift Engine (immune to measurement slip-ups) & Alert Throttling to prevent duplicate draft PMs.
+    - `[x]` Task 11.4.5 — Early Warning Alert trigger with ISO 10816-3 vibration severity zones and Human Feedback loop for false positive suppression.
+    - `[x]` Task 11.4.6 — Web & Mobile UI: Condition monitoring telemetry chart with ISO bands, Theil-Sen robust forecast line, and False Alarm feedback action.
+  - `[x]` **11.5 — Deep Learning Predictive Maintenance (LSTM for Remaining Useful Life - RUL)** *(Đề Cương Mục 3.1.3 & 101)*
+    - `[x]` Task 11.5.1 — Dataset preparation & 4-feature pipeline: Integrate FEMTO/PRONOSTIA & UCI AI4I with 4-feature vector (Vibration, $\Delta T$, Pressure, Load Factor) and Piece-wise linear target ($RUL \le 125$).
+    - `[x]` Task 11.5.2 — Lightweight CPU inference service & Monte Carlo Dropout ($M=20$) for 90% confidence intervals and uncertainty estimation.
+    - `[x]` Task 11.5.3 — Cold start bypass engine (skip LSTM & show `CALIBRATING` when samples $<15$), Standby/Idle filtering, and Operating Days to Calendar Days converter.
+    - `[x]` Task 11.5.4 — Phantom Recovery Clamp (freeze RUL on micro-maintenance jump $>30\%$) and Monotonic Degradation Filter.
+    - `[x]` Task 11.5.5 — Dynamic Lead-Time Aware Risk Matrix, two-stage alert consolidation (11.4 $\rightarrow$ 11.5), and automated predictive PM draft creation.
+    - `[x]` Task 11.5.6 — Web Portal UI: RUL Health Gauge with uncertainty band, Phantom Recovery Warning banner, and full 12 test cases (`TC-RUL-01` to `TC-RUL-12`).
   - `[ ]` **11.6 — Maintenance Cost & Budget Forecasting (Random Forest Regressor & Hybrid Budgeting Engine)** *(Đề Cương Mục 3.1.3 & 105)*
     - `[ ]` Task 11.6.1 — Immutable cost snapshot & net cost schema: Record snapshot unit/labor costs, separate Gross vs Net Cost (deducting Warranty & Insurance), and freeze costs upon WO completion.
     - `[ ]` Task 11.6.2 — Actual consumption pipeline & Disposed pruning: Filter out 100% warehouse inventory stocking orders, extract purely actual consumption, and prune disposed asset history.

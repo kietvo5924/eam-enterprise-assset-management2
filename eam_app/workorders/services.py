@@ -149,6 +149,7 @@ class WorkOrderTransitionService:
         load_f = float(post_repair_data.get('load_factor') or 1.0)
         amb_t = post_repair_data.get('ambient_temperature')
         amb_t_val = float(amb_t) if amb_t is not None else None
+        m_state = str(post_repair_data.get('machine_state') or 'RUNNING')
 
         # Rung sau sửa chữa
         vib_val = post_repair_data.get('vibration')
@@ -164,7 +165,7 @@ class WorkOrderTransitionService:
                     unit='mm/s',
                     ambient_temperature=amb_t_val,
                     load_factor=load_f,
-                    machine_state='RUNNING',
+                    machine_state=m_state,
                     measurement_phase='POST_REPAIR_ACCEPTANCE',
                     is_pre_repair=False,
                     recorded_by=user if (user and user.is_authenticated) else None,
@@ -188,7 +189,7 @@ class WorkOrderTransitionService:
                     unit='°C',
                     ambient_temperature=amb_t_val,
                     load_factor=load_f,
-                    machine_state='RUNNING',
+                    machine_state=m_state,
                     measurement_phase='POST_REPAIR_ACCEPTANCE',
                     is_pre_repair=False,
                     recorded_by=user if (user and user.is_authenticated) else None,

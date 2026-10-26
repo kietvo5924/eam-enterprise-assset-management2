@@ -6,8 +6,24 @@ def get_iso_thresholds_for_asset(asset=None) -> dict:
       - Vùng C: 2.8 - 7.1 mm/s (Cảnh báo)
       - Vùng D: > 7.1 mm/s (Nguy hiểm)
     """
-    # Nếu danh mục tài sản có cấu hình tùy biến riêng thì cho phép ghi đè
-    cat = getattr(asset, 'category', None)
+    # Nếu tài sản hoặc danh mục có cấu hình tùy biến riêng thì cho phép ghi đè
+    custom_limits = getattr(asset, 'custom_iso_thresholds', None)
+    if not custom_limits:
+        cat = getattr(asset, 'category', None)
+        custom_limits = getattr(cat, 'custom_iso_thresholds', None)
+
+    if isinstance(custom_limits, dict):
+        ab_lim = float(custom_limits.get('zone_ab_limit', 2.8))
+        c_lim = float(custom_limits.get('zone_c_limit', 7.1))
+        std_name = custom_limits.get('standard', 'ISO 10816-3 (Custom/OEM Override)')
+        return {
+            "standard": std_name,
+            "zone_ab_limit": ab_lim,
+            "zone_c_limit": c_lim,
+            "unit": custom_limits.get('unit', 'mm/s'),
+            "description": f"< {ab_lim} mm/s: Đạt chuẩn (A/B) | {ab_lim} - {c_lim} mm/s: Cảnh báo (C) | > {c_lim} mm/s: Nguy hiểm (D)"
+        }
+
     return {
         "standard": "ISO 10816-3 (Group 2 Rigid)",
         "zone_ab_limit": 2.8,

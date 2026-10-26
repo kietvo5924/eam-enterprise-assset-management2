@@ -165,10 +165,13 @@ class Asset(BaseTenantModel):
 
     # Phase 11.5: Deep Learning LSTM RUL Fields
     RUL_RISK_CHOICES = (
+        ('CALIBRATING', 'Calibrating'),
+        ('LOW', 'Low Risk'),
+        ('MEDIUM', 'Medium Risk'),
+        ('HIGH', 'High Risk'),
+        ('CRITICAL', 'Critical Risk'),
         ('HEALTHY', 'Healthy'),
         ('WARNING', 'Warning'),
-        ('CRITICAL', 'Critical'),
-        ('CALIBRATING', 'Calibrating'),
         ('STANDBY', 'Standby'),
         ('UNHEALTHY_BASELINE', 'Unhealthy Baseline'),
     )
@@ -180,10 +183,16 @@ class Asset(BaseTenantModel):
         related_name='primary_assets',
         help_text='Vật tư / Vòng bi phụ tùng cốt lõi chính của tài sản'
     )
-    current_rul_days = models.FloatField(null=True, blank=True, help_text='Thời gian hoạt động hữu ích còn lại dự đoán (ngày)')
-    rul_risk_level = models.CharField(max_length=20, choices=RUL_RISK_CHOICES, default='HEALTHY', db_index=True)
+    current_rul_days = models.FloatField(null=True, blank=True, help_text='Thời gian hoạt động hữu ích còn lại dự đoán (ngày vận hành)')
+    current_rul_calendar_days = models.FloatField(null=True, blank=True, help_text='Thời gian còn lại quy đổi theo ngày dương lịch')
+    duty_cycle_ratio = models.FloatField(default=1.0, help_text='Hệ số chu kỳ phụ tải luân phiên (0.1 - 1.0, mặc định 1.0)')
+    rul_confidence_lower = models.FloatField(null=True, blank=True, help_text='Cận dưới khoảng tin cậy 90% (ngày)')
+    rul_confidence_upper = models.FloatField(null=True, blank=True, help_text='Cận trên khoảng tin cậy 90% (ngày)')
+    rul_risk_level = models.CharField(max_length=20, choices=RUL_RISK_CHOICES, default='CALIBRATING', db_index=True)
     is_phantom_recovery = models.BooleanField(default=False, help_text='Cờ phát hiện bẫy hồi phục ảo sau bôi trơn/siết ốc')
+    rapid_degradation_alert = models.BooleanField(default=False, help_text='Cờ cảnh báo gia tốc suy thoái đột biến')
     last_core_overhaul_at = models.DateTimeField(null=True, blank=True, help_text='Thời điểm đại tu / thay thế cụm cốt lõi gần nhất')
+    last_rul_predicted_at = models.DateTimeField(null=True, blank=True, help_text='Thời điểm chạy mô hình dự đoán RUL gần nhất')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -470,5 +479,51 @@ class ToolReservation(BaseTenantModel):
 
     def __str__(self):
         return f"Reservation of {self.tool.code} (x{self.reserved_quantity}) for WO-{str(self.work_order_id)[:8]} [{self.status}]"
+
+
+class AssetRulPrediction(BaseTenantModel):
+    TRIGGER_SOURCE_CHOICES = (
+        ('MANUAL', 'Manual User Trigger / Kích hoạt thủ công'),
+        ('ANOMALY_TRIGGER_11_4', 'Phase 11.4 Anomaly Trigger / Kích hoạt từ phát hiện dị biệt'),
+        ('METER_LOG', 'Meter Log Routine / Lưu số đo định kỳ'),
+        ('WEEKLY_SCAN', 'Weekly Scheduled Scan / Quét định kỳ hàng tuần'),
+    )
+
+    ACTION_TAKEN_CHOICES = (
+        ('CALIBRATING', 'Calibrating / Đang hiệu chuẩn'),
+        ('NORMAL_MONITORING', 'Normal Monitoring / Theo dõi bình thường'),
+        ('CHECK_INVENTORY', 'Check Inventory / Kiểm tra phụ tùng kho'),
+        ('DRAFT_PM_CREATED', 'Draft PM Created / Tự động tạo bản thảo PM đón đầu'),
+        ('URGENT_PM_CREATED', 'Urgent PM Created / Tạo phiếu PM khẩn cấp do suy thoái đột biến'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name='rul_predictions')
+    predicted_rul_op_days = models.FloatField(help_text='RUL dự đoán tính theo ngày vận hành thực tế')
+    predicted_rul_cal_days = models.FloatField(help_text='RUL dự đoán tính theo ngày dương lịch')
+    confidence_lower = models.FloatField(help_text='Cận dưới khoảng tin cậy 90%')
+    confidence_upper = models.FloatField(help_text='Cận trên khoảng tin cậy 90%')
+    std_deviation = models.FloatField(default=0.0, help_text='Độ lệch chuẩn Monte Carlo Dropout')
+    risk_level = models.CharField(max_length=20, choices=Asset.RUL_RISK_CHOICES, db_index=True)
+    trigger_source = models.CharField(max_length=32, choices=TRIGGER_SOURCE_CHOICES, default='MANUAL')
+    load_factor_average = models.FloatField(default=1.0, help_text='Hệ số phụ tải trung bình trong cửa sổ 30 mẫu')
+    input_window_samples_count = models.IntegerField(default=30, help_text='Số lượng mẫu đo hợp lệ đưa vào mô hình')
+    is_phantom_recovery = models.BooleanField(default=False, help_text='Cờ phát hiện bẫy hồi phục ảo')
+    rapid_degradation_rate = models.FloatField(null=True, blank=True, help_text='Tốc độ sụt giảm RUL (ngày sụt giảm/lần đo)')
+    action_taken = models.CharField(max_length=64, choices=ACTION_TAKEN_CHOICES, default='NORMAL_MONITORING')
+    work_order = models.ForeignKey('workorders.WorkOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='rul_predictions')
+    model_version = models.CharField(max_length=32, default='v1.0.0-cpu')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'asset_rul_predictions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'asset', '-created_at']),
+            models.Index(fields=['tenant', 'risk_level']),
+        ]
+
+    def __str__(self):
+        return f"{self.asset.name} RUL: {self.predicted_rul_op_days}d ({self.risk_level}) [{self.created_at}]"
 
 

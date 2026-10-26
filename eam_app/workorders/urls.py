@@ -9,7 +9,7 @@ from workorders.views import (
     WorkOrderAutoAssignPreviewView, WorkOrderAutoAssignApplyView,
     WorkOrderGAAutoAssignInitiateView, WorkOrderGAAutoAssignProgressView,
     WorkOrderGAAutoAssignApplyView, WorkOrderAlgorithmReadinessView,
-    WorkOrderReportIncidentView
+    WorkOrderReportIncidentView, WorkOrderRequestReassignmentView
 )
 
 urlpatterns = [
@@ -26,6 +26,7 @@ urlpatterns = [
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/assign/?$', WorkOrderAssignView.as_view(), name='work_order_assign'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/status/?$', WorkOrderStatusView.as_view(), name='work_order_status'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/report-incident/?$', WorkOrderReportIncidentView.as_view(), name='work_order_report_incident'),
+    re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/request-reassignment/?$', WorkOrderRequestReassignmentView.as_view(), name='work_order_request_reassignment'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/checklists/?$', WorkOrderChecklistView.as_view(), name='work_order_checklist'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/checklists/(?P<checklist_id>[^/]+)/?$', WorkOrderChecklistDeleteView.as_view(), name='work_order_checklist_delete'),
     re_path(r'^work-orders/(?P<wo_id>[0-9a-fA-F-]+)/notes/?$', WorkOrderNoteUpdateView.as_view(), name='work_order_note'),

@@ -33,6 +33,12 @@ class MaintenanceGAScheduler:
                  in_progress_wos: Optional[Dict[Any, Any]] = None,
                  progress_callback: Optional[Callable[[int, int, float, List[Dict]], None]] = None):
         cfg = config or {}
+        self.random_seed = cfg.get('randomSeed') or cfg.get('seed') or cfg.get('random_seed')
+        if self.random_seed is not None:
+            import random
+            np.random.seed(int(self.random_seed))
+            random.seed(int(self.random_seed))
+
         self.pop_size = int(cfg.get('populationSize', DEFAULT_POPULATION_SIZE))
         self.max_gen = int(cfg.get('maxGenerations', DEFAULT_MAX_GENERATIONS))
         self.catalog = catalog

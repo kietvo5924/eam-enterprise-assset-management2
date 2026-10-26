@@ -6,7 +6,8 @@ from assets.views import (
     SparePartListView, SparePartDetailView,
     AssetListView, AssetDetailView, MeterReadingListView,
     AssetTreeView, AssetQRCodeView, AssetImportView, AssetExportView,
-    AssetImportTemplateView, AssetAnomalyHistoryView, ConditionMonitoringAlertFeedbackView
+    AssetImportTemplateView, AssetAnomalyHistoryView, ConditionMonitoringAlertFeedbackView,
+    AssetRulPredictionDetailView, AssetRulPredictionRunView, AssetRulOverridePhantomView, CriticalAssetsRulListView
 )
 
 urlpatterns = [
@@ -34,4 +35,10 @@ urlpatterns = [
     re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/meter-readings/?$', MeterReadingListView.as_view(), name='meter_reading_list'),
     re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/anomaly-history/?$', AssetAnomalyHistoryView.as_view(), name='asset_anomaly_history'),
     re_path(r'^condition-monitoring/alerts/(?P<alert_id>[0-9a-fA-F-]+)/feedback/?$', ConditionMonitoringAlertFeedbackView.as_view(), name='condition_monitoring_alert_feedback'),
+
+    # Phase 11.5: RUL Predictive Maintenance Endpoints
+    re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/rul-prediction/?$', AssetRulPredictionDetailView.as_view(), name='asset_rul_prediction_detail'),
+    re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/rul-prediction/run/?$', AssetRulPredictionRunView.as_view(), name='asset_rul_prediction_run'),
+    re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/rul-prediction/override-phantom/?$', AssetRulOverridePhantomView.as_view(), name='asset_rul_override_phantom'),
+    re_path(r'^predictive-maintenance/critical-assets/?$', CriticalAssetsRulListView.as_view(), name='critical_assets_rul_list'),
 ]

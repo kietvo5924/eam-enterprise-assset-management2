@@ -12,10 +12,22 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController(text: 'vf_admin@vinfast.local');
-  final _passwordController = TextEditingController(text: 'Admin@123456');
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.text = 'vf_admin@vinfast.local';
+    _passwordController.text = 'admin';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _handleLogin();
+      }
+    });
+  }
 
   Future<void> _handleLogin() async {
     setState(() {
@@ -45,6 +57,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override

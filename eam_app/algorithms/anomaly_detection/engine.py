@@ -82,7 +82,12 @@ class ConditionMonitoringEngine:
 
                 rec = None
                 if chk_item:
-                    rec = MeterReading.objects.filter(checklist_item=chk_item, tenant=cur_tenant).first()
+                    rec = MeterReading.objects.filter(
+                        checklist_item=chk_item,
+                        metric_code=metric,
+                        asset=asset,
+                        tenant=cur_tenant
+                    ).first()
 
                 if rec:
                     rec.reading_value = val
@@ -138,7 +143,12 @@ class ConditionMonitoringEngine:
 
             rec = None
             if chk_item:
-                rec = MeterReading.objects.filter(checklist_item=chk_item, tenant=cur_tenant).first()
+                rec = MeterReading.objects.filter(
+                    checklist_item=chk_item,
+                    metric_code=metric,
+                    asset=asset,
+                    tenant=cur_tenant
+                ).first()
 
             if rec:
                 rec.reading_value = val
@@ -301,7 +311,8 @@ class ConditionMonitoringEngine:
                     timestamps=t_list,
                     values=v_list,
                     limit_value=limit_v,
-                    current_time=rec_time
+                    current_time=rec_time,
+                    metric_code=metric
                 )
                 if drift_res.get('isDrifting'):
                     trend_drift_info = drift_res
@@ -326,6 +337,7 @@ class ConditionMonitoringEngine:
         for ch, default_val in [('VIBRATION', 2.0), ('TEMPERATURE', 65.0), ('PRESSURE', 2.5), ('CURRENT', 15.0)]:
             if ch not in channel_vals:
                 hist_ch = MeterReading.objects.filter(
+                    tenant=cur_tenant,
                     asset=asset,
                     metric_code=ch,
                     machine_state='RUNNING',
@@ -337,6 +349,42 @@ class ConditionMonitoringEngine:
                     channel_vals[ch] = float(hist_ch.reading_value)
                 else:
                     channel_vals[ch] = default_val
+
+        # Huấn luyện Isolation Forest bằng dữ liệu vector đa biến thực tế nếu có
+        hist_records = list(
+            MeterReading.objects.filter(
+                tenant=cur_tenant,
+                asset=asset,
+                machine_state='RUNNING',
+                is_pre_repair=False,
+                is_suppressed=False,
+                reading_date__lt=rec_time
+            ).order_by('-reading_date')[:120]
+        )
+        hist_by_round = {}
+        for hr in hist_records:
+            rk = hr.round_id or hr.reading_date.strftime('%Y-%m-%d %H')
+            if rk not in hist_by_round:
+                hist_by_round[rk] = {}
+            hist_by_round[rk][hr.metric_code] = float(hr.reading_value)
+
+        historical_vectors = []
+        for rk, vals in hist_by_round.items():
+            if 'VIBRATION' in vals and 'TEMPERATURE' in vals:
+                h_v = vals.get('VIBRATION', 2.0)
+                h_t = vals.get('TEMPERATURE', 65.0)
+                h_p = vals.get('PRESSURE', channel_vals.get('PRESSURE', 2.5))
+                h_c = vals.get('CURRENT', channel_vals.get('CURRENT', 15.0))
+                historical_vectors.append(multi_detector.build_vector(
+                    vibration=h_v,
+                    temperature=h_t,
+                    ambient_temperature=ambient_temperature,
+                    pressure=h_p,
+                    current=h_c
+                ))
+
+        if len(historical_vectors) >= 5:
+            multi_detector.train_or_fit(historical_vectors)
 
         current_vec = multi_detector.build_vector(
             vibration=channel_vals['VIBRATION'],
@@ -367,8 +415,9 @@ class ConditionMonitoringEngine:
             metric_type = 'MULTIVARIATE' if is_multivariate_only else 'SINGLE_METRIC'
             primary_val = float(primary_rec.reading_value)
 
-            # Khóa dòng và lọc chính xác theo tài sản, chỉ số và trạng thái OPEN
+            # Khóa dòng và lọc chính xác theo tenant, tài sản, chỉ số và trạng thái OPEN
             existing_open_alert = AssetAnomalyAlert.objects.select_for_update().filter(
+                tenant=cur_tenant,
                 asset=asset,
                 metric_code=primary_metric,
                 status='OPEN'
@@ -393,6 +442,20 @@ class ConditionMonitoringEngine:
                 elif multi_res.get('has_anomaly') and multi_res.get('message'):
                     target_alert.message = multi_res.get('message')
                 target_alert.last_detected_at = timezone.now()
+
+                # Đồng bộ toàn diện các trường số liệu và dự phóng mới nhất (Audit #6)
+                if z_score_alert_info and z_score_alert_info.get('zScore') is not None:
+                    target_alert.z_score = z_score_alert_info.get('zScore')
+                if multi_res and multi_res.get('anomaly_score') is not None:
+                    target_alert.anomaly_score = multi_res.get('anomaly_score')
+                if trend_drift_info:
+                    if trend_drift_info.get('slopePerDay') is not None:
+                        target_alert.trend_slope = trend_drift_info.get('slopePerDay')
+                    if trend_drift_info.get('daysRemaining') is not None:
+                        target_alert.days_remaining = trend_drift_info.get('daysRemaining')
+                    if trend_drift_info.get('predictedFailureDate') is not None:
+                        target_alert.predicted_failure_date = trend_drift_info.get('predictedFailureDate')
+
                 target_alert.save()
 
                 draft_pm_action = "UPDATED_EXISTING_DRAFT"
@@ -432,8 +495,22 @@ class ConditionMonitoringEngine:
 
             if highest_severity == 'CRITICAL':
                 # 1. TRƯỜNG HỢP NẶNG (Sự cố Đỏ / CRITICAL / ISO Zone D / Z-Score >= 3.0):
-                # Tự động tạo Work Order khẩn cấp nếu chưa có phiếu khẩn cấp
-                needs_critical_wo = not active_alert.draft_work_order or active_alert.draft_work_order.priority != 'URGENT'
+                # Kiểm tra xem tài sản đã có Work Order khắc phục (CORRECTIVE) nào đang mở chưa (Audit #3)
+                active_corrective_wo = WorkOrder.objects.filter(
+                    tenant=cur_tenant,
+                    asset=asset,
+                    type='CORRECTIVE',
+                    status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'PENDING']
+                ).order_by('-created_at').first()
+
+                if active_corrective_wo:
+                    # Đã có phiếu khắc phục đang mở: Không tạo thêm phiếu trùng lặp, liên kết alert với phiếu hiện có
+                    needs_critical_wo = False
+                    if not active_alert.draft_work_order:
+                        active_alert.draft_work_order = active_corrective_wo
+                        active_alert.save(update_fields=['draft_work_order'])
+                else:
+                    needs_critical_wo = not active_alert.draft_work_order or active_alert.draft_work_order.priority != 'URGENT'
                 if needs_critical_wo:
                     crit_deadline = timezone.now() + timedelta(hours=4)
 
@@ -572,6 +649,22 @@ class ConditionMonitoringEngine:
             if wo.assigned_to:
                 assigned_tech_display = wo.assigned_to.get_full_name() or wo.assigned_to.username
 
+        # Phase 11.5: Tuyến Chiến Lược RUL (Kích hoạt liên hoàn 11.4 -> 11.5 & Alert Consolidation)
+        rul_prediction_result = None
+        cur_machine_state = saved_records[0].machine_state if saved_records else 'RUNNING'
+        if cur_machine_state == 'RUNNING':
+            try:
+                from algorithms.predictive_rul import RULPredictiveService
+                trigger_src = 'ANOMALY_TRIGGER_11_4' if has_anomaly else 'METER_LOG'
+                rul_prediction_result = RULPredictiveService.predict_asset_rul(
+                    asset=asset,
+                    trigger_source=trigger_src,
+                    current_user=recorded_by
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"RUL auto-trigger error for asset {asset.id}: {e}")
+
         return {
             "machineState": saved_records[0].machine_state if saved_records else "RUNNING",
             "hasAnomaly": has_anomaly,
@@ -588,5 +681,6 @@ class ConditionMonitoringEngine:
             "draftWorkOrderCode": created_or_updated_alert.draft_work_order.code if (created_or_updated_alert and created_or_updated_alert.draft_work_order) else None,
             "draftWorkOrderStatus": created_or_updated_alert.draft_work_order.status if (created_or_updated_alert and created_or_updated_alert.draft_work_order) else None,
             "assignedTechnicianName": assigned_tech_display,
-            "workOrderId": str(work_order.id) if work_order else None
+            "workOrderId": str(work_order.id) if work_order else None,
+            "rulPrediction": rul_prediction_result.get('data') if rul_prediction_result else None
         }

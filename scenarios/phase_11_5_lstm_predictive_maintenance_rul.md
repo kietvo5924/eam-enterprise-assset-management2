@@ -460,24 +460,24 @@ critical_threshold = max(14, lead_time + 5)
 
 ## 12. Kế Hoạch Triển Khai & Nghiệm Thu (Implementation Checklist)
 
-- [ ] **Task 11.5.1 — Industrial Dataset Mapping & 4-Feature Pipeline**
-  - [ ] Xây dựng bộ nạp dữ liệu suy thoái vòng bi FEMTO / PRONOSTIA và UCI AI4I.
-  - [ ] Thiết lập pipeline tạo ma trận chuỗi trượt $(W = 30, \text{Features} = 4)$: Vibrate, $\Delta T$, Pressure, Load Factor.
-  - [ ] Cài đặt thuật toán kẹp trần Piece-wise Linear RUL Target ($RUL \le 125$).
-- [ ] **Task 11.5.2 — PyTorch LSTM CPU Inference Service & MC-Dropout**
-  - [ ] Xây dựng kiến trúc mạng 2 lớp LSTM gọn nhẹ phục vụ suy diễn thuần CPU.
-  - [ ] Cài đặt vòng lặp suy diễn Monte Carlo Dropout ($M=20$) trích xuất khoảng tin cậy 90%.
-  - [ ] Đóng gói `RULInferenceService` với cơ chế tải trọng số an toàn.
-- [ ] **Task 11.5.3 — Cold Start Bypass & Standby Filtering Engine**
-  - [ ] Cài đặt quy tắc Bypass Threshold: Bỏ qua LSTM và gán nhãn `CALIBRATING` khi số mẫu `RUNNING` $< 15$.
-  - [ ] Cài đặt bộ lọc loại bỏ mẫu `IDLE` / `STANDBY` và thuật toán quy đổi `OperatingDays` sang `CalendarDays`.
-- [ ] **Task 11.5.4 — Phantom Recovery Clamp & Monotonic Filter**
-  - [ ] Lưu vết lịch sử `MICRO_MAINTENANCE` và kích hoạt cờ `is_phantom_recovery` khi RUL tăng vọt $> 30\%$.
-  - [ ] Cài đặt bộ lọc suy thoái đơn điệu $RUL_t \le RUL_{t-1} + \epsilon$.
-- [ ] **Task 11.5.5 — Dynamic Lead-Time Aware Risk Matrix & Alert Consolidation**
-  - [ ] Cài đặt ma trận 4 cấp độ rủi ro với ngưỡng Critical động dựa trên `lead_time_days` của kho phụ tùng.
-  - [ ] Tích hợp cơ chế gom thông báo (Alert Consolidation Window) liên kết hai tầng Task 11.4 $\rightarrow$ Task 11.5.
-  - [ ] Tự động sinh bản thảo Work Order đón đầu (`type = 'PREDICTIVE_PM'`) khi chạm ngưỡng Critical.
-- [ ] **Task 11.5.6 — UI Integration & Test Verification**
-  - [ ] Thiết kế đồng hồ đo sức khỏe RUL có dải bóng mờ khoảng tin cậy và thẻ cảnh báo Phantom Recovery.
-  - [ ] Triển khai bộ kiểm thử tự động 12 test cases (`TC-RUL-01` đến `TC-RUL-12`).
+- [x] **Task 11.5.1 — Industrial Dataset Mapping & 4-Feature Pipeline**
+  - [x] Xây dựng bộ nạp dữ liệu suy thoái vòng bi FEMTO / PRONOSTIA và UCI AI4I.
+  - [x] Thiết lập pipeline tạo ma trận chuỗi trượt $(W = 30, \text{Features} = 4)$: Vibrate, $\Delta T$, Pressure, Load Factor.
+  - [x] Cài đặt thuật toán kẹp trần Piece-wise Linear RUL Target ($RUL \le 125$).
+- [x] **Task 11.5.2 — PyTorch LSTM CPU Inference Service & MC-Dropout**
+  - [x] Xây dựng kiến trúc mạng 2 lớp LSTM gọn nhẹ phục vụ suy diễn thuần CPU.
+  - [x] Cài đặt vòng lặp suy diễn Monte Carlo Dropout ($M=20$) trích xuất khoảng tin cậy 90%.
+  - [x] Đóng gói `RULInferenceService` với cơ chế tải trọng số an toàn.
+- [x] **Task 11.5.3 — Cold Start Bypass & Standby Filtering Engine**
+  - [x] Cài đặt quy tắc Bypass Threshold: Bỏ qua LSTM và gán nhãn `CALIBRATING` khi số mẫu `RUNNING` $< 15$.
+  - [x] Cài đặt bộ lọc loại bỏ mẫu `IDLE` / `STANDBY` và thuật toán quy đổi `OperatingDays` sang `CalendarDays`.
+- [x] **Task 11.5.4 — Phantom Recovery Clamp & Monotonic Filter**
+  - [x] Lưu vết lịch sử `MICRO_MAINTENANCE` và kích hoạt cờ `is_phantom_recovery` khi RUL tăng vọt $> 30\%$.
+  - [x] Cài đặt bộ lọc suy thoái đơn điệu $RUL_t \le RUL_{t-1} + \epsilon$.
+- [x] **Task 11.5.5 — Dynamic Lead-Time Aware Risk Matrix & Alert Consolidation**
+  - [x] Cài đặt ma trận 4 cấp độ rủi ro với ngưỡng Critical động dựa trên `lead_time_days` của kho phụ tùng.
+  - [x] Tích hợp cơ chế gom thông báo (Alert Consolidation Window) liên kết hai tầng Task 11.4 $\rightarrow$ Task 11.5.
+  - [x] Tự động sinh bản thảo Work Order đón đầu (`type = 'PREDICTIVE_PM'`) khi chạm ngưỡng Critical.
+- [x] **Task 11.5.6 — UI Integration & Test Verification**
+  - [x] Thiết kế đồng hồ đo sức khỏe RUL có dải bóng mờ khoảng tin cậy và thẻ cảnh báo Phantom Recovery.
+  - [x] Triển khai bộ kiểm thử tự động 12 test cases (`TC-RUL-01` đến `TC-RUL-12`).

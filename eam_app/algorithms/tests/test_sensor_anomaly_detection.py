@@ -1090,4 +1090,147 @@ class SensorAnomalyDetectionTestCase(TestCase):
         alert.refresh_from_db()
         self.assertEqual(alert.status, 'RESOLVED')
 
+    def test_audit_point1_multi_metric_same_checklist_no_overwrite(self):
+        """
+        AUDIT #1: Khi đo nhiều chỉ số (VIBRATION và TEMPERATURE) trên cùng 1 checklist_item,
+        chỉ số sau TUYỆT ĐỐI KHÔNG được ghi đè chỉ số trước mà phải lưu thành 2 bản ghi độc lập.
+        """
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            title="Đo đa kênh checklist",
+            status="IN_PROGRESS"
+        )
+        chk = WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            item_name="Kiểm tra thông số ổ bi"
+        )
+
+        # 1. Ghi nhận VIBRATION
+        ConditionMonitoringEngine.process_readings(
+            asset=self.pump_asset,
+            readings_data=[{'metricCode': 'VIBRATION', 'value': 2.5, 'unit': 'mm/s'}],
+            tenant=self.tenant,
+            work_order=wo,
+            checklist_item=chk
+        )
+        # 2. Ghi nhận TEMPERATURE trên cùng checklist_item
+        ConditionMonitoringEngine.process_readings(
+            asset=self.pump_asset,
+            readings_data=[{'metricCode': 'TEMPERATURE', 'value': 68.0, 'unit': '°C'}],
+            tenant=self.tenant,
+            work_order=wo,
+            checklist_item=chk
+        )
+
+        readings = MeterReading.objects.filter(checklist_item=chk)
+        self.assertEqual(readings.count(), 2, "Cả 2 chỉ số VIBRATION và TEMPERATURE phải được lưu độc lập!")
+        vib = readings.filter(metric_code='VIBRATION').first()
+        temp = readings.filter(metric_code='TEMPERATURE').first()
+        self.assertIsNotNone(vib)
+        self.assertIsNotNone(temp)
+        self.assertEqual(float(vib.reading_value), 2.5)
+        self.assertEqual(float(temp.reading_value), 68.0)
+
+    def test_audit_point3_workorder_idempotency_no_duplicate_on_active_corrective(self):
+        """
+        AUDIT #3: Khi tài sản đã có Work Order khắc phục (CORRECTIVE) đang xử lý,
+        các cảnh báo CRITICAL tiếp theo không được tạo trùng Work Order mới mà phải liên kết phiếu hiện có.
+        """
+        active_wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            title="Sửa chữa khẩn cấp đang xử lý",
+            type="CORRECTIVE",
+            priority="URGENT",
+            status="IN_PROGRESS"
+        )
+        initial_wo_count = WorkOrder.objects.filter(asset=self.pump_asset, type="CORRECTIVE").count()
+
+        # Đo chỉ số CRITICAL (vibration 12.0 mm/s)
+        ConditionMonitoringEngine.process_readings(
+            asset=self.pump_asset,
+            readings_data=[{'metricCode': 'VIBRATION', 'value': 12.0, 'unit': 'mm/s'}],
+            tenant=self.tenant
+        )
+
+        new_wo_count = WorkOrder.objects.filter(asset=self.pump_asset, type="CORRECTIVE").count()
+        self.assertEqual(new_wo_count, initial_wo_count, "Tuyệt đối không được tạo thêm Work Order trùng lặp!")
+
+        alert = AssetAnomalyAlert.objects.filter(asset=self.pump_asset, metric_code='VIBRATION', status='OPEN').first()
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert.draft_work_order, active_wo, "Cảnh báo phải được liên kết với Work Order đang mở.")
+
+    def test_audit_point5_theil_sen_invalid_timestamps_safely_ignored(self):
+        """
+        AUDIT #5: Các mốc thời gian không hợp lệ (chuỗi rác, parse lỗi) phải được loại bỏ an toàn,
+        không được tự ý thay thế bằng now() làm sai lệch thứ tự và độ dốc (slope).
+        """
+        from algorithms.anomaly_detection.theil_sen_drift import compute_theil_sen_drift
+        now = timezone.now()
+        # 5 mốc đo hợp lệ (cách nhau 1 ngày, giá trị tăng đều) + 1 mốc rác ở giữa
+        timestamps = [
+            now - timedelta(days=5),
+            "INVALID_CORRUPT_TIMESTAMP",
+            now - timedelta(days=4),
+            now - timedelta(days=3),
+            now - timedelta(days=2),
+            now - timedelta(days=1),
+        ]
+        values = [4.0, 99.0, 4.4, 4.8, 5.2, 5.6]
+
+        slope, days_rem = compute_theil_sen_drift(timestamps, values, limit_value=7.1)
+        self.assertIsNotNone(slope)
+        # Độ dốc thực tế: 0.4 đơn vị/ngày
+        self.assertAlmostEqual(slope, 0.4, places=2)
+        # Điểm hiện tại là 5.6, chạm 7.1 sau (7.1 - 5.6) / 0.4 = 3.75 -> 3 ngày
+        self.assertEqual(days_rem, 3)
+
+    def test_audit_point6_open_alert_fields_synchronized(self):
+        """
+        AUDIT #6: Khi cảnh báo đã mở tiếp tục nhận mẫu đo mới, các trường anomaly_score,
+        trend_slope, days_remaining, predicted_failure_date và z_score phải được đồng bộ cập nhật.
+        """
+        now = timezone.now()
+        alert = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.pump_asset,
+            metric_code='VIBRATION',
+            current_value=4.0,
+            status='OPEN',
+            occurrence_count=1,
+            trend_slope=0.1,
+            days_remaining=20,
+            severity='WARNING'
+        )
+
+        # Tạo chuỗi đo tăng dốc mạnh
+        for i in range(5):
+            MeterReading.objects.create(
+                tenant=self.tenant,
+                asset=self.pump_asset,
+                metric_code='VIBRATION',
+                reading_value=4.0 + (i * 0.6),
+                reading_date=now - timedelta(days=5 - i),
+                machine_state='RUNNING',
+                unit='mm/s'
+            )
+
+        ConditionMonitoringEngine.process_readings(
+            asset=self.pump_asset,
+            readings_data=[{'metricCode': 'VIBRATION', 'value': 6.8, 'unit': 'mm/s'}],
+            tenant=self.tenant
+        )
+
+        alert.refresh_from_db()
+        self.assertEqual(alert.occurrence_count, 2)
+        self.assertEqual(float(alert.current_value), 6.8)
+        # Phải được cập nhật độ dốc mới (khoảng 0.6) và số ngày còn lại mới (<= 2 ngày)
+        self.assertIsNotNone(alert.trend_slope)
+        self.assertAlmostEqual(alert.trend_slope, 0.6, delta=0.15)
+        self.assertIsNotNone(alert.days_remaining)
+        self.assertLessEqual(alert.days_remaining, 3)
+
+
 

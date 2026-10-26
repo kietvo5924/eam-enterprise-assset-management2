@@ -623,7 +623,13 @@ class WorkOrderService {
     }
   }
 
-  Future<bool> updateStatus(String woId, String status) async {
+  Future<bool> updateStatus(
+    String woId,
+    String status, {
+    String? resolutionNotes,
+    String? machineState,
+    double? loadFactor,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final tenantId = prefs.getString('tenantId') ?? '';
@@ -664,9 +670,20 @@ class WorkOrderService {
 
       if (NetworkService().isOnline) {
         try {
+          final putData = <String, dynamic>{'status': status};
+          if (resolutionNotes != null && resolutionNotes.trim().isNotEmpty) {
+            putData['resolutionNotes'] = resolutionNotes.trim();
+          }
+          if (machineState != null && machineState.trim().isNotEmpty) {
+            putData['machineState'] = machineState.trim();
+          }
+          if (loadFactor != null) {
+            putData['postRepairLoadFactor'] = loadFactor;
+          }
+
           final response = await _dio.put(
             '/api/v1/work-orders/$woId/status',
-            data: {'status': status},
+            data: putData,
           );
           if (response.statusCode == 200 && response.data['success'] == true) {
             apiSuccess = true;
@@ -702,6 +719,25 @@ class WorkOrderService {
         return false;
       }
     } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> requestReassignment(String woId, {required String reason}) async {
+    try {
+      if (NetworkService().isOnline) {
+        final response = await _dio.post(
+          '/api/v1/work-orders/$woId/request-reassignment',
+          data: {'reason': reason},
+        );
+        if (response.statusCode == 200 && response.data['success'] == true) {
+          _updateLocalWorkOrder(woId);
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('requestReassignment failed: $e');
       return false;
     }
   }

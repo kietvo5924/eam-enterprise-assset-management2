@@ -279,6 +279,94 @@
 
             <div id="tab-content-meterReadings" class="mt-2 min-h-[300px] hidden">
               <div class="flex flex-col h-full space-y-4">
+                <!-- Phase 11.5: Phantom Recovery Warning Banner -->
+                <div id="rul-phantom-banner" class="hidden border border-amber-300 bg-amber-50 rounded-2xl p-4 shadow-sm animate-pulse-slow">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-start gap-3">
+                      <i class="ph-bold ph-shield-warning text-2xl text-amber-600 mt-0.5 shrink-0"></i>
+                      <div>
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="text-xs font-black uppercase px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-900 border border-amber-300">
+                            Cảnh Báo Hồi Phục Ảo (Phantom Recovery)
+                          </span>
+                        </div>
+                        <p class="text-sm font-semibold text-amber-950 m-0 mb-1" id="rul-phantom-text">
+                          Chỉ số rung/nhiệt giảm tạm thời sau bảo dưỡng nhỏ (bôi trơn/siết ốc). RUL được khóa an toàn để phòng ngừa nứt vỡ vòng bi đột ngột.
+                        </p>
+                      </div>
+                    </div>
+                    {% if 'asset:update' in user_permissions %}
+                    <button onclick="openOverridePhantomModal()" class="px-3 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0">
+                      <i class="ph-bold ph-check-circle text-amber-700"></i>
+                      <span>Xác thực ghi đè</span>
+                    </button>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Phase 11.5: RUL Health Card & Uncertainty Band Widget -->
+                <div id="rul-health-container" class="border border-neutral-200 bg-gradient-to-br from-white to-neutral-50 rounded-2xl p-5 shadow-sm">
+                  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-neutral-100 pb-4 mb-4">
+                    <div class="flex items-center gap-3">
+                      <div id="rul-gauge-icon" class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-2xl shrink-0 shadow-inner">
+                        <i class="ph-bold ph-hourglass-high"></i>
+                      </div>
+                      <div>
+                        <div class="flex items-center gap-2 mb-0.5">
+                          <span class="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">DỰ BÁO TUỔI THỌ CÒN LẠI (AI LSTM)</span>
+                          <span id="rul-risk-badge" class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-neutral-100 text-neutral-600">CALIBRATING</span>
+                          <span id="rul-rapid-badge" class="hidden px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-300 animate-pulse">
+                            <i class="ph-bold ph-lightning"></i> GIA TỐC ĐỘT BIẾN
+                          </span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                          <span id="rul-op-days-display" class="text-2xl font-black text-neutral-900 font-mono tracking-tight">--</span>
+                          <span class="text-xs text-neutral-500 font-medium">ngày vận hành</span>
+                          <span id="rul-cal-days-display" class="text-xs font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-lg font-mono">≈ -- ngày lịch</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      {% if 'asset:update' in user_permissions %}
+                      <button onclick="runRulPrediction()" id="btn-run-rul-prediction" class="px-3.5 py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-bold rounded-xl transition-all flex items-center gap-2">
+                        <i class="ph-bold ph-play text-sm"></i>
+                        <span>Chạy Dự Đoán RUL Tức Thời</span>
+                      </button>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <!-- Details Grid -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                    <div class="bg-white p-3 rounded-xl border border-neutral-100 shadow-xs">
+                      <span class="text-neutral-400 font-bold block mb-1">ĐỘ TIN CẬY 90% (MC-DROPOUT)</span>
+                      <p id="rul-confidence-interval" class="font-extrabold text-neutral-800 font-mono m-0">-- ngày</p>
+                      <span id="rul-uncertainty-label" class="text-[10px] text-neutral-400">Std: --</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-neutral-100 shadow-xs">
+                      <span class="text-neutral-400 font-bold block mb-1">HỆ SỐ CHU KỲ TẢI (DUTY CYCLE)</span>
+                      <p id="rul-duty-cycle" class="font-extrabold text-neutral-800 font-mono m-0">1.0 (24/7)</p>
+                      <span id="rul-load-summary" class="text-[10px] text-neutral-400">Phụ tải: Bình thường</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-neutral-100 shadow-xs">
+                      <span class="text-neutral-400 font-bold block mb-1">VẬT TƯ CỐT LÕI (SPARE PART)</span>
+                      <p id="rul-spare-part-name" class="font-bold text-neutral-800 truncate m-0">--</p>
+                      <span id="rul-spare-part-status" class="text-[10px] text-neutral-500 font-medium">Tồn kho: --</span>
+                    </div>
+                    <div class="bg-white p-3 rounded-xl border border-neutral-100 shadow-xs">
+                      <span class="text-neutral-400 font-bold block mb-1">NGƯỠNG NGUY CẤP ĐỘNG</span>
+                      <p id="rul-critical-threshold" class="font-extrabold text-rose-700 font-mono m-0">14 ngày</p>
+                      <span id="rul-evaluated-at" class="text-[10px] text-neutral-400">Cập nhật: --</span>
+                    </div>
+                  </div>
+
+                  <!-- Recommendation Banner -->
+                  <div id="rul-recommendation-box" class="mt-3 p-3 bg-neutral-100/70 border border-neutral-200/80 rounded-xl text-xs flex items-start gap-2 text-neutral-700">
+                    <i class="ph-bold ph-lightbulb text-primary text-base mt-0.5 shrink-0"></i>
+                    <p id="rul-recommendation-text" class="m-0 font-medium leading-relaxed">Đang nạp dữ liệu khuyến nghị bảo trì...</p>
+                  </div>
+                </div>
+
                 <!-- Anomaly Alerts Container -->
                 <div id="meter-alerts-container" class="hidden"></div>
 
@@ -355,7 +443,7 @@
         </p>
       </div>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-3 gap-3">
         <!-- Metric Code -->
         <div>
           <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Chỉ số đo (*)</label>
@@ -375,12 +463,24 @@
         </div>
         <!-- Ambient Temperature -->
         <div>
-          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Nhiệt độ môi trường (°C)</label>
+          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Nhiệt độ MT (°C)</label>
           <input type="number" id="meter-ambient-temp" step="0.5" placeholder="VD: 30.0" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-800 focus:outline-none focus:border-primary">
         </div>
+        <!-- Load Factor Dropdown -->
+        <div>
+          <label class="block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1.5">Mức tải máy lúc đo (*)</label>
+          <select id="meter-load-factor" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-800 focus:outline-none focus:border-primary">
+            <option value="1.0" selected>Đủ tải / Bình thường (100% định mức)</option>
+            <option value="0.5">Non tải / Không tải (50%)</option>
+            <option value="0.8">Tải vừa phải (80%)</option>
+            <option value="1.2">Tải cao (120% định mức)</option>
+            <option value="1.4">Quá tải tạm thời (140% - Đang dập mẻ lớn)</option>
+          </select>
+        </div>
+      </div>
 
         <!-- Custom Metric Input (Hiển thị khi chọn Khác...) -->
-        <div id="meter-custom-metric-container" class="hidden col-span-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl">
+        <div id="meter-custom-metric-container" class="hidden p-3 bg-amber-50/60 border border-amber-200 rounded-xl">
           <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
             <i class="ph-bold ph-pencil-simple text-amber-700"></i>
             <span>Mã chỉ số tùy chỉnh (*)</span>
@@ -388,7 +488,6 @@
           <input type="text" id="meter-custom-metric-code" placeholder="VD: OIL_PRESS, BEARING_TEMP_2, VISCOSITY..." class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-sm font-bold text-neutral-900 focus:outline-none focus:border-primary uppercase" maxlength="64">
           <p class="text-[11px] text-amber-700 mt-1 mb-0">Chỉ gồm chữ in hoa, số, gạch dưới hoặc gạch nối (VD: RPM, NOISE, FLOW_RATE).</p>
         </div>
-      </div>
 
       <div class="grid grid-cols-2 gap-4">
         <!-- Giá trị đo được -->
@@ -420,6 +519,40 @@
       <button type="button" onclick="submitConditionMonitoringReading()" id="btn-submit-meter-reading" class="px-5 py-2 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary-hover shadow-sm transition-all flex items-center gap-2">
         <i class="ph-bold ph-check"></i>
         <span>Lưu & Phân tích AI</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Override Phantom Recovery Modal -->
+<div id="override-phantom-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
+      <div class="flex items-center gap-2">
+        <i class="ph-bold ph-shield-check text-xl text-amber-600"></i>
+        <h3 class="text-lg font-bold text-neutral-800 m-0">Xác thực ghi đè Hồi Phục Ảo</h3>
+      </div>
+      <button onclick="closeOverridePhantomModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
+        <i class="ph ph-x text-xl"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <p class="text-xs text-neutral-600 leading-relaxed m-0">
+        Bạn đang xác thực bỏ qua cảnh báo hồi phục ảo (Phantom Recovery). Hành động này chỉ nên thực hiện khi Quản đốc đã trực tiếp thẩm định hiện trường và xác nhận thiết bị an toàn.
+      </p>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-1.5">Lý do kỹ thuật (*)</label>
+        <textarea id="override-phantom-reason" rows="3" placeholder="Nhập lý do kỹ thuật (VD: Đã kiểm tra khe hở vòng bi đạt chuẩn 0.05mm, nhiệt độ vỏ ổn định sau 4h chạy thử)..." class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-800 focus:outline-none focus:border-primary resize-none"></textarea>
+      </div>
+      <div id="override-phantom-error" class="hidden p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium"></div>
+    </div>
+    <div class="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-3">
+      <button type="button" onclick="closeOverridePhantomModal()" class="px-4 py-2 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors">
+        Hủy
+      </button>
+      <button type="button" onclick="submitOverridePhantom()" id="btn-submit-override-phantom" class="px-5 py-2 bg-amber-600 text-white text-xs font-bold rounded-xl hover:bg-amber-700 shadow-sm transition-all flex items-center gap-2">
+        <i class="ph-bold ph-check"></i>
+        <span>Xác nhận ghi đè</span>
       </button>
     </div>
   </div>
@@ -520,6 +653,18 @@
               <option value="DOWN">DOWN</option>
               <option value="MAINTENANCE">MAINTENANCE</option>
               <option value="RETIRED">RETIRED</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Chu kỳ vận hành / Ca kíp (*)</label>
+            <select id="asset-duty-cycle" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="1.0">Chạy liên tục 24/7 (3 ca) — Hệ số 1.0</option>
+              <option value="0.75">Chạy 2 ca / 16h mỗi ngày — Hệ số 0.75</option>
+              <option value="0.7">Chạy luân phiên 70% thời gian — Hệ số 0.7</option>
+              <option value="0.5">Chạy 1 ca 12h hoặc luân phiên cách ngày — Hệ số 0.5</option>
+              <option value="0.33">Chạy giờ hành chính (8h/ngày, 6 ngày/tuần) — Hệ số 0.33</option>
+              <option value="0.25">Chạy giờ hành chính (8h/ngày, 5 ngày/tuần) — Hệ số 0.25</option>
+              <option value="0.1">Máy dự phòng / Chạy không thường xuyên — Hệ số 0.1</option>
             </select>
           </div>
           <div class="flex flex-col justify-center">
@@ -844,6 +989,7 @@
       value: "{{ asset.value|default:'-' }}",
       value_raw: "{{ asset.value|default:'' }}",
       isActive: {{ asset.is_active|lower }},
+      duty_cycle_ratio: {{ asset.duty_cycle_ratio|default:1.0 }},
       qrCode: "{{ asset.qr_code|escapejs }}",
       createdAt: "{{ asset.created_at|date:'H:i d/m/Y' }}",
       updatedAt: "{{ asset.updated_at|date:'H:i d/m/Y' }}",
@@ -990,6 +1136,26 @@
     document.getElementById('asset-serial').value = serial;
     document.getElementById('asset-category').value = category_id;
     if (status) document.getElementById('asset-status').value = status;
+    const curAsset = assetsData[id];
+    const dcRatio = (curAsset && curAsset.duty_cycle_ratio) ? String(curAsset.duty_cycle_ratio) : "1.0";
+    const dcSelect = document.getElementById('asset-duty-cycle');
+    if (dcSelect) {
+      dcSelect.value = dcRatio;
+      if (!dcSelect.value) {
+        let bestOpt = dcSelect.options[0].value;
+        let minDiff = 999;
+        const numVal = parseFloat(dcRatio);
+        for (let i = 0; i < dcSelect.options.length; i++) {
+          const optNum = parseFloat(dcSelect.options[i].value);
+          const diff = Math.abs(optNum - numVal);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestOpt = dcSelect.options[i].value;
+          }
+        }
+        dcSelect.value = bestOpt;
+      }
+    }
     
     document.getElementById('asset-manufacturer').value = manufacturer;
     document.getElementById('asset-purchase').value = purchase_date;
@@ -1044,6 +1210,7 @@
     if (!location_id && floorplan_id) {
       location_id = floorplan_id;
     }
+    const duty_cycle_val = document.getElementById('asset-duty-cycle') ? parseFloat(document.getElementById('asset-duty-cycle').value || 1.0) : 1.0;
 
     const btn = document.getElementById('btn-save-asset');
     const msg = document.getElementById('asset-error');
@@ -1062,6 +1229,7 @@
         manufacturer: manufacturer || null,
         purchase_date: purchase_date || null,
         value: value || null,
+        duty_cycle_ratio: duty_cycle_val,
         hierarchy_template_id: template_id || null,
         location_id: location_id || null,
         is_active: is_active
@@ -1691,8 +1859,272 @@
   let currentMeterReadings = [];
   let currentAssetAlerts = [];
   let currentTrendDrift = null;
+  let currentRulData = null;
+
+  function fetchRulPrediction(assetId) {
+    if (!assetId) return;
+    fetch(`/api/v1/assets/${assetId}/rul-prediction/`, {
+      credentials: 'same-origin',
+      headers: (() => {
+        const h = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        const csrf = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrf) h['X-CSRFToken'] = csrf;
+        return h;
+      })()
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success && res.data) {
+        currentRulData = res.data;
+        renderRulHealthCard(res.data);
+      }
+    })
+    .catch(err => console.error("Error fetching RUL prediction:", err));
+  }
+
+  function renderRulHealthCard(data) {
+    if (!data) return;
+    const isCalibrating = (data.riskLevel === 'CALIBRATING' || data.operatingRulDays === null || data.operatingRulDays === undefined);
+
+    const riskBadge = document.getElementById('rul-risk-badge');
+    const rapidBadge = document.getElementById('rul-rapid-badge');
+    const opDisplay = document.getElementById('rul-op-days-display');
+    const calDisplay = document.getElementById('rul-cal-days-display');
+    const confInterval = document.getElementById('rul-confidence-interval');
+    const uncertLabel = document.getElementById('rul-uncertainty-label');
+    const dutyCycle = document.getElementById('rul-duty-cycle');
+    const loadSummary = document.getElementById('rul-load-summary');
+    const spareName = document.getElementById('rul-spare-part-name');
+    const spareStatus = document.getElementById('rul-spare-part-status');
+    const critThresh = document.getElementById('rul-critical-threshold');
+    const evalAt = document.getElementById('rul-evaluated-at');
+    const recText = document.getElementById('rul-recommendation-text');
+    const phantomBanner = document.getElementById('rul-phantom-banner');
+    const phantomText = document.getElementById('rul-phantom-text');
+
+    let badgeClass = "bg-neutral-100 text-neutral-600";
+    if (data.riskLevel === 'CRITICAL') {
+      badgeClass = "bg-rose-100 text-rose-700 border border-rose-300 animate-pulse";
+    } else if (data.riskLevel === 'HIGH') {
+      badgeClass = "bg-amber-100 text-amber-800 border border-amber-300";
+    } else if (data.riskLevel === 'MEDIUM') {
+      badgeClass = "bg-yellow-100 text-yellow-800";
+    } else if (data.riskLevel === 'LOW' || data.riskLevel === 'HEALTHY') {
+      badgeClass = "bg-emerald-100 text-emerald-700";
+    }
+
+    if (riskBadge) {
+      riskBadge.className = `px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${badgeClass}`;
+      riskBadge.textContent = data.riskLevel || 'CALIBRATING';
+    }
+
+    if (rapidBadge) {
+      if (data.rapidDegradationAlert) {
+        rapidBadge.classList.remove('hidden');
+      } else {
+        rapidBadge.classList.add('hidden');
+      }
+    }
+
+    if (opDisplay) {
+      opDisplay.textContent = isCalibrating ? "--" : `${data.operatingRulDays}`;
+      if (data.riskLevel === 'CRITICAL') opDisplay.className = "text-2xl font-black text-rose-600 font-mono tracking-tight";
+      else if (data.riskLevel === 'HIGH') opDisplay.className = "text-2xl font-black text-amber-600 font-mono tracking-tight";
+      else opDisplay.className = "text-2xl font-black text-neutral-900 font-mono tracking-tight";
+    }
+
+    if (calDisplay) {
+      calDisplay.textContent = isCalibrating ? "≈ -- ngày lịch" : `≈ ${data.calendarRulDays || '--'} ngày lịch`;
+    }
+
+    if (confInterval) {
+      if (isCalibrating || !data.confidenceInterval) {
+        confInterval.textContent = "Đang hiệu chuẩn";
+      } else {
+        confInterval.textContent = `${data.confidenceInterval.lower} — ${data.confidenceInterval.upper} ngày`;
+      }
+    }
+
+    if (uncertLabel) {
+      const std = data.confidenceInterval?.stdDeviation;
+      uncertLabel.textContent = std !== undefined ? `Độ lệch chuẩn: ±${std} ngày` : 'Std: --';
+    }
+
+    if (dutyCycle) {
+      const dc = data.dutyCycleRatio || 1.0;
+      let label = "24/7";
+      if (dc <= 0.35) label = "1 ca hành chính (8h)";
+      else if (dc <= 0.6) label = "Luân phiên 12h/ngày";
+      else if (dc <= 0.75) label = "5 ngày/tuần";
+      dutyCycle.textContent = `${dc} (${label})`;
+    }
+
+    if (loadSummary) {
+      const avgL = data.loadConditionSummary?.averageLoadFactor;
+      loadSummary.textContent = avgL ? `Phụ tải TB: ${avgL}x` : 'Phụ tải: Bình thường';
+    }
+
+    if (spareName) {
+      spareName.textContent = data.sparePartStatus?.partName || 'Chưa gán phụ tùng';
+    }
+
+    if (spareStatus) {
+      const qty = data.sparePartStatus?.availableQuantity;
+      const isSufficient = data.sparePartStatus?.isStockSufficient;
+      spareStatus.textContent = qty !== undefined ? `Tồn kho: ${qty} ${isSufficient ? '(Đủ dùng)' : '(HẾT HÀNG - ĐẶT GẤP)'}` : 'Tồn kho: --';
+      if (isSufficient === false) spareStatus.className = "text-[10px] text-rose-600 font-bold";
+      else spareStatus.className = "text-[10px] text-neutral-500 font-medium";
+    }
+
+    if (critThresh) {
+      critThresh.textContent = `${data.sparePartStatus?.dynamicCriticalThreshold || 14} ngày`;
+    }
+
+    if (evalAt) {
+      if (data.lastEvaluatedAt) {
+        const d = new Date(data.lastEvaluatedAt);
+        evalAt.textContent = `Cập nhật: ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} ${d.toLocaleDateString('en-GB')}`;
+      } else {
+        evalAt.textContent = 'Chưa phân tích';
+      }
+    }
+
+    if (recText) {
+      recText.textContent = data.recommendedAction || data.message || "Thiết bị hoạt động trong giới hạn an toàn.";
+    }
+
+    if (phantomBanner) {
+      if (data.isPhantomRecovery) {
+        phantomBanner.classList.remove('hidden');
+        if (phantomText) {
+          phantomText.textContent = `Chỉ số rung/nhiệt giảm tạm thời sau can thiệp bảo dưỡng nhỏ. RUL được khóa an toàn ở mức ${data.operatingRulDays} ngày để phòng ngừa vỡ vòng bi.`;
+        }
+      } else {
+        phantomBanner.classList.add('hidden');
+      }
+    }
+  }
+
+  function runRulPrediction() {
+    if (!currentSelectedAssetId) {
+      alert("Vui lòng chọn thiết bị.");
+      return;
+    }
+    const btn = document.getElementById('btn-run-rul-prediction');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i><span>Đang tính toán LSTM...</span>`;
+    }
+
+    fetch(`/api/v1/assets/${currentSelectedAssetId}/rul-prediction/run/`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: (() => {
+        const h = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        const csrf = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrf) h['X-CSRFToken'] = csrf;
+        return h;
+      })(),
+      body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="ph-bold ph-play text-sm"></i><span>Chạy Dự Đoán RUL Tức Thời</span>`;
+      }
+      if (res.success && res.data) {
+        renderRulHealthCard(res.data);
+      } else {
+        alert("Thông báo: " + (res.message || res.error || "Không thể chạy dự đoán RUL."));
+      }
+    })
+    .catch(err => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="ph-bold ph-play text-sm"></i><span>Chạy Dự Đoán RUL Tức Thời</span>`;
+      }
+      alert("Lỗi kết nối: " + err);
+    });
+  }
+
+  function openOverridePhantomModal() {
+    const modal = document.getElementById('override-phantom-modal');
+    const input = document.getElementById('override-phantom-reason');
+    const err = document.getElementById('override-phantom-error');
+    if (input) input.value = '';
+    if (err) err.classList.add('hidden');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeOverridePhantomModal() {
+    const modal = document.getElementById('override-phantom-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function submitOverridePhantom() {
+    if (!currentSelectedAssetId) return;
+    const reason = (document.getElementById('override-phantom-reason')?.value || '').trim();
+    const errDiv = document.getElementById('override-phantom-error');
+
+    if (!reason) {
+      if (errDiv) {
+        errDiv.textContent = "Bắt buộc phải nhập lý do kỹ thuật để xác thực ghi đè.";
+        errDiv.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const btn = document.getElementById('btn-submit-override-phantom');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Đang xử lý...";
+    }
+
+    fetch(`/api/v1/assets/${currentSelectedAssetId}/rul-prediction/override-phantom/`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: (() => {
+        const h = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('access_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        const csrf = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (csrf) h['X-CSRFToken'] = csrf;
+        return h;
+      })(),
+      body: JSON.stringify({ reason: reason })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Xác nhận ghi đè";
+      }
+      if (res.success) {
+        closeOverridePhantomModal();
+        fetchRulPrediction(currentSelectedAssetId);
+      } else {
+        if (errDiv) {
+          errDiv.textContent = res.message || res.error || "Không thể ghi đè.";
+          errDiv.classList.remove('hidden');
+        }
+      }
+    })
+    .catch(e => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Xác nhận ghi đè";
+      }
+      alert("Lỗi kết nối: " + e);
+    });
+  }
 
   function fetchMeterReadings(assetId) {
+    fetchRulPrediction(assetId);
     fetch(`/api/v1/assets/${assetId}/anomaly-history`, {
       credentials: 'same-origin',
       headers: (() => {
@@ -1706,7 +2138,6 @@
     })
     .then(res => {
       if (!res.ok) {
-        // Fallback to meter-readings endpoint if anomaly-history is not available
         return fetch(`/api/v1/assets/${assetId}/meter-readings`, {
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' }
@@ -1738,61 +2169,126 @@
     }
 
     container.classList.remove('hidden');
-    let alertsHtml = '';
 
-    activeAlerts.forEach(alert => {
-      const isCritical = alert.severity === 'CRITICAL';
-      const borderClass = isCritical ? 'border-rose-200 bg-rose-50/80 text-rose-900' : 'border-amber-200 bg-amber-50/80 text-amber-900';
-      const badgeClass = isCritical ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200';
-      const icon = isCritical ? 'ph-bold ph-warning-circle text-rose-600' : 'ph-bold ph-warning text-amber-600';
+    // Sắp xếp ưu tiên: CRITICAL (trọng số 3) > WARNING (trọng số 2) > INFO (trọng số 1)
+    const severityWeight = { 'CRITICAL': 3, 'WARNING': 2, 'INFO': 1 };
+    activeAlerts.sort((a, b) => (severityWeight[b.severity] || 0) - (severityWeight[a.severity] || 0));
 
-      alertsHtml += `
-        <div class="border ${borderClass} rounded-2xl p-4 shadow-sm mb-3">
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex items-start gap-3">
-              <i class="${icon} text-2xl mt-0.5 shrink-0"></i>
-              <div>
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs font-black uppercase px-2 py-0.5 rounded-md border ${badgeClass}">
-                    ${alert.severity} (${alert.metricCode})
-                  </span>
-                  ${alert.occurrenceCount > 1 ? `<span class="text-xs font-semibold bg-neutral-200/80 text-neutral-700 px-2 py-0.5 rounded-md">Lặp lại: ${alert.occurrenceCount} lần</span>` : ''}
-                </div>
-                <p class="text-sm font-semibold m-0 mb-1">${alert.message || 'Phát hiện bất thường từ chỉ số cảm biến.'}</p>
-                <div class="flex flex-wrap items-center gap-4 text-xs font-medium opacity-85">
-                  ${alert.zScore !== null && alert.zScore !== undefined ? `<span>Z-Score: <b>${alert.zScore}</b></span>` : ''}
-                  ${alert.daysRemaining !== null && alert.daysRemaining !== undefined ? `<span>Dự kiến sự cố sau: <b>${alert.daysRemaining} ngày</b></span>` : ''}
-                  ${alert.trendSlope ? `<span>Tốc độ trôi: <b>+${alert.trendSlope}/ngày</b></span>` : ''}
-                </div>
-                ${alert.draftWorkOrderId ? `
-                  <div class="mt-2.5 pt-2 border-t ${isCritical ? 'border-rose-200/70' : 'border-amber-200/70'} flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center gap-1.5 text-xs">
-                      <i class="${isCritical ? 'ph-bold ph-lightning text-rose-600' : 'ph-bold ph-file-text text-amber-600'}"></i>
-                      <span class="font-bold">${isCritical ? 'Phiếu sự cố khẩn cấp:' : 'Phiếu WO đề xuất:'}</span>
-                      <a href="/portal/work-orders/?wo_id=${alert.draftWorkOrderId}" class="font-extrabold underline ${isCritical ? 'text-rose-700 hover:text-rose-900' : 'text-amber-700 hover:text-amber-900'}">${alert.draftWorkOrderCode || 'Xem chi tiết'}</a>
-                      ${alert.assignedTechnicianName ? `<span class="px-1.5 py-0.5 rounded bg-white/80 border border-neutral-200 text-neutral-700 font-semibold text-[11px]"><i class="ph-bold ph-user-check text-emerald-600"></i> ${alert.assignedTechnicianName}</span>` : ''}
-                      ${alert.draftWorkOrderStatus ? `<span class="px-1.5 py-0.5 rounded ${alert.draftWorkOrderStatus === 'ASSIGNED' ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-100 text-neutral-700'} font-bold text-[10px] uppercase">${alert.draftWorkOrderStatus}</span>` : ''}
-                    </div>
-                    <a href="/portal/work-orders/?wo_id=${alert.draftWorkOrderId}" class="px-2.5 py-1 ${isCritical ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'} rounded-lg text-xs font-bold shadow-xs transition-all flex items-center gap-1">
-                      <span>${isCritical ? 'Mở Phiếu Khẩn Cấp' : 'Mở Phiếu WO'}</span>
-                      <i class="ph-bold ph-arrow-up-right text-[10px]"></i>
-                    </a>
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <button onclick="handleAlertFeedback('${alert.id}', 'FALSE_ALARM')" class="px-3 py-1.5 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-700 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5">
-                <i class="ph-bold ph-shield-slash text-neutral-500"></i>
-                <span>Báo động giả</span>
-              </button>
-            </div>
+    // Lấy cảnh báo nghiêm trọng nhất làm Banner trung tâm (nếu cùng mục đích bảo vệ máy thì chỉ hiện 1 cấp cao nhất)
+    const primaryAlert = activeAlerts[0];
+    const secondaryAlerts = activeAlerts.slice(1);
+
+    const isCritical = primaryAlert.severity === 'CRITICAL';
+    const borderClass = isCritical ? 'border-rose-200 bg-gradient-to-br from-rose-50/90 via-rose-50/50 to-white' : 'border-amber-200 bg-gradient-to-br from-amber-50/90 via-amber-50/50 to-white';
+    const borderSubClass = isCritical ? 'border-rose-200/80' : 'border-amber-200/80';
+    const badgeClass = isCritical ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+    const iconBgClass = isCritical ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600';
+    const icon = isCritical ? 'ph-bold ph-warning-circle' : 'ph-bold ph-warning';
+
+    let secondaryHtml = '';
+    if (secondaryAlerts.length > 0) {
+      secondaryHtml = `
+        <div class="mt-3 pt-2.5 border-t ${borderSubClass} flex flex-wrap items-center gap-2">
+          <span class="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <i class="ph-fill ph-info text-amber-600"></i> Cảnh báo phụ cùng thời điểm:
+          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            ${secondaryAlerts.map(sa => `
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/95 border border-amber-200 text-amber-900 shadow-2xs">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span><b>${sa.metricCode}</b>${sa.currentValue !== null && sa.currentValue !== undefined ? `: <span class="font-mono font-bold">${sa.currentValue}</span>` : ''}</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 uppercase">${sa.severity}</span>
+                <button type="button" onclick="handleAlertFeedback('${sa.id}', 'FALSE_ALARM')" class="ml-1 text-neutral-400 hover:text-danger text-[10px] cursor-pointer" title="Đánh dấu báo động giả cho chỉ số ${sa.metricCode}">✕</button>
+              </span>
+            `).join('')}
           </div>
         </div>
       `;
-    });
+    }
 
-    container.innerHTML = alertsHtml;
+    let workOrderHtml = '';
+    if (primaryAlert.draftWorkOrderId) {
+      workOrderHtml = `
+        <div class="mt-3.5 pt-3 border-t ${borderSubClass} flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-wrap text-xs">
+            <span class="inline-flex items-center gap-1.5 font-bold ${isCritical ? 'text-rose-900' : 'text-amber-900'} whitespace-nowrap">
+              <i class="${isCritical ? 'ph-fill ph-lightning text-rose-600' : 'ph-fill ph-wrench text-amber-600'} text-base"></i>
+              <span>${isCritical ? 'Phiếu sự cố khẩn cấp:' : 'Phiếu WO đề xuất:'}</span>
+            </span>
+            <a href="/portal/work-orders/?wo_id=${primaryAlert.draftWorkOrderId}" class="font-mono font-extrabold px-2.5 py-1 rounded-lg bg-white border ${isCritical ? 'border-rose-300 text-rose-700 hover:bg-rose-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'} shadow-2xs transition-colors whitespace-nowrap">
+              ${primaryAlert.draftWorkOrderCode || 'WO-DETAILS'}
+            </a>
+            ${primaryAlert.assignedTechnicianName ? `
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-700 font-semibold text-xs whitespace-nowrap shadow-2xs">
+                <i class="ph-bold ph-user-check text-emerald-600"></i>
+                <span>${primaryAlert.assignedTechnicianName}</span>
+              </span>` : ''}
+            ${primaryAlert.draftWorkOrderStatus ? `
+              <span class="px-2.5 py-1 rounded-lg ${primaryAlert.draftWorkOrderStatus === 'ASSIGNED' ? 'bg-emerald-100 text-emerald-800' : (primaryAlert.draftWorkOrderStatus === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-800' : 'bg-neutral-100 text-neutral-700')} font-extrabold text-[11px] uppercase tracking-wider whitespace-nowrap">
+                ${primaryAlert.draftWorkOrderStatus}
+              </span>` : ''}
+          </div>
+          <a href="/portal/work-orders/?wo_id=${primaryAlert.draftWorkOrderId}" class="whitespace-nowrap px-4 py-2 ${isCritical ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-rose-200' : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 shadow-amber-200'} text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+            <span>${isCritical ? 'Mở Phiếu Khẩn Cấp' : 'Mở Phiếu WO'}</span>
+            <i class="ph-bold ph-arrow-up-right text-xs"></i>
+          </a>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="border ${borderClass} rounded-2xl p-4 sm:p-5 shadow-xs mb-4 transition-all">
+        <!-- Header: Icon, Badge, Message & False alarm button -->
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex items-start gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl ${iconBgClass} flex items-center justify-center text-xl shrink-0 mt-0.5">
+              <i class="${icon}"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span class="text-xs font-black uppercase px-2.5 py-0.5 rounded-md border ${badgeClass} tracking-wide">
+                  ${primaryAlert.severity} (${primaryAlert.metricCode})
+                </span>
+                ${primaryAlert.occurrenceCount > 1 ? `<span class="text-xs font-semibold bg-white/80 border border-neutral-200 text-neutral-700 px-2 py-0.5 rounded-md shadow-2xs">Lặp lại: ${primaryAlert.occurrenceCount} lần</span>` : ''}
+              </div>
+              <h4 class="text-sm sm:text-base font-black text-neutral-900 m-0 mb-2 leading-snug">
+                ${primaryAlert.message || 'Phát hiện bất thường nghiêm trọng từ chỉ số cảm biến.'}
+              </h4>
+              <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-neutral-700">
+                ${primaryAlert.currentValue !== undefined && primaryAlert.currentValue !== null ? `
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-neutral-200">
+                    <i class="ph-bold ph-gauge text-primary"></i> Giá trị đo: <b class="font-mono text-neutral-900">${primaryAlert.currentValue}</b>
+                  </span>` : ''}
+                ${primaryAlert.daysRemaining !== null && primaryAlert.daysRemaining !== undefined ? `
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-neutral-200">
+                    <i class="ph-bold ph-clock-countdown text-amber-600"></i> Dự kiến sự cố sau: <b class="text-neutral-900">${primaryAlert.daysRemaining} ngày</b>
+                  </span>` : ''}
+                ${primaryAlert.trendSlope ? `
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-neutral-200">
+                    <i class="ph-bold ph-trend-up text-rose-600"></i> Tốc độ trôi: <b class="text-neutral-900">+${primaryAlert.trendSlope}/ngày</b>
+                  </span>` : ''}
+                ${primaryAlert.zScore !== null && primaryAlert.zScore !== undefined ? `
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/80 border border-neutral-200">
+                    Z-Score: <b class="text-neutral-900">${primaryAlert.zScore}</b>
+                  </span>` : ''}
+              </div>
+            </div>
+          </div>
+          <div class="shrink-0">
+            <button onclick="handleAlertFeedback('${primaryAlert.id}', 'FALSE_ALARM')" class="px-3 py-1.5 bg-white/90 border border-neutral-200 hover:bg-white text-neutral-600 hover:text-neutral-900 text-xs font-bold rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+              <i class="ph-bold ph-shield-slash text-neutral-400"></i>
+              <span>Báo động giả</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Secondary Alerts Strip -->
+        ${secondaryHtml}
+
+        <!-- Work Order Action Bar -->
+        ${workOrderHtml}
+      </div>
+    `;
   }
 
   function handleAlertFeedback(alertId, feedback) {
@@ -2030,10 +2526,13 @@
     const remarks = document.getElementById('meter-reading-remarks').value;
     const ambStr = document.getElementById('meter-ambient-temp').value;
     const ambTemp = ambStr && !isNaN(parseFloat(ambStr)) ? parseFloat(ambStr) : null;
+    const loadStr = document.getElementById('meter-load-factor')?.value;
+    const loadFactor = loadStr && !isNaN(parseFloat(loadStr)) ? parseFloat(loadStr) : 1.0;
 
     const payload = {
       machineState: machineState,
       ambientTemperature: ambTemp,
+      loadFactor: loadFactor,
       readings: [
         {
           metricCode: effectiveMetricCode,

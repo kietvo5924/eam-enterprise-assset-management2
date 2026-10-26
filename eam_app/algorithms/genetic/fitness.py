@@ -85,6 +85,7 @@ def evaluate_individual_fitness(individual,
     pen_late = 0.0
     pen_frag = 0.0
     pen_floorplan = 0.0
+    pen_skill_cert = 0.0
 
     for t_idx, tech in enumerate(technicians):
         assigned_wos = tech_assignments[t_idx]
@@ -118,6 +119,9 @@ def evaluate_individual_fitness(individual,
         # Skill Score Evaluation
         for tsk in ordered:
             score = calculate_task_skill_score(tsk, tech, catalog=catalog)
+            if score == 0.0:
+                # Vi phạm chứng chỉ an toàn hoặc thiếu kỹ năng bắt buộc
+                pen_skill_cert += 50.0
             total_skill_points += score
             assigned_tasks_count += 1
 
@@ -194,6 +198,7 @@ def evaluate_individual_fitness(individual,
         min(30.0, pen_late) +
         min(40.0, pen_backlog) +
         min(20.0, pen_frag) +
+        min(100.0, pen_skill_cert) +
         min(1000.0, pen_floorplan)
     )
 
@@ -212,7 +217,8 @@ def evaluate_individual_fitness(individual,
         'late': round(pen_late, 2),
         'backlog': round(pen_backlog, 2),
         'frag': round(pen_frag, 2),
-        'floorplan': round(pen_floorplan, 2)
+        'floorplan': round(pen_floorplan, 2),
+        'skill_cert': round(pen_skill_cert, 2)
     }
     individual.schedules = tech_schedules
     individual.backlog_tasks = backlog_tasks_data

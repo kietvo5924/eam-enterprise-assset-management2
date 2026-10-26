@@ -390,15 +390,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF0f172a), Color(0xFF1e293b)],
+                      colors: [Color(0xFFf0f9ff), Color(0xFFe0f2fe)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF0284c7), width: 1.2),
+                    border: Border.all(color: const Color(0xFFbae6fd), width: 1.2),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF0284c7).withValues(alpha: 0.2),
+                        color: const Color(0xFF0284c7).withValues(alpha: 0.08),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -409,13 +409,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0284c7).withValues(alpha: 0.25),
+                          color: const Color(0xFF0284c7),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF38bdf8), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0284c7).withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Icon(
                           PhosphorIcons.navigationArrow(PhosphorIconsStyle.fill),
-                          color: const Color(0xFF38bdf8),
+                          color: Colors.white,
                           size: 22,
                         ),
                       ),
@@ -429,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Text(
                                   'Sơ đồ Lộ trình KTV',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: Color(0xFF0f172a),
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -458,8 +464,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             Text(
                               'Định tuyến trực giao Manhattan & chặng tiếp vận',
                               style: TextStyle(
-                                color: Colors.white70,
+                                color: Color(0xFF475569),
                                 fontSize: 11,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
@@ -468,7 +475,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Icon(
                         Icons.arrow_forward_ios,
                         size: 14,
-                        color: Color(0xFF38bdf8),
+                        color: Color(0xFF0284c7),
                       ),
                     ],
                   ),

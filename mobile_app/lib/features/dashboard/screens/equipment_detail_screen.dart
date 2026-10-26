@@ -38,6 +38,17 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
     }
   }
 
+  String _formatDutyCycle(dynamic ratio) {
+    if (ratio == null) return 'Chạy liên tục 24/7 (3 ca) — Hệ số 1.0';
+    final num = double.tryParse(ratio.toString()) ?? 1.0;
+    if (num >= 0.95) return 'Chạy liên tục 24/7 (3 ca) — Hệ số 1.0';
+    if (num >= 0.70) return 'Chạy 2 ca / 16h mỗi ngày — Hệ số 0.75';
+    if (num >= 0.45) return 'Chạy 1 ca 12h / Luân phiên — Hệ số 0.5';
+    if (num >= 0.30) return 'Giờ hành chính (8h/ngày, 6 ngày/tuần) — Hệ số 0.33';
+    if (num >= 0.20) return 'Giờ hành chính (8h/ngày, 5 ngày/tuần) — Hệ số 0.25';
+    return 'Máy dự phòng / Chạy không thường xuyên — Hệ số 0.1';
+  }
+
   @override
   Widget build(BuildContext context) {
     final status =
@@ -185,6 +196,11 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       'Nhà sản xuất',
                       widget.equipment['manufacturer'] ?? 'N/A',
                     ),
+                    _buildInfoRow(
+                      PhosphorIcons.clock(),
+                      'Chu kỳ vận hành / Ca kíp',
+                      _formatDutyCycle(widget.equipment['dutyCycleRatio']),
+                    ),
                   ]),
 
                   const SizedBox(height: 24),
@@ -269,6 +285,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
     final notesController = TextEditingController();
     String metricCode = 'VIBRATION';
     String machineState = 'RUNNING';
+    double loadFactor = 1.0;
 
     showDialog(
       context: context,
@@ -277,12 +294,13 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Cập nhật chỉ số (Meter Reading)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              title: const Text('Cập nhật chỉ số đo kiểm tra', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: metricCode,
                       decoration: const InputDecoration(
                         labelText: 'Loại chỉ số đo',
@@ -363,6 +381,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: machineState,
                       decoration: const InputDecoration(
                         labelText: 'Trạng thái vận hành máy',
@@ -376,6 +395,27 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       onChanged: (val) {
                         setDialogState(() {
                           machineState = val ?? 'RUNNING';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<double>(
+                      isExpanded: true,
+                      initialValue: loadFactor,
+                      decoration: const InputDecoration(
+                        labelText: 'Mức tải máy lúc đo (*)',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 0.5, child: Text('0.5 - 50% Không tải / Chạy ấm máy', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 0.8, child: Text('0.8 - 80% Vừa phải', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 1.0, child: Text('1.0 - 100% Đủ tải định mức', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 1.2, child: Text('1.2 - 120% Tải cao', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 1.4, child: Text('1.4 - 140% Quá tải đỉnh', overflow: TextOverflow.ellipsis)),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          loadFactor = val ?? 1.0;
                         });
                       },
                     ),
@@ -445,6 +485,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                           'readingValue': val,
                           'unit': unitController.text.trim(),
                           'machineState': machineState,
+                          'loadFactor': loadFactor,
                           'remarks': notesController.text.trim(),
                           'readingDate': DateTime.now().toIso8601String(),
                         });

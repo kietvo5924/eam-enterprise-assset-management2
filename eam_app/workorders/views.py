@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 from workorders.serializers import (
     WorkOrderSerializer, WorkOrderCreateSerializer,
     WorkOrderAssignSerializer, WorkOrderStatusUpdateSerializer,
+    WorkOrderRequestReassignmentSerializer,
     WorkOrderAutoAssignPreviewRequestSerializer,
     WorkOrderAutoAssignApplyRequestSerializer,
     WorkOrderGAAutoAssignInitiateRequestSerializer,
@@ -356,11 +357,12 @@ class WorkOrderStatusView(APIView):
             raise ValidationError('Cannot manually change status to ASSIGNED')
             
         if new_status == 'IN_PROGRESS':
-            if wo.status != 'ASSIGNED':
-                raise ValidationError('Work Order can only be started from ASSIGNED state')
+            if wo.status not in ('ASSIGNED', 'ON_HOLD'):
+                raise ValidationError('Work Order can only be started from ASSIGNED or ON_HOLD state')
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can start the Work Order')
-            wo.actual_start_time = timezone.now()
+            if not wo.actual_start_time:
+                wo.actual_start_time = timezone.now()
 
             # Event-based technician positioning: snap tech coords & zone to machine
             assigned_user = wo.assigned_to or request.user
@@ -383,17 +385,27 @@ class WorkOrderStatusView(APIView):
                 notify_work_order_started(wo, technician=assigned_user)
             except Exception:
                 pass
+
+        if new_status == 'ON_HOLD':
+            if wo.status != 'IN_PROGRESS':
+                raise ValidationError('Chỉ có thể tạm dừng phiếu đang thực hiện (IN_PROGRESS)')
+            assigned_user = wo.assigned_to or request.user
+            if hasattr(assigned_user, 'technician_profile'):
+                tp = assigned_user.technician_profile
+                tp.availability_status = 'AVAILABLE'
+                tp.save()
             
         if new_status == 'COMPLETED':
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can complete the Work Order')
 
             post_repair_payload = None
-            if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor')):
+            if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor', 'machineState', 'postRepairMachineState')):
                 post_repair_payload = {
                     'vibration': data.get('postRepairVibration'),
                     'temperature': data.get('postRepairTemperature'),
                     'load_factor': data.get('postRepairLoadFactor', 1.0),
+                    'machine_state': data.get('machineState') or data.get('postRepairMachineState') or 'RUNNING',
                 }
 
             from workorders.services import WorkOrderTransitionService
@@ -482,6 +494,49 @@ class WorkOrderReportIncidentView(APIView):
 
         return success_response({
             'message': 'Đã gửi báo cáo phát sinh sự cố tới Quản đốc bảo trì thành công.',
+            'notifications_sent': len(notifs) if isinstance(notifs, list) else 1
+        })
+
+
+class WorkOrderRequestReassignmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, wo_id):
+        try:
+            wo = WorkOrder.objects.get(id=wo_id)
+        except WorkOrder.DoesNotExist:
+            raise NotFound("Work Order not found")
+
+        tenant_id = getattr(request.user, 'tenant_id', None)
+        if tenant_id and str(wo.tenant_id) != str(tenant_id):
+            return Response({'success': False, 'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        if wo.status in ['COMPLETED', 'CANCELLED']:
+            return Response({'success': False, 'error': 'Không thể yêu cầu phân công lại phiếu đã hoàn thành hoặc đã hủy'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = WorkOrderRequestReassignmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'success': False, 'error': serializer.errors.get('reason', ['Lý do không hợp lệ'])[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = serializer.validated_data['reason'].strip()
+
+        # Set status to ON_HOLD to pause work while supervisor reviews reassignment
+        wo.status = 'ON_HOLD'
+        wo.save()
+
+        # Free technician availability
+        if hasattr(request.user, 'technician_profile'):
+            tp = request.user.technician_profile
+            tp.availability_status = 'AVAILABLE'
+            tp.save()
+
+        # Dispatch notification to Supervisor / Maintenance Managers
+        from notifications.services import notify_work_order_reassignment_requested
+        notifs = notify_work_order_reassignment_requested(wo, technician=request.user, reason=reason)
+
+        return success_response({
+            'message': 'Đã gửi yêu cầu phân công lại tới Quản đốc/Supervisor thành công.',
             'notifications_sent': len(notifs) if isinstance(notifs, list) else 1
         })
 

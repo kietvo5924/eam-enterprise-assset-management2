@@ -138,7 +138,14 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     postRepairVibration = serializers.FloatField(required=False, allow_null=True)
     postRepairTemperature = serializers.FloatField(required=False, allow_null=True)
     postRepairLoadFactor = serializers.FloatField(required=False, allow_null=True, default=1.0)
-    
+    machineState = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    postRepairMachineState = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class WorkOrderRequestReassignmentSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=True, allow_blank=False, max_length=1000)
+
+
 class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
     id = serializers.UUIDField(required=False, allow_null=True)
     itemId = serializers.UUIDField(required=False, allow_null=True)

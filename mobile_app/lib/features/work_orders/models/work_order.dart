@@ -54,6 +54,14 @@ class WorkOrder {
           'bgColor': const Color(0xFFfff7ed),
           'textColor': const Color(0xFFc2410c),
         };
+      case 'ON_HOLD':
+      case 'PAUSED':
+        return {
+          'label': 'Tạm dừng',
+          'color': const Color(0xFF0284c7),
+          'bgColor': const Color(0xFFe0f2fe),
+          'textColor': const Color(0xFF0369a1),
+        };
       case 'CREATED':
         return {
           'label': 'Mới',

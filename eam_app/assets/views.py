@@ -3,10 +3,13 @@ import re
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.db import transaction
+from django.db import transaction, models
 from django.core.exceptions import ValidationError
 from rest_framework.exceptions import NotFound
-from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart, Asset, MeterReading, AssetAnomalyAlert
+from assets.models import (
+    Location, AssetCategory, HierarchyTemplate, SparePart, Asset,
+    MeterReading, AssetAnomalyAlert, AssetRulPrediction
+)
 from assets.serializers import (
     LocationSerializer, LocationCreateUpdateSerializer,
     AssetCategorySerializer, AssetCategoryCreateUpdateSerializer,
@@ -25,6 +28,13 @@ def success_response(data=None, message="Success"):
         "message": message,
         "data": data
     }, status=status.HTTP_200_OK)
+
+def error_response(message="Error", status_code=status.HTTP_400_BAD_REQUEST, errors=None):
+    return Response({
+        "success": False,
+        "message": message,
+        "errors": errors
+    }, status=status_code)
 
 def format_to_ltree(input_str):
     if not input_str:
@@ -790,6 +800,7 @@ class MeterReadingListView(APIView):
 
         machine_state = data.get('machineState', 'RUNNING')
         ambient_temp = data.get('ambientTemperature')
+        load_factor = data.get('loadFactor') or data.get('load_factor') or request.data.get('loadFactor') or request.data.get('load_factor') or 1.0
         rec_time = data.get('recordedAt') or data.get('readingDate') or timezone.now()
 
         # Liên kết với Work Order nếu được gửi lên từ quy trình bảo dưỡng
@@ -805,6 +816,7 @@ class MeterReadingListView(APIView):
             readings_data=readings_data,
             machine_state=machine_state,
             ambient_temperature=ambient_temp,
+            load_factor=float(load_factor),
             recorded_at=rec_time,
             recorded_by=request.user if request.user and request.user.is_authenticated else None,
             tenant=asset.tenant,
@@ -1222,3 +1234,153 @@ class AssetImportTemplateView(APIView):
         writer.writerow(sample_row)
         
         return response
+
+
+from algorithms.predictive_rul import RULPredictiveService, PredictiveRULGuardrails
+from assets.serializers import AssetRulPredictionSerializer
+
+class AssetRulPredictionDetailView(APIView):
+    def get(self, request, asset_id):
+        if not HasPermission('asset:read')().has_permission(request, self):
+            self.permission_denied(request)
+
+        try:
+            asset = Asset.objects.get(id=asset_id, is_active=True)
+        except Asset.DoesNotExist:
+            raise NotFound("Asset not found")
+
+        # Kiểm tra tài sản tĩnh
+        is_machinery, static_err = PredictiveRULGuardrails.validate_asset_machinery_type(asset)
+        if not is_machinery:
+            return error_response(message=static_err, status_code=400)
+
+        # Lấy bản ghi dự đoán RUL gần nhất (nếu có)
+        latest_pred = AssetRulPrediction.objects.filter(asset=asset).order_by('-created_at').first()
+        
+        # Nếu chưa có bản ghi nào và chưa từng tính RUL
+        if not latest_pred and asset.current_rul_days is None and asset.rul_risk_level != 'CALIBRATING':
+            try:
+                result = RULPredictiveService.predict_asset_rul(asset=asset, trigger_source='MANUAL', current_user=request.user)
+                return success_response(result.get('data', {}))
+            except Exception:
+                pass
+
+        # Lấy lịch sử 10 lần dự đoán gần nhất để vẽ biểu đồ suy thoái
+        history = list(AssetRulPrediction.objects.filter(asset=asset).order_by('-created_at')[:10])
+        history.reverse()
+
+        spare_part = asset.primary_spare_part
+        lead_time = int(spare_part.lead_time_days) if spare_part else 7
+        crit_threshold = PredictiveRULGuardrails.calculate_dynamic_critical_threshold(lead_time)
+        stock_qty = float(spare_part.quantity_in_stock) if spare_part else 0.0
+
+        data = {
+            "assetId": str(asset.id),
+            "assetName": asset.name,
+            "currentStatus": asset.status,
+            "operatingRulDays": asset.current_rul_days,
+            "calendarRulDays": asset.current_rul_calendar_days,
+            "dutyCycleRatio": asset.duty_cycle_ratio,
+            "confidenceInterval": {
+                "lower": asset.rul_confidence_lower,
+                "upper": asset.rul_confidence_upper,
+                "stdDeviation": latest_pred.std_deviation if latest_pred else 0.0,
+                "isHighUncertainty": bool(latest_pred.std_deviation > 10.0) if latest_pred else False
+            },
+            "riskLevel": asset.rul_risk_level,
+            "isPhantomRecovery": asset.is_phantom_recovery,
+            "rapidDegradationAlert": asset.rapid_degradation_alert,
+            "rapidDegradationRate": latest_pred.rapid_degradation_rate if latest_pred else None,
+            "lastEvaluatedAt": asset.last_rul_predicted_at.isoformat() if asset.last_rul_predicted_at else None,
+            "sparePartStatus": {
+                "partId": str(spare_part.id) if spare_part else None,
+                "partName": spare_part.name if spare_part else None,
+                "availableQuantity": stock_qty,
+                "leadTimeDays": lead_time,
+                "dynamicCriticalThreshold": crit_threshold,
+                "isStockSufficient": bool(stock_qty >= 1.0)
+            },
+            "history": AssetRulPredictionSerializer(history, many=True).data,
+            "activeWorkOrderId": str(latest_pred.work_order_id) if latest_pred and latest_pred.work_order_id else None,
+            "activeWorkOrderCode": latest_pred.work_order.code if latest_pred and latest_pred.work_order else None
+        }
+        return success_response(data)
+
+
+class AssetRulPredictionRunView(APIView):
+    def post(self, request, asset_id):
+        if not HasPermission('asset:update')().has_permission(request, self):
+            self.permission_denied(request)
+
+        try:
+            asset = Asset.objects.get(id=asset_id, is_active=True)
+        except Asset.DoesNotExist:
+            raise NotFound("Asset not found")
+
+        custom_load = request.data.get('loadFactor') or request.data.get('load_factor')
+        if custom_load is not None:
+            try:
+                custom_load = float(custom_load)
+            except (ValueError, TypeError):
+                custom_load = None
+
+        result = RULPredictiveService.predict_asset_rul(
+            asset=asset,
+            trigger_source='MANUAL',
+            custom_load_factor=custom_load,
+            current_user=request.user
+        )
+        return success_response(result.get('data', {}), message="Dự đoán RUL thành công")
+
+
+class AssetRulOverridePhantomView(APIView):
+    def post(self, request, asset_id):
+        if not HasPermission('asset:update')().has_permission(request, self):
+            self.permission_denied(request)
+
+        try:
+            asset = Asset.objects.get(id=asset_id, is_active=True)
+        except Asset.DoesNotExist:
+            raise NotFound("Asset not found")
+
+        reason = str(request.data.get('reason') or '').strip()
+        if not reason:
+            raise ValidationError({"reason": "Bắt buộc phải nhập lý do kỹ thuật để xác thực ghi đè Phantom Recovery."})
+
+        # Ghi đè cờ hồi phục ảo
+        asset.is_phantom_recovery = False
+        asset.save(update_fields=['is_phantom_recovery', 'updated_at'])
+
+        # Cập nhật bản ghi prediction gần nhất nếu có
+        latest_pred = AssetRulPrediction.objects.filter(asset=asset, is_phantom_recovery=True).first()
+        if latest_pred:
+            latest_pred.is_phantom_recovery = False
+            latest_pred.action_taken = f"OVERRIDDEN_BY_MANAGER: {reason}"
+            latest_pred.save(update_fields=['is_phantom_recovery', 'action_taken'])
+
+        return success_response({
+            "assetId": str(asset.id),
+            "isPhantomRecovery": False,
+            "overrideReason": reason
+        }, message="Đã xác thực bỏ qua cảnh báo Phantom Recovery.")
+
+
+class CriticalAssetsRulListView(APIView):
+    def get(self, request):
+        if not HasPermission('asset:read')().has_permission(request, self):
+            self.permission_denied(request)
+
+        cur_tenant = getattr(request.user, 'tenant', None)
+        qs = Asset.objects.filter(is_active=True)
+        if cur_tenant and not getattr(request.user, 'is_superuser', False):
+            qs = qs.filter(tenant=cur_tenant)
+
+        # Lọc các thiết bị có nguy cơ cao (HIGH / CRITICAL) hoặc có cảnh báo gia tốc suy thoái đột biến
+        critical_assets = qs.filter(
+            models.Q(rul_risk_level__in=['HIGH', 'CRITICAL']) |
+            models.Q(rapid_degradation_alert=True)
+        ).select_related('category', 'location', 'primary_spare_part').order_by('current_rul_days')
+
+        data = AssetSerializer(critical_assets, many=True).data
+        return success_response(data)
+

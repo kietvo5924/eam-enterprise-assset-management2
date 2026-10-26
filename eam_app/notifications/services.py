@@ -1077,3 +1077,41 @@ def notify_work_order_incident_reported(work_order, technician, incident_descrip
     )
 
 
+def notify_work_order_reassignment_requested(work_order, technician, reason):
+    """
+    Event: WO_REASSIGNMENT_REQUESTED (Technician requests work order reassignment with reason)
+    """
+    tenant = work_order.tenant
+    tech_user = technician or work_order.assigned_to
+    tech_name = getattr(tech_user, 'full_name', '') or getattr(tech_user, 'username', 'KTV') if tech_user else 'KTV'
+
+    recipients = list(NotificationRouter.get_maintenance_managers(tenant.id))
+    if work_order.created_by and work_order.created_by not in recipients and work_order.created_by != tech_user:
+        recipients.append(work_order.created_by)
+
+    if not recipients:
+        return []
+
+    title = f"Yêu cầu phân công lại: #{work_order.code}"
+    message = (
+        f"Kỹ thuật viên {tech_name} yêu cầu phân công lại phiếu #{work_order.code} ({work_order.title}). Lý do: {reason}"
+    )
+    link = f"/portal/work-orders/?reassign_wo={work_order.id}&ref_code={work_order.code}"
+
+    return dispatch_event_notification(
+        event_type='WO_REASSIGNMENT_REQUESTED',
+        tenant=tenant,
+        entity_type='WorkOrder',
+        entity_id=work_order.id,
+        recipients=recipients,
+        title=title,
+        message=message,
+        link=link,
+        sender=tech_user,
+        category='WORK_ORDER',
+        severity='WARNING',
+        is_actionable=True
+    )
+
+
+

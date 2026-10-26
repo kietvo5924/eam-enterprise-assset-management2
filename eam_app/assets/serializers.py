@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart, Asset, MeterReading
+from assets.models import Location, AssetCategory, HierarchyTemplate, SparePart, Asset, MeterReading, AssetRulPrediction
 
 class LocationSerializer(serializers.ModelSerializer):
     parentId = serializers.CharField(source='parent_id', read_only=True)
@@ -94,16 +94,24 @@ class AssetSerializer(serializers.ModelSerializer):
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     primarySparePartId = serializers.UUIDField(source='primary_spare_part.id', read_only=True, allow_null=True)
     currentRulDays = serializers.FloatField(source='current_rul_days', read_only=True)
+    currentRulCalendarDays = serializers.FloatField(source='current_rul_calendar_days', read_only=True)
+    dutyCycleRatio = serializers.FloatField(source='duty_cycle_ratio', read_only=True)
+    rulConfidenceLower = serializers.FloatField(source='rul_confidence_lower', read_only=True)
+    rulConfidenceUpper = serializers.FloatField(source='rul_confidence_upper', read_only=True)
     rulRiskLevel = serializers.CharField(source='rul_risk_level', read_only=True)
     isPhantomRecovery = serializers.BooleanField(source='is_phantom_recovery', read_only=True)
+    rapidDegradationAlert = serializers.BooleanField(source='rapid_degradation_alert', read_only=True)
     lastCoreOverhaulAt = serializers.DateTimeField(source='last_core_overhaul_at', read_only=True)
+    lastRulPredictedAt = serializers.DateTimeField(source='last_rul_predicted_at', read_only=True)
 
     class Meta:
         model = Asset
         fields = ['id', 'categoryId', 'categoryName', 'parentId', 'name', 'serialNumber', 'model', 'manufacturer', 
                   'purchaseDate', 'value', 'status', 'locationId', 'locationName', 'hierarchyTemplateId', 
                   'hierarchyTemplateName', 'qrCode', 'isActive', 'coordsX', 'coordsY', 'floorLevel', 'zoneId',
-                  'primarySparePartId', 'currentRulDays', 'rulRiskLevel', 'isPhantomRecovery', 'lastCoreOverhaulAt',
+                  'primarySparePartId', 'currentRulDays', 'currentRulCalendarDays', 'dutyCycleRatio',
+                  'rulConfidenceLower', 'rulConfidenceUpper', 'rulRiskLevel', 'isPhantomRecovery',
+                  'rapidDegradationAlert', 'lastCoreOverhaulAt', 'lastRulPredictedAt',
                   'createdAt', 'updatedAt']
 
 class AssetCreateUpdateSerializer(serializers.Serializer):
@@ -120,6 +128,37 @@ class AssetCreateUpdateSerializer(serializers.Serializer):
     hierarchyTemplateId = serializers.UUIDField(required=False, allow_null=True)
     qrCode = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     isActive = serializers.BooleanField(required=False, default=True)
+    dutyCycleRatio = serializers.FloatField(required=False, default=1.0)
+
+class AssetRulPredictionSerializer(serializers.ModelSerializer):
+    assetId = serializers.UUIDField(source='asset.id', read_only=True)
+    assetName = serializers.CharField(source='asset.name', read_only=True)
+    workOrderId = serializers.UUIDField(source='work_order.id', read_only=True, allow_null=True)
+    workOrderCode = serializers.CharField(source='work_order.code', read_only=True, allow_null=True)
+    predictedRulOpDays = serializers.FloatField(source='predicted_rul_op_days', read_only=True)
+    predictedRulCalDays = serializers.FloatField(source='predicted_rul_cal_days', read_only=True)
+    confidenceLower = serializers.FloatField(source='confidence_lower', read_only=True)
+    confidenceUpper = serializers.FloatField(source='confidence_upper', read_only=True)
+    stdDeviation = serializers.FloatField(source='std_deviation', read_only=True)
+    riskLevel = serializers.CharField(source='risk_level', read_only=True)
+    triggerSource = serializers.CharField(source='trigger_source', read_only=True)
+    loadFactorAverage = serializers.FloatField(source='load_factor_average', read_only=True)
+    inputWindowSamplesCount = serializers.IntegerField(source='input_window_samples_count', read_only=True)
+    isPhantomRecovery = serializers.BooleanField(source='is_phantom_recovery', read_only=True)
+    rapidDegradationRate = serializers.FloatField(source='rapid_degradation_rate', read_only=True, allow_null=True)
+    actionTaken = serializers.CharField(source='action_taken', read_only=True)
+    modelVersion = serializers.CharField(source='model_version', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = AssetRulPrediction
+        fields = [
+            'id', 'assetId', 'assetName', 'predictedRulOpDays', 'predictedRulCalDays',
+            'confidenceLower', 'confidenceUpper', 'stdDeviation', 'riskLevel',
+            'triggerSource', 'loadFactorAverage', 'inputWindowSamplesCount',
+            'isPhantomRecovery', 'rapidDegradationRate', 'actionTaken',
+            'workOrderId', 'workOrderCode', 'modelVersion', 'createdAt'
+        ]
 
 from assets.models import AssetAnomalyAlert
 

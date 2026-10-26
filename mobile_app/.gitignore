@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Desktop and web platform folders if unused in git
+/linux/
+/macos/
+/web/
+/windows/

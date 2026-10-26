@@ -1405,6 +1405,7 @@ def portal_asset_registry(request):
                 manufacturer=data.get('manufacturer') or None,
                 purchase_date=data.get('purchase_date') or None,
                 value=data.get('value') or None,
+                duty_cycle_ratio=float(data.get('duty_cycle_ratio') or 1.0),
                 is_active=data.get('is_active', True)
             )
             return JsonResponse({'success': True, 'id': str(a.id)})
@@ -1448,6 +1449,14 @@ def portal_asset_registry(request):
                 a.purchase_date = data.get('purchase_date') or None
             if 'is_active' in data:
                 a.is_active = data.get('is_active', True)
+            if 'duty_cycle_ratio' in data and data.get('duty_cycle_ratio') is not None:
+                try:
+                    dc_val = float(data.get('duty_cycle_ratio'))
+                    a.duty_cycle_ratio = max(0.1, min(1.0, dc_val))
+                    if a.current_rul_days is not None:
+                        a.current_rul_calendar_days = round(a.current_rul_days / a.duty_cycle_ratio, 1)
+                except (ValueError, TypeError):
+                    pass
             if 'coords_x' in data and data.get('coords_x') is not None:
                 a.coords_x = float(data.get('coords_x') or 0.0)
             if 'coords_y' in data and data.get('coords_y') is not None:
@@ -1869,7 +1878,7 @@ def portal_work_orders(request):
             from django.utils import timezone
             
             # 1. Update Status Action
-            if 'status' in data and data.get('status') in ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'CANCELLED']:
+            if 'status' in data and data.get('status') in ['ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELED', 'CANCELLED']:
                 if not check_perm(request, ('work_order:execute', 'work_order:update')):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:execute required'}, status=403)
                 new_status = data.get('status')
@@ -1881,9 +1890,9 @@ def portal_work_orders(request):
                     if new_status == 'ASSIGNED':
                         raise Exception("Cannot manually change status to ASSIGNED")
                     elif new_status == 'IN_PROGRESS':
-                        if current_status != 'ASSIGNED':
-                            raise Exception("Work Order can only be started from ASSIGNED state")
-                        if str(wo.assigned_to_id) != str(request.user.id):
+                        if current_status not in ['ASSIGNED', 'ON_HOLD']:
+                            raise Exception("Work Order can only be started from ASSIGNED or ON_HOLD state")
+                        if str(wo.assigned_to_id) != str(request.user.id) and not check_perm(request, 'work_order:update'):
                             raise Exception("Only the assignee can start the Work Order")
                         wo.actual_start_time = timezone.now()
 
@@ -1908,16 +1917,27 @@ def portal_work_orders(request):
                         except Exception:
                             pass
 
+                    elif new_status == 'ON_HOLD':
+                        if current_status != 'IN_PROGRESS':
+                            raise Exception("Chỉ có thể tạm dừng phiếu đang thực hiện (IN_PROGRESS)")
+                        assigned_user = wo.assigned_to or request.user
+                        if hasattr(assigned_user, 'technician_profile'):
+                            tp = assigned_user.technician_profile
+                            tp.availability_status = 'AVAILABLE'
+                            tp.save()
+
                     elif new_status == 'COMPLETED':
                         if str(wo.assigned_to_id) != str(request.user.id) and not check_perm(request, 'work_order:update'):
                             raise Exception("Only the assignee can complete the Work Order")
 
+                        m_state = data.get('machine_state') or data.get('machineState') or data.get('postRepairMachineState') or 'RUNNING'
                         post_repair_payload = None
-                        if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor', 'post_repair_vibration', 'post_repair_temperature')):
+                        if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor', 'post_repair_vibration', 'post_repair_temperature', 'machine_state', 'machineState')):
                             post_repair_payload = {
                                 'vibration': data.get('postRepairVibration') or data.get('post_repair_vibration'),
                                 'temperature': data.get('postRepairTemperature') or data.get('post_repair_temperature'),
                                 'load_factor': data.get('postRepairLoadFactor') or data.get('post_repair_load_factor') or 1.0,
+                                'machine_state': m_state,
                             }
 
                         from workorders.services import WorkOrderTransitionService
