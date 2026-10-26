@@ -655,6 +655,8 @@ class AssetListView(APIView):
             purchase_date=data.get('purchaseDate'),
             value=data.get('value'),
             status=data.get('status', 'OPERATIONAL'),
+            asset_type=data.get('assetType', 'MACHINERY'),
+            duty_cycle_ratio=data.get('dutyCycleRatio', 1.0),
             location_id=data.get('locationId'),
             hierarchy_template_id=data.get('hierarchyTemplateId'),
             qr_code=qr_code,
@@ -734,6 +736,12 @@ class AssetDetailView(APIView):
             
         if 'isActive' in data:
             asset.is_active = data['isActive']
+            
+        if 'assetType' in data:
+            asset.asset_type = data['assetType']
+
+        if 'dutyCycleRatio' in data:
+            asset.duty_cycle_ratio = data['dutyCycleRatio']
             
         asset.save()
         return success_response(AssetSerializer(asset).data)

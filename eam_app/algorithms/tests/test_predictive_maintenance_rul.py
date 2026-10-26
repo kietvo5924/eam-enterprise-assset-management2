@@ -88,16 +88,30 @@ class PredictiveMaintenanceRULTests(TestCase):
         return readings
 
     def test_tc_rul_01_block_passive_asset(self):
-        """TC-RUL-01: Chặn phân tích RUL đối với tài sản tĩnh (bàn, ghế, tủ)."""
+        """TC-RUL-01: Chặn phân tích RUL đối với tài sản tĩnh (asset_type=STATIC hoặc fallback)."""
         static_asset = Asset.objects.create(
             name='Bàn làm việc gỗ giám đốc',
             qr_code=f'DESK-{uuid.uuid4().hex[:6]}',
             category=self.static_category,
+            asset_type='STATIC',
             tenant=self.tenant
         )
         with self.assertRaises(ValidationError) as ctx:
             RULPredictiveService.predict_asset_rul(asset=static_asset, current_user=self.user)
         self.assertIn("Tài sản tĩnh", str(ctx.exception))
+
+    def test_tc_rul_01b_motorized_chair_machinery_allowed(self):
+        """Kiểm tra thiết bị cơ điện có tên chứa 'ghế' nhưng asset_type=MACHINERY không bị chặn nhầm."""
+        motorized_chair = Asset.objects.create(
+            name='Ghế thử nghiệm rung NVH mô-tơ điện xưởng Body',
+            qr_code=f'CHAIR-NVH-{uuid.uuid4().hex[:6]}',
+            category=self.machinery_category,
+            asset_type='MACHINERY',
+            tenant=self.tenant
+        )
+        is_machinery, err = PredictiveRULGuardrails.validate_asset_machinery_type(motorized_chair)
+        self.assertTrue(is_machinery)
+        self.assertIsNone(err)
 
     def test_tc_rul_02_cold_start_bypass(self):
         """TC-RUL-02: Ngưỡng khởi động nguội (< 15 mẫu đo RUNNING -> CALIBRATING)."""

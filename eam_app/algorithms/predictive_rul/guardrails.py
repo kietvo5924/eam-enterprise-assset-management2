@@ -24,25 +24,21 @@ class PredictiveRULGuardrails:
         Quy Tắc 10: Phân Luồng Thiết Bị Cơ Điện vs Tài Sản Tĩnh.
         Chặn thực thi đối với các tài sản tĩnh (bàn, ghế, tủ văn phòng).
         """
-        # Kiểm tra qua category hoặc is_static_asset
-        category = getattr(asset, 'category', None)
-        cat_name = str(getattr(category, 'name', '') or '').lower()
-        asset_name = str(getattr(asset, 'name', '') or '').lower()
+        # 1. Kiểm tra thuộc tính tường minh asset_type do người dùng chọn
+        asset_type = getattr(asset, 'asset_type', None)
+        if asset_type == 'STATIC':
+            return False, (
+                f"Tài sản tĩnh '{asset.name}' không đo đạc rung nhiệt; "
+                f"tuổi thọ được quản lý qua Khấu hao đường thẳng tại Phân hệ 10.3."
+            )
+        if asset_type == 'MACHINERY':
+            return True, None
 
-        static_keywords = [
-            'bàn', 'ghế', 'tủ', 'kệ', 'văn phòng', 'desk', 'chair',
-            'cabinet', 'table', 'sofa', 'furniture', 'tĩnh'
-        ]
-
-        # Kiểm tra xem có từ khóa tài sản tĩnh không
-        for kw in static_keywords:
-            if kw in cat_name or kw in asset_name:
-                return False, (
-                    f"Tài sản tĩnh '{asset.name}' không đo đạc rung nhiệt; "
-                    f"tuổi thọ được quản lý qua Khấu hao đường thẳng tại Phân hệ 10.3."
-                )
-
-        return True, None
+        # 2. Bắt buộc tài sản phải được chỉ định loại rõ ràng
+        return False, (
+            f"Tài sản '{asset.name}' chưa được chỉ định loại tài sản hợp lệ. "
+            f"Vui lòng cập nhật loại tài sản (Thiết bị cơ điện, máy móc hoặc Tài sản tĩnh)."
+        )
 
     @staticmethod
     def filter_running_meter_readings(readings_qs) -> List[Dict[str, Any]]:

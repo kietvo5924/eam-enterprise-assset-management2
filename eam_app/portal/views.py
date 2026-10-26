@@ -1390,6 +1390,10 @@ def portal_asset_registry(request):
                 if t_loc and t_loc.zone_type != 'FLOORPLAN':
                     zone_id_val = t_loc.code or t_loc.name
 
+            asset_type_val = data.get('asset_type') or data.get('assetType')
+            if not asset_type_val or asset_type_val not in ['MACHINERY', 'STATIC']:
+                return JsonResponse({'success': False, 'error': 'Vui lòng chọn Loại tài sản hợp lệ (Thiết bị cơ điện hoặc Tài sản tĩnh).'}, status=400)
+
             a = Asset.objects.create(
                 tenant_id=tenant_id,
                 name=data.get('name'),
@@ -1406,6 +1410,7 @@ def portal_asset_registry(request):
                 purchase_date=data.get('purchase_date') or None,
                 value=data.get('value') or None,
                 duty_cycle_ratio=float(data.get('duty_cycle_ratio') or 1.0),
+                asset_type=asset_type_val,
                 is_active=data.get('is_active', True)
             )
             return JsonResponse({'success': True, 'id': str(a.id)})
@@ -1424,6 +1429,8 @@ def portal_asset_registry(request):
             if 'serial_number' in data: a.serial_number = data.get('serial_number')
             if data.get('qr_code'): a.qr_code = data.get('qr_code')
             if 'status' in data: a.status = data.get('status')
+            if 'asset_type' in data or 'assetType' in data:
+                a.asset_type = data.get('asset_type') or data.get('assetType') or 'MACHINERY'
             
             if 'category_id' in data:
                 category_id = data.get('category_id')

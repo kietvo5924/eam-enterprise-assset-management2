@@ -93,6 +93,7 @@ class AssetSerializer(serializers.ModelSerializer):
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     primarySparePartId = serializers.UUIDField(source='primary_spare_part.id', read_only=True, allow_null=True)
+    assetType = serializers.CharField(source='asset_type', read_only=True)
     currentRulDays = serializers.FloatField(source='current_rul_days', read_only=True)
     currentRulCalendarDays = serializers.FloatField(source='current_rul_calendar_days', read_only=True)
     dutyCycleRatio = serializers.FloatField(source='duty_cycle_ratio', read_only=True)
@@ -107,7 +108,7 @@ class AssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Asset
         fields = ['id', 'categoryId', 'categoryName', 'parentId', 'name', 'serialNumber', 'model', 'manufacturer', 
-                  'purchaseDate', 'value', 'status', 'locationId', 'locationName', 'hierarchyTemplateId', 
+                  'purchaseDate', 'value', 'status', 'assetType', 'locationId', 'locationName', 'hierarchyTemplateId', 
                   'hierarchyTemplateName', 'qrCode', 'isActive', 'coordsX', 'coordsY', 'floorLevel', 'zoneId',
                   'primarySparePartId', 'currentRulDays', 'currentRulCalendarDays', 'dutyCycleRatio',
                   'rulConfidenceLower', 'rulConfidenceUpper', 'rulRiskLevel', 'isPhantomRecovery',
@@ -124,6 +125,7 @@ class AssetCreateUpdateSerializer(serializers.Serializer):
     purchaseDate = serializers.DateField(required=False, allow_null=True)
     value = serializers.DecimalField(max_digits=19, decimal_places=2, required=False, allow_null=True)
     status = serializers.ChoiceField(choices=Asset.STATUS_CHOICES, required=False, default='OPERATIONAL')
+    assetType = serializers.ChoiceField(choices=Asset.ASSET_TYPE_CHOICES, required=False, default='MACHINERY')
     locationId = serializers.UUIDField(required=False, allow_null=True)
     hierarchyTemplateId = serializers.UUIDField(required=False, allow_null=True)
     qrCode = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)

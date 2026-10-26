@@ -131,8 +131,9 @@
               <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.18em] mb-1 hidden sm:block">CHI TIẾT TÀI SẢN</p>
               <div class="flex items-center gap-3 flex-wrap mb-2">
                 <h2 class="text-xl sm:text-2xl leading-tight font-black text-neutral-900 tracking-tight" id="detail-name">Asset Name</h2>
-                <div class="shrink-0 mt-0.5">
+                <div class="shrink-0 mt-0.5 flex items-center gap-1.5">
                   <span id="detail-status" class="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md"></span>
+                  <span id="detail-asset-type" class="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md"></span>
                 </div>
               </div>
               <div class="flex items-center gap-2 text-xs flex-wrap">
@@ -618,6 +619,14 @@
             </select>
           </div>
           <div>
+            <label class="block text-sm font-bold text-neutral-700 mb-1.5">Loại tài sản <span class="text-danger">*</span></label>
+            <select id="asset-type" required class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
+              <option value="">-- Chọn loại tài sản --</option>
+              <option value="MACHINERY">Thiết bị cơ điện, máy móc</option>
+              <option value="STATIC">Tài sản tĩnh, nội thất</option>
+            </select>
+          </div>
+          <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mẫu cấu trúc</label>
             <select id="asset-template" class="w-full px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary transition-all font-medium h-10">
               <option value="">-- Chọn mẫu --</option>
@@ -990,6 +999,7 @@
       value_raw: "{{ asset.value|default:'' }}",
       isActive: {{ asset.is_active|lower }},
       duty_cycle_ratio: {{ asset.duty_cycle_ratio|default:1.0 }},
+      asset_type: "{{ asset.asset_type|default:'MACHINERY' }}",
       qrCode: "{{ asset.qr_code|escapejs }}",
       createdAt: "{{ asset.created_at|date:'H:i d/m/Y' }}",
       updatedAt: "{{ asset.updated_at|date:'H:i d/m/Y' }}",
@@ -1036,6 +1046,17 @@
       } else {
         statusBadge.className = 'inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md bg-red-50 text-red-700';
         statusBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-red-600"></span> ${data.status}`;
+      }
+      
+      const typeBadge = document.getElementById('detail-asset-type');
+      if (typeBadge) {
+        if (data.asset_type === 'STATIC') {
+          typeBadge.className = 'inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-neutral-100 text-neutral-600 border border-neutral-300';
+          typeBadge.innerText = 'Tài sản tĩnh';
+        } else {
+          typeBadge.className = 'inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-blue-50 text-blue-700 border border-blue-200';
+          typeBadge.innerText = 'Cơ điện / Máy móc';
+        }
       }
       
       document.getElementById('detail-serial').innerText = data.serial;
@@ -1157,6 +1178,10 @@
       }
     }
     
+    const assetTypeVal = (curAsset && curAsset.asset_type) ? curAsset.asset_type : '';
+    const typeSelect = document.getElementById('asset-type');
+    if (typeSelect) typeSelect.value = assetTypeVal;
+    
     document.getElementById('asset-manufacturer').value = manufacturer;
     document.getElementById('asset-purchase').value = purchase_date;
     document.getElementById('asset-value').value = value;
@@ -1211,9 +1236,16 @@
       location_id = floorplan_id;
     }
     const duty_cycle_val = document.getElementById('asset-duty-cycle') ? parseFloat(document.getElementById('asset-duty-cycle').value || 1.0) : 1.0;
+    const asset_type_val = document.getElementById('asset-type') ? document.getElementById('asset-type').value : '';
 
     const btn = document.getElementById('btn-save-asset');
     const msg = document.getElementById('asset-error');
+
+    if (!asset_type_val) {
+      msg.innerText = "Vui lòng chọn Loại tài sản (Thiết bị cơ điện, máy móc hoặc Tài sản tĩnh, nội thất).";
+      msg.classList.remove('hidden');
+      return;
+    }
     
     btn.disabled = true;
     msg.classList.add('hidden');
@@ -1230,6 +1262,7 @@
         purchase_date: purchase_date || null,
         value: value || null,
         duty_cycle_ratio: duty_cycle_val,
+        asset_type: asset_type_val,
         hierarchy_template_id: template_id || null,
         location_id: location_id || null,
         is_active: is_active
@@ -1879,6 +1912,12 @@
       if (res.success && res.data) {
         currentRulData = res.data;
         renderRulHealthCard(res.data);
+      } else if (!res.success && res.message) {
+        renderRulHealthCard({
+          isStaticAsset: true,
+          riskLevel: 'STATIC_ASSET',
+          message: res.message
+        });
       }
     })
     .catch(err => console.error("Error fetching RUL prediction:", err));
@@ -1886,7 +1925,6 @@
 
   function renderRulHealthCard(data) {
     if (!data) return;
-    const isCalibrating = (data.riskLevel === 'CALIBRATING' || data.operatingRulDays === null || data.operatingRulDays === undefined);
 
     const riskBadge = document.getElementById('rul-risk-badge');
     const rapidBadge = document.getElementById('rul-rapid-badge');
@@ -1903,6 +1941,26 @@
     const recText = document.getElementById('rul-recommendation-text');
     const phantomBanner = document.getElementById('rul-phantom-banner');
     const phantomText = document.getElementById('rul-phantom-text');
+
+    if (data.isStaticAsset || data.riskLevel === 'STATIC_ASSET') {
+      if (riskBadge) {
+        riskBadge.className = "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-neutral-200 text-neutral-600";
+        riskBadge.textContent = "TÀI SẢN TĨNH";
+      }
+      if (rapidBadge) rapidBadge.classList.add('hidden');
+      if (opDisplay) {
+        opDisplay.textContent = "N/A";
+        opDisplay.className = "text-2xl font-black text-neutral-400 font-mono tracking-tight";
+      }
+      if (calDisplay) calDisplay.textContent = "(Khấu hao đường thẳng)";
+      if (confInterval) confInterval.textContent = "Không áp dụng RUL";
+      if (uncertLabel) uncertLabel.textContent = "Quản lý tại Phân hệ 10.3";
+      if (recText) recText.textContent = data.message || "Tài sản tĩnh không đo đạc rung nhiệt; tuổi thọ được quản lý qua Khấu hao đường thẳng tại Phân hệ 10.3.";
+      if (phantomBanner) phantomBanner.classList.add('hidden');
+      return;
+    }
+
+    const isCalibrating = (data.riskLevel === 'CALIBRATING' || data.operatingRulDays === null || data.operatingRulDays === undefined);
 
     let badgeClass = "bg-neutral-100 text-neutral-600";
     if (data.riskLevel === 'CRITICAL') {
@@ -2040,7 +2098,15 @@
       if (res.success && res.data) {
         renderRulHealthCard(res.data);
       } else {
-        alert("Thông báo: " + (res.message || res.error || "Không thể chạy dự đoán RUL."));
+        const errMsg = res.message || (typeof res.error === 'string' ? res.error : (res.error ? JSON.stringify(res.error) : "Không thể chạy dự đoán RUL."));
+        alert("Thông báo: " + errMsg);
+        if (errMsg && errMsg.includes('Tài sản tĩnh')) {
+          renderRulHealthCard({
+            isStaticAsset: true,
+            riskLevel: 'STATIC_ASSET',
+            message: errMsg
+          });
+        }
       }
     })
     .catch(err => {

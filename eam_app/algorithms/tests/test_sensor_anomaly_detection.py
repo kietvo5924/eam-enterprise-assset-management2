@@ -85,7 +85,8 @@ class SensorAnomalyDetectionTestCase(TestCase):
             name="Bàn làm việc kỹ sư B-01",
             category=self.category_static,
             location=self.location,
-            qr_code="QR-DESK-01"
+            qr_code="QR-DESK-01",
+            asset_type="STATIC"
         )
 
     def test_tc_anom_01_warm_up_guardrail(self):

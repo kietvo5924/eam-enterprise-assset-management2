@@ -152,7 +152,19 @@ class Asset(BaseTenantModel):
     useful_life_years = models.IntegerField(default=5)
     capitalized_cost = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
     capitalized_date = models.DateField(null=True, blank=True)
+    ASSET_TYPE_CHOICES = (
+        ('MACHINERY', 'Machinery & Rotating Equipment / Thiết bị cơ điện'),
+        ('STATIC', 'Static & Passive Asset / Tài sản tĩnh, nội thất'),
+    )
+
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='OPERATIONAL')
+    asset_type = models.CharField(
+        max_length=20,
+        choices=ASSET_TYPE_CHOICES,
+        default='MACHINERY',
+        db_index=True,
+        help_text='Bản chất tài sản: MACHINERY (đo rung nhiệt, RUL LSTM) hoặc STATIC (kiểm tra định tính, khấu hao)'
+    )
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets')
     hierarchy_template = models.ForeignKey(HierarchyTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name='assets')
     qr_code = models.CharField(max_length=100)

@@ -64,6 +64,13 @@ def is_static_asset(asset) -> bool:
     if asset is None:
         return False
 
+    # 1. Kiểm tra thuộc tính tường minh asset_type do người dùng cấu hình
+    asset_type = getattr(asset, 'asset_type', None)
+    if asset_type == 'STATIC':
+        return True
+    if asset_type == 'MACHINERY':
+        return False
+
     # Nếu cờ is_trackable bị tắt
     if hasattr(asset, 'is_trackable') and asset.is_trackable is False:
         return True
@@ -71,20 +78,6 @@ def is_static_asset(asset) -> bool:
     # Nếu có thuộc tính is_static trực tiếp
     if getattr(asset, 'is_static', False):
         return True
-
-    # Kiểm tra theo danh mục (AssetCategory)
-    category = getattr(asset, 'category', None)
-    if category and getattr(category, 'name', None):
-        cat_name = category.name.lower().strip()
-        for kw in STATIC_CATEGORY_KEYWORDS:
-            if kw in cat_name:
-                return True
-
-    # Kiểm tra theo tên tài sản
-    asset_name = getattr(asset, 'name', '').lower().strip()
-    for kw in STATIC_CATEGORY_KEYWORDS:
-        if kw in asset_name:
-            return True
 
     return False
 
