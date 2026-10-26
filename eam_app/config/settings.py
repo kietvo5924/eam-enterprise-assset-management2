@@ -32,7 +32,9 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-o-vpz0i87++$s)sl9y4&0n80
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG', default=False)
 
-ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '10.0.2.2']
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '10.0.2.2', 'testserver'])
+if DEBUG and '*' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('*')
 
 
 # Application definition

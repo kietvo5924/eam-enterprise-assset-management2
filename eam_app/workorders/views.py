@@ -94,10 +94,13 @@ class WorkOrderListView(APIView):
 
         from assets.models import Asset
         asset_obj = Asset.objects.filter(id=data['assetId']).first()
-        coords_x = float(asset_obj.coords_x) if (asset_obj and asset_obj.coords_x is not None) else 0.0
-        coords_y = float(asset_obj.coords_y) if (asset_obj and asset_obj.coords_y is not None) else 0.0
-        floor_level = int(asset_obj.floor_level) if (asset_obj and asset_obj.floor_level is not None) else 1
-        zone_id = asset_obj.zone_id if (asset_obj and asset_obj.zone_id) else ''
+        if not asset_obj:
+            raise ValidationError({'assetId': 'Tài sản không tồn tại hoặc không thuộc tổ chức của bạn.'})
+
+        coords_x = float(asset_obj.coords_x) if asset_obj.coords_x is not None else 0.0
+        coords_y = float(asset_obj.coords_y) if asset_obj.coords_y is not None else 0.0
+        floor_level = int(asset_obj.floor_level) if asset_obj.floor_level is not None else 1
+        zone_id = asset_obj.zone_id if asset_obj.zone_id else ''
 
         wo = WorkOrder.objects.create(
             asset_id=data['assetId'],
@@ -135,10 +138,13 @@ class WorkOrderListView(APIView):
                 is_completed=False
             )
             
-        # Save Materials and Deduct Inventory
+        # Save Materials and Deduct Inventory with select_for_update to avoid race conditions
         materials = data.get('materials', [])
         for pm in materials:
-            part = get_object_or_404(SparePart, id=pm.get('sparePartId'), tenant_id=wo.tenant_id)
+            part_id = pm.get('sparePartId')
+            part = SparePart.objects.select_for_update().filter(id=part_id, tenant_id=wo.tenant_id).first()
+            if not part:
+                raise ValidationError(f"Phụ tùng/vật tư không tồn tại trong kho của tổ chức: {part_id}")
             from decimal import Decimal
             req_qty = pm.get('quantity')
             if req_qty is None:
@@ -151,7 +157,7 @@ class WorkOrderListView(APIView):
                 raise ValidationError(f"Số lượng yêu cầu cho vật tư {part.name} phải lớn hơn 0.")
             if part.quantity_in_stock is not None:
                 if part.quantity_in_stock < dec_qty:
-                    raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name}")
+                    raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name} (Tồn hiện tại: {part.quantity_in_stock}, Yêu cầu: {dec_qty})")
                 part.quantity_in_stock -= dec_qty
                 part.save()
                 from notifications.services import notify_spare_part_low_stock
