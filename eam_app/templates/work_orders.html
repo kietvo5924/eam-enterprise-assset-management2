@@ -8669,7 +8669,9 @@
           tsp3DAnimId = requestAnimationFrame(animate);
           const time = tsp3DClock ? tsp3DClock.getElapsedTime() : performance.now() * 0.001;
 
-          if (tsp3DControls) tsp3DControls.update();
+          if (tsp3DCameraMode !== 'agv' && tsp3DControls) {
+              tsp3DControls.update();
+          }
 
           // Chuyển động tuần tra tự hành của Robot AGV & Quầng sáng Travel Orb
           if (tsp3DRouteCurve && tsp3DAGVRobot) {
@@ -8698,21 +8700,22 @@
                       agvHudStatus.innerText = `Tuần tra • ${speed} m/s • ${pct}%`;
                   }
 
-                  // Camera bám sát theo Robot AGV: Cố định tâm nhìn ngay tại con robot, góc máy liên tục quay tròn 360 độ xung quanh xe
+                  // Camera bám sát theo Robot AGV: Tâm nhìn luôn gắn cố định vào robot
+                  // Người dùng tự do dùng chuột kéo xoay 360 độ xung quanh con robot theo ý muốn (không gán cứng)
                   if (tsp3DCameraMode === 'agv' && tsp3DCamera && tsp3DControls) {
-                      const orbitRadius = 14.0; // Khoảng cách nhìn bao quát toàn bộ con xe và máy móc xung quanh
-                      const orbitHeight = 6.8;  // Độ cao góc nhìn từ trên xuống
-                      const orbitSpeed = 0.35;  // Tốc độ quay tròn êm dịu, mượt mà (~18s cho một vòng quay 360 độ hoàn chỉnh)
-                      const orbitAngle = time * orbitSpeed;
+                      const newTarget = new THREE.Vector3(pos.x, pos.y + 1.2, pos.z);
+                      const delta = newTarget.clone().sub(tsp3DControls.target);
 
-                      const targetCamX = pos.x + Math.sin(orbitAngle) * orbitRadius;
-                      const targetCamY = pos.y + orbitHeight;
-                      const targetCamZ = pos.z + Math.cos(orbitAngle) * orbitRadius;
-
-                      // Cố định góc nhìn vào trọng tâm robot AGV, liên tục quay tròn xung quanh robot
-                      tsp3DControls.target.set(pos.x, pos.y + 1.2, pos.z);
-                      tsp3DCamera.position.set(targetCamX, targetCamY, targetCamZ);
-                      tsp3DCamera.lookAt(pos.x, pos.y + 1.2, pos.z);
+                      if (delta.lengthSq() < 100) {
+                          tsp3DCamera.position.add(delta);
+                          tsp3DControls.target.copy(newTarget);
+                      } else {
+                          // Nếu robot đổi chu kỳ hoặc nhảy vị trí lớn
+                          const offset = tsp3DCamera.position.clone().sub(tsp3DControls.target);
+                          tsp3DControls.target.copy(newTarget);
+                          tsp3DCamera.position.copy(newTarget).add(offset);
+                      }
+                      tsp3DControls.update();
 
                       // Chế độ X-Ray thông minh khi Bám AGV: làm mờ tường phòng, trần và mặt dựng để không cản tầm nhìn
                       if (tsp3DWorldGroup) {
@@ -8875,6 +8878,13 @@
           tsp3DCameraMode = (tsp3DCameraMode === 'agv') ? 'free' : 'agv';
           if (tsp3DCameraMode === 'agv') {
               if (btnAgv) btnAgv.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 transition flex items-center gap-1 cursor-pointer shadow-xs';
+              if (tsp3DAGVRobot && tsp3DCamera && tsp3DControls) {
+                  const p = tsp3DAGVRobot.position;
+                  tsp3DControls.target.set(p.x, p.y + 1.2, p.z);
+                  tsp3DCamera.position.set(p.x - 12.0, p.y + 6.5, p.z + 10.0);
+                  tsp3DControls.enablePan = false;
+                  tsp3DControls.update();
+              }
           } else {
               setTSP3DCameraView('iso');
           }
@@ -8882,6 +8892,9 @@
       }
 
       tsp3DCameraMode = 'free';
+      if (tsp3DControls) {
+          tsp3DControls.enablePan = true;
+      }
 
       if (viewType === 'iso') {
           if (btnIso) btnIso.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
