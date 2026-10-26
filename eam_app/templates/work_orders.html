@@ -7520,7 +7520,6 @@
   let tsp3DTravelOrb = null;
   let tsp3DAGVRobot = null;
   let tsp3DCameraMode = 'free'; // 'free' or 'agv'
-  let tsp3DLastAgvFollowPos = null;
   let tsp3DClock = null;
 
   // Fixed architectural constants (Cố định chiều cao và khoảng cách sàn chuẩn BIM/CAD Digital Twin)
@@ -8699,33 +8698,21 @@
                       agvHudStatus.innerText = `Tuần tra • ${speed} m/s • ${pct}%`;
                   }
 
-                  // Camera bám sát theo Robot AGV khi kích hoạt chế độ "Bám AGV"
-                  // Cho phép người dùng dùng chuột xoay tròn 360 độ quanh con robot tự do
+                  // Camera bám sát theo Robot AGV: Cố định tâm nhìn ngay tại con robot, góc máy liên tục quay tròn 360 độ xung quanh xe
                   if (tsp3DCameraMode === 'agv' && tsp3DCamera && tsp3DControls) {
-                      if (tsp3DLastAgvFollowPos) {
-                          const dx = pos.x - tsp3DLastAgvFollowPos.x;
-                          const dy = pos.y - tsp3DLastAgvFollowPos.y;
-                          const dz = pos.z - tsp3DLastAgvFollowPos.z;
-                          const dDistSq = dx * dx + dy * dy + dz * dz;
+                      const orbitRadius = 14.0; // Khoảng cách nhìn bao quát toàn bộ con xe và máy móc xung quanh
+                      const orbitHeight = 6.8;  // Độ cao góc nhìn từ trên xuống
+                      const orbitSpeed = 0.35;  // Tốc độ quay tròn êm dịu, mượt mà (~18s cho một vòng quay 360 độ hoàn chỉnh)
+                      const orbitAngle = time * orbitSpeed;
 
-                          // Khi di chuyển tuần tự dọc hành trình (không gián đoạn lớn)
-                          if (dDistSq < 100) {
-                              tsp3DCamera.position.x += dx;
-                              tsp3DCamera.position.y += dy;
-                              tsp3DCamera.position.z += dz;
-                              tsp3DControls.target.x += dx;
-                              tsp3DControls.target.y += dy;
-                              tsp3DControls.target.z += dz;
-                          } else {
-                              // Khi robot hoàn thành chu kỳ hoặc đổi đoạn nhảy điểm: dịch camera giữ nguyên góc xoay người dùng
-                              const offset = tsp3DCamera.position.clone().sub(tsp3DControls.target);
-                              tsp3DControls.target.set(pos.x, pos.y + 1.2, pos.z);
-                              tsp3DCamera.position.copy(tsp3DControls.target).add(offset);
-                          }
-                      } else {
-                          tsp3DControls.target.set(pos.x, pos.y + 1.2, pos.z);
-                      }
-                      tsp3DLastAgvFollowPos = pos.clone();
+                      const targetCamX = pos.x + Math.sin(orbitAngle) * orbitRadius;
+                      const targetCamY = pos.y + orbitHeight;
+                      const targetCamZ = pos.z + Math.cos(orbitAngle) * orbitRadius;
+
+                      // Cố định góc nhìn vào trọng tâm robot AGV, liên tục quay tròn xung quanh robot
+                      tsp3DControls.target.set(pos.x, pos.y + 1.2, pos.z);
+                      tsp3DCamera.position.set(targetCamX, targetCamY, targetCamZ);
+                      tsp3DCamera.lookAt(pos.x, pos.y + 1.2, pos.z);
 
                       // Chế độ X-Ray thông minh khi Bám AGV: làm mờ tường phòng, trần và mặt dựng để không cản tầm nhìn
                       if (tsp3DWorldGroup) {
@@ -8742,7 +8729,6 @@
                           });
                       }
                   } else {
-                      tsp3DLastAgvFollowPos = null;
 
                       // Khôi phục độ mờ kiến trúc bình thường khi ở chế độ tự do
                       if (tsp3DWorldGroup) {
@@ -8889,13 +8875,6 @@
           tsp3DCameraMode = (tsp3DCameraMode === 'agv') ? 'free' : 'agv';
           if (tsp3DCameraMode === 'agv') {
               if (btnAgv) btnAgv.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 transition flex items-center gap-1 cursor-pointer shadow-xs';
-              if (tsp3DAGVRobot && tsp3DCamera && tsp3DControls) {
-                  const agvPos = tsp3DAGVRobot.position;
-                  tsp3DControls.target.set(agvPos.x, agvPos.y + 1.2, agvPos.z);
-                  tsp3DCamera.position.set(agvPos.x - 12, agvPos.y + 7.5, agvPos.z + 10);
-                  tsp3DControls.update();
-                  tsp3DLastAgvFollowPos = agvPos.clone();
-              }
           } else {
               setTSP3DCameraView('iso');
           }
@@ -8903,7 +8882,6 @@
       }
 
       tsp3DCameraMode = 'free';
-      tsp3DLastAgvFollowPos = null;
 
       if (viewType === 'iso') {
           if (btnIso) btnIso.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
