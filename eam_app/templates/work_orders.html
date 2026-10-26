@@ -7523,10 +7523,10 @@
   let tsp3DClock = null;
 
   // Fixed architectural constants (Cố định chiều cao và khoảng cách sàn chuẩn BIM/CAD Digital Twin)
-  const TSP3D_WALL_HEIGHT = 9.0;       // Chiều cao tầng thông thủy chuẩn công nghiệp: 9.0m
-  const TSP3D_FLOOR_SPACING = 9.0;     // Khoảng cách giữa các tầng: 9.0m (DÍNH SÁT đỉnh tường Tầng 1!)
-  const TSP3D_SLAB_THICKNESS = 0.6;    // Độ dày sàn kết cấu: 0.6m
-  const TSP3D_EXPLODED_EXTRA = 22.0;   // Khoảng cách giãn tách tầng khi bật Exploded View: 22.0m
+  const TSP3D_WALL_HEIGHT = 12.0;      // Chiều cao tầng thông thủy chuẩn công nghiệp: 12.0m (cao ráo, thoáng đãng)
+  const TSP3D_FLOOR_SPACING = 12.0;    // Khoảng cách giữa các tầng: 12.0m (DÍNH SÁT đỉnh tường Tầng 1!)
+  const TSP3D_SLAB_THICKNESS = 0.7;    // Độ dày sàn kết cấu: 0.7m
+  const TSP3D_EXPLODED_EXTRA = 26.0;   // Khoảng cách giãn tách tầng khi bật Exploded View: 26.0m
   let tsp3DFloorFilter = 'all';        // 'all', 1, 2
 
   function setTSP3DFloorFilter(filter) {
@@ -7680,16 +7680,17 @@
               tsp3DControls.update();
           }
 
-          const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+          const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
           tsp3DScene.add(ambientLight);
 
-          const sunLight = new THREE.DirectionalLight(0x38bdf8, 2.2);
-          sunLight.position.set(120, 180, 100);
+          // Ánh sáng chiếu tự nhiên dịu nhẹ, không gây chói lóa (Zero harsh specular hotspot)
+          const sunLight = new THREE.DirectionalLight(0xf8fafc, 1.1);
+          sunLight.position.set(60, 240, 60);
           tsp3DScene.add(sunLight);
 
-          const warmFill = new THREE.DirectionalLight(0xf59e0b, 1.3);
-          warmFill.position.set(-100, 130, -90);
-          tsp3DScene.add(warmFill);
+          const fillLight = new THREE.DirectionalLight(0x94a3b8, 0.55);
+          fillLight.position.set(-80, 160, -80);
+          tsp3DScene.add(fillLight);
 
           const grid = new THREE.GridHelper(360, 36, 0x1e293b, 0x0f172a);
           grid.position.y = -0.5;
@@ -7798,10 +7799,6 @@
       hlRight.position.set(bodyW / 2 + 0.05, 0.65, 0.7);
       group.add(hlLeft);
       group.add(hlRight);
-
-      const headSpot = new THREE.PointLight(0xffffff, 2.5, 20);
-      headSpot.position.set(bodyW / 2 + 1.2, 0.8, 0);
-      group.add(headSpot);
 
       // Taillights (Rear red LED)
       const tlMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
@@ -8041,14 +8038,15 @@
 
           const floorGroup = new THREE.Group();
           const baseY = (F - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+          const roomH = TSP3D_WALL_HEIGHT - TSP3D_SLAB_THICKNESS; // 11.3m: Chiều cao tầng công nghiệp thoáng đãng, dính sát đáy sàn tầng trên
 
-          // 1. Tầng 1: Sàn Bê Tông Mặt Đất & Vạch Kẻ Sơn An Toàn Lối Đi Bộ (Industrial Ground Slab & Safety Walkway)
+          // 1. Tầng 1: Sàn Bê Tông Mặt Đất & Vạch Kẻ Sơn An Toàn Lối Đi Bộ (Không chói lóa - Matte Finish)
           if (F === 1) {
               const slabGeo = new THREE.BoxGeometry(factoryW, TSP3D_SLAB_THICKNESS, factoryH);
               const slabMat = new THREE.MeshStandardMaterial({
                   color: 0x1e293b,
-                  roughness: 0.75,
-                  metalness: 0.25
+                  roughness: 0.85,
+                  metalness: 0.1
               });
               const slabMesh = new THREE.Mesh(slabGeo, slabMat);
               slabMesh.position.set(0, baseY - TSP3D_SLAB_THICKNESS / 2, 0);
@@ -8096,19 +8094,19 @@
               }
           }
 
-          // 2. Tầng 2: Sàn Lửng Kính Mờ Chịu Lực (Architectural Mezzanine Deck - Dính sát đỉnh tường Tầng 1)
+          // 2. Tầng 2: Sàn Lửng Bề Mặt Mờ Chịu Lực (Architectural Mezzanine Deck - Không chói lóa, Dính sát đỉnh tường Tầng 1)
           if (F === 2) {
               const slabGeo = new THREE.BoxGeometry(factoryW, TSP3D_SLAB_THICKNESS, factoryH);
-              const slabMat = new THREE.MeshPhysicalMaterial({
-                  color: 0x0f172a,
-                  roughness: 0.15,
-                  metalness: 0.5,
-                  transmission: 0.65,
+              const slabMat = new THREE.MeshStandardMaterial({
+                  color: 0x1e293b,
+                  roughness: 0.85,
+                  metalness: 0.1,
                   transparent: true,
-                  opacity: 0.72
+                  opacity: 0.65
               });
               const slabMesh = new THREE.Mesh(slabGeo, slabMat);
               slabMesh.position.set(0, baseY - TSP3D_SLAB_THICKNESS / 2, 0);
+              slabMesh.userData = { isCeilingSlab: true, defaultOpacity: 0.65 };
               floorGroup.add(slabMesh);
 
               const slabEdges = new THREE.LineSegments(
@@ -8120,7 +8118,7 @@
 
               // Hệ dầm thép chịu lực tổ hợp (Heavy Structural Steel I-Beams) chạy bên dưới sàn Tầng 2
               const beamY = baseY - TSP3D_SLAB_THICKNESS - 0.2;
-              const beamMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
+              const beamMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.4 });
               
               // 5 dầm dọc xuyên suốt chiều dài nhà xưởng
               [-42, -21, 0, 21, 42].forEach(bz => {
@@ -8140,12 +8138,12 @@
 
               // Lan can an toàn kính cường lực (Perimeter Safety Tempered Glass Balustrades) viền quanh Tầng 2
               const railHeight = 1.1;
-              const railMat = new THREE.MeshPhysicalMaterial({
+              const railMat = new THREE.MeshStandardMaterial({
                   color: 0x38bdf8,
                   transparent: true,
-                  opacity: 0.25,
-                  roughness: 0.1,
-                  metalness: 0.2
+                  opacity: 0.22,
+                  roughness: 0.5,
+                  metalness: 0.1
               });
 
               // Kính chắn 4 cạnh viền ngoài
@@ -8180,7 +8178,47 @@
               floorGroup.add(new THREE.Line(handrailGeo, handrailMat));
           }
 
-          // 3. Floor Badge
+          // 3. Tường Bao Che Mặt Dựng Ngoại Thất Kiến Trúc Toàn Tòa Nhà (Exterior Curtain Wall Facade for Both Floors)
+          // Giúp cả Tầng 1 và Tầng 2 đều có tường bao che chuẩn BIM kiến trúc, không còn tình trạng Tầng 2 trống hoác không tường!
+          const facadeMat = new THREE.MeshStandardMaterial({
+              color: 0x0284c7,
+              transparent: true,
+              opacity: 0.12,
+              roughness: 0.7,
+              metalness: 0.2
+          });
+
+          const northWall = new THREE.Mesh(new THREE.BoxGeometry(factoryW, roomH, 0.2), facadeMat);
+          northWall.position.set(0, baseY + roomH / 2, -cz0);
+          northWall.userData = { isFacadeWall: true, defaultOpacity: 0.12 };
+          floorGroup.add(northWall);
+
+          const southWall = new THREE.Mesh(new THREE.BoxGeometry(factoryW, roomH, 0.2), facadeMat);
+          southWall.position.set(0, baseY + roomH / 2, cz0);
+          southWall.userData = { isFacadeWall: true, defaultOpacity: 0.12 };
+          floorGroup.add(southWall);
+
+          const eastWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, roomH, factoryH), facadeMat);
+          eastWall.position.set(cx0, baseY + roomH / 2, 0);
+          eastWall.userData = { isFacadeWall: true, defaultOpacity: 0.12 };
+          floorGroup.add(eastWall);
+
+          const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, roomH, factoryH), facadeMat);
+          westWall.position.set(-cx0, baseY + roomH / 2, 0);
+          westWall.userData = { isFacadeWall: true, defaultOpacity: 0.12 };
+          floorGroup.add(westWall);
+
+          // Khung viền và đố nhôm mặt dựng kính kiến trúc ngoại thất
+          [northWall, southWall, eastWall, westWall].forEach(w => {
+              const wEdge = new THREE.LineSegments(
+                  new THREE.EdgesGeometry(w.geometry),
+                  new THREE.LineBasicMaterial({ color: 0x0ea5e9, linewidth: 1.5, transparent: true, opacity: 0.7 })
+              );
+              wEdge.position.copy(w.position);
+              floorGroup.add(wEdge);
+          });
+
+          // 4. Floor Badge
           const floorBadge = createTSP3DTextSprite(`TẦNG ${F} ${F === 1 ? '• XƯỞNG SẢN XUẤT' : '• KHU LẮP RÁP & VĂN PHÒNG'}`, {
               bgColor: 'rgba(15, 23, 42, 0.94)',
               borderColor: '#38bdf8',
@@ -8190,9 +8228,33 @@
           floorBadge.position.set(-cx0 + 26, baseY + TSP3D_WALL_HEIGHT + 1.2, -cz0 + 8);
           floorGroup.add(floorBadge);
 
-          // 4. Extruded Room/Zone Volumes (Chiều cao phòng tiếp giáp sát đáy sàn tầng trên: 8.4m)
-          const floorZones = allChildZones.filter(z => (parseInt(z.floor_level) || 1) === F);
-          const roomH = TSP3D_WALL_HEIGHT - TSP3D_SLAB_THICKNESS; // 8.4m: Đỉnh tường Tầng 1 dính sát đáy sàn Tầng 2!
+          // 5. Extruded Room/Zone Volumes (Chiều cao phòng tiếp giáp sát đáy sàn tầng trên: 11.3m)
+          let floorZones = allChildZones.filter(z => (parseInt(z.floor_level) || 1) === F);
+
+          // Bổ sung đầy đủ các phân khu chức năng Tầng 2 (Mezzanine Engineering & Testing Bays) để Tầng 2 có tường phòng hoàn chỉnh
+          if (F === 2) {
+              const existingCodes = new Set(floorZones.map(z => z.code));
+              if (!existingCodes.has('ZONE_HP_METROLOGY_F2')) {
+                  floorZones.push({
+                      name: 'Khu Đo Kiểm CMM & Chuẩn Hóa F2',
+                      code: 'ZONE_HP_METROLOGY_F2',
+                      zone_type: 'CLEANROOM',
+                      center_x: 145,
+                      center_y: 88,
+                      description: '[DIM:72.0x44.0]'
+                  });
+              }
+              if (!existingCodes.has('ZONE_HP_ECU_LAB_F2')) {
+                  floorZones.push({
+                      name: 'Phòng Lab Lập Trình ECU & HMI F2',
+                      code: 'ZONE_HP_ECU_LAB_F2',
+                      zone_type: 'CONTROLLED',
+                      center_x: 48,
+                      center_y: 96,
+                      description: '[DIM:68.0x42.0]'
+                  });
+              }
+          }
 
           floorZones.forEach(zone => {
               const pts = getParsedZonePoints(zone);
@@ -8215,18 +8277,19 @@
               if (zone.zone_type === 'CLEANROOM') { themeColor = 0x06b6d4; hexColor = '#06b6d4'; }
               else if (zone.zone_type === 'WAREHOUSE') { themeColor = 0xf59e0b; hexColor = '#f59e0b'; }
               else if (zone.zone_type === 'STAIRS') { themeColor = 0x8b5cf6; hexColor = '#a855f7'; }
-              else if (zone.zone_type === 'OFFICE') { themeColor = 0x10b981; hexColor = '#10b981'; }
+              else if (zone.zone_type === 'OFFICE' || zone.zone_type === 'CONTROLLED') { themeColor = 0x10b981; hexColor = '#10b981'; }
 
               const roomGeo = new THREE.BoxGeometry(zw, roomH, zh);
               const roomMat = new THREE.MeshStandardMaterial({
                   color: themeColor,
                   transparent: true,
                   opacity: 0.28,
-                  roughness: 0.3,
-                  metalness: 0.2
+                  roughness: 0.6,
+                  metalness: 0.1
               });
               const roomMesh = new THREE.Mesh(roomGeo, roomMat);
               roomMesh.position.set(zcx - cx0, baseY + roomH / 2, zcz - cz0);
+              roomMesh.userData = { isRoomVolume: true, defaultOpacity: 0.28 };
               floorGroup.add(roomMesh);
 
               const roomEdges = new THREE.LineSegments(
@@ -8250,15 +8313,15 @@
           tsp3DWorldGroup.add(floorGroup);
       });
 
-      // 5. Hệ thống 8 Cột Thép Chịu Lực Titan (8 Heavy Structural Columns) kết nối Tầng 1 lên Tầng 2
+      // 6. Hệ thống 8 Cột Thép Chịu Lực Titan (8 Heavy Structural Columns) kết nối Tầng 1 lên Tầng 2
       if (tsp3DFloorFilter === 'all') {
           const colGroup = new THREE.Group();
           const colHeight = (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0)) - TSP3D_SLAB_THICKNESS;
           const colGeo = new THREE.CylinderGeometry(0.65, 0.65, colHeight, 16);
           const colMat = new THREE.MeshStandardMaterial({
               color: 0x1e293b,
-              roughness: 0.4,
-              metalness: 0.8
+              roughness: 0.6,
+              metalness: 0.6
           });
 
           const basePlinthGeo = new THREE.BoxGeometry(2.0, 0.4, 2.0);
@@ -8296,11 +8359,11 @@
           tsp3DWorldGroup.add(colGroup);
       }
 
-      // 6. Central 3D Physical Staircase at (110m, 62m) kết nối liên thông Tầng 1 -> Tầng 2
+      // 7. Central 3D Physical Staircase at (110m, 62m) kết nối liên thông Tầng 1 -> Tầng 2 (30 bậc độ dốc chuẩn)
       if (tsp3DFloorFilter === 'all') {
           const stairBaseY1 = 0;
           const stairBaseY2 = TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0);
-          const stairSteps = 24;
+          const stairSteps = 30;
           const sx = 110 - cx0;
           const sz = 62 - cz0;
           const stairGroup = new THREE.Group();
@@ -8308,13 +8371,13 @@
           for (let s = 0; s < stairSteps; s++) {
               const frac = s / (stairSteps - 1);
               const curY = stairBaseY1 + frac * stairBaseY2;
-              const stepZ = sz - 9 + frac * 18;
+              const stepZ = sz - 10 + frac * 20;
               const stepGeo = new THREE.BoxGeometry(4.8, 0.45, 1.2);
               const stepMat = new THREE.MeshStandardMaterial({
                   color: 0x8b5cf6,
                   emissive: 0x6d28d9,
-                  emissiveIntensity: 0.4,
-                  roughness: 0.35
+                  emissiveIntensity: 0.3,
+                  roughness: 0.6
               });
               const stepMesh = new THREE.Mesh(stepGeo, stepMat);
               stepMesh.position.set(sx, curY, stepZ);
@@ -8325,16 +8388,16 @@
           const landingGeo = new THREE.BoxGeometry(5.2, 0.5, 4.0);
           const landingMat = new THREE.MeshStandardMaterial({ color: 0x6d28d9, metalness: 0.5 });
           const landingMesh = new THREE.Mesh(landingGeo, landingMat);
-          landingMesh.position.set(sx, stairBaseY2 - 0.25, sz + 10.5);
+          landingMesh.position.set(sx, stairBaseY2 - 0.25, sz + 11.5);
           stairGroup.add(landingMesh);
 
           const railLeftPts = [
-              new THREE.Vector3(sx - 2.4, stairBaseY1 + 1.2, sz - 9),
-              new THREE.Vector3(sx - 2.4, stairBaseY2 + 1.2, sz + 12)
+              new THREE.Vector3(sx - 2.4, stairBaseY1 + 1.2, sz - 10),
+              new THREE.Vector3(sx - 2.4, stairBaseY2 + 1.2, sz + 13)
           ];
           const railRightPts = [
-              new THREE.Vector3(sx + 2.4, stairBaseY1 + 1.2, sz - 9),
-              new THREE.Vector3(sx + 2.4, stairBaseY2 + 1.2, sz + 12)
+              new THREE.Vector3(sx + 2.4, stairBaseY1 + 1.2, sz - 10),
+              new THREE.Vector3(sx + 2.4, stairBaseY2 + 1.2, sz + 13)
           ];
           stairGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(railLeftPts), new THREE.LineBasicMaterial({ color: 0xa855f7, linewidth: 2.5 })));
           stairGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(railRightPts), new THREE.LineBasicMaterial({ color: 0xa855f7, linewidth: 2.5 })));
@@ -8531,10 +8594,8 @@
               tsp3DRouteGroup.add(tubeMesh);
 
               const orbGeo = new THREE.SphereGeometry(1.6, 16, 16);
-              const orbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+              const orbMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
               tsp3DTravelOrb = new THREE.Mesh(orbGeo, orbMat);
-              const orbLight = new THREE.PointLight(0xf59e0b, 3.5, 24);
-              tsp3DTravelOrb.add(orbLight);
               tsp3DTravelOrb.position.copy(curvePoints[0]);
               tsp3DRouteGroup.add(tsp3DTravelOrb);
 
@@ -8559,7 +8620,7 @@
 
           // Chuyển động tuần tra tự hành của Robot AGV & Quầng sáng Travel Orb
           if (tsp3DRouteCurve && tsp3DAGVRobot) {
-              const loopDuration = 18; // 1 chu kỳ tuần tra nhà xưởng 18 giây
+              const loopDuration = 55; // Chu kỳ tuần tra công nghiệp 55 giây (tốc độ thực tế điềm tĩnh ~0.8 m/s)
               const progress = (time / loopDuration) % 1.0;
               const pos = tsp3DRouteCurve.getPointAt(progress);
               const tangent = tsp3DRouteCurve.getTangentAt(progress).normalize();
@@ -8570,7 +8631,7 @@
 
                   // Xoay tháp quét Lidar liên tục 360 độ
                   const turret = tsp3DAGVRobot.getObjectByName('agvTurret');
-                  if (turret) turret.rotation.y = time * 6.0;
+                  if (turret) turret.rotation.y = time * 4.0;
 
                   if (tsp3DTravelOrb) {
                       tsp3DTravelOrb.position.set(pos.x, pos.y + 0.6, pos.z);
@@ -8579,31 +8640,62 @@
                   // Cập nhật bảng Telemetry HUD thời gian thực
                   const agvHudStatus = document.getElementById('hud-agv-status');
                   if (agvHudStatus) {
-                      const speed = (1.4 + Math.sin(time * 2.0) * 0.25).toFixed(1);
+                      const speed = (0.8 + Math.sin(time * 0.8) * 0.12).toFixed(1);
                       const pct = Math.round(progress * 100);
                       agvHudStatus.innerText = `Tuần tra • ${speed} m/s • ${pct}%`;
                   }
 
                   // Camera bám sát góc nhìn thứ 3 theo Robot AGV khi kích hoạt chế độ "Bám AGV"
                   if (tsp3DCameraMode === 'agv' && tsp3DCamera && tsp3DControls) {
-                      const camDist = 26;
-                      const camH = 13;
+                      // Góc máy cao 7.5m, cách sau 12m, không bị lùi sâu vào phòng hay va chạm trần sàn
+                      const camDist = 12.0;
+                      const camH = 7.5;
                       const targetCamPos = new THREE.Vector3(
                           pos.x - tangent.x * camDist,
                           pos.y + camH,
                           pos.z - tangent.z * camDist
                       );
                       const targetLook = new THREE.Vector3(
-                          pos.x + tangent.x * 6,
-                          pos.y + 2,
-                          pos.z + tangent.z * 6
+                          pos.x + tangent.x * 5,
+                          pos.y + 1.2,
+                          pos.z + tangent.z * 5
                       );
-                      tsp3DCamera.position.lerp(targetCamPos, 0.05);
-                      tsp3DControls.target.lerp(targetLook, 0.05);
+                      tsp3DCamera.position.lerp(targetCamPos, 0.08);
+                      tsp3DControls.target.lerp(targetLook, 0.08);
+
+                      // Chế độ X-Ray thông minh khi Bám AGV: làm mờ tường phòng, trần và mặt dựng để không cản tầm nhìn
+                      if (tsp3DWorldGroup) {
+                          tsp3DWorldGroup.traverse(node => {
+                              if (node.isMesh && node.userData) {
+                                  if (node.userData.isRoomVolume) {
+                                      node.material.opacity = 0.05;
+                                  } else if (node.userData.isCeilingSlab) {
+                                      node.material.opacity = 0.06;
+                                  } else if (node.userData.isFacadeWall) {
+                                      node.material.opacity = 0.03;
+                                  }
+                              }
+                          });
+                      }
+                  } else {
+                      // Khôi phục độ mờ kiến trúc bình thường khi ở chế độ tự do
+                      if (tsp3DWorldGroup) {
+                          tsp3DWorldGroup.traverse(node => {
+                              if (node.isMesh && node.userData) {
+                                  if (node.userData.isRoomVolume && node.userData.defaultOpacity !== undefined) {
+                                      node.material.opacity = node.userData.defaultOpacity;
+                                  } else if (node.userData.isCeilingSlab && node.userData.defaultOpacity !== undefined) {
+                                      node.material.opacity = node.userData.defaultOpacity;
+                                  } else if (node.userData.isFacadeWall && node.userData.defaultOpacity !== undefined) {
+                                      node.material.opacity = node.userData.defaultOpacity;
+                                  }
+                              }
+                          });
+                      }
                   }
               }
           } else if (tsp3DRouteCurve && tsp3DTravelOrb) {
-              const loopDuration = 10;
+              const loopDuration = 55;
               const progress = (time / loopDuration) % 1.0;
               const pos = tsp3DRouteCurve.getPointAt(progress);
               if (pos) tsp3DTravelOrb.position.copy(pos);
