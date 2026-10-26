@@ -199,7 +199,21 @@ class ConditionMonitoringEngine:
                 }
             }
 
-        # Bước 5: Tiến hành phân tích AI Condition Monitoring trên các mẫu đo
+        # Bước 5: Kiểm tra cờ bật/tắt AI Anomaly Detection của Tenant
+        if cur_tenant and not getattr(cur_tenant, 'enable_ai_anomaly_detection', True):
+            return {
+                "savedReadingsCount": len(saved_records),
+                "isStaticAsset": False,
+                "analysisSummary": {
+                    "hasAnomaly": False,
+                    "highestSeverity": "NORMAL",
+                    "mode": "STANDARD_STATIC_ONLY",
+                    "aiEnabled": False,
+                    "message": "Thuật toán Phân tích Dị thường AI đang tắt theo cài đặt của tổ chức. Dữ liệu cảm biến được ghi nhận an toàn."
+                }
+            }
+
+        # Tiến hành phân tích AI Condition Monitoring trên các mẫu đo
         analysis_summary = cls._run_ai_analysis(
             asset=asset,
             saved_records=saved_records,

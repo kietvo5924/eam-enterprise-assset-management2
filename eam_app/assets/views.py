@@ -1257,6 +1257,20 @@ class AssetRulPredictionDetailView(APIView):
         except Asset.DoesNotExist:
             raise NotFound("Asset not found")
 
+        tenant = getattr(request.user, 'tenant', None)
+        if tenant and not getattr(tenant, 'enable_ai_rul', True):
+            return success_response({
+                "assetId": str(asset.id),
+                "assetName": asset.name,
+                "currentStatus": asset.status,
+                "aiEnabled": False,
+                "operatingRulDays": None,
+                "calendarRulDays": None,
+                "riskLevel": "DISABLED",
+                "message": "Thuật toán AI Dự đoán Tuổi thọ Còn lại (RUL) đang tạm tắt theo cài đặt tổ chức. Hệ thống áp dụng quy trình bảo trì định kỳ truyền thống.",
+                "history": []
+            })
+
         # Kiểm tra tài sản tĩnh
         is_machinery, static_err = PredictiveRULGuardrails.validate_asset_machinery_type(asset)
         if not is_machinery:
@@ -1286,6 +1300,7 @@ class AssetRulPredictionDetailView(APIView):
             "assetId": str(asset.id),
             "assetName": asset.name,
             "currentStatus": asset.status,
+            "aiEnabled": True,
             "operatingRulDays": asset.current_rul_days,
             "calendarRulDays": asset.current_rul_calendar_days,
             "dutyCycleRatio": asset.duty_cycle_ratio,
@@ -1324,6 +1339,10 @@ class AssetRulPredictionRunView(APIView):
             asset = Asset.objects.get(id=asset_id, is_active=True)
         except Asset.DoesNotExist:
             raise NotFound("Asset not found")
+
+        tenant = getattr(request.user, 'tenant', None)
+        if tenant and not getattr(tenant, 'enable_ai_rul', True):
+            return error_response(message="Thuật toán Dự đoán Tuổi thọ Còn lại (RUL) đang tạm tắt trong Cài đặt tổ chức.", status_code=400)
 
         custom_load = request.data.get('loadFactor') or request.data.get('load_factor')
         if custom_load is not None:

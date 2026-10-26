@@ -14,6 +14,20 @@ from notifications.serializers import (
 )
 
 
+def apply_ai_toggles_filter(qs, tenant):
+    """
+    Ẩn thông báo của các giải thuật AI đang tạm tắt theo cài đặt của tổ chức (Tenant).
+    """
+    if not tenant:
+        return qs
+    excluded_events = []
+    if not getattr(tenant, 'enable_ai_anomaly_detection', True):
+        excluded_events.append('SENSOR_ANOMALY_DETECTED')
+    if excluded_events:
+        qs = qs.exclude(event_type__in=excluded_events)
+    return qs
+
+
 class NotificationListView(APIView):
     """
     List notifications for authenticated user with multi-tenant isolation,
@@ -30,6 +44,7 @@ class NotificationListView(APIView):
         )
         if tenant:
             qs = qs.filter(tenant=tenant)
+        qs = apply_ai_toggles_filter(qs, tenant)
 
         # Filter by read status
         unread_only = request.query_params.get('unread_only', '').strip().lower() in ('true', '1')
@@ -77,12 +92,16 @@ class NotificationListView(APIView):
             elif len(events) > 1:
                 qs = qs.filter(event_type__in=events)
 
-        # Calculate unread count for badge indicators
-        unread_count = Notification.objects.filter(
+        # Calculate unread count for badge indicators (honoring tenant & AI toggles)
+        unread_qs = Notification.objects.filter(
             recipient=request.user,
             is_read=False,
             is_deleted=False
-        ).count()
+        )
+        if tenant:
+            unread_qs = unread_qs.filter(tenant=tenant)
+        unread_qs = apply_ai_toggles_filter(unread_qs, tenant)
+        unread_count = unread_qs.count()
 
         # Pagination
         try:
@@ -128,6 +147,7 @@ class NotificationUnreadCountView(APIView):
         )
         if tenant:
             base_qs = base_qs.filter(tenant=tenant)
+        base_qs = apply_ai_toggles_filter(base_qs, tenant)
 
         unread_count = base_qs.count()
         has_critical = base_qs.filter(severity='CRITICAL').exists()

@@ -22,6 +22,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
       {% if 'work_order:reassign' in user_permissions %}
+      {% if current_tenant.enable_ai_hungarian %}
       <button 
         type="button"
         id="btn-hungarian-optimize"
@@ -31,6 +32,8 @@
       >
         <i class="ph-bold ph-lightning"></i> <span>Điều phối tức thời 1-1</span>
       </button>
+      {% endif %}
+      {% if current_tenant.enable_ai_genetic %}
       <button 
         type="button"
         id="btn-ga-scheduler"
@@ -41,7 +44,9 @@
         <i class="ph-bold ph-calendar-check"></i> <span>Lập lịch cả ca nhiều việc</span>
       </button>
       {% endif %}
+      {% endif %}
       {% if 'work_order:execute' in user_permissions or 'system:admin' in user_permissions or is_system_admin %}
+      {% if current_tenant.enable_tsp_routing %}
       <button 
         type="button"
         id="btn-tsp-routing"
@@ -51,6 +56,7 @@
       >
         <i class="ph-bold ph-path"></i> <span>Tối ưu lộ trình di chuyển</span>
       </button>
+      {% endif %}
       {% endif %}
       {% if 'work_order:create' in user_permissions %}
       <button 
@@ -3751,7 +3757,7 @@
       });
   }
 
-  const currentUserId = "{{ request.user.id }}";
+  // currentUserId is already globally declared in base.html
   let currentAnomalyForWo = null;
 
   // Checklists & Condition Monitoring logic

@@ -613,11 +613,67 @@ class UserMeProfileView(APIView):
             "fullName": getattr(user, 'full_name', None) or user.username,
             "email": user.email,
             "tenantId": str(user.tenant_id) if user.tenant_id else None,
+            "themeColor": getattr(user, 'theme_color', None) or (tenant.theme_color if tenant and hasattr(tenant, 'theme_color') else 'cyan') or 'cyan',
+            "preferredLanguage": getattr(user, 'preferred_language', None) or 'vi',
             "roles": roles,
             "permissions": sorted(list(permissions)),
-            "technicianProfile": tech_data
+            "technicianProfile": tech_data,
+            "aiFeatures": {
+                "enableTspRouting": getattr(tenant, 'enable_tsp_routing', True) if tenant else True,
+                "enableAiHungarian": getattr(tenant, 'enable_ai_hungarian', True) if tenant else True,
+                "enableAiGenetic": getattr(tenant, 'enable_ai_genetic', True) if tenant else True,
+                "enableAiRul": getattr(tenant, 'enable_ai_rul', True) if tenant else True,
+                "enableAiAnomalyDetection": getattr(tenant, 'enable_ai_anomaly_detection', True) if tenant else True,
+                "enableAiCostForecasting": getattr(tenant, 'enable_ai_cost_forecasting', True) if tenant else True,
+            }
         }
         return success_response(res_data)
+
+
+class UserPreferencesView(APIView):
+    """
+    API lấy và cập nhật cấu hình giao diện cá nhân của người dùng (Theme color, Preferred language).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        tenant = getattr(user, 'tenant', None)
+        tenant_theme = tenant.theme_color if tenant and hasattr(tenant, 'theme_color') else 'cyan'
+        return success_response({
+            'themeColor': getattr(user, 'theme_color', None) or tenant_theme or 'cyan',
+            'preferredLanguage': getattr(user, 'preferred_language', None) or 'vi'
+        })
+
+    def post(self, request):
+        user = request.user
+        theme_color = request.data.get('theme_color') or request.data.get('themeColor')
+        preferred_lang = request.data.get('preferred_language') or request.data.get('preferredLanguage')
+        
+        ALLOWED_THEMES = {'cyan', 'emerald', 'navy', 'indigo', 'amber'}
+        ALLOWED_LANGS = {'vi', 'en', 'ja', 'ko', 'zh-CN'}
+        
+        update_fields = []
+        if theme_color and theme_color in ALLOWED_THEMES:
+            user.theme_color = theme_color
+            update_fields.append('theme_color')
+            
+        if preferred_lang and preferred_lang in ALLOWED_LANGS:
+            user.preferred_language = preferred_lang
+            update_fields.append('preferred_language')
+            
+        if update_fields:
+            user.save(update_fields=update_fields)
+            
+        tenant = getattr(user, 'tenant', None)
+        tenant_theme = tenant.theme_color if tenant and hasattr(tenant, 'theme_color') else 'cyan'
+        return success_response({
+            'themeColor': getattr(user, 'theme_color', None) or tenant_theme or 'cyan',
+            'preferredLanguage': getattr(user, 'preferred_language', None) or 'vi'
+        })
+
+    def put(self, request):
+        return self.post(request)
 
 
 class UserMeScheduleView(APIView):

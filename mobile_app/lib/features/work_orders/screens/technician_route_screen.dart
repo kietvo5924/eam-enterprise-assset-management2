@@ -1001,12 +1001,40 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
     final hours = (data.totalEstimatedMinutes / 60).toStringAsFixed(1);
     final distanceMeters = data.totalDistanceMeters.toStringAsFixed(0);
     final stopsCount = data.totalStops.toString();
-    final modeLabel = data.routingMode.contains('MANHATTAN') ? 'Manhattan 2D' : 'Tô-pô Phân cấp';
+    final modeLabel = data.routingMode.contains('MANHATTAN')
+        ? 'Manhattan 2D'
+        : (data.routingMode.contains('PRIORITY') || !data.routingEnabled ? 'Thứ tự Ưu tiên' : 'Tô-pô Phân cấp');
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!data.routingEnabled)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFfffbeb),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFfde68a)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFFb45309), size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Định tuyến TSP đang tạm tắt. Danh sách phiếu được sắp xếp theo thứ tự ưu tiên (Chế độ Fallback).',
+                    style: TextStyle(color: Color(0xFF92400e), fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
         children: [
           _buildKpiCard(
             title: 'Tổng thời gian',

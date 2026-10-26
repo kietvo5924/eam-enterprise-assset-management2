@@ -1047,6 +1047,15 @@ class WorkOrderAutoAssignPreviewView(APIView):
         work_order_ids = serializer.validated_data.get('workOrderIds')
         tenant = getattr(request.user, 'tenant', None)
 
+        if tenant and not getattr(tenant, 'enable_ai_hungarian', True):
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "AI_FEATURE_DISABLED",
+                    "message": "Thuật toán phân công tối ưu (Hungarian) đang tạm tắt theo cài đặt tổ chức. Vui lòng sử dụng tính năng phân công thủ công."
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         preview_result = HungarianAssignmentService.preview(
             tenant=tenant,
             work_order_ids=work_order_ids
@@ -1072,6 +1081,15 @@ class WorkOrderAutoAssignApplyView(APIView):
 
         assignments_data = serializer.validated_data.get('assignments')
         tenant = getattr(request.user, 'tenant', None)
+
+        if tenant and not getattr(tenant, 'enable_ai_hungarian', True):
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "AI_FEATURE_DISABLED",
+                    "message": "Thuật toán phân công tối ưu (Hungarian) đang tạm tắt theo cài đặt tổ chức. Vui lòng phân công thủ công."
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             apply_result = HungarianAssignmentService.apply(
@@ -1114,6 +1132,16 @@ class WorkOrderGAAutoAssignInitiateView(APIView):
             raise ValidationError(serializer.errors)
 
         tenant = getattr(request.user, 'tenant', None)
+
+        if tenant and not getattr(tenant, 'enable_ai_genetic', True):
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "AI_FEATURE_DISABLED",
+                    "message": "Thuật toán điều độ di truyền (GA) đang tạm tắt theo cài đặt tổ chức. Lịch bảo trì tuân theo chu kỳ kế hoạch định kỳ."
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         floorplan_id = serializer.validated_data.get('floorplanId')
         work_order_ids = serializer.validated_data.get('workOrderIds')
         max_generations = serializer.validated_data.get('maxGenerations', 150)
@@ -1193,6 +1221,15 @@ class WorkOrderGAAutoAssignApplyView(APIView):
 
         assignments_data = serializer.validated_data.get('assignments')
         tenant = getattr(request.user, 'tenant', None)
+
+        if tenant and not getattr(tenant, 'enable_ai_genetic', True):
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "AI_FEATURE_DISABLED",
+                    "message": "Thuật toán điều độ di truyền (GA) đang tạm tắt theo cài đặt tổ chức."
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             apply_result = GASchedulingService.apply_solution(

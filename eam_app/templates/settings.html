@@ -64,7 +64,7 @@
       <!-- Form section (Compact) -->
       <div class="flex-1 flex flex-col bg-white/50">
         <div class="flex-1 overflow-y-auto">
-          <form id="settings-form" class="p-6 sm:p-8 space-y-5">
+          <form id="settings-form" novalidate class="p-6 sm:p-8 space-y-5">
             {% csrf_token %}
             <!-- Organization Name -->
             <div class="group">
@@ -84,7 +84,7 @@
               </label>
               <div class="flex items-center gap-3">
                 <div class="flex-1">
-                  <input type="url" name="logoUrl" id="input-logoUrl" value="{{ tenant.logo_url|default:'' }}" placeholder="https://example.com/logo.png" {% if 'tenant:update' not in user_permissions %}disabled class="w-full px-4 h-11 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-xl text-sm font-semibold cursor-not-allowed"{% else %}class="w-full px-4 h-11 bg-white border border-neutral-200/80 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-3 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300"{% endif %} onchange="updateLogoPreview(this.value)" />
+                  <input type="text" name="logoUrl" id="input-logoUrl" value="{{ tenant.logo_url|default:'' }}" placeholder="https://example.com/logo.png" {% if 'tenant:update' not in user_permissions %}disabled class="w-full px-4 h-11 bg-neutral-100 text-neutral-500 border border-neutral-200 rounded-xl text-sm font-semibold cursor-not-allowed"{% else %}class="w-full px-4 h-11 bg-white border border-neutral-200/80 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-3 focus:ring-primary/10 transition font-semibold text-neutral-900 shadow-sm group-hover:border-neutral-300"{% endif %} onchange="updateLogoPreview(this.value)" />
                 </div>
                 {% if 'tenant:update' in user_permissions %}
                 <div class="shrink-0">
@@ -117,6 +117,161 @@
                 </div>
               </div>
               <p class="text-[11px] font-medium text-neutral-500 mt-1 ml-0.5">Tất cả ngày giờ và lịch trình bảo trì trong hệ thống sẽ đồng bộ theo múi giờ này.</p>
+            </div>
+            <!-- Section: Trung Tâm Quản Trị Thuật Toán AI & Tối Ưu Hóa (AI Algorithm Center) -->
+            <div class="pt-5 border-t border-neutral-100/80">
+              <div class="flex items-center justify-between mb-3">
+                <div>
+                  <h3 class="text-xs font-extrabold text-neutral-800 uppercase tracking-wide flex items-center gap-1.5 m-0">
+                    <i class="ph-fill ph-cpu text-primary"></i>
+                    Quản Trị Thuật Toán AI & Tối Ưu Hóa (AI Algorithm Governance)
+                  </h3>
+                  <p class="text-[11px] font-medium text-neutral-500 m-0 mt-0.5">Bật hoặc tạm tắt từng giải thuật thông minh. Mặc định tất cả đều được kích hoạt để đạt hiệu quả vận hành tối đa.</p>
+                </div>
+                <span class="px-2.5 py-1 bg-primary-50 text-primary-700 text-[10px] font-bold rounded-lg border border-primary-200 shrink-0">
+                  <i class="ph-fill ph-shield-check"></i> Fallback An Toàn
+                </span>
+              </div>
+
+              <div class="space-y-3">
+                <!-- Toggle 1: Hungarian -->
+                <div class="p-3.5 bg-neutral-50/80 hover:bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start justify-between gap-4 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                      <i class="ph-fill ph-users-three text-base"></i>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-900">Tối ưu Phân công Kỹ thuật viên (Hungarian Algorithm)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20" id="badge-hungarian">BẬT</span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 m-0 mt-0.5 leading-relaxed">
+                        Tự động giải bài toán ma trận chi phí kỹ năng, chứng chỉ và vị trí để gán kỹ thuật viên tối ưu. 
+                        <span class="text-neutral-400 block mt-0.5 italic">Khi tắt: Chuyển sang phân công thủ công trực tiếp (Manual Dispatch).</span>
+                      </p>
+                    </div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input type="checkbox" id="input-enableAiHungarian" class="sr-only peer" {% if tenant.enable_ai_hungarian %}checked{% endif %} onchange="updateToggleBadge(this, 'badge-hungarian')" />
+                    <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <!-- Toggle 2: Genetic Algorithm (GA) -->
+                <div class="p-3.5 bg-neutral-50/80 hover:bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start justify-between gap-4 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-info/10 text-info flex items-center justify-center shrink-0 mt-0.5">
+                      <i class="ph-fill ph-calendar-check text-base"></i>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-900">Điều độ Lịch bảo trì Đa ngày (Genetic Algorithm - GA)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20" id="badge-genetic">BẬT</span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 m-0 mt-0.5 leading-relaxed">
+                        Giải bài toán NP-hard tối ưu hóa Pareto phân bổ hàng loạt phiếu bảo trì nhiều ca, cân bằng tải công việc.
+                        <span class="text-neutral-400 block mt-0.5 italic">Khi tắt: Tuân thủ lịch bảo trì định kỳ tuần tự theo chu kỳ ngày cố định (Calendar PM).</span>
+                      </p>
+                    </div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input type="checkbox" id="input-enableAiGenetic" class="sr-only peer" {% if tenant.enable_ai_genetic %}checked{% endif %} onchange="updateToggleBadge(this, 'badge-genetic')" />
+                    <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <!-- Toggle 3: Predictive RUL -->
+                <div class="p-3.5 bg-neutral-50/80 hover:bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start justify-between gap-4 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <i class="ph-fill ph-chart-line-up text-base"></i>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-900">Dự đoán Tuổi thọ Còn lại Thiết bị (Predictive RUL)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20" id="badge-rul">BẬT</span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 m-0 mt-0.5 leading-relaxed">
+                        Tính toán đường cong suy giảm Weibull và dải bất định (Uncertainty Band) để cảnh báo sự cố trước hạn.
+                        <span class="text-neutral-400 block mt-0.5 italic">Khi tắt: Chuyển sang quản lý bảo trì theo giờ máy vận hành tích lũy hoặc chu kỳ ngày.</span>
+                      </p>
+                    </div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input type="checkbox" id="input-enableAiRul" class="sr-only peer" {% if tenant.enable_ai_rul %}checked{% endif %} onchange="updateToggleBadge(this, 'badge-rul')" />
+                    <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <!-- Toggle 4: Sensor Anomaly Detection -->
+                <div class="p-3.5 bg-neutral-50/80 hover:bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start justify-between gap-4 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <i class="ph-fill ph-waveform text-base"></i>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-900">Phát hiện Dị thường Cảm biến & Tự tạo WO (Anomaly Detection)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20" id="badge-anomaly">BẬT</span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 m-0 mt-0.5 leading-relaxed">
+                        Phân tích rung chấn ISO 10816, Theil-Sen drift và tự động phát sinh phiếu công việc sửa chữa khi phát hiện nguy cơ cao.
+                        <span class="text-neutral-400 block mt-0.5 italic">Khi tắt: Chỉ kiểm tra ngưỡng tĩnh Min/Max đơn giản, không tự động tạo WO AI.</span>
+                      </p>
+                    </div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input type="checkbox" id="input-enableAiAnomalyDetection" class="sr-only peer" {% if tenant.enable_ai_anomaly_detection %}checked{% endif %} onchange="updateToggleBadge(this, 'badge-anomaly')" />
+                    <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <!-- Toggle 5: TSP Routing -->
+                <div class="p-3.5 bg-neutral-50/80 hover:bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start justify-between gap-4 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <i class="ph-fill ph-navigation-arrow text-base"></i>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-900">Tối ưu Lộ trình Di chuyển Hiện trường (TSP Routing)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20" id="badge-tsp">BẬT</span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 m-0 mt-0.5 leading-relaxed">
+                        Giải bài toán Người bán hàng du lịch (ATTSP) tối ưu quãng đường và thang bộ giữa các tầng nhà xưởng.
+                        <span class="text-neutral-400 block mt-0.5 italic">Khi tắt: Tự động sắp xếp công việc thuần túy theo mức độ ưu tiên (Pure Business Mode).</span>
+                      </p>
+                    </div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input type="checkbox" id="input-enableTspRouting" class="sr-only peer" {% if tenant.enable_tsp_routing %}checked{% endif %} onchange="updateToggleBadge(this, 'badge-tsp')" />
+                    <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+
+                <!-- Toggle 6: Maintenance Cost Forecasting -->
+                <div class="p-3.5 bg-neutral-50/80 hover:bg-neutral-50 rounded-xl border border-neutral-200/80 flex items-start justify-between gap-4 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <i class="ph-fill ph-currency-dollar text-base"></i>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-neutral-900">Dự báo Chi phí Bảo trì Tương lai (Cost Forecasting)</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20" id="badge-cost">BẬT</span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 m-0 mt-0.5 leading-relaxed">
+                        Dự báo chi phí nhân công và vật tư bảo dưỡng cho quý/năm tiếp theo bằng mô hình chuỗi thời gian.
+                        <span class="text-neutral-400 block mt-0.5 italic">Khi tắt: Chỉ hiển thị số liệu chi phí thực tế đã thanh quyết toán trong lịch sử.</span>
+                      </p>
+                    </div>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+                    <input type="checkbox" id="input-enableAiCostForecasting" class="sr-only peer" {% if tenant.enable_ai_cost_forecasting %}checked{% endif %} onchange="updateToggleBadge(this, 'badge-cost')" />
+                    <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div class="pt-6 border-t border-neutral-100/80 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -184,6 +339,13 @@ async function handleLogoUpload(input) {
         icon.className = 'ph-bold ph-spinner animate-spin text-base text-primary';
         text.innerText = 'ĐANG TẢI...';
 
+        const resetUploadButton = () => {
+            label.classList.remove('opacity-70', 'pointer-events-none');
+            icon.className = originalIcon;
+            text.innerText = 'TẢI ẢNH';
+            input.value = '';
+        };
+
         try {
             const response = await fetch('/api/v1/files/upload/logo', {
                 method: 'POST',
@@ -194,24 +356,63 @@ async function handleLogoUpload(input) {
             });
             const data = await response.json();
             
-            if (data.success) {
+            resetUploadButton();
+            if (data.success && data.data && data.data.url) {
                 document.getElementById('input-logoUrl').value = data.data.url;
                 updateLogoPreview(data.data.url);
                 const msg = document.getElementById('settings-message');
                 msg.innerHTML = '<i class="ph-fill ph-check-circle text-success text-base"></i> <span class="text-success">Đã tải ảnh lên thành công! Đừng quên nhấn lưu thay đổi.</span>';
+                if (window.showToast) {
+                    window.showToast('Tải ảnh logo lên thành công!', 'success');
+                }
             } else {
-                alert(data.error || 'Tải ảnh lên thất bại');
+                const errMsg = data.message || data.error || 'Tải ảnh lên thất bại';
+                if (window.showToast) {
+                    window.showToast(errMsg, 'error');
+                } else {
+                    alert(errMsg);
+                }
             }
         } catch (error) {
-            alert('Tải ảnh lên thất bại');
+            resetUploadButton();
+            if (window.showToast) {
+                window.showToast('Không thể kết nối đến máy chủ lưu trữ ảnh', 'error');
+            } else {
+                alert('Không thể kết nối đến máy chủ lưu trữ ảnh');
+            }
         } finally {
-            label.classList.remove('opacity-70', 'pointer-events-none');
-            icon.className = originalIcon;
-            text.innerText = 'TẢI ẢNH';
-            input.value = '';
+            resetUploadButton();
         }
     }
 }
+
+function updateToggleBadge(checkbox, badgeId) {
+    const badge = document.getElementById(badgeId);
+    if (!badge) return;
+    if (checkbox.checked) {
+        badge.innerText = 'BẬT';
+        badge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-success/10 text-success border border-success/20';
+    } else {
+        badge.innerText = 'ĐÃ TẮT';
+        badge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-neutral-200 text-neutral-500 border border-neutral-300';
+    }
+}
+
+// Khởi tạo trạng thái ban đầu cho giao diện cài đặt
+document.addEventListener('DOMContentLoaded', () => {
+    const toggles = [
+        { id: 'input-enableAiHungarian', badge: 'badge-hungarian' },
+        { id: 'input-enableAiGenetic', badge: 'badge-genetic' },
+        { id: 'input-enableAiRul', badge: 'badge-rul' },
+        { id: 'input-enableAiAnomalyDetection', badge: 'badge-anomaly' },
+        { id: 'input-enableTspRouting', badge: 'badge-tsp' },
+        { id: 'input-enableAiCostForecasting', badge: 'badge-cost' },
+    ];
+    toggles.forEach(t => {
+        const el = document.getElementById(t.id);
+        if (el) updateToggleBadge(el, t.badge);
+    });
+});
 
 document.getElementById('settings-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -228,6 +429,12 @@ document.getElementById('settings-form').addEventListener('submit', function(e) 
         name: document.getElementById('input-name').value,
         logoUrl: document.getElementById('input-logoUrl').value,
         timezone: document.getElementById('input-timezone').value,
+        enableAiHungarian: document.getElementById('input-enableAiHungarian').checked,
+        enableAiGenetic: document.getElementById('input-enableAiGenetic').checked,
+        enableAiRul: document.getElementById('input-enableAiRul').checked,
+        enableAiAnomalyDetection: document.getElementById('input-enableAiAnomalyDetection').checked,
+        enableTspRouting: document.getElementById('input-enableTspRouting').checked,
+        enableAiCostForecasting: document.getElementById('input-enableAiCostForecasting').checked,
     };
 
     fetch('{% url "portal_settings" %}', {
@@ -241,18 +448,19 @@ document.getElementById('settings-form').addEventListener('submit', function(e) 
     .then(res => res.json())
     .then(data => {
         if(data.success) {
-            msg.innerHTML = '<i class="ph-fill ph-check-circle text-success text-base"></i> <span class="text-success">Cài đặt đã lưu thành công! <span class="sr-only">Settings updated successfully!</span></span>';
+            msg.innerHTML = '<i class="ph-fill ph-check-circle text-success text-base"></i> <span class="text-success">Cài đặt đã lưu thành công! Đang làm mới...</span>';
             setTimeout(() => {
-                msg.innerHTML = '<i class="ph-fill ph-shield-check text-success text-base"></i> Thay đổi áp dụng ngay lập tức cho toàn bộ các phiên làm việc.';
-            }, 3000);
+                window.location.reload();
+            }, 800);
         } else {
-            msg.innerHTML = '<i class="ph-fill ph-x-circle text-danger text-base"></i> <span class="text-danger">Không thể lưu cài đặt: ' + data.error + '</span>';
+            msg.innerHTML = '<i class="ph-fill ph-x-circle text-danger text-base"></i> <span class="text-danger">Không thể lưu cài đặt: ' + (data.error || 'Lỗi không xác định') + '</span>';
+            btn.disabled = false;
+            icon.className = 'ph-bold ph-floppy-disk text-base';
+            text.innerText = 'LƯU CÀI ĐẶT';
         }
     })
     .catch(err => {
         msg.innerHTML = '<i class="ph-fill ph-warning text-danger text-base"></i> <span class="text-danger">Đã xảy ra lỗi kết nối.</span>';
-    })
-    .finally(() => {
         btn.disabled = false;
         icon.className = 'ph-bold ph-floppy-disk text-base';
         text.innerText = 'LƯU CÀI ĐẶT';

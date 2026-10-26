@@ -224,5 +224,12 @@
           btn.innerText = 'Đặt Lại Mật Khẩu';
       });
   });
+
+  // Đảm bảo xóa sạch cache tài khoản cũ khi đang ở màn hình đăng nhập
+  localStorage.removeItem('eam_active_user_id');
+  localStorage.removeItem('eam_theme');
+  localStorage.removeItem('eam_language');
+  document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname;
 </script>
 {% endblock %}

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from core.views.system import (
     SystemTenantListView, SystemTenantDetailView, SystemTenantStatusView,
     SystemTenantAdminListView, SystemTenantAdminDetailView, SystemTenantAdminStatusView
@@ -9,7 +9,7 @@ from core.views.audit import AuditLogListView
 
 urlpatterns = [
     path('audit-logs', AuditLogListView.as_view(), name='audit_log_list'),
-    path('tenant/settings', TenantSettingsView.as_view(), name='tenant_settings'),
+    re_path(r'^tenants?/settings/?$', TenantSettingsView.as_view(), name='tenant_settings'),
     path('system/tenants', SystemTenantListView.as_view(), name='system_tenant_list'),
     path('system/tenants/<uuid:tenant_id>', SystemTenantDetailView.as_view(), name='system_tenant_detail'),
     path('system/tenants/<uuid:tenant_id>/status', SystemTenantStatusView.as_view(), name='system_tenant_status'),

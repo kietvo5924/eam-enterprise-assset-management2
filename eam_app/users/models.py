@@ -76,6 +76,10 @@ class User(AbstractBaseUser, BaseTenantModel):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
+    # Cá nhân hóa giao diện người dùng
+    theme_color = models.CharField(max_length=32, default='cyan', blank=True, help_text="Màu sắc giao diện cá nhân của người dùng")
+    preferred_language = models.CharField(max_length=10, default='vi', blank=True, help_text="Ngôn ngữ ưu tiên cá nhân của người dùng")
+
     objects = UserManager()
     all_objects = AllUserManager() # Bypassing tenant filter if needed
 

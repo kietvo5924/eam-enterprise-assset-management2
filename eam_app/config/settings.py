@@ -193,13 +193,13 @@ SIMPLE_JWT = {
 }
 
 # MinIO Config
-MINIO_URL = env('MINIO_URL', default='http://localhost:9000')
+MINIO_URL = env('MINIO_URL', default='http://localhost:9900')
 MINIO_ENDPOINT = MINIO_URL.replace('http://', '').replace('https://', '') # Derive endpoint from URL for python-minio compatibility
 MINIO_ACCESS_KEY = env('MINIO_ACCESS_KEY', default='minioadmin')
 MINIO_SECRET_KEY = env('MINIO_SECRET_KEY', default='minioadmin')
 MINIO_BUCKET_NAME = env('MINIO_BUCKET_NAME', default='tenant-assets')
 MINIO_SECURE = env('MINIO_SECURE', default=False, cast=bool)
-MINIO_PUBLIC_URL = env('MINIO_PUBLIC_URL', default='http://localhost:9000')
+MINIO_PUBLIC_URL = env('MINIO_PUBLIC_URL', default='http://localhost:9900')
 
 RESEND_API_KEY = env('RESEND_API_KEY', default='')
 
@@ -226,6 +226,7 @@ CELERY_TASK_ROUTES = {
     'analytics.tasks.generate_export_report': {'queue': 'reports_export'},
     'analytics.tasks.cleanup_zombie_export_jobs': {'queue': 'periodic'},
     'analytics.tasks.purge_expired_export_files': {'queue': 'periodic'},
+    'core.tasks.sync_and_purge_local_fallback_files': {'queue': 'periodic'},
 }
 
 CELERY_BEAT_SCHEDULE = {
@@ -236,6 +237,10 @@ CELERY_BEAT_SCHEDULE = {
     'purge-expired-export-files': {
         'task': 'analytics.tasks.purge_expired_export_files',
         'schedule': timedelta(days=1),
+    },
+    'sync-and-purge-local-fallback': {
+        'task': 'core.tasks.sync_and_purge_local_fallback_files',
+        'schedule': timedelta(minutes=5),
     },
 }
 

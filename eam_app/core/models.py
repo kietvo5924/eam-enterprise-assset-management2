@@ -11,6 +11,12 @@ class Tenant(models.Model):
     service_plan = models.CharField(max_length=50, default='FREE')
     status = models.CharField(max_length=50, default='ACTIVE')
     enable_tsp_routing = models.BooleanField(default=True, help_text='Bật/tắt tính năng tối ưu hóa lộ trình di chuyển TSP')
+    theme_color = models.CharField(max_length=50, default='cyan', help_text='Màu sắc chủ đạo thương hiệu (cyan, emerald, navy, indigo, amber)')
+    enable_ai_hungarian = models.BooleanField(default=True, help_text='Bật/tắt tối ưu phân công công việc Hungarian')
+    enable_ai_genetic = models.BooleanField(default=True, help_text='Bật/tắt điều độ lịch bảo trì di truyền GA')
+    enable_ai_rul = models.BooleanField(default=True, help_text='Bật/tắt dự đoán tuổi thọ còn lại RUL')
+    enable_ai_anomaly_detection = models.BooleanField(default=True, help_text='Bật/tắt phát hiện dị thường cảm biến và ISO 10816')
+    enable_ai_cost_forecasting = models.BooleanField(default=True, help_text='Bật/tắt dự báo chi phí bảo trì tương lai')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

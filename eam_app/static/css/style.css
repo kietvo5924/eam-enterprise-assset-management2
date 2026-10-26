@@ -168,3 +168,27 @@ input::-webkit-credentials-auto-fill-button {
   pointer-events: none;
 }
 
+/* Tối ưu hiển thị Google Translate Engine */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner-frame,
+iframe.goog-te-banner-frame,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+body {
+  top: 0px !important;
+  position: static !important;
+}
+#goog-gt-tt, .goog-tooltip, .goog-tooltip:hover {
+  display: none !important;
+}
+.goog-text-highlight {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.skiptranslate iframe {
+  display: none !important;
+}
+
+

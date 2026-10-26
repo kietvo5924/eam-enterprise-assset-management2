@@ -329,10 +329,16 @@
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                       {% if 'asset:update' in user_permissions %}
+                      {% if current_tenant.enable_ai_rul %}
                       <button onclick="runRulPrediction()" id="btn-run-rul-prediction" class="px-3.5 py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-bold rounded-xl transition-all flex items-center gap-2">
                         <i class="ph-bold ph-play text-sm"></i>
                         <span>Chạy Dự Đoán RUL Tức Thời</span>
                       </button>
+                      {% else %}
+                      <span class="px-3 py-1.5 bg-neutral-100 text-neutral-400 text-xs font-semibold rounded-xl border border-neutral-200 flex items-center gap-1.5">
+                        <i class="ph-bold ph-pause"></i> Dự đoán RUL tạm tắt
+                      </span>
+                      {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -1941,6 +1947,34 @@
     const recText = document.getElementById('rul-recommendation-text');
     const phantomBanner = document.getElementById('rul-phantom-banner');
     const phantomText = document.getElementById('rul-phantom-text');
+
+    if (data.riskLevel === 'DISABLED' || data.aiEnabled === false) {
+      if (riskBadge) {
+        riskBadge.className = "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-neutral-200 text-neutral-600";
+        riskBadge.textContent = "AI RUL TẮT";
+      }
+      if (rapidBadge) rapidBadge.classList.add('hidden');
+      if (opDisplay) {
+        opDisplay.textContent = "Định kỳ";
+        opDisplay.className = "text-xl font-bold text-neutral-500 font-mono tracking-tight";
+      }
+      if (calDisplay) calDisplay.textContent = "Bảo trì theo kế hoạch";
+      if (confInterval) confInterval.textContent = "Theo giờ máy";
+      if (uncertLabel) uncertLabel.textContent = "Calendar PM";
+      if (dutyCycle) dutyCycle.textContent = "--";
+      if (loadSummary) loadSummary.textContent = "Vận hành chuẩn";
+      if (critThresh) critThresh.textContent = "--";
+      if (evalAt) evalAt.textContent = "Chế độ thủ công";
+      if (recText) recText.innerHTML = '<span class="text-neutral-500 font-medium">' + (data.message || 'Tính năng AI RUL đang tắt theo cài đặt tổ chức.') + '</span>';
+      if (phantomBanner) phantomBanner.classList.add('hidden');
+      const btn = document.getElementById('btn-run-rul-prediction');
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+        btn.title = "Tính năng AI RUL đang tắt trong Cài đặt tổ chức";
+      }
+      return;
+    }
 
     if (data.isStaticAsset || data.riskLevel === 'STATIC_ASSET') {
       if (riskBadge) {

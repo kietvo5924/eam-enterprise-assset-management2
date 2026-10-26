@@ -5,7 +5,7 @@ from users.views import (
     UserListView, UserDetailView, UserDisableView, UserEnableView,
     UserInviteView, UserImportView,
     ChangePasswordView, ForgotPasswordView, ResetPasswordView,
-    UserMeProfileView, UserMeScheduleView
+    UserMeProfileView, UserMeScheduleView, UserPreferencesView
 )
 
 urlpatterns = [
@@ -17,6 +17,7 @@ urlpatterns = [
 
     re_path(r'^users/me/profile/?$', UserMeProfileView.as_view(), name='user_me_profile'),
     re_path(r'^users/me/schedule/?$', UserMeScheduleView.as_view(), name='user_me_schedule'),
+    re_path(r'^users/me/preferences/?$', UserPreferencesView.as_view(), name='user_me_preferences'),
     
     path('roles', RoleListView.as_view(), name='role_list'),
     path('roles/<uuid:role_id>', RoleDetailView.as_view(), name='role_detail'),

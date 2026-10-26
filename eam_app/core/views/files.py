@@ -64,12 +64,13 @@ class FileUploadView(APIView):
             extension = os.path.splitext(file_obj.name)[1]
             object_name = f"logos/{uuid.uuid4()}{extension}"
             
+            file_obj.seek(0)
             client.put_object(
                 bucket_name,
                 object_name,
-                file_obj.file,
+                file_obj,
                 length=file_obj.size,
-                content_type=file_obj.content_type
+                content_type=content_type or file_obj.content_type
             )
             
             url = f"{settings.MINIO_PUBLIC_URL}/{bucket_name}/{object_name}"
@@ -77,4 +78,15 @@ class FileUploadView(APIView):
             return success_response({"url": url})
             
         except Exception as e:
-            raise ValidationError(f"Error occurred: {str(e)}")
+            import logging
+            logging.getLogger(__name__).warning(f"MinIO logo upload failed, falling back to default_storage: {e}")
+            from django.core.files.storage import default_storage
+            try:
+                file_obj.seek(0)
+                file_path = default_storage.save(f"tenant-assets/logos/{uuid.uuid4()}{extension}", file_obj)
+                file_url = default_storage.url(file_path)
+                if not file_url.startswith('/') and not file_url.startswith('http'):
+                    file_url = f"/{file_url}"
+                return success_response({"url": file_url})
+            except Exception as storage_err:
+                raise ValidationError(f"Error occurred: {str(e)} | Storage fallback error: {str(storage_err)}")

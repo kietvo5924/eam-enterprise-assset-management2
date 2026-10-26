@@ -656,6 +656,9 @@ def notify_spare_part_requested(spare_part, work_order, quantity_requested, requ
 
 def notify_sensor_anomaly(asset, anomaly_type, metric_value, threshold_value, severity='CRITICAL', work_order=None, suggested_technician=None, alert_id=None, days_remaining=None, slope=None):
     """Event 11: SENSOR_ANOMALY_DETECTED"""
+    tenant = getattr(asset, 'tenant', None)
+    if tenant and not getattr(tenant, 'enable_ai_anomaly_detection', True):
+        return []
     managers = NotificationRouter.get_maintenance_managers(asset.tenant_id)
     
     if severity == 'CRITICAL':

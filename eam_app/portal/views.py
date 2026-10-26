@@ -42,7 +42,16 @@ def portal_login(request):
                 user = authenticate(request, username=found_user.username, password=p)
         if user is not None:
             login(request, user)
-            return redirect('portal_dashboard')
+            resp = redirect('portal_dashboard')
+            pref_lang = getattr(user, 'preferred_language', 'vi') or 'vi'
+            host = request.get_host().split(':')[0]
+            if pref_lang == 'vi':
+                resp.delete_cookie('googtrans', path='/')
+                resp.delete_cookie('googtrans', domain=host, path='/')
+            else:
+                resp.set_cookie('googtrans', f'/vi/{pref_lang}', path='/')
+                resp.set_cookie('googtrans', f'/vi/{pref_lang}', domain=host, path='/')
+            return resp
         else:
             messages.error(request, 'Invalid username or password')
             
@@ -50,7 +59,11 @@ def portal_login(request):
 
 def portal_logout(request):
     logout(request)
-    return redirect('portal_login')
+    resp = redirect('portal_login')
+    host = request.get_host().split(':')[0]
+    resp.delete_cookie('googtrans', path='/')
+    resp.delete_cookie('googtrans', domain=host, path='/')
+    return resp
 
 @login_required(login_url='portal_login')
 def portal_dashboard(request):
@@ -262,8 +275,28 @@ def portal_settings(request):
         try:
             data = json.loads(request.body)
             tenant.name = data.get('name', tenant.name)
-            tenant.logo_url = data.get('logoUrl', tenant.logo_url)
+            raw_logo = data.get('logoUrl', data.get('logo_url', tenant.logo_url))
+            tenant.logo_url = str(raw_logo).strip() if raw_logo and str(raw_logo).strip() else None
             tenant.timezone = data.get('timezone', tenant.timezone)
+            
+            # Theme color
+            if 'themeColor' in data or 'theme_color' in data:
+                tenant.theme_color = data.get('themeColor', data.get('theme_color', tenant.theme_color))
+            
+            # AI algorithm toggles
+            if 'enableTspRouting' in data or 'enable_tsp_routing' in data:
+                tenant.enable_tsp_routing = bool(data.get('enableTspRouting', data.get('enable_tsp_routing', tenant.enable_tsp_routing)))
+            if 'enableAiHungarian' in data or 'enable_ai_hungarian' in data:
+                tenant.enable_ai_hungarian = bool(data.get('enableAiHungarian', data.get('enable_ai_hungarian', tenant.enable_ai_hungarian)))
+            if 'enableAiGenetic' in data or 'enable_ai_genetic' in data:
+                tenant.enable_ai_genetic = bool(data.get('enableAiGenetic', data.get('enable_ai_genetic', tenant.enable_ai_genetic)))
+            if 'enableAiRul' in data or 'enable_ai_rul' in data:
+                tenant.enable_ai_rul = bool(data.get('enableAiRul', data.get('enable_ai_rul', tenant.enable_ai_rul)))
+            if 'enableAiAnomalyDetection' in data or 'enable_ai_anomaly_detection' in data:
+                tenant.enable_ai_anomaly_detection = bool(data.get('enableAiAnomalyDetection', data.get('enable_ai_anomaly_detection', tenant.enable_ai_anomaly_detection)))
+            if 'enableAiCostForecasting' in data or 'enable_ai_cost_forecasting' in data:
+                tenant.enable_ai_cost_forecasting = bool(data.get('enableAiCostForecasting', data.get('enable_ai_cost_forecasting', tenant.enable_ai_cost_forecasting)))
+
             tenant.save()
             return JsonResponse({'success': True})
         except Exception as e:

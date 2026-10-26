@@ -19,7 +19,7 @@ A modern, multi-tenant **Enterprise Asset Management (EAM / CMMS)** platform des
 - Complete data isolation per organization/tenant (`TenantMiddleware`).
 - Strict Role-Based Access Control:
   - **Super Administrator (`SUPER_ADMIN`)**: Global system management, tenant lifecycle, cross-tenant licensing.
-  - **Tenant Administrator (`TENANT_ADMIN`)**: Organization configuration, factory layout, user & role provisioning.
+  - **Tenant Administrator (`TENANT_ADMIN`)**: Organization configuration, factory layout, user & role provisioning, AI governance toggles.
   - **Maintenance Manager / Supervisor**: Planning, resource allocation, tool & spare parts approvals.
   - **Field Technician (`TECHNICIAN` / `FIELD_TECHNICIAN`)**: Work order execution, checklist inspection, on-site measurements, direct camera proof upload.
   - **Viewer**: Read-only dashboard and operational KPI monitoring.
@@ -30,18 +30,24 @@ A modern, multi-tenant **Enterprise Asset Management (EAM / CMMS)** platform des
 - **Mandatory Live Photo Proof**: Strict hardware camera requirement (`ImageSource.camera`) for technicians at machine sites.
 - **Automated Resource Lifecycle**: Automatic check-out/check-in of reserved tools (`ToolReservation`) and inventory spare parts stock adjustment on completion or cancellation.
 
-### 3. AI/ML Predictive Maintenance & Condition Monitoring
-- **Real-Time Sensor Anomaly Detection**:
-  - **Isolation Forest**: Multi-variate anomaly detection on telemetry streams.
-  - **Z-Score & Physical Bound Filtering**: Real-time threshold breach detection.
-  - **Theil-Sen Robust Linear Regression**: Long-term sensor drift analysis and trend degradation forecasting.
-- Automated anomaly event generation linking directly to corrective Work Orders.
+### 3. AI Algorithm Governance & Safe Fallbacks (Trung Tâm Quản Trị Thuật Toán AI)
+Each organization/tenant has full granular control to enable or temporarily disable 6 advanced operations research and machine learning algorithms with automated defensive safe fallbacks:
+- **Hungarian Algorithm Dispatcher**: Optimal assignment of pending work orders to technicians based on skill levels, certifications, and location. *When disabled: Falls back cleanly to Manual Dispatch mode.*
+- **Genetic Algorithm (GA) Scheduler**: Multi-day NP-hard Pareto optimization distributing work orders across shifts and teams. *When disabled: Falls back to sequential calendar-based preventive maintenance (Calendar PM).*
+- **Predictive Remaining Useful Life (RUL)**: Weibull distribution degradation modeling with 95% uncertainty bands for failure prediction. *When disabled: Falls back to cumulative runtime hours or calendar thresholds.*
+- **Real-Time Sensor Anomaly Detection**: ISO 10816 vibration standards, Theil-Sen robust drift regression, and Isolation Forest. Automatically generates emergency Work Orders. *When disabled: Evaluates static min/max thresholds only, skipping automated AI WO generation.*
+- **2D CAD Floorplan & TSP Routing**: Traveling Salesperson Problem (ATTSP) navigating technicians via stairs and corridors between factory floors. *When disabled: Falls back to pure business priority sequencing.*
+- **Maintenance Cost Forecasting**: Time-series predictive models for labor and material cost projections. *When disabled: Displays historical actual invoiced expenses.*
 
-### 4. Advanced Operations Research & Factory Floor Navigation
-- **Hungarian Algorithm Dispatcher**: Optimal assignment of pending work orders to technicians based on skill levels, certifications, and distance.
-- **2D CAD Floorplan & TSP Routing**: Integrated factory layout routing navigating field technicians through optimal paths across machines and duty stations.
+### 4. Enterprise Personalization & Multilingual Experience
+- **Personalized Multi-Palette Themes**: 5 curated enterprise themes (**EAM Cyan**, **Emerald**, **Navy Blue**, **Indigo**, **Amber**) customizable directly from the header dropdown, persistently synchronized with each user profile (`User.theme_color`) and runtime Tailwind CSS variables.
+- **Client-Side Multilingual Engine**: Seamless in-place UI translation powered by Google Translate client engine (Vietnamese, English, Japanese, Korean, Chinese, German, etc.) without requiring hardcoded per-string translations.
 
-### 5. Offline-First Mobile Application (Flutter)
+### 5. Fault-Tolerant Storage & Auto-Sync Engine
+- **Resilient Media Storage**: S3-compatible MinIO object storage with automatic graceful fallback to Django `default_storage` upon network timeouts or storage unavailability.
+- **Background Auto-Sync & Local Purge**: Scheduled Celery background task (`core.tasks.sync_and_purge_local_fallback_files`) that automatically reconciles fallback files to MinIO and safely cleans local disk storage once remote storage connectivity is restored.
+
+### 6. Offline-First Mobile Application (Flutter)
 - Built for on-the-ground technicians in network-challenged industrial facilities.
 - **Local Embedded Database**: Drift (SQLite) storing work orders, checklists, and asset telemetry locally.
 - **Robust Background Sync Engine**: Automatic queue processing, conflict handling, deterministic error management, and tenant data isolation.
@@ -195,7 +201,7 @@ The web application is now active at **http://localhost:8000**.
 | **VinFast Tenant Admin** | `http://localhost:8000` | Username: `admin_vf@vinfast.vn`<br>Password: `password123` | Factory Tenant Admin (`VF_MFG`) |
 | **Field Technician** | Mobile App / Web | Username: `Le Thi Hoa`<br>Password: `admin123` | Field maintenance technician |
 | **pgAdmin 4 (Web UI)** | `http://localhost:5050` | Email: `admin@admin.com`<br>Password: `admin` | Web-based PostgreSQL browser |
-| **MinIO Console** | `http://localhost:9001` | Username: `minioadmin`<br>Password: `minioadmin` | Object storage bucket browser (S3 API: `9000`) |
+| **MinIO Console** | `http://localhost:9001` | Username: `minioadmin`<br>Password: `minioadmin` | Object storage browser (Host S3 API: `http://localhost:9900`, mapped to internal port `9000`) |
 | **PostgreSQL Database** | `localhost:5433` | User: `eam_user`<br>Password: `eam_password`<br>DB: `eam_db` | Direct host connection (internal port: `5432`) |
 
 > 📖 **Full Credentials Directory**: For a comprehensive table of all 20+ specialized technician accounts (electrical, hydraulic, PLC, robotics) and managers across all organizations, see **[TEST_CREDENTIALS.md](TEST_CREDENTIALS.md)**.
@@ -245,6 +251,12 @@ cd eam_app
 
 # Run all work orders tests
 python manage.py test workorders.tests
+
+# Run AI algorithm governance toggles & defensive safe fallbacks
+python manage.py test algorithms.tests.test_ai_governance_toggles
+
+# Run fault-tolerant file upload & user preferences tests
+python manage.py test core.tests.test_upload_and_preferences
 
 # Run sensor anomaly detection & algorithm tests
 pytest algorithms/tests/ -v
