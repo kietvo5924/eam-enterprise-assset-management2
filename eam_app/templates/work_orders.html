@@ -7520,6 +7520,7 @@
   let tsp3DTravelOrb = null;
   let tsp3DAGVRobot = null;
   let tsp3DCameraMode = 'free'; // 'free' or 'agv'
+  let tsp3DLastAgvFollowPos = null;
   let tsp3DClock = null;
 
   // Fixed architectural constants (Cố định chiều cao và khoảng cách sàn chuẩn BIM/CAD Digital Twin)
@@ -7584,7 +7585,15 @@
               viewInfo.innerHTML = '<span class="text-amber-400 font-bold">🏢 Phối cảnh 3D Digital Twin</span> (Xuyên tầng liên thông)';
           }
 
-          setTimeout(() => initOrUpdateTSP3D(), 40);
+          setTimeout(() => {
+              initOrUpdateTSP3D();
+              // Mặc định góc nhìn Isometric bao quát toàn cảnh xưởng, không nhảy bám AGV tự động
+              setTimeout(() => {
+                  if (typeof setTSP3DCameraView === 'function') {
+                      setTSP3DCameraView('iso');
+                  }
+              }, 60);
+          }, 40);
       } else {
           if (btn2D) {
               btn2D.className = 'px-2.5 py-1 rounded-md text-xs font-bold bg-amber-500 text-slate-950 flex items-center gap-1.5 transition cursor-pointer shadow-xs';
@@ -7780,14 +7789,6 @@
       lidarEye.position.set(0.3, bodyH + 0.55, 0);
       turretGroup.add(lidarEye);
 
-      // Laser Scanner Fan Ring
-      const scanGeo = new THREE.RingGeometry(0.8, 3.2, 24);
-      scanGeo.rotateX(-Math.PI / 2);
-      const scanMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, transparent: true, opacity: 0.35 });
-      const scanMesh = new THREE.Mesh(scanGeo, scanMat);
-      scanMesh.position.set(0, bodyH + 0.5, 0);
-      turretGroup.add(scanMesh);
-
       group.add(turretGroup);
 
       // Headlights (Front white LED)
@@ -7809,15 +7810,17 @@
       group.add(tlLeft);
       group.add(tlRight);
 
-      // AGV Floating Sprite Badge
-      const agvLabel = createTSP3DTextSprite('🤖 AGV-01 • TUẦN TRA TỰ HÀNH', {
+      // AGV Floating Sprite Badge (Cân đối, rõ nét, tỉ lệ 3.8m x 0.95m vừa vặn bằng thân xe AGV)
+      const agvLabel = createTSP3DTextSprite('🤖 AGV-01', {
           textColor: '#fde047',
-          bgColor: 'rgba(15, 23, 42, 0.92)',
+          bgColor: 'rgba(15, 23, 42, 0.88)',
           borderColor: '#eab308',
-          fontSize: 22,
-          isBadge: true
+          fontSize: 38,
+          isBadge: true,
+          baseHeight: 0.95
       });
-      agvLabel.position.set(0, bodyH + 2.2, 0);
+      agvLabel.name = 'agvLabel';
+      agvLabel.position.set(0, bodyH + 0.95, 0);
       group.add(agvLabel);
 
       return group;
@@ -8457,7 +8460,65 @@
       }
       tsp3DWorldGroup.add(tsp3DMachinesGroup);
 
-      // 7. 3D Glowing TSP Route Tube & 3D Stop Pins
+  function createTSP3DRouteRibbon(curve, width = 1.1) {
+      const segments = Math.max(260, (curve.points ? curve.points.length : 10) * 35);
+      const pts = curve.getSpacedPoints(segments);
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i < pts.length; i++) {
+          const u = i / (pts.length - 1);
+          const p = pts[i];
+          const tangent = curve.getTangentAt(u).normalize();
+          
+          let nx = -tangent.z;
+          let nz = tangent.x;
+          const len = Math.hypot(nx, nz);
+          if (len > 0.001) {
+              nx /= len;
+              nz /= len;
+          } else {
+              nx = 0;
+              nz = 1;
+          }
+
+          const halfW = width * 0.5;
+          // Left vertex nằm sát sàn
+          positions.push(p.x + nx * halfW, p.y + 0.04, p.z + nz * halfW);
+          // Right vertex nằm sát sàn
+          positions.push(p.x - nx * halfW, p.y + 0.04, p.z - nz * halfW);
+
+          uvs.push(0, u * 15);
+          uvs.push(1, u * 15);
+
+          if (i < pts.length - 1) {
+              const base = i * 2;
+              indices.push(base, base + 1, base + 2);
+              indices.push(base + 1, base + 3, base + 2);
+          }
+      }
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+          color: 0xf59e0b,
+          emissive: 0xf59e0b,
+          emissiveIntensity: 0.75,
+          roughness: 0.35,
+          metalness: 0.1,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.95
+      });
+      return new THREE.Mesh(geom, mat);
+  }
+
+      // 7. 3D Glowing TSP Route Ribbon & 3D Stop Pins
       tsp3DRouteGroup = new THREE.Group();
       tsp3DPinsGroup = new THREE.Group();
       tsp3DRouteCurve = null;
@@ -8486,7 +8547,7 @@
               // Only include in 3D route path if matches floor filter
               if (tsp3DFloorFilter === 'all' || sFloor === tsp3DFloorFilter) {
                   if (idx === 0) {
-                      addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                      addWaypoint(stopX, sBaseY + 0.05, stopZ);
                   } else {
                       const prevStop = stops[idx - 1];
                       const pFloor = parseInt(prevStop.floorNumber || prevStop.floor_level) || 1;
@@ -8498,20 +8559,20 @@
                       if (pFloor === sFloor) {
                           // Đi từ trạm trước -> ra hành lang trung tâm (hallZ) -> chạy dọc hành lang -> rẽ vào trạm đích
                           // Tuyệt đối không đi chéo xuyên thủng tường phòng!
-                          addWaypoint(prevX, sBaseY + 1.2, hallZ);
-                          addWaypoint(stopX, sBaseY + 1.2, hallZ);
-                          addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                          addWaypoint(prevX, sBaseY + 0.05, hallZ);
+                          addWaypoint(stopX, sBaseY + 0.05, hallZ);
+                          addWaypoint(stopX, sBaseY + 0.05, stopZ);
                       } else if (tsp3DFloorFilter === 'all') {
                           // Khác tầng: Ra hành lang tầng cũ -> đi tới cầu thang trung tâm -> đổi tầng -> hành lang tầng mới -> vào trạm
-                          addWaypoint(prevX, pBaseY + 1.2, hallZ);
-                          addWaypoint(stairX, pBaseY + 1.2, hallZ);
-                          addWaypoint(stairX, (pBaseY + sBaseY) / 2 + 1.2, hallZ);
-                          addWaypoint(stairX, sBaseY + 1.2, hallZ);
-                          addWaypoint(stopX, sBaseY + 1.2, hallZ);
-                          addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                          addWaypoint(prevX, pBaseY + 0.05, hallZ);
+                          addWaypoint(stairX, pBaseY + 0.05, hallZ);
+                          addWaypoint(stairX, (pBaseY + sBaseY) / 2 + 0.05, hallZ);
+                          addWaypoint(stairX, sBaseY + 0.05, hallZ);
+                          addWaypoint(stopX, sBaseY + 0.05, hallZ);
+                          addWaypoint(stopX, sBaseY + 0.05, stopZ);
                       } else {
-                          addWaypoint(stopX, sBaseY + 1.2, hallZ);
-                          addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                          addWaypoint(stopX, sBaseY + 0.05, hallZ);
+                          addWaypoint(stopX, sBaseY + 0.05, stopZ);
                       }
                   }
               }
@@ -8580,23 +8641,16 @@
 
           if (curvePoints.length >= 2) {
               tsp3DRouteCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'centripetal', 0.05);
-              const tubeGeo = new THREE.TubeGeometry(tsp3DRouteCurve, Math.max(160, curvePoints.length * 20), 0.95, 10, false);
-              const tubeMat = new THREE.MeshStandardMaterial({
-                  color: 0xf59e0b,
-                  emissive: 0xf59e0b,
-                  emissiveIntensity: 1.0,
-                  roughness: 0.15,
-                  metalness: 0.3,
-                  transparent: true,
-                  opacity: 0.95
-              });
-              const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
-              tsp3DRouteGroup.add(tubeMesh);
+              
+              // Tạo đường kẻ dẫn hướng phẳng dẹp nằm sát sàn (Flat Industrial Guide Ribbon 1.1m)
+              const routeRibbon = createTSP3DRouteRibbon(tsp3DRouteCurve, 1.1);
+              tsp3DRouteGroup.add(routeRibbon);
 
-              const orbGeo = new THREE.SphereGeometry(1.6, 16, 16);
-              const orbMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
+              const orbGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.08, 16);
+              const orbMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
               tsp3DTravelOrb = new THREE.Mesh(orbGeo, orbMat);
               tsp3DTravelOrb.position.copy(curvePoints[0]);
+              tsp3DTravelOrb.position.y += 0.06;
               tsp3DRouteGroup.add(tsp3DTravelOrb);
 
               // Khởi tạo Robot tự hành AGV / AMR di chuyển thực tế trên tuyến hành trình
@@ -8645,23 +8699,33 @@
                       agvHudStatus.innerText = `Tuần tra • ${speed} m/s • ${pct}%`;
                   }
 
-                  // Camera bám sát góc nhìn thứ 3 theo Robot AGV khi kích hoạt chế độ "Bám AGV"
+                  // Camera bám sát theo Robot AGV khi kích hoạt chế độ "Bám AGV"
+                  // Cho phép người dùng dùng chuột xoay tròn 360 độ quanh con robot tự do
                   if (tsp3DCameraMode === 'agv' && tsp3DCamera && tsp3DControls) {
-                      // Góc máy cao 7.5m, cách sau 12m, không bị lùi sâu vào phòng hay va chạm trần sàn
-                      const camDist = 12.0;
-                      const camH = 7.5;
-                      const targetCamPos = new THREE.Vector3(
-                          pos.x - tangent.x * camDist,
-                          pos.y + camH,
-                          pos.z - tangent.z * camDist
-                      );
-                      const targetLook = new THREE.Vector3(
-                          pos.x + tangent.x * 5,
-                          pos.y + 1.2,
-                          pos.z + tangent.z * 5
-                      );
-                      tsp3DCamera.position.lerp(targetCamPos, 0.08);
-                      tsp3DControls.target.lerp(targetLook, 0.08);
+                      if (tsp3DLastAgvFollowPos) {
+                          const dx = pos.x - tsp3DLastAgvFollowPos.x;
+                          const dy = pos.y - tsp3DLastAgvFollowPos.y;
+                          const dz = pos.z - tsp3DLastAgvFollowPos.z;
+                          const dDistSq = dx * dx + dy * dy + dz * dz;
+
+                          // Khi di chuyển tuần tự dọc hành trình (không gián đoạn lớn)
+                          if (dDistSq < 100) {
+                              tsp3DCamera.position.x += dx;
+                              tsp3DCamera.position.y += dy;
+                              tsp3DCamera.position.z += dz;
+                              tsp3DControls.target.x += dx;
+                              tsp3DControls.target.y += dy;
+                              tsp3DControls.target.z += dz;
+                          } else {
+                              // Khi robot hoàn thành chu kỳ hoặc đổi đoạn nhảy điểm: dịch camera giữ nguyên góc xoay người dùng
+                              const offset = tsp3DCamera.position.clone().sub(tsp3DControls.target);
+                              tsp3DControls.target.set(pos.x, pos.y + 1.2, pos.z);
+                              tsp3DCamera.position.copy(tsp3DControls.target).add(offset);
+                          }
+                      } else {
+                          tsp3DControls.target.set(pos.x, pos.y + 1.2, pos.z);
+                      }
+                      tsp3DLastAgvFollowPos = pos.clone();
 
                       // Chế độ X-Ray thông minh khi Bám AGV: làm mờ tường phòng, trần và mặt dựng để không cản tầm nhìn
                       if (tsp3DWorldGroup) {
@@ -8678,6 +8742,8 @@
                           });
                       }
                   } else {
+                      tsp3DLastAgvFollowPos = null;
+
                       // Khôi phục độ mờ kiến trúc bình thường khi ở chế độ tự do
                       if (tsp3DWorldGroup) {
                           tsp3DWorldGroup.traverse(node => {
@@ -8775,7 +8841,7 @@
       });
       const sprite = new THREE.Sprite(spriteMat);
       const aspect = canvas.width / canvas.height;
-      const baseHeight = options.isBadge ? 3.2 : 4.0;
+      const baseHeight = options.baseHeight || (options.isBadge ? 3.2 : 4.0);
       sprite.scale.set(baseHeight * aspect, baseHeight, 1);
       return sprite;
   }
@@ -8823,6 +8889,13 @@
           tsp3DCameraMode = (tsp3DCameraMode === 'agv') ? 'free' : 'agv';
           if (tsp3DCameraMode === 'agv') {
               if (btnAgv) btnAgv.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 transition flex items-center gap-1 cursor-pointer shadow-xs';
+              if (tsp3DAGVRobot && tsp3DCamera && tsp3DControls) {
+                  const agvPos = tsp3DAGVRobot.position;
+                  tsp3DControls.target.set(agvPos.x, agvPos.y + 1.2, agvPos.z);
+                  tsp3DCamera.position.set(agvPos.x - 12, agvPos.y + 7.5, agvPos.z + 10);
+                  tsp3DControls.update();
+                  tsp3DLastAgvFollowPos = agvPos.clone();
+              }
           } else {
               setTSP3DCameraView('iso');
           }
@@ -8830,6 +8903,7 @@
       }
 
       tsp3DCameraMode = 'free';
+      tsp3DLastAgvFollowPos = null;
 
       if (viewType === 'iso') {
           if (btnIso) btnIso.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
