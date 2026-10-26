@@ -2108,10 +2108,13 @@
                   <button type="button" id="btn-cam-iso" onclick="setTSP3DCameraView('iso')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer" title="Góc nhìn đẳng cự Isometric (45°)">
                     <i class="ph-bold ph-perspective"></i> <span>Isometric</span>
                   </button>
-                  <button type="button" id="btn-cam-persp" onclick="setTSP3DCameraView('perspective')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Phối cảnh góc nhìn 3D">
-                    <i class="ph-bold ph-buildings"></i> <span>Phối cảnh</span>
+                  <button type="button" id="btn-cam-front" onclick="setTSP3DCameraView('front')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Nhìn thẳng chính diện mặt trước">
+                    <i class="ph-bold ph-layout"></i> <span>Chính diện</span>
                   </button>
-                  <button type="button" id="btn-cam-top" onclick="setTSP3DCameraView('top')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Nhìn thẳng từ trên xuống">
+                  <button type="button" id="btn-cam-side" onclick="setTSP3DCameraView('side')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Nhìn ngang từ cạnh xưởng">
+                    <i class="ph-bold ph-sidebar"></i> <span>Cạnh bên</span>
+                  </button>
+                  <button type="button" id="btn-cam-top" onclick="setTSP3DCameraView('top')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer" title="Nhìn thẳng từ trên nóc xuống">
                     <i class="ph-bold ph-arrows-in-cardinal"></i> <span>Từ trên</span>
                   </button>
                 </div>
@@ -2134,23 +2137,34 @@
                   <i class="ph-bold ph-arrows-out-line-vertical"></i> <span id="label-tsp-3d-exploded">Tách tầng 3D</span>
                 </button>
 
-                <!-- Reset Camera -->
-                <button type="button" onclick="resetTSP3DCamera()" class="w-7 h-7 rounded-xl bg-slate-900/95 backdrop-blur-md border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center text-xs font-bold shadow-2xl cursor-pointer" title="Đặt lại góc nhìn camera">
-                  <i class="ph-bold ph-arrows-clockwise"></i>
+                <!-- Reset / Center Camera -->
+                <button type="button" onclick="resetTSP3DCamera()" class="px-2.5 py-1.5 rounded-xl bg-slate-900/95 backdrop-blur-md border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 text-[11px] font-bold shadow-2xl cursor-pointer" title="Đặt lại góc nhìn camera về trung tâm">
+                  <i class="ph-bold ph-arrows-clockwise text-xs"></i> <span>Căn giữa</span>
+                </button>
+              </div>
+
+              <!-- Fullscreen / Phóng to Toàn màn hình Button -->
+              <div class="flex items-center gap-2">
+                <button type="button" id="btn-tsp-3d-fullscreen" onclick="toggleTSP3DFullscreen()" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-bold transition flex items-center gap-1.5 shadow-2xl cursor-pointer" title="Phóng to chiếm trọn toàn bộ màn hình để quan sát chi tiết nhất">
+                  <i class="ph-bold ph-corners-out text-sm" id="icon-tsp-3d-fullscreen"></i>
+                  <span id="label-tsp-3d-fullscreen">Toàn màn hình</span>
                 </button>
               </div>
             </div>
 
             <!-- 3D Legend & Interaction Guide -->
             <div class="absolute bottom-3 left-3 z-20 hidden md:flex items-center gap-3 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-xl text-[10px] text-slate-300 shadow-2xl pointer-events-none">
-              <span class="flex items-center gap-1.5 text-amber-400 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-xs"></span> Tuyến lộ trình 3D</span>
-              <span class="flex items-center gap-1.5 text-emerald-400 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs"></span> Máy CNC bình thường</span>
-              <span class="flex items-center gap-1.5 text-red-400 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-xs animate-pulse"></span> Máy có sự cố</span>
-              <span class="text-slate-400 ml-1 border-l border-slate-700 pl-2">Kéo chuột trái: Xoay 360° • Cuộn / Nút +/-: Zoom • Phải: Di chuyển</span>
+              <span class="flex items-center gap-1.5 text-amber-400 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-xs"></span> Tuyến hành trình</span>
+              <span class="flex items-center gap-1.5 text-emerald-400 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs"></span> Thiết bị bình thường</span>
+              <span class="flex items-center gap-1.5 text-red-400 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-xs animate-pulse"></span> Thiết bị cần bảo trì</span>
+              <span class="text-slate-400 ml-1 border-l border-slate-700 pl-2">Chuột trái: Xoay tự do • Chuột phải / W,A,S,D: Di chuyển (Pan) • Cuộn chuột / +/-: Zoom • Click vào máy/sàn: Căn tâm</span>
             </div>
 
-            <!-- 3D Zoom Controls Widget (Phóng to / Thu nhỏ / Mặc định cho 3D) -->
+            <!-- 3D Zoom Controls Widget (Phóng to / Thu nhỏ / Mặc định / Toàn màn hình cho 3D) -->
             <div id="tsp-3d-zoom-toolbar" class="absolute bottom-4 right-4 z-20 flex flex-col items-center bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl p-1 shadow-2xl gap-1 select-none pointer-events-auto">
+              <button type="button" onclick="toggleTSP3DFullscreen()" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center text-sm font-bold transition shadow-xs cursor-pointer" title="Phóng to toàn màn hình (Fullscreen)">
+                <i class="ph-bold ph-corners-out"></i>
+              </button>
               <button type="button" onclick="adjustTSP3DZoom(0.75)" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-sm font-bold transition shadow-xs cursor-pointer" title="Phóng to 3D (Zoom In)">
                 <i class="ph-bold ph-plus"></i>
               </button>
@@ -2158,7 +2172,7 @@
                 <i class="ph-bold ph-minus"></i>
               </button>
               <button type="button" onclick="resetTSP3DCamera()" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition shadow-xs cursor-pointer" title="Đặt lại góc nhìn trung tâm (Reset View)">
-                <i class="ph-bold ph-arrows-out-simple"></i>
+                <i class="ph-bold ph-arrows-clockwise"></i>
               </button>
             </div>
 
@@ -7579,9 +7593,22 @@
               tsp3DControls = new THREE.OrbitControls(tsp3DCamera, tsp3DRenderer.domElement);
               tsp3DControls.enableDamping = true;
               tsp3DControls.dampingFactor = 0.08;
-              tsp3DControls.maxPolarAngle = Math.PI / 2 - 0.02;
-              tsp3DControls.minDistance = 15;
-              tsp3DControls.maxDistance = 1200;
+              tsp3DControls.minPolarAngle = 0.02;
+              tsp3DControls.maxPolarAngle = Math.PI * 0.92;
+              tsp3DControls.minDistance = 6;
+              tsp3DControls.maxDistance = 1500;
+              tsp3DControls.enablePan = true;
+              tsp3DControls.panSpeed = 1.4;
+              tsp3DControls.screenSpacePanning = true;
+              tsp3DControls.mouseButtons = {
+                  LEFT: THREE.MOUSE.ROTATE,
+                  MIDDLE: THREE.MOUSE.DOLLY,
+                  RIGHT: THREE.MOUSE.PAN
+              };
+              tsp3DControls.touches = {
+                  ONE: THREE.TOUCH.ROTATE,
+                  TWO: THREE.TOUCH.DOLLY_PAN
+              };
               tsp3DControls.target.set(-15, 14, 0);
               tsp3DControls.update();
           }
@@ -7774,15 +7801,17 @@
       greenLightMesh.position.set(poleX, plinthH + bodyH + poleH + 0.1, poleZ);
       group.add(greenLightMesh);
 
-      // 7. Floating 3D Equipment Label Sprite
-      const labelSprite = createTSP3DTextSprite(`${ast.code || 'EQ'} • ${ast.name}`, {
-          textColor: hasIssue ? '#f87171' : '#38bdf8',
-          bgColor: 'rgba(15, 23, 42, 0.92)',
-          borderColor: hasIssue ? '#ef4444' : '#0284c7',
-          fontSize: 22
-      });
-      labelSprite.position.set(0, plinthH + bodyH + poleH + 1.2, 0);
-      group.add(labelSprite);
+      // 7. Floating 3D Equipment Label Sprite (Chỉ hiển thị nhãn tên cho máy móc có liên quan lộ trình di chuyển / bảo trì)
+      if (hasIssue) {
+          const labelSprite = createTSP3DTextSprite(`${ast.code || 'EQ'} • ${ast.name}`, {
+              textColor: '#fca5a5',
+              bgColor: 'rgba(15, 23, 42, 0.94)',
+              borderColor: '#ef4444',
+              fontSize: 24
+          });
+          labelSprite.position.set(0, plinthH + bodyH + poleH + 1.4, 0);
+          group.add(labelSprite);
+      }
 
       group.position.set(posX, astBaseY, posZ);
 
@@ -7830,39 +7859,30 @@
           const floorGroup = new THREE.Group();
           const baseY = (F - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
 
-          // 1. Concrete Floor Slab (Upper floor in "all" mode uses frosted glass transparency)
-          const isUpperFloor = (F > 1);
-          const slabGeo = new THREE.BoxGeometry(factoryW, TSP3D_SLAB_THICKNESS, factoryH);
-          const slabMat = new THREE.MeshStandardMaterial({
-              color: isUpperFloor ? 0x0f172a : 0x1e293b,
-              roughness: 0.65,
-              metalness: 0.25,
-              transparent: isUpperFloor && tsp3DFloorFilter === 'all',
-              opacity: (isUpperFloor && tsp3DFloorFilter === 'all') ? 0.35 : 1.0
-          });
-          const slabMesh = new THREE.Mesh(slabGeo, slabMat);
-          slabMesh.position.set(0, baseY - TSP3D_SLAB_THICKNESS / 2, 0);
-          floorGroup.add(slabMesh);
+          // 1. Concrete Floor Slab
+          // Tầng 1 luôn có sàn móng mặt đất chắc chắn.
+          // Tầng 2 CHỈ vẽ sàn bê tông đặc khi người dùng chọn xem riêng "Chỉ Tầng 2".
+          // Khi xem "Tất cả tầng", KHÔNG vẽ tấm sàn lơ lửng che khuất để nhìn Tầng 1 thông thoáng 100%!
+          if (F === 1 || (F === 2 && tsp3DFloorFilter === 2)) {
+              const slabGeo = new THREE.BoxGeometry(factoryW, TSP3D_SLAB_THICKNESS, factoryH);
+              const slabMat = new THREE.MeshStandardMaterial({
+                  color: 0x1e293b,
+                  roughness: 0.7,
+                  metalness: 0.2
+              });
+              const slabMesh = new THREE.Mesh(slabGeo, slabMat);
+              slabMesh.position.set(0, baseY - TSP3D_SLAB_THICKNESS / 2, 0);
+              floorGroup.add(slabMesh);
 
-          const slabEdges = new THREE.LineSegments(
-              new THREE.EdgesGeometry(slabGeo),
-              new THREE.LineBasicMaterial({ color: 0x0ea5e9, linewidth: 2 })
-          );
-          slabEdges.position.copy(slabMesh.position);
-          floorGroup.add(slabEdges);
+              const slabEdges = new THREE.LineSegments(
+                  new THREE.EdgesGeometry(slabGeo),
+                  new THREE.LineBasicMaterial({ color: 0x0ea5e9, linewidth: 1.5 })
+              );
+              slabEdges.position.copy(slabMesh.position);
+              floorGroup.add(slabEdges);
+          }
 
-          // 2. Glass Curtain Wall Wireframe
-          const wallH = TSP3D_WALL_HEIGHT;
-          const railPts = [
-              new THREE.Vector3(-cx0, baseY + wallH, -cz0),
-              new THREE.Vector3(cx0, baseY + wallH, -cz0),
-              new THREE.Vector3(cx0, baseY + wallH, cz0),
-              new THREE.Vector3(-cx0, baseY + wallH, cz0),
-              new THREE.Vector3(-cx0, baseY + wallH, -cz0)
-          ];
-          const railGeo = new THREE.BufferGeometry().setFromPoints(railPts);
-          const railLine = new THREE.Line(railGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 }));
-          floorGroup.add(railLine);
+          // (Ghi chú: Lớp khung dây trần railLine đã được loại bỏ hoàn toàn để không còn mảng bay lơ lửng!)
 
           // 3. Floor Badge
           const floorBadge = createTSP3DTextSprite(`TẦNG ${F} ${F === 1 ? '• XƯỞNG SẢN XUẤT' : '• KHU LẮP RÁP & VĂN PHÒNG'}`, {
@@ -7871,7 +7891,7 @@
               textColor: '#38bdf8',
               isBadge: true
           });
-          floorBadge.position.set(-cx0 + 26, baseY + wallH + 1.2, -cz0 + 8);
+          floorBadge.position.set(-cx0 + 26, baseY + TSP3D_WALL_HEIGHT + 1.2, -cz0 + 8);
           floorGroup.add(floorBadge);
 
           // 4. Extruded Room/Zone Volumes
@@ -7904,7 +7924,7 @@
               const roomMat = new THREE.MeshStandardMaterial({
                   color: themeColor,
                   transparent: true,
-                  opacity: 0.32,
+                  opacity: 0.28,
                   roughness: 0.3,
                   metalness: 0.2
               });
@@ -8014,6 +8034,15 @@
       if (tspCurrentRouteData && tspCurrentRouteData.orderedStops && tspCurrentRouteData.orderedStops.length > 0) {
           const stops = tspCurrentRouteData.orderedStops;
           const curvePoints = [];
+          const hallZ = 62.0 - cz0; // Tọa độ Z hành lang trung tâm (-3.0m)
+          const stairX = 110.0 - cx0; // Tọa độ X cầu thang bộ trung tâm (0m)
+
+          function addWaypoint(x, y, z) {
+              const pt = new THREE.Vector3(x, y, z);
+              if (curvePoints.length === 0 || curvePoints[curvePoints.length - 1].distanceTo(pt) > 0.4) {
+                  curvePoints.push(pt);
+              }
+          }
 
           stops.forEach((stop, idx) => {
               const sFloor = parseInt(stop.floorNumber || stop.floor_level) || 1;
@@ -8024,20 +8053,34 @@
 
               // Only include in 3D route path if matches floor filter
               if (tsp3DFloorFilter === 'all' || sFloor === tsp3DFloorFilter) {
-                  if (idx > 0 && tsp3DFloorFilter === 'all') {
+                  if (idx === 0) {
+                      addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                  } else {
                       const prevStop = stops[idx - 1];
                       const pFloor = parseInt(prevStop.floorNumber || prevStop.floor_level) || 1;
-                      if (pFloor !== sFloor) {
-                          const pBaseY = (pFloor - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
-                          curvePoints.push(new THREE.Vector3(110 - cx0, pBaseY + 1.2, 62 - cz0));
-                          curvePoints.push(new THREE.Vector3(110 - cx0, (pBaseY + sBaseY) / 2 + 1.2, 62 - cz0));
-                          curvePoints.push(new THREE.Vector3(110 - cx0, sBaseY + 1.2, 62 - cz0));
-                      }
-                  }
+                      const pBaseY = (pFloor - 1) * (TSP3D_FLOOR_SPACING + (tsp3DExploded ? TSP3D_EXPLODED_EXTRA : 0));
+                      const prevM = getTSPStopCoordsM(prevStop);
+                      const prevX = prevM.x - cx0;
+                      const prevZ = prevM.y - cz0;
 
-                  const curPt = new THREE.Vector3(stopX, sBaseY + 1.2, stopZ);
-                  if (curvePoints.length === 0 || curPt.distanceTo(curvePoints[curvePoints.length - 1]) > 0.1) {
-                      curvePoints.push(curPt);
+                      if (pFloor === sFloor) {
+                          // Đi từ trạm trước -> ra hành lang trung tâm (hallZ) -> chạy dọc hành lang -> rẽ vào trạm đích
+                          // Tuyệt đối không đi chéo xuyên thủng tường phòng!
+                          addWaypoint(prevX, sBaseY + 1.2, hallZ);
+                          addWaypoint(stopX, sBaseY + 1.2, hallZ);
+                          addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                      } else if (tsp3DFloorFilter === 'all') {
+                          // Khác tầng: Ra hành lang tầng cũ -> đi tới cầu thang trung tâm -> đổi tầng -> hành lang tầng mới -> vào trạm
+                          addWaypoint(prevX, pBaseY + 1.2, hallZ);
+                          addWaypoint(stairX, pBaseY + 1.2, hallZ);
+                          addWaypoint(stairX, (pBaseY + sBaseY) / 2 + 1.2, hallZ);
+                          addWaypoint(stairX, sBaseY + 1.2, hallZ);
+                          addWaypoint(stopX, sBaseY + 1.2, hallZ);
+                          addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                      } else {
+                          addWaypoint(stopX, sBaseY + 1.2, hallZ);
+                          addWaypoint(stopX, sBaseY + 1.2, stopZ);
+                      }
                   }
               }
 
@@ -8104,8 +8147,8 @@
           });
 
           if (curvePoints.length >= 2) {
-              tsp3DRouteCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.15);
-              const tubeGeo = new THREE.TubeGeometry(tsp3DRouteCurve, Math.max(160, curvePoints.length * 28), 1.1, 12, false);
+              tsp3DRouteCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'centripetal', 0.05);
+              const tubeGeo = new THREE.TubeGeometry(tsp3DRouteCurve, Math.max(160, curvePoints.length * 20), 0.95, 10, false);
               const tubeMat = new THREE.MeshStandardMaterial({
                   color: 0xf59e0b,
                   emissive: 0xf59e0b,
@@ -8118,13 +8161,12 @@
               const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
               tsp3DRouteGroup.add(tubeMesh);
 
-              const orbGeo = new THREE.SphereGeometry(2.2, 16, 16);
+              const orbGeo = new THREE.SphereGeometry(2.0, 16, 16);
               const orbMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
               tsp3DTravelOrb = new THREE.Mesh(orbGeo, orbMat);
               const orbLight = new THREE.PointLight(0xf59e0b, 4.0, 28);
               tsp3DTravelOrb.add(orbLight);
               tsp3DTravelOrb.position.copy(curvePoints[0]);
-              tsp3DRouteGroup.add(tsp3DTravelOrb);
           }
       }
 
@@ -8226,14 +8268,41 @@
       return sprite;
   }
 
+  let tsp3DIsFullscreen = false;
+  function toggleTSP3DFullscreen() {
+      const vp = document.getElementById('tsp-3d-viewport');
+      const icon = document.getElementById('icon-tsp-3d-fullscreen');
+      const label = document.getElementById('label-tsp-3d-fullscreen');
+      if (!vp) return;
+
+      tsp3DIsFullscreen = !tsp3DIsFullscreen;
+
+      if (tsp3DIsFullscreen) {
+          vp.classList.remove('absolute');
+          vp.classList.add('fixed', 'inset-0', 'z-[99999]', 'w-screen', 'h-screen');
+          if (icon) icon.className = 'ph-bold ph-corners-in text-sm text-amber-400';
+          if (label) label.innerText = 'Thu nhỏ';
+      } else {
+          vp.classList.remove('fixed', 'inset-0', 'z-[99999]', 'w-screen', 'h-screen');
+          vp.classList.add('absolute');
+          if (icon) icon.className = 'ph-bold ph-corners-out text-sm';
+          if (label) label.innerText = 'Toàn màn hình';
+      }
+
+      setTimeout(() => {
+          onTSP3DResize();
+      }, 50);
+  }
+
   function setTSP3DCameraView(viewType) {
       if (!tsp3DCamera || !tsp3DControls) return;
 
       const btnIso = document.getElementById('btn-cam-iso');
-      const btnPersp = document.getElementById('btn-cam-persp');
+      const btnFront = document.getElementById('btn-cam-front');
+      const btnSide = document.getElementById('btn-cam-side');
       const btnTop = document.getElementById('btn-cam-top');
 
-      [btnIso, btnPersp, btnTop].forEach(b => {
+      [btnIso, btnFront, btnSide, btnTop].forEach(b => {
           if (b) b.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-1 cursor-pointer';
       });
 
@@ -8241,10 +8310,14 @@
           if (btnIso) btnIso.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
           tsp3DCamera.position.set(160, 160, 180);
           tsp3DControls.target.set(-15, 14, 0);
-      } else if (viewType === 'perspective') {
-          if (btnPersp) btnPersp.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
-          tsp3DCamera.position.set(180, 95, 140);
-          tsp3DControls.target.set(-15, 10, 0);
+      } else if (viewType === 'front') {
+          if (btnFront) btnFront.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
+          tsp3DCamera.position.set(-15, 30, 220);
+          tsp3DControls.target.set(-15, 14, 0);
+      } else if (viewType === 'side') {
+          if (btnSide) btnSide.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
+          tsp3DCamera.position.set(220, 30, 0);
+          tsp3DControls.target.set(-15, 14, 0);
       } else if (viewType === 'top') {
           if (btnTop) btnTop.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-amber-400 hover:bg-slate-700 transition flex items-center gap-1 cursor-pointer';
           tsp3DCamera.position.set(-15, 280, 0.01);
@@ -8348,6 +8421,14 @@
 
       if (intersects.length > 0) {
           const hit = intersects[0].object;
+          const hitPt = intersects[0].point;
+
+          // Re-center orbit target smoothly on clicked object / point
+          if (hitPt && tsp3DControls) {
+              tsp3DControls.target.copy(hitPt);
+              tsp3DControls.update();
+          }
+
           if (hit.userData && hit.userData.type === 'STOP' && hit.userData.stopIndex !== undefined) {
               focusTSPStop(hit.userData.stopIndex);
           }
@@ -8356,6 +8437,7 @@
 
   function onTSP3DResize() {
       const viewport = document.getElementById('tsp-3d-viewport');
+      const canvas = document.getElementById('tsp-3d-canvas');
       if (!viewport || !tsp3DCamera || !tsp3DRenderer) return;
       const width = viewport.clientWidth;
       const height = viewport.clientHeight;
@@ -8365,5 +8447,55 @@
           tsp3DRenderer.setSize(width, height);
       }
   }
+
+  // Keyboard navigation & Esc shortcut
+  window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && tsp3DIsFullscreen) {
+          toggleTSP3DFullscreen();
+          return;
+      }
+      if (tspActiveDimension !== '3d' || !tsp3DCamera || !tsp3DControls) return;
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+      const moveSpeed = e.shiftKey ? 14.0 : 6.0;
+      const forward = new THREE.Vector3();
+      tsp3DCamera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+      let moved = false;
+      if (e.code === 'KeyW' || e.key === 'ArrowUp') {
+          tsp3DCamera.position.addScaledVector(forward, moveSpeed);
+          tsp3DControls.target.addScaledVector(forward, moveSpeed);
+          moved = true;
+      } else if (e.code === 'KeyS' || e.key === 'ArrowDown') {
+          tsp3DCamera.position.addScaledVector(forward, -moveSpeed);
+          tsp3DControls.target.addScaledVector(forward, -moveSpeed);
+          moved = true;
+      } else if (e.code === 'KeyA' || e.key === 'ArrowLeft') {
+          tsp3DCamera.position.addScaledVector(right, -moveSpeed);
+          tsp3DControls.target.addScaledVector(right, -moveSpeed);
+          moved = true;
+      } else if (e.code === 'KeyD' || e.key === 'ArrowRight') {
+          tsp3DCamera.position.addScaledVector(right, moveSpeed);
+          tsp3DControls.target.addScaledVector(right, moveSpeed);
+          moved = true;
+      } else if (e.code === 'KeyQ') {
+          const offset = new THREE.Vector3().subVectors(tsp3DCamera.position, tsp3DControls.target);
+          offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.08);
+          tsp3DCamera.position.copy(tsp3DControls.target).add(offset);
+          moved = true;
+      } else if (e.code === 'KeyE') {
+          const offset = new THREE.Vector3().subVectors(tsp3DCamera.position, tsp3DControls.target);
+          offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.08);
+          tsp3DCamera.position.copy(tsp3DControls.target).add(offset);
+          moved = true;
+      }
+      if (moved) {
+          e.preventDefault();
+          tsp3DControls.update();
+      }
+  });
 </script>
 {% endblock %}
