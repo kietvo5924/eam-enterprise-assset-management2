@@ -24,8 +24,9 @@ LEMON_ASSET_COST_CONCENTRATION_THRESHOLD = 0.50  # >= 50% chi phí
 LEMON_ASSET_PERCENT_THRESHOLD = 0.05             # <= 5% số lượng thiết bị
 RRR_BAD_ACTOR_THRESHOLD = 70.0                   # RRR >= 70% nguyên giá -> Bad Actor
 
-# Training Requirements & Cold Start (Rule 12)
-MIN_MONTHS_TRAINING_DATA = 3                 # Tối thiểu 3 tháng dữ liệu để kích hoạt AI
+# Training Requirements & Cold Start (Rule 12 & ML Verification)
+MIN_MONTHS_TRAINING_DATA = 3                     # Ngưỡng lịch sử tối thiểu cơ bản
+MIN_HISTORICAL_PERIODS_FOR_ML = 12               # Tối thiểu 12 kỳ quan sát thực tế có nhãn để huấn luyện mô hình đa biến 16 đặc trưng
 
 # 16 Multivariate Time-Series Features (Section 4.1)
 FEATURE_NAMES = [

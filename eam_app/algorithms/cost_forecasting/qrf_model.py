@@ -38,7 +38,10 @@ HUMAN_READABLE_FEATURE_NAMES = {
 
 class QuantileRegressionForestEngine:
     """
-    Wrapper mô hình Quantile Regression Forest dựa trên tập hợp lá cây của RandomForestRegressor.
+    Triển khai chuẩn mực Quantile Regression Forests (Meinshausen, 2006).
+    Dự báo hàm phân phối tích lũy có điều kiện F(y|X=x) từ trọng số lá cây trong rừng,
+    đảm bảo tính đơn điệu toán học tự nhiên P10 <= P50 <= P90 từ phân phối thực nghiệm có trọng số
+    mà không cần dùng thủ thuật max() nhân tạo.
     """
 
     def __init__(
@@ -62,16 +65,23 @@ class QuantileRegressionForestEngine:
             random_state=self.random_state
         )
         self.is_fitted = False
+        self.y_train_ = None
+        self.train_leaves_ = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "QuantileRegressionForestEngine":
         """
-        Huấn luyện mô hình với biến đổi Log-Transform: y_log = ln(1 + y).
+        Huấn luyện mô hình với biến đổi Log-Transform: y_log = ln(1 + y),
+        và lưu vết phân bổ mẫu huấn luyện vào từng lá cây để ước lượng phân vị có điều kiện.
         """
-        # Quy tắc 2: Áp dụng Log-Transform ổn định phương sai chống sốc cực trị
         X_arr = np.asarray(X, dtype=float)
         y_arr = np.asarray(y, dtype=float)
         y_log = np.log1p(np.maximum(0.0, y_arr))
+
         self.model.fit(X_arr, y_log)
+        self.y_train_ = y_arr
+        self.y_log_train_ = y_log
+        # Lưu vết chỉ số lá cây của từng mẫu huấn luyện: shape (n_samples, n_estimators)
+        self.train_leaves_ = self.model.apply(X_arr)
         self.is_fitted = True
         return self
 
@@ -81,39 +91,115 @@ class QuantileRegressionForestEngine:
         quantiles: List[float] = [0.10, 0.50, 0.90]
     ) -> Dict[str, float]:
         """
-        Trích xuất dự đoán theo các phân vị P10, P50, P90 từ toàn bộ tập hợp 100 cây quyết định,
-        sau đó giải biến đổi ngược: exp(y_log) - 1.
+        Ước lượng phân vị có điều kiện thực sự theo thuật toán Meinshausen QRF:
+        1. Xác định lá cây của điểm dữ liệu x_test trên toàn bộ T cây quyết định.
+        2. Tính trọng số w_i(x) cho từng mẫu huấn luyện y_i dựa trên tần suất rơi chung lá.
+        3. Tính phân vị từ hàm phân phối thực nghiệm có trọng số sum(w_i * I(y_i <= y)).
         """
-        if not self.is_fitted:
+        if not self.is_fitted or self.train_leaves_ is None or self.y_train_ is None:
             raise ValueError("Mô hình QRF chưa được huấn luyện (fit).")
 
         X_test = np.asarray(X_test, dtype=float)
         if X_test.ndim == 1:
             X_test = X_test.reshape(1, -1)
 
-        # Thu thập dự đoán từ từng cây con (mỗi cây dự đoán trong miền log1p)
-        # estimators_predictions shape: (n_estimators, n_samples)
-        estimators_predictions = np.array([tree.predict(X_test) for tree in self.model.estimators_])
+        n_train = len(self.y_train_)
+        n_trees = self.n_estimators
+        test_leaves = self.model.apply(X_test)  # shape (n_test, n_estimators)
 
-        # Tính toán phân vị trên trục cây con (axis=0)
-        # np.percentile nhận giá trị từ 0 đến 100
-        percentiles = [q * 100.0 for q in quantiles]
-        quantile_vals_log = np.percentile(estimators_predictions, percentiles, axis=0)
+        # Tính toán phân vị cho mẫu đầu tiên (hoặc mẫu duy nhất)
+        weights = np.zeros(n_train, dtype=float)
+        for t in range(n_trees):
+            leaf_idx = test_leaves[0, t]
+            leaf_mask = (self.train_leaves_[:, t] == leaf_idx)
+            count = np.sum(leaf_mask)
+            if count > 0:
+                weights[leaf_mask] += 1.0 / (count * n_trees)
 
-        # Giải biến đổi ngược expm1
-        p10_raw = float(np.expm1(quantile_vals_log[0, 0]))
-        p50_raw = float(np.expm1(quantile_vals_log[1, 0]))
-        p90_raw = float(np.expm1(quantile_vals_log[2, 0]))
+        # Sắp xếp các giá trị y thực tế theo thứ tự tăng dần
+        order = np.argsort(self.y_train_)
+        y_sorted = self.y_train_[order]
+        w_sorted = weights[order]
 
-        # Đảm bảo tính đơn điệu không suy thoái toán học P10 <= P50 <= P90
-        p10 = max(0.0, p10_raw)
-        p50 = max(p10, p50_raw)
-        p90 = max(p50, p90_raw)
+        # Tính hàm phân phối tích lũy thực nghiệm (Empirical CDF)
+        cum_weights = np.cumsum(w_sorted)
+        if cum_weights[-1] > 0:
+            cum_weights = cum_weights / cum_weights[-1]
+
+        # Trích xuất phân vị tự nhiên (tính đơn điệu P10 <= P50 <= P90 được đảm bảo bởi CDF)
+        p10_idx = min(len(y_sorted) - 1, int(np.searchsorted(cum_weights, quantiles[0])))
+        p50_idx = min(len(y_sorted) - 1, int(np.searchsorted(cum_weights, quantiles[1])))
+        p90_idx = min(len(y_sorted) - 1, int(np.searchsorted(cum_weights, quantiles[2])))
+
+        p10 = float(y_sorted[p10_idx])
+        p50 = float(y_sorted[p50_idx])
+        p90 = float(y_sorted[p90_idx])
 
         return {
             "p10": p10,
             "p50": p50,
             "p90": p90
+        }
+
+    def evaluate_backtest_performance(
+        self,
+        X_val: np.ndarray,
+        y_val: np.ndarray
+    ) -> Dict[str, Any]:
+        """
+        Kiểm định sai số dự báo và độ tin cậy phân vị độc lập theo chuỗi thời gian:
+        - MAE (Mean Absolute Error)
+        - WAPE (Weighted Absolute Percentage Error)
+        - RMSE (Root Mean Squared Error)
+        - Độ bao phủ phân vị (Coverage Rate P10 - P90)
+        - So sánh đối chuẩn với baseline SMA trượt.
+        """
+        if not self.is_fitted:
+            raise ValueError("Mô hình chưa được fit.")
+
+        X_val = np.asarray(X_val, dtype=float)
+        y_val = np.asarray(y_val, dtype=float)
+        n_samples = len(y_val)
+        if n_samples == 0:
+            return {}
+
+        p50_preds = []
+        p10_preds = []
+        p90_preds = []
+
+        for i in range(n_samples):
+            q_res = self.predict_quantiles(X_val[i:i+1])
+            p10_preds.append(q_res["p10"])
+            p50_preds.append(q_res["p50"])
+            p90_preds.append(q_res["p90"])
+
+        p50_arr = np.array(p50_preds)
+        p10_arr = np.array(p10_preds)
+        p90_arr = np.array(p90_preds)
+
+        errors = np.abs(y_val - p50_arr)
+        mae = float(np.mean(errors))
+        total_actual = float(np.sum(y_val))
+        wape = float(np.sum(errors) / total_actual * 100.0) if total_actual > 0 else 0.0
+        rmse = float(np.sqrt(np.mean((y_val - p50_arr) ** 2)))
+
+        # Tỷ lệ giá trị thực tế rơi vào khoảng tin cậy [P10, P90] (Kỳ vọng ~80%)
+        coverage_count = np.sum((y_val >= p10_arr) & (y_val <= p90_arr))
+        coverage_rate = float(coverage_count / n_samples * 100.0)
+
+        # Baseline SMA 3 tháng gần nhất từ đặc trưng (feature 3 là sma_3_cost)
+        sma_baseline = X_val[:, 3] if X_val.shape[1] > 3 else p50_arr
+        sma_mae = float(np.mean(np.abs(y_val - sma_baseline)))
+        sma_improvement_pct = round(((sma_mae - mae) / sma_mae * 100.0), 1) if sma_mae > 0 else 0.0
+
+        return {
+            "sampleCount": n_samples,
+            "mae": round(mae, 2),
+            "wapePercent": round(wape, 2),
+            "rmse": round(rmse, 2),
+            "coverageP10P90Percent": round(coverage_rate, 1),
+            "baselineSmaMae": round(sma_mae, 2),
+            "improvementOverBaselinePercent": sma_improvement_pct
         }
 
     def get_top_cost_drivers(self, top_n: int = 5) -> List[Dict[str, Any]]:

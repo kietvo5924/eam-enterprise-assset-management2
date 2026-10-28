@@ -88,6 +88,7 @@ class BudgetForecast(BaseTenantModel):
     lemon_assets_detected = models.JSONField(default=list, blank=True)
     top_cost_drivers = models.JSONField(default=list, blank=True)
     is_ai_fallback = models.BooleanField(default=False)
+    fallback_reason = models.CharField(max_length=64, null=True, blank=True, help_text="Lý do chuyển sang chế độ Fallback nếu có")
     is_manually_approved = models.BooleanField(default=False, help_text='True nếu hạn mức ngân sách được người dùng nhập tay phê duyệt')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -131,6 +132,12 @@ class TenantFinancialSetting(BaseTenantModel):
 
     class Meta:
         db_table = 'tenant_financial_settings'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant'],
+                name='uniq_tenant_financial_setting'
+            )
+        ]
 
     def __str__(self):
         return f"FinancialSetting [{self.tenant.name}] Rate: {self.default_labor_hourly_rate} VND/h"
@@ -155,6 +162,18 @@ class PeriodApprovedBudget(BaseTenantModel):
         indexes = [
             models.Index(fields=['tenant', 'period']),
             models.Index(fields=['tenant', 'period', 'cost_center']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'period', 'cost_center'],
+                name='uniq_period_budget_tenant_period_cost_center',
+                condition=models.Q(cost_center__isnull=False)
+            ),
+            models.UniqueConstraint(
+                fields=['tenant', 'period'],
+                name='uniq_period_budget_tenant_period_macro',
+                condition=models.Q(cost_center__isnull=True)
+            )
         ]
 
     def __str__(self):

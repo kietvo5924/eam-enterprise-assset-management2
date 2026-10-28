@@ -140,6 +140,13 @@ class WorkOrderTransitionService:
                 Q(draft_work_order=wo) | Q(draft_work_order__isnull=True)
             ).update(status='RESOLVED')
 
+        # 11. Task 11.6: Đóng băng bất biến snapshot chi phí và phân tách Gross vs Net Cost
+        try:
+            from algorithms.cost_forecasting import CostForecastingService
+            CostForecastingService.freeze_work_order_cost(wo)
+        except Exception as ex:
+            logger.error(f"Failed to freeze work order cost for completed WO {wo.id}: {ex}")
+
         logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}, action={wo.maintenance_action}")
         return wo
 

@@ -2881,6 +2881,10 @@ def portal_reports(request):
 def portal_cost_forecasting(request):
     if not request.user.is_authenticated:
         return redirect('portal_login')
+    from analytics.cost_forecasting_views import has_cost_forecasting_read_permission
+    if not has_cost_forecasting_read_permission(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Bạn không có quyền truy cập trang Dự báo Chi phí & Ngân sách Bảo trì.")
     from assets.models import Location
     from django.utils import timezone
     from algorithms.cost_forecasting import CostForecastingService

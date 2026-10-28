@@ -27,70 +27,95 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
     Quy tắc 5 & 6: Tính chi phí tiêu hao thực tế (loại bỏ 100% nhập kho lưu trữ RECEIPT).
     Chỉ lấy phụ tùng đã xuất vào WorkOrder completed trừ đi nhập trả thừa,
     cộng giờ công thợ theo kế toán dồn tích, bóc tách CapEx và khấu trừ tài sản đã thanh lý.
+    Tổng hợp cả Work Order đã chốt snapshot lẫn chưa chốt snapshot trong kỳ mà không cộng trùng,
+    bảo toàn chi phí ròng net_cost = 0 khi được bảo hành/bảo hiểm 100%.
     """
     # 1. Danh sách ID tài sản đã thanh lý cần cắt tỉa (Rule 7)
-    disposed_asset_ids = Asset.all_objects.filter(
+    disposed_asset_ids = set(Asset.all_objects.filter(
         tenant=tenant,
         status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD']
-    ).values_list('id', flat=True)
+    ).values_list('id', flat=True))
 
-    # 2. Chi phí từ WorkOrderCost nếu đã khóa snapshot (Rule 1)
-    frozen_wo_costs = WorkOrderCost.all_objects.filter(
+    # 2. Toàn bộ Work Order hoàn tất trong kỳ (loại trừ tài sản đã thanh lý)
+    completed_wos = WorkOrder.all_objects.filter(
         tenant=tenant,
-        is_cost_frozen=True,
-        work_order__status='COMPLETED',
-        work_order__completed_at__date__gte=start_date,
-        work_order__completed_at__date__lte=end_date,
-        is_capital_overhaul=False
-    ).exclude(work_order__asset_id__in=disposed_asset_ids)
+        status='COMPLETED',
+        completed_at__date__gte=start_date,
+        completed_at__date__lte=end_date
+    ).exclude(asset_id__in=disposed_asset_ids).select_related('asset', 'incident_location', 'asset__location')
 
-    if cost_center:
-        frozen_wo_costs = frozen_wo_costs.filter(cost_center_snapshot=cost_center)
+    if not completed_wos.exists():
+        return Decimal('0.00')
 
-    frozen_total = frozen_wo_costs.aggregate(s=Sum('net_cost'))['s']
-    if frozen_total is not None and frozen_total > 0:
-        return frozen_total
+    # Bản đồ snapshot chi phí đã khóa
+    frozen_costs_map = {
+        fc.work_order_id: fc
+        for fc in WorkOrderCost.all_objects.filter(
+            tenant=tenant,
+            work_order__in=completed_wos,
+            is_cost_frozen=True
+        )
+    }
 
-    # 3. Tính toán dồn tích trực tiếp từ StockTransaction & LaborLog (cho các WO hoàn tất)
-    # Lọc giao dịch vật tư: chỉ lấy ISSUE, ADJUSTMENT, trừ RETURN gắn với WorkOrder completed
-    material_qs = StockTransaction.all_objects.filter(
-        tenant=tenant,
-        work_order__status='COMPLETED',
-        work_order__is_capitalized=False,
-        issue_date__date__gte=start_date,
-        issue_date__date__lte=end_date,
-        transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
-    ).exclude(work_order__asset_id__in=disposed_asset_ids)
+    total_net = Decimal('0.00')
 
-    if cost_center:
-        material_qs = material_qs.filter(cost_center_snapshot=cost_center)
+    for wo in completed_wos:
+        # Trường hợp 1: Đã khóa snapshot
+        if wo.id in frozen_costs_map:
+            fc = frozen_costs_map[wo.id]
+            # Loại trừ CapEx
+            if fc.is_capital_overhaul:
+                continue
+            # Lọc theo Cost Center snapshot
+            if cost_center and fc.cost_center_snapshot != cost_center:
+                continue
+            total_net += (fc.net_cost or Decimal('0.00'))
 
-    material_total = Decimal('0')
-    for tx in material_qs:
-        amt = tx.total_amount or Decimal('0')
-        if tx.transaction_type == 'RETURN':
-            material_total -= amt
+        # Trường hợp 2: Chưa khóa snapshot
         else:
-            material_total += amt
+            # Loại trừ CapEx
+            if wo.is_capitalized or wo.maintenance_action == 'CORE_REPLACEMENT':
+                continue
 
-    # Lọc giờ công thợ
-    labor_qs = LaborLog.all_objects.filter(
-        tenant=tenant,
-        work_order__status='COMPLETED',
-        work_order__is_capitalized=False,
-        work_date__gte=start_date,
-        work_date__lte=end_date
-    ).exclude(work_order__asset_id__in=disposed_asset_ids)
+            # Xác định Cost Center của WO
+            wo_cc = getattr(wo, 'cost_center_snapshot', None)
+            if not wo_cc:
+                if wo.incident_location and wo.incident_location.name:
+                    wo_cc = wo.incident_location.name
+                elif wo.asset and wo.asset.location and wo.asset.location.name:
+                    wo_cc = wo.asset.location.name
 
-    if cost_center:
-        labor_qs = labor_qs.filter(cost_center_snapshot=cost_center)
+            if cost_center and wo_cc != cost_center:
+                continue
 
-    labor_total = labor_qs.aggregate(s=Sum('total_cost'))['s'] or Decimal('0')
+            # Tính vật tư: Chỉ ISSUE, ADJUSTMENT (+), trừ RETURN (-) gắn với WO
+            mat_qs = StockTransaction.all_objects.filter(
+                tenant=tenant,
+                work_order=wo,
+                transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
+            )
+            mat_total = Decimal('0.00')
+            for tx in mat_qs:
+                amt = tx.total_amount or Decimal('0.00')
+                if tx.transaction_type == 'RETURN':
+                    mat_total -= amt
+                else:
+                    mat_total += amt
 
-    # Bóc tách bảo hành & bảo hiểm từ WorkOrder (nếu có)
-    # Nếu chưa có bản ghi work_order_costs thì lấy gross = material + labor
-    total_net = max(Decimal('0'), material_total + labor_total)
-    return total_net
+            # Tính giờ công thợ
+            lab_total = LaborLog.all_objects.filter(
+                tenant=tenant,
+                work_order=wo
+            ).aggregate(s=Sum('total_cost'))['s'] or Decimal('0.00')
+
+            gross = max(Decimal('0.00'), mat_total + lab_total)
+            w_cov = getattr(wo, 'warranty_covered_amount', None) or Decimal('0.00')
+            i_cov = getattr(wo, 'insurance_covered_amount', None) or Decimal('0.00')
+            net = max(Decimal('0.00'), gross - (w_cov + i_cov))
+
+            total_net += net
+
+    return total_net.quantize(Decimal('0.01'))
 
 
 def count_working_days(year: int, month: int) -> int:
@@ -211,13 +236,27 @@ class CostFeaturePipeline:
             if age > 0:
                 total_age_days += age
                 valid_assets_count += 1
-        avg_asset_age_years = round((total_age_days / (valid_assets_count * 365.25)), 1) if valid_assets_count > 0 else 3.5
+        if valid_assets_count > 0:
+            avg_asset_age_years = round((total_age_days / (valid_assets_count * 365.25)), 1)
+        else:
+            # Fallback: Tính theo ngày tạo hồ sơ tài sản (created_at) thay vì gán số cố định 3.5
+            created_age_days = 0
+            created_count = 0
+            for ast in active_assets_qs:
+                c_date = ast.created_at.date() if hasattr(ast, 'created_at') and ast.created_at else None
+                if c_date:
+                    age = (target_date - c_date).days
+                    if age > 0:
+                        created_age_days += age
+                        created_count += 1
+            avg_asset_age_years = round((created_age_days / (created_count * 365.25)), 1) if created_count > 0 else 0.0
 
         # 11: Tỷ lệ sự cố đột xuất 3 tháng gần nhất (Rule 8)
         recent_90d = target_date - datetime.timedelta(days=90)
         recent_wos = WorkOrder.all_objects.filter(
             tenant=tenant,
-            created_at__date__gte=recent_90d
+            created_at__date__gte=recent_90d,
+            created_at__date__lte=target_date
         )
         if cost_center:
             recent_wos = recent_wos.filter(
@@ -225,7 +264,7 @@ class CostFeaturePipeline:
             )
         total_recent_wos = recent_wos.count()
         cm_wos = recent_wos.filter(type__in=['CORRECTIVE', 'EMERGENCY', 'BREAKDOWN']).count()
-        breakdown_cm_ratio = round(float(cm_wos) / total_recent_wos, 2) if total_recent_wos > 0 else 0.40
+        breakdown_cm_ratio = round(float(cm_wos) / total_recent_wos, 2) if total_recent_wos > 0 else 0.0
 
         # 12: Nghĩa vụ tài chính vật tư từ máy RUL Critical Task 11.5 (Rule 10)
         critical_assets = Asset.all_objects.filter(
@@ -248,14 +287,13 @@ class CostFeaturePipeline:
             if ca.primary_spare_part and ca.primary_spare_part.unit_cost:
                 rul_critical_liability += ca.primary_spare_part.unit_cost
             else:
-                # Ước tính theo tỷ lệ nguyên giá máy thay cho số cứng 15 triệu
                 base_c = ca.effective_purchase_cost or Decimal('0')
                 if not isinstance(base_c, Decimal):
                     base_c = Decimal(str(base_c))
                 if base_c > Decimal('0'):
                     rul_critical_liability += (base_c * Decimal(str(spare_ratio))).quantize(Decimal('1'))
                 else:
-                    rul_critical_liability += Decimal('5000000.00')
+                    rul_critical_liability += Decimal('0.00')
 
         # 13: Tổng giá trị thay thế toàn bộ dàn máy (Total Fleet RAV)
         total_rav_decimal = Decimal('0')
@@ -270,13 +308,31 @@ class CostFeaturePipeline:
         total_fleet_rav = float(total_rav_decimal)
 
         # 14: Tỷ trọng chi phí thuộc nhóm thiết bị Class A / Bad Actors (%)
-        class_a_cost_ratio = 0.25 # Baseline 25% nếu chưa có sự lệch pha nghiêm trọng
-        # Kiểm tra nhanh nồng độ chi phí
+        # Tính theo tỷ trọng chi phí thực tế của nhóm thiết bị rủi ro nguy cấp (RUL Critical / Rapid Degradation)
+        class_a_cost_ratio = 0.0
         if total_recent_wos > 0:
-            top_asset_wos = recent_wos.values('asset_id').annotate(c=Count('id')).order_by('-c')
-            if top_asset_wos.exists():
-                top_1_orders = top_asset_wos.first()['c']
-                class_a_cost_ratio = round(float(top_1_orders) / total_recent_wos, 2)
+            bad_actor_ids = active_assets_qs.filter(
+                Q(rul_risk_level='CRITICAL') | Q(rapid_degradation_alert=True)
+            ).values_list('id', flat=True)
+
+            recent_costs_all = WorkOrderCost.all_objects.filter(
+                tenant=tenant,
+                work_order__in=recent_wos,
+                is_capital_overhaul=False
+            ).aggregate(s=Sum('net_cost'))['s'] or Decimal('0')
+
+            recent_costs_bad = WorkOrderCost.all_objects.filter(
+                tenant=tenant,
+                work_order__in=recent_wos,
+                work_order__asset_id__in=bad_actor_ids,
+                is_capital_overhaul=False
+            ).aggregate(s=Sum('net_cost'))['s'] or Decimal('0')
+
+            if recent_costs_all > Decimal('0'):
+                class_a_cost_ratio = round(float(recent_costs_bad / recent_costs_all), 2)
+            else:
+                class_a_wos = recent_wos.filter(asset_id__in=bad_actor_ids).count()
+                class_a_cost_ratio = round(float(class_a_wos) / total_recent_wos, 2)
 
         # 15: Hệ số mùa vụ (Tháng 1 - 12)
         seasonality_month = float(target_date.month)
@@ -316,6 +372,67 @@ class CostFeaturePipeline:
         }
 
     @classmethod
+    def build_historical_training_dataset(
+        cls,
+        tenant,
+        reference_date: Optional[datetime.date] = None,
+        months_back: int = 24,
+        cost_center: Optional[str] = None
+    ) -> Tuple[np.ndarray, np.ndarray, List[Dict[str, Any]]]:
+        """
+        Xây dựng tập dữ liệu huấn luyện ML thực sự từ chuỗi thời gian lịch sử:
+        Mỗi mẫu (X_t, y_t):
+        - Target y_t: Chi phí tiêu hao thực tế của tháng t.
+        - Features X_t: 16 đặc trưng tính toán nghiêm ngặt tại thời điểm bắt đầu tháng t
+          (chỉ dùng thông tin trước ngày 1 của tháng t, không data leakage tương lai).
+        Chỉ trả về các mẫu có dữ liệu lịch sử hợp lệ.
+        """
+        if not reference_date:
+            reference_date = timezone.now().date()
+
+        X_samples = []
+        y_samples = []
+        metadata = []
+
+        cur_year = reference_date.year
+        cur_month = reference_date.month
+
+        for i in range(months_back, 0, -1):
+            m = cur_month - i
+            y = cur_year
+            while m <= 0:
+                m += 12
+                y -= 1
+
+            start_t = datetime.date(y, m, 1)
+            _, last_day = calendar.monthrange(y, m)
+            end_t = datetime.date(y, m, last_day)
+
+            # Target y_t: Chi phí thực tế tháng t
+            target_cost = get_actual_consumption_net_cost(tenant, start_t, end_t, cost_center)
+
+            # Feature vector X_t trích xuất tại ngày đầu tháng t (start_t)
+            feat_data = cls.extract_features(
+                tenant=tenant,
+                target_date=start_t,
+                cost_center=cost_center
+            )
+            vec = feat_data["feature_vector"]
+
+            X_samples.append(vec)
+            y_samples.append(float(target_cost))
+            metadata.append({
+                "period": f"{y}-{m:02d}",
+                "target_cost": float(target_cost),
+                "features": feat_data["feature_dict"]
+            })
+
+        X_arr = np.array(X_samples, dtype=float) if X_samples else np.empty((0, len(FEATURE_NAMES)))
+        y_arr = np.array(y_samples, dtype=float) if y_samples else np.empty((0,))
+
+        return X_arr, y_arr, metadata
+
+    @classmethod
     def generate_synthetic_training_data(
         cls,
         base_features: List[float],
@@ -323,8 +440,9 @@ class CostFeaturePipeline:
         num_samples: int = 48
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Sinh tập mẫu huấn luyện tăng cường (augmented dataset) quanh vector đặc trưng hiện tại
-        kết hợp tính mùa vụ và nợ kỹ thuật để huấn luyện mô hình QRF.
+        [CHỈ DÙNG TRONG UNIT TEST / BENCHMARK]:
+        Sinh dữ liệu mô phỏng tăng cường quanh một vector đặc trưng để kiểm thử thuật toán.
+        Tuyệt đối không sử dụng trong luồng chạy dự báo thực tế (production forecasting).
         """
         np.random.seed(42)
         X_samples = []

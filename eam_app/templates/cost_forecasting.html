@@ -74,10 +74,16 @@
           Thiết bị chiếm tỷ trọng chi phí bảo trì bất thường so với danh mục. Đề xuất kiểm định hoặc thanh lý thực tế để tối ưu ngân sách kỳ tới.
         </p>
       </div>
-      <a href="{% url 'portal_asset_registry' %}" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1.5 shrink-0">
-        <span>Xem Hồ Sơ Thiết Bị</span>
-        <i class="ph-bold ph-arrow-square-out text-sm"></i>
-      </a>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="openLemonSimulationModal()" class="px-3.5 py-1.5 bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
+          <i class="ph-bold ph-chart-polar text-sm"></i>
+          <span>Mô Phỏng Cắt Giảm Chi Phí</span>
+        </button>
+        <a href="{% url 'portal_asset_registry' %}" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1.5">
+          <span>Xem Hồ Sơ Thiết Bị</span>
+          <i class="ph-bold ph-arrow-square-out text-sm"></i>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -239,6 +245,77 @@
 
 </div>
 
+
+<!-- Modal: Mô Phỏng Tác Động Chi Phí Thiết Bị Quả Chanh (Lemon Asset Simulation) -->
+<div id="lemonSimulationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
+  <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+    <div class="px-6 py-4.5 bg-white border-b border-slate-100 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0 shadow-xs border border-rose-100/60">
+          <i class="ph-bold ph-chart-polar"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-base font-black text-slate-900 tracking-tight m-0">Mô Phỏng Cắt Giảm Chi Phí Bad Actor</h3>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 uppercase tracking-wider">Simulation Only</span>
+          </div>
+          <p class="text-xs text-slate-500 m-0 mt-0.5">Phân tích tác động tài chính nếu thay thế hoặc thanh lý thiết bị quả chanh</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeLemonSimulationModal()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-4">
+      <div class="p-4 bg-rose-50/50 rounded-xl border border-rose-200/60 space-y-2">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-600 font-bold">Thiết bị phân tích:</span>
+          <span id="simAssetName" class="font-black text-rose-900">--</span>
+        </div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-600 font-bold">Chi phí bảo trì lịch sử (1 năm):</span>
+          <span id="simAssetCost" class="font-black text-rose-700">0 VNĐ</span>
+        </div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-600 font-bold">Tỷ lệ RRR trên nguyên giá:</span>
+          <span id="simAssetRrr" class="font-black text-rose-700">0%</span>
+        </div>
+      </div>
+
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+        <h4 class="text-xs font-bold uppercase text-slate-700 tracking-wider">Kịch Bản Giả Định: Sau Khi Thay Mới / Thanh Lý</h4>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-500">Ngân sách CM dự báo hiện tại:</span>
+          <span id="simCurrentCm" class="font-bold text-slate-800">0 VNĐ</span>
+        </div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-emerald-700 font-bold">Ngân sách CM dự báo sau mô phỏng:</span>
+          <span id="simNewCm" class="font-black text-emerald-700">0 VNĐ</span>
+        </div>
+        <div class="pt-2 border-t border-slate-200 flex justify-between items-center text-xs">
+          <span class="text-slate-800 font-black">Ước tính tiết kiệm ngân sách kỳ tới:</span>
+          <span id="simSavings" class="font-black text-emerald-600 text-sm">0 VNĐ</span>
+        </div>
+      </div>
+
+      <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
+        <i class="ph-bold ph-info text-base text-amber-600 shrink-0 mt-0.5"></i>
+        <span>Lưu ý: Đây là phép tính mô phỏng giả định phục vụ phân tích tài chính. Thao tác này tuyệt đối KHÔNG làm thay đổi trạng thái, danh mục hay dữ liệu tài sản thực tế trong hệ thống.</span>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button type="button" onclick="closeLemonSimulationModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-all cursor-pointer">
+          Đóng Cửa Sổ Mô Phỏng
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
 <!-- Modal: Cấu Hình Ngân Sách & Tham Số Tài Chính Đa Doanh Nghiệp -->
 <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
   <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
@@ -369,6 +446,38 @@ function parseFormattedNumber(valStr) {
   return Number(String(valStr).replace(/\D/g, '')) || 0;
 }
 
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  const bgColors = {
+    success: 'bg-emerald-600 text-white shadow-emerald-500/20',
+    error: 'bg-rose-600 text-white shadow-rose-500/20',
+    warning: 'bg-amber-600 text-white shadow-amber-500/20',
+    info: 'bg-slate-800 text-white shadow-slate-700/20'
+  };
+  const icons = {
+    success: 'ph-check-circle',
+    error: 'ph-x-circle',
+    warning: 'ph-warning',
+    info: 'ph-info'
+  };
+
+  toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-lg flex items-center gap-2.5 text-xs font-bold transition-all duration-300 transform translate-y-2 opacity-0 ${bgColors[type] || bgColors.info}`;
+  toast.innerHTML = `<i class="ph-bold ${icons[type] || icons.info} text-base shrink-0"></i><span>${message}</span>`;
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('translate-y-2', 'opacity-0');
+  });
+
+  setTimeout(() => {
+    toast.classList.add('opacity-0', '-translate-y-2');
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
 function openSettingsModal() {
   const period = document.getElementById('selectPeriod').value;
   const costCenter = document.getElementById('selectCostCenter').value;
@@ -382,6 +491,33 @@ function openSettingsModal() {
 
 function closeSettingsModal() {
   document.getElementById('settingsModal').classList.add('hidden');
+}
+
+function openLemonSimulationModal() {
+  if (!currentForecastData || !currentForecastData.lemonAssetsAlert || !currentForecastData.lemonAssetsAlert.topLemonAsset) {
+    showToast('Không có thiết bị Bad Actor để mô phỏng.', 'warning');
+    return;
+  }
+  const topLemon = currentForecastData.lemonAssetsAlert.topLemonAsset;
+  const cmP50 = (currentForecastData.budgetOverview && currentForecastData.budgetOverview.predictedCmMedianP50) || 0;
+  const lemonCost = topLemon.totalMaintenanceCost || 0;
+
+  // Tính toán mô phỏng toán học: loại bỏ chi phí máy bad actor khỏi nhu cầu sửa chữa sự cố
+  const simNewCm = Math.max(0, cmP50 - (lemonCost * 0.7)); // Ước tính giảm 70% chi phí sự cố phát sinh từ máy này
+  const savings = cmP50 - simNewCm;
+
+  document.getElementById('simAssetName').textContent = `${topLemon.assetName} (${topLemon.costCenter || 'Xưởng'})`;
+  document.getElementById('simAssetCost').textContent = formatVND(lemonCost);
+  document.getElementById('simAssetRrr').textContent = (topLemon.rrrPercent || 0) + '%';
+  document.getElementById('simCurrentCm').textContent = formatVND(cmP50);
+  document.getElementById('simNewCm').textContent = formatVND(simNewCm);
+  document.getElementById('simSavings').textContent = '-' + formatVND(savings);
+
+  document.getElementById('lemonSimulationModal').classList.remove('hidden');
+}
+
+function closeLemonSimulationModal() {
+  document.getElementById('lemonSimulationModal').classList.add('hidden');
 }
 
 async function loadFinancialSettings(period, costCenter) {
@@ -404,16 +540,20 @@ async function loadFinancialSettings(period, costCenter) {
       document.getElementById('inputInflationRate').value = d.defaultInflationRatePercent;
       document.getElementById('inputContingencyRate').value = d.defaultContingencyRatePercent;
       document.getElementById('inputSpareRatio').value = d.criticalSparePartRatioPercent;
+    } else if (json.error) {
+      showToast(json.error, 'error');
     }
   } catch (err) {
     console.error('Lỗi khi tải cài đặt tài chính:', err);
+    showToast('Không thể kết nối đến máy chủ để tải cài đặt tài chính.', 'error');
   }
 }
 
 function suggestApprovedBudget() {
   if (currentForecastData && currentForecastData.budgetOverview) {
     const pm = currentForecastData.budgetOverview.plannedPmDeterministic || 0;
-    const suggested = Math.round(pm * 1.10);
+    const cm = currentForecastData.budgetOverview.predictedCmMedianP50 || 0;
+    const suggested = Math.round((pm + cm) * 1.05);
     document.getElementById('inputApprovedBudget').value = suggested.toLocaleString('vi-VN');
   }
 }
@@ -426,9 +566,9 @@ async function saveFinancialSettings(e) {
 
   const approvedBudget = parseFormattedNumber(document.getElementById('inputApprovedBudget').value);
   const hourlyRate = parseFormattedNumber(document.getElementById('inputHourlyRate').value);
-  const inflationRate = parseFloat(document.getElementById('inputInflationRate').value) || 4.5;
-  const contingencyRate = parseFloat(document.getElementById('inputContingencyRate').value) || 5.0;
-  const spareRatio = parseFloat(document.getElementById('inputSpareRatio').value) || 5.0;
+  const inflationRate = parseFloat(document.getElementById('inputInflationRate').value);
+  const contingencyRate = parseFloat(document.getElementById('inputContingencyRate').value);
+  const spareRatio = parseFloat(document.getElementById('inputSpareRatio').value);
 
   btn.disabled = true;
   btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin text-sm"></i><span>Đang lưu...</span>';
@@ -445,20 +585,24 @@ async function saveFinancialSettings(e) {
         costCenter: costCenter,
         approvedBudget: approvedBudget,
         defaultLaborHourlyRate: hourlyRate,
-        defaultInflationRate: inflationRate,
-        defaultContingencyRate: contingencyRate,
-        criticalSparePartRatio: spareRatio
+        defaultInflationRate: isNaN(inflationRate) ? 4.5 : inflationRate,
+        defaultContingencyRate: isNaN(contingencyRate) ? 5.0 : contingencyRate,
+        criticalSparePartRatio: isNaN(spareRatio) ? 5.0 : spareRatio
       })
     });
 
     const json = await res.json();
     if (json.success) {
       closeSettingsModal();
+      showToast('Đã lưu cấu hình tài chính & cập nhật dự báo thành công!', 'success');
       await loadForecastData();
       await loadHistoricalTrends();
+    } else {
+      showToast(json.error || 'Lỗi khi lưu cấu hình tài chính.', 'error');
     }
   } catch (err) {
     console.error('Lỗi khi lưu cài đặt tài chính:', err);
+    showToast('Lỗi kết nối khi lưu cấu hình.', 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="ph-bold ph-check text-sm"></i><span>Lưu & Áp Dụng Ngay</span>';
@@ -480,15 +624,22 @@ async function loadForecastData() {
     if (json.success && json.data) {
       currentForecastData = json.data;
       renderForecastView(json.data);
+    } else if (json.error) {
+      showToast(json.error, 'error');
     }
   } catch (err) {
     console.error('Lỗi khi tải dữ liệu dự báo chi phí:', err);
+    showToast('Không thể kết nối đến máy chủ để tải dữ liệu dự báo.', 'error');
   }
 }
 
 async function loadHistoricalTrends() {
   const costCenter = document.getElementById('selectCostCenter').value;
+  const period = document.getElementById('selectPeriod').value;
   let url = `/api/v1/cost-forecasting/historical-trends/?months=12`;
+  if (period) {
+    url += `&period=${encodeURIComponent(period)}`;
+  }
   if (costCenter) {
     url += `&cost_center=${encodeURIComponent(costCenter)}`;
   }
@@ -498,6 +649,8 @@ async function loadHistoricalTrends() {
     const json = await res.json();
     if (json.success && json.data) {
       renderChart(json.data);
+    } else if (json.error) {
+      showToast(json.error, 'error');
     }
   } catch (err) {
     console.error('Lỗi khi tải dữ liệu xu hướng chi phí:', err);
@@ -509,16 +662,21 @@ function renderForecastView(data) {
   const r = data.riskFactors;
   const lemon = data.lemonAssetsAlert;
 
-  // Update AI Engine badge based on actual execution mode
+  // Cập nhật huy hiệu AI Governance phản ánh chính xác tình trạng từ backend
   const aiBadge = document.getElementById('aiGovernanceBadge');
-  const aiText = document.getElementById('aiGovernanceText');
-  if (aiBadge && aiText) {
+  if (aiBadge) {
     if (data.isAiFallback) {
-      aiBadge.className = 'text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-      aiBadge.innerHTML = '<i class="ph-bold ph-shield-warning"></i><span id="aiGovernanceText">Heuristic Fallback Mode (Dưới 3 tháng dữ liệu)</span>';
+      if (data.fallbackReason === 'AI_DISABLED') {
+        aiBadge.className = 'text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
+        aiBadge.innerHTML = '<i class="ph-bold ph-power text-slate-500"></i><span id="aiGovernanceText">AI Engine Tắt (Cấu hình Quản trị viên)</span>';
+      } else {
+        aiBadge.className = 'text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
+        const reasonText = 'Heuristic Fallback Mode (Chưa đủ kỳ dữ liệu lịch sử thực tế có nhãn)';
+        aiBadge.innerHTML = `<i class="ph-bold ph-shield-warning"></i><span id="aiGovernanceText">${reasonText}</span>`;
+      }
     } else {
       aiBadge.className = 'text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-      aiBadge.innerHTML = '<i class="ph-bold ph-sparkle"></i><span id="aiGovernanceText">AI Engine Active (Quantile Forest)</span>';
+      aiBadge.innerHTML = '<i class="ph-bold ph-sparkle"></i><span id="aiGovernanceText">AI Engine Hoạt Động (Rừng hồi quy phân vị QRF)</span>';
     }
   }
 
@@ -616,19 +774,27 @@ function renderCostDrivers(drivers) {
 }
 
 function renderChart(trendData) {
-  const ctx = document.getElementById('costForecastChart').getContext('2d');
+  const canvas = document.getElementById('costForecastChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
   if (costChartInstance) {
     costChartInstance.destroy();
   }
 
-  const labels = [...trendData.labels, trendData.forecastProjections.period];
+  const proj = trendData.forecastProjections || {};
+  const forecastPeriod = proj.period || "Kỳ tới";
+
+  const labels = [...trendData.labels, forecastPeriod];
   const actuals = [...trendData.actualSeries, null];
 
+  const p10Series = new Array(trendData.labels.length).fill(null);
+  p10Series.push(proj.p10 || null);
+
   const p50Series = new Array(trendData.labels.length).fill(null);
-  p50Series.push(trendData.forecastProjections.p50);
+  p50Series.push(proj.p50 || null);
 
   const p90Series = new Array(trendData.labels.length).fill(null);
-  p90Series.push(trendData.forecastProjections.p90);
+  p90Series.push(proj.p90 || null);
 
   costChartInstance = new Chart(ctx, {
     type: 'line',
@@ -645,12 +811,21 @@ function renderChart(trendData) {
           fill: true
         },
         {
+          label: 'Dự báo P10 (Kịch bản thuận lợi)',
+          data: p10Series,
+          borderColor: '#10b981',
+          backgroundColor: '#10b981',
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          showLine: false
+        },
+        {
           label: 'Dự báo P50 (Kế hoạch cơ sở)',
           data: p50Series,
           borderColor: '#2563eb',
           backgroundColor: '#2563eb',
-          pointRadius: 6,
-          pointHoverRadius: 8,
+          pointRadius: 7,
+          pointHoverRadius: 9,
           showLine: false
         },
         {
@@ -668,7 +843,11 @@ function renderChart(trendData) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { boxWidth: 10, font: { size: 10 } }
+        },
         tooltip: {
           callbacks: {
             label: function(context) {
@@ -713,11 +892,15 @@ async function triggerRunForecast() {
 
     const json = await res.json();
     if (json.success) {
+      showToast('Tính toán dự báo ngân sách lai ghép thành công!', 'success');
       await loadForecastData();
       await loadHistoricalTrends();
+    } else {
+      showToast(json.error || 'Lỗi khi tính toán dự báo.', 'error');
     }
   } catch (err) {
     console.error('Lỗi khi kích hoạt tính toán dự báo:', err);
+    showToast('Lỗi kết nối khi gửi yêu cầu tính toán dự báo.', 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="ph-bold ph-arrows-clockwise text-sm"></i><span>Tính Toán Dự Báo</span>';
@@ -730,6 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('selectPeriod').addEventListener('change', () => {
     loadForecastData();
+    loadHistoricalTrends();
   });
   document.getElementById('selectCostCenter').addEventListener('change', () => {
     loadForecastData();

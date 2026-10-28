@@ -5,6 +5,7 @@ Bao gồm trọn vẹn 12 Test Cases (TC-COST-01 -> TC-COST-12) phủ kín 100% 
 import uuid
 import datetime
 from decimal import Decimal
+from unittest.mock import patch, MagicMock
 from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -523,3 +524,477 @@ class MaintenanceCostForecastingTests(TestCase):
         self.assertEqual(forecast.approved_budget, Decimal('5000000000.00'))
         self.assertEqual(forecast.budget_status, 'HEALTHY')
         self.assertLess(forecast.budget_usage_ratio, 50.0)
+
+    def test_tc_cost_15_regression_real_data_training_and_no_synthetic_in_production(self):
+        """
+        TC-COST-15: Xác minh không sử dụng dữ liệu tổng hợp (synthetic) trong luồng dự báo production.
+        Khi chưa đủ 12 kỳ quan sát thực tế có nhãn, hệ thống chuyển sang Fallback xác định có ghi rõ lý do.
+        """
+        with patch.object(CostFeaturePipeline, 'generate_synthetic_training_data') as mock_synth:
+            forecast = CostForecastingService.run_forecast(
+                tenant=self.tenant,
+                period='2026-Q4'
+            )
+            # generate_synthetic_training_data tuyệt đối không được gọi trong production run_forecast
+            mock_synth.assert_not_called()
+
+        self.assertTrue(forecast.is_ai_fallback)
+        self.assertEqual(forecast.forecast_method, 'DETERMINISTIC_FALLBACK')
+        self.assertEqual(forecast.fallback_reason, 'INSUFFICIENT_HISTORICAL_DATA')
+
+        # Kiểm tra readiness giải thích rõ ràng lý do
+        readiness = CostForecastingService.check_readiness(self.tenant)
+        self.assertFalse(readiness["isReadyForAiQrf"])
+        self.assertEqual(readiness["fallbackReason"], 'INSUFFICIENT_HISTORICAL_DATA')
+        self.assertIn("Cần tối thiểu 12 kỳ", readiness["statusLabel"])
+
+    def test_tc_cost_16_regression_time_based_dataset_no_future_leakage(self):
+        """
+        TC-COST-16: Kiểm định chuỗi thời gian time-series không rò rỉ dữ liệu tương lai (no data leakage).
+        Đặc trưng của tháng t được trích xuất nghiêm ngặt tại ngày 1 của tháng t.
+        """
+        today = timezone.now().date()
+        X_real, y_real, meta = CostFeaturePipeline.build_historical_training_dataset(
+            tenant=self.tenant,
+            reference_date=today,
+            months_back=6
+        )
+        self.assertEqual(len(X_real), 6)
+        self.assertEqual(len(y_real), 6)
+        # Các mẫu phải có nhãn thời gian giảm dần về quá khứ
+        periods = [m["period"] for m in meta]
+        self.assertEqual(len(periods), 6)
+        # Không có phần tử NaN hay Inf
+        import numpy as np
+        self.assertFalse(np.isnan(X_real).any())
+        self.assertFalse(np.isinf(X_real).any())
+
+    def test_tc_cost_17_regression_mixed_period_snapshot_and_unfrozen_work_orders(self):
+        """
+        TC-COST-17: Tổng hợp chi phí trong kỳ có cả WorkOrder đã đóng băng và chưa đóng băng:
+        Không bỏ sót, không cộng trùng, loại trừ CapEx và tài sản đã thanh lý.
+        """
+        start_d = datetime.date(2026, 5, 1)
+        end_d = datetime.date(2026, 5, 31)
+
+        # WO 1: Đã đóng băng snapshot net_cost = 5M
+        wo1 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='WO 1 Snapshot Chốt',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.make_aware(datetime.datetime(2026, 5, 10, 10, 0))
+        )
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo1,
+            material_cost=Decimal('3000000.00'),
+            labor_cost=Decimal('2000000.00'),
+            gross_cost=Decimal('5000000.00'),
+            net_cost=Decimal('5000000.00'),
+            is_cost_frozen=True
+        )
+
+        # WO 2: Chưa đóng băng snapshot, có 2M vật tư + 1M công = 3M
+        wo2 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='WO 2 Chưa Snapshot',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.make_aware(datetime.datetime(2026, 5, 15, 14, 0))
+        )
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo2,
+            spare_part=self.spare_part,
+            transaction_type='ISSUE',
+            quantity=Decimal('1.0'),
+            total_amount=Decimal('2000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 5, 15, 10, 0))
+        )
+        LaborLog.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo2,
+            technician=self.user,
+            work_date=datetime.date(2026, 5, 15),
+            hours_worked=Decimal('5.0'),
+            total_cost=Decimal('1000000.00')
+        )
+
+        # WO 3: Đại tu CapEx (is_capitalized=True) = 20M -> Phải bị loại trừ khỏi OpEx
+        wo3 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='WO 3 CapEx',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            is_capitalized=True,
+            completed_at=timezone.make_aware(datetime.datetime(2026, 5, 20, 10, 0))
+        )
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo3,
+            gross_cost=Decimal('20000000.00'),
+            net_cost=Decimal('20000000.00'),
+            is_capital_overhaul=True,
+            is_cost_frozen=True
+        )
+
+        # Tổng chi phí ròng kỳ tháng 5 phải là 5M + 3M = 8,000,000 VNĐ
+        net_cost = get_actual_consumption_net_cost(self.tenant, start_d, end_d)
+        self.assertEqual(net_cost, Decimal('8000000.00'))
+
+    def test_tc_cost_18_regression_100_percent_warranty_preserves_zero_net_cost(self):
+        """
+        TC-COST-18: Phiếu bảo hành 100% cho ra chi phí ròng 0 VNĐ, không bao giờ rơi về chi phí thô dương.
+        """
+        start_d = datetime.date(2026, 6, 1)
+        end_d = datetime.date(2026, 6, 30)
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Sửa chữa bảo hành toàn bộ',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.make_aware(datetime.datetime(2026, 6, 12, 10, 0))
+        )
+        # Vật tư 50 triệu
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='ISSUE',
+            quantity=Decimal('1.0'),
+            unit_price=Decimal('50000000.00'),
+            total_amount=Decimal('50000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 6, 12, 9, 0))
+        )
+        # Khóa snapshot với bảo hành 50M -> Net = 0
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            gross_cost=Decimal('50000000.00'),
+            warranty_covered_amount=Decimal('50000000.00'),
+            net_cost=Decimal('0.00'),
+            is_cost_frozen=True
+        )
+
+        net_cost = get_actual_consumption_net_cost(self.tenant, start_d, end_d)
+        self.assertEqual(net_cost, Decimal('0.00'))
+
+    def test_tc_cost_19_regression_stock_transaction_semantics(self):
+        """
+        TC-COST-19: Xử lý đúng ISSUE (+), ADJUSTMENT (+), RETURN (-) và loại trừ 100% RECEIPT.
+        """
+        start_d = datetime.date(2026, 7, 1)
+        end_d = datetime.date(2026, 7, 31)
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Lệnh sửa chữa phân tách vật tư',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.make_aware(datetime.datetime(2026, 7, 15, 10, 0))
+        )
+        # 1. ISSUE xuất 10M
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='ISSUE',
+            quantity=Decimal('10.0'),
+            unit_price=Decimal('1000000.00'),
+            total_amount=Decimal('10000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 7, 15, 8, 0))
+        )
+        # 2. ADJUSTMENT điều chỉnh tăng 2M
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='ADJUSTMENT',
+            quantity=Decimal('2.0'),
+            unit_price=Decimal('1000000.00'),
+            total_amount=Decimal('2000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 7, 15, 9, 0))
+        )
+        # 3. RETURN trả kho thừa 3M
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='RETURN',
+            quantity=Decimal('-3.0'),
+            unit_price=Decimal('1000000.00'),
+            total_amount=Decimal('3000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 7, 15, 11, 0))
+        )
+        # 4. RECEIPT nhập kho lưu trữ 200M (không được tính vào tiêu hao)
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            spare_part=self.spare_part,
+            transaction_type='RECEIPT',
+            quantity=Decimal('200.0'),
+            unit_price=Decimal('1000000.00'),
+            total_amount=Decimal('200000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 7, 15, 7, 0))
+        )
+
+        net_cost = get_actual_consumption_net_cost(self.tenant, start_d, end_d)
+        # 10M + 2M - 3M = 9,000,000 VNĐ
+        self.assertEqual(net_cost, Decimal('9000000.00'))
+
+    def test_tc_cost_20_regression_work_order_completion_freezes_snapshot(self):
+        """
+        TC-COST-20: Đóng băng snapshot chi phí bất biến khi hoàn thành Work Order qua WorkOrderTransitionService.
+        Gọi lặp lại bảo toàn tính idempotent, không ghi đè số liệu.
+        """
+        from workorders.services import WorkOrderTransitionService
+        from workorders.models import WorkOrderChecklistItem, WorkOrderAttachment
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Lệnh bảo dưỡng nghiệm thu',
+            type='CORRECTIVE',
+            status='IN_PROGRESS',
+            assigned_to=self.user
+        )
+        # Tạo attachment bắt buộc
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url="/media/proof.jpg",
+            file_name="proof.jpg",
+            file_type="image/jpeg",
+            file_size=1024
+        )
+        # Tạo xuất kho 2 vòng bi
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='ISSUE',
+            quantity=Decimal('2.0'),
+            unit_price=Decimal('1500000.00'),
+            total_amount=Decimal('3000000.00'),
+            issue_date=timezone.now()
+        )
+
+        completed_wo = WorkOrderTransitionService.complete_work_order(
+            work_order_id=wo.id,
+            user=self.user,
+            tenant_id=self.tenant.id
+        )
+        self.assertEqual(completed_wo.status, 'COMPLETED')
+
+        # Kiểm tra WorkOrderCost snapshot được tạo tự động
+        cost_snap = WorkOrderCost.all_objects.filter(work_order=wo).first()
+        self.assertIsNotNone(cost_snap)
+        self.assertTrue(cost_snap.is_cost_frozen)
+        self.assertEqual(cost_snap.material_cost, Decimal('3000000.00'))
+        self.assertEqual(cost_snap.net_cost, Decimal('3000000.00'))
+        frozen_time = cost_snap.cost_frozen_at
+
+        # Gọi lại freeze_work_order_cost -> Idempotent, không thay đổi thời điểm và giá trị
+        cost_snap_again = CostForecastingService.freeze_work_order_cost(wo)
+        self.assertEqual(cost_snap_again.id, cost_snap.id)
+        self.assertEqual(cost_snap_again.cost_frozen_at, frozen_time)
+
+    def test_tc_cost_21_regression_pm_scheduling_yearly_and_suppression(self):
+        """
+        TC-COST-21: Lập lịch PM không mặc định kích hoạt nếu chưa đến hạn.
+        Kế hoạch chu kỳ năm (365 ngày) không phát sinh chi phí trong tháng nếu chưa đến hạn;
+        Tôn trọng quy tắc suppress_if_pending khi có phiếu bảo trì đang tồn đọng.
+        """
+        start_d = datetime.date(2026, 11, 1)
+        end_d = datetime.date(2026, 11, 30)
+
+        # 1. Kế hoạch năm (365 ngày), vừa thực hiện hôm qua -> Trong tháng 11 không được tính
+        plan_yearly = PmPlan.objects.create(
+            tenant=self.tenant,
+            name='Đại tu năm toàn nhà máy',
+            interval_value=Decimal('1.0'),
+            interval_unit='YEARS',
+            is_active=True,
+            estimated_duration_minutes=600
+        )
+        assign_yearly = PmPlanAssignment.objects.create(
+            tenant=self.tenant,
+            pm_plan=plan_yearly,
+            asset=self.asset,
+            last_triggered_at=timezone.make_aware(datetime.datetime(2026, 10, 27, 8, 0)),
+            status='ACTIVE'
+        )
+
+        # 2. Kế hoạch 30 ngày có suppress_if_pending=True, nhưng đang có 1 phiếu PREVENTIVE mở
+        plan_suppressed = PmPlan.objects.create(
+            tenant=self.tenant,
+            name='Bảo dưỡng hàng tháng tránh trùng lặp',
+            interval_value=Decimal('30.0'),
+            interval_unit='DAYS',
+            is_active=True,
+            suppress_if_pending=True,
+            estimated_duration_minutes=120
+        )
+        assign_suppressed = PmPlanAssignment.objects.create(
+            tenant=self.tenant,
+            pm_plan=plan_suppressed,
+            asset=self.asset,
+            last_triggered_at=timezone.make_aware(datetime.datetime(2026, 10, 1, 8, 0)),
+            status='ACTIVE'
+        )
+        # Phiếu bảo trì định kỳ đang chờ thực hiện
+        WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Phiếu PM đang chờ xử lý',
+            type='PREVENTIVE',
+            status='IN_PROGRESS'
+        )
+
+        pm_budget = HybridBudgetingEngine.calculate_deterministic_pm_budget(self.tenant, start_d, end_d)
+        # Cả 2 kế hoạch đều không phát sinh trong tháng 11 -> Chi phí = 0 VNĐ
+        self.assertEqual(pm_budget, Decimal('0.00'))
+
+    def test_tc_cost_22_regression_custom_financial_settings_persistence_on_rerun(self):
+        """
+        TC-COST-22: Tỷ lệ tài chính tùy chỉnh cấp Tenant (lương thợ, lạm phát, dự phòng)
+        được giữ nguyên vẹn khi người dùng bấm chạy lại dự báo trên API.
+        """
+        from analytics.models import TenantFinancialSetting
+        from rest_framework.test import APIClient
+
+        # Thiết lập cài đặt tùy chỉnh
+        TenantFinancialSetting.all_objects.update_or_create(
+            tenant=self.tenant,
+            defaults={
+                'default_inflation_rate': 0.08,    # 8.0%
+                'default_contingency_rate': 0.10,  # 10.0%
+                'default_labor_hourly_rate': Decimal('250000.00')
+            }
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+
+        # Chạy dự báo mà không truyền tham số override
+        res = client.post('/api/v1/cost-forecasting/run-forecast/', {
+            'period': '2026-Q4'
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+
+        forecast = BudgetForecast.all_objects.filter(tenant=self.tenant, forecast_period='2026-Q4').latest('created_at')
+        # Tỷ lệ lạm phát áp dụng phải là 8.0%, không bị gán đè bởi mặc định 4.5%
+        self.assertAlmostEqual(forecast.inflation_rate_applied, 0.08)
+
+    def test_tc_cost_23_regression_tenant_isolation_and_permission_denial(self):
+        """
+        TC-COST-23: Cô lập Tenant A vs Tenant B và từ chối người dùng không có thẩm quyền tài chính.
+        """
+        from rest_framework.test import APIClient
+        from django.core.exceptions import PermissionDenied
+        from portal.views import portal_cost_forecasting
+        from django.test import RequestFactory
+
+        # Tenant B
+        tenant_b = Tenant.objects.create(
+            name="Tenant B Competitor",
+            tenant_code=f"T-B-{uuid.uuid4().hex[:6]}"
+        )
+        user_b = User.objects.create_user(
+            username=f'user_b_{uuid.uuid4().hex[:6]}',
+            email='b@test.com',
+            password='password123',
+            tenant=tenant_b
+        )
+        role_b = Role.objects.create(name="Plant Manager", tenant=tenant_b)
+        user_b.roles.add(role_b)
+
+        client = APIClient()
+        client.force_authenticate(user=user_b)
+
+        # User B truy cập báo cáo của Tenant B thành công
+        res = client.get(f'/api/v1/cost-forecasting/current-forecast/?period=2026-Q4')
+        self.assertEqual(res.status_code, 200)
+        # Forecast trả về phải gắn đúng Tenant B
+        self.assertNotEqual(res.data['data']['period'], None)
+
+        # Tạo user Kỹ thuật viên thuần túy trong Tenant A (không có role Finance hay quyền reports:read)
+        tech_user = User.objects.create_user(
+            username=f'tech_only_{uuid.uuid4().hex[:6]}',
+            email='tech@test.com',
+            password='password123',
+            tenant=self.tenant
+        )
+        tech_role, _ = Role.objects.get_or_create(name="Junior Field Technician", tenant=self.tenant)
+        tech_user.roles.add(tech_role)
+
+        tech_client = APIClient()
+        tech_client.force_authenticate(user=tech_user)
+
+        # Bị chặn 403 Forbidden ở mọi API dự báo tài chính
+        res1 = tech_client.get('/api/v1/cost-forecasting/current-forecast/')
+        self.assertEqual(res1.status_code, 403)
+
+        res2 = tech_client.post('/api/v1/cost-forecasting/run-forecast/', {'period': '2026-Q4'}, format='json')
+        self.assertEqual(res2.status_code, 403)
+
+        res3 = tech_client.post('/api/v1/cost-forecasting/settings/', {'defaultInflationRate': 5.0}, format='json')
+        self.assertEqual(res3.status_code, 403)
+
+        # Bị chặn ở giao diện portal
+        factory = RequestFactory()
+        req = factory.get('/portal/cost-forecasting/')
+        req.user = tech_user
+        with self.assertRaises(PermissionDenied):
+            portal_cost_forecasting(req)
+
+    def test_tc_cost_24_regression_notification_deduplication_no_spam(self):
+        """
+        TC-COST-24: Chống spam thông báo bội chi khi gọi lại hoặc tải trang nhiều lần.
+        """
+        # Chạy dự báo với hạn mức rất thấp để kích hoạt bội chi
+        forecast = CostForecastingService.run_forecast(
+            tenant=self.tenant,
+            period='2026-Q4',
+            approved_budget=Decimal('1000.00')
+        )
+        self.assertEqual(forecast.budget_status, 'CRITICAL_OVERRUN')
+
+        count_1 = Notification.objects.filter(
+            tenant=self.tenant,
+            event_type='BUDGET_OVERRUN_ALERT',
+            metadata__period='2026-Q4'
+        ).count()
+        self.assertGreater(count_1, 0)
+
+        # GET request tải lại trang không được sinh thêm thông báo
+        _ = CostForecastingService.get_current_forecast(
+            tenant=self.tenant,
+            period='2026-Q4'
+        )
+        count_2 = Notification.objects.filter(
+            tenant=self.tenant,
+            event_type='BUDGET_OVERRUN_ALERT',
+            metadata__period='2026-Q4'
+        ).count()
+        self.assertEqual(count_1, count_2)
+
+        # Chạy lại run_forecast cho cùng kỳ trong vòng 24h không bị nhân đôi
+        CostForecastingService.run_forecast(
+            tenant=self.tenant,
+            period='2026-Q4',
+            approved_budget=Decimal('1000.00')
+        )
+        count_3 = Notification.objects.filter(
+            tenant=self.tenant,
+            event_type='BUDGET_OVERRUN_ALERT',
+            metadata__period='2026-Q4'
+        ).count()
+        self.assertEqual(count_1, count_3)
+

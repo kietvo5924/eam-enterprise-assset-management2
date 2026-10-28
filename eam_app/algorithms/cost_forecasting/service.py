@@ -20,7 +20,8 @@ from notifications.models import Notification
 from algorithms.cost_forecasting.constants import (
     DEFAULT_INFLATION_RATE,
     DEFAULT_CONTINGENCY_BUFFER_RATE,
-    MIN_MONTHS_TRAINING_DATA
+    MIN_MONTHS_TRAINING_DATA,
+    MIN_HISTORICAL_PERIODS_FOR_ML
 )
 from algorithms.cost_forecasting.feature_pipeline import CostFeaturePipeline, get_actual_consumption_net_cost
 from algorithms.cost_forecasting.lemon_detector import LemonAssetDetector
@@ -45,13 +46,24 @@ class CostForecastingService:
         Quy tắc 1: Khóa bất biến đơn giá snapshot tại thời điểm hoàn tất nghiệm thu Work Order.
         Quy tắc 2: Tách bạch CapEx vs OpEx.
         Quy tắc 6: Bóc tách Gross vs Net Cost (trừ bảo hành & bảo hiểm).
+        Đảm bảo tính Idempotent: nếu đã khóa (is_cost_frozen=True), không bao giờ ghi đè.
         """
         tenant = work_order.tenant
 
-        # 1. Tính toán chi phí vật tư từ các giao dịch StockTransaction liên kết
-        mat_txs = StockTransaction.all_objects.filter(
+        # 0. Idempotency Check: Nếu đã có snapshot và đã chốt khóa, trả về ngay lập tức
+        existing = WorkOrderCost.all_objects.select_for_update().filter(
             tenant=tenant,
             work_order=work_order
+        ).first()
+        if existing and existing.is_cost_frozen:
+            return existing
+
+        # 1. Tính toán chi phí vật tư từ các giao dịch StockTransaction liên kết
+        # Chỉ lấy ISSUE (+), ADJUSTMENT (+), trừ RETURN (-)
+        mat_txs = StockTransaction.all_objects.filter(
+            tenant=tenant,
+            work_order=work_order,
+            transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
         )
         material_cost = Decimal('0')
         cost_center_snapshot = None
@@ -77,8 +89,11 @@ class CostForecastingService:
             if first_ll:
                 cost_center_snapshot = first_ll.cost_center_snapshot
 
-        if not cost_center_snapshot and work_order.asset and work_order.asset.location:
-            cost_center_snapshot = work_order.asset.location.name
+        if not cost_center_snapshot:
+            if work_order.incident_location and work_order.incident_location.name:
+                cost_center_snapshot = work_order.incident_location.name
+            elif work_order.asset and work_order.asset.location:
+                cost_center_snapshot = work_order.asset.location.name
 
         # 3. Chi phí thuê ngoài dịch vụ
         v_cost = vendor_cost or Decimal('0')
@@ -87,10 +102,10 @@ class CostForecastingService:
         gross_cost = max(Decimal('0'), material_cost + labor_cost + v_cost)
 
         # 5. Chi phí bảo hành & bảo hiểm
-        w_cost = warranty_covered_amount or Decimal('0')
-        i_cost = insurance_covered_amount or Decimal('0')
+        w_cost = warranty_covered_amount or getattr(work_order, 'warranty_covered_amount', None) or Decimal('0')
+        i_cost = insurance_covered_amount or getattr(work_order, 'insurance_covered_amount', None) or Decimal('0')
 
-        # 6. Chi phí ròng Net Cost
+        # 6. Chi phí ròng Net Cost (có thể = 0 nếu bảo hành/bảo hiểm 100%)
         net_cost = max(Decimal('0'), gross_cost - (w_cost + i_cost))
 
         # 7. Cờ đại tu lớn CapEx
@@ -195,6 +210,7 @@ class CostForecastingService:
             lemon_assets_detected=lemon_assets_list,
             top_cost_drivers=forecast_result["topCostDrivers"],
             is_ai_fallback=forecast_result["isAiFallback"],
+            fallback_reason=forecast_result.get("fallbackReason"),
             is_manually_approved=forecast_result.get("isManuallyApproved", False)
         )
 
@@ -208,7 +224,20 @@ class CostForecastingService:
     def _dispatch_overrun_notifications(cls, tenant, forecast: BudgetForecast) -> None:
         """
         Gửi thông báo Real-time cho Admin và Kế toán trưởng khi ngân sách chạm ngưỡng nguy hiểm.
+        Kiểm tra chống spam thông báo trùng lặp cho cùng một kỳ và trạng thái trong 24 giờ.
         """
+        # Deduplication check
+        recent_threshold = timezone.now() - datetime.timedelta(hours=24)
+        already_sent = Notification.objects.filter(
+            tenant=tenant,
+            event_type='BUDGET_OVERRUN_ALERT',
+            created_at__gte=recent_threshold,
+            metadata__period=forecast.forecast_period,
+            metadata__budgetStatus=forecast.budget_status
+        ).exists()
+        if already_sent:
+            return
+
         severity = 'CRITICAL' if forecast.budget_status == 'CRITICAL_OVERRUN' else 'WARNING'
         status_text = "Bội chi nghiêm trọng" if severity == 'CRITICAL' else "Tiệm cận hạn mức"
 
@@ -259,7 +288,8 @@ class CostForecastingService:
         cost_center: Optional[str] = None
     ) -> BudgetForecast:
         """
-        Lấy bản ghi dự báo ngân sách hiện hành gần nhất, hoặc tự động chạy mới nếu chưa có.
+        Lấy bản ghi dự báo ngân sách hiện hành gần nhất, hoặc tự động tính toán nếu chưa có.
+        Yêu cầu GET chỉ đọc dữ liệu, không phát notification rác khi tải trang.
         """
         if not period:
             today = timezone.now().date()
@@ -276,15 +306,53 @@ class CostForecastingService:
             qs = qs.filter(cost_center_snapshot__isnull=True)
 
         latest = qs.order_by('-created_at').first()
+        ai_enabled = getattr(tenant, 'enable_ai_cost_forecasting', True)
         if latest:
+            # Đồng bộ lại dự báo nếu cấu hình AI Governance của Tenant thay đổi
+            if not ai_enabled and latest.fallback_reason != 'AI_DISABLED':
+                return cls.run_forecast(tenant=tenant, period=period, cost_center=cost_center)
+            elif ai_enabled and latest.fallback_reason == 'AI_DISABLED':
+                return cls.run_forecast(tenant=tenant, period=period, cost_center=cost_center)
             return latest
 
-        # Nếu chưa có, chạy tính toán tức thời
-        return cls.run_forecast(
+        # Nếu chưa có, chạy tính toán tức thời mà KHÔNG phát notification rác
+        forecast_result = HybridBudgetingEngine.execute_forecast(
             tenant=tenant,
-            period=period,
+            period_str=period,
             cost_center=cost_center
         )
+        lemon_data = LemonAssetDetector.audit_lemon_assets(
+            tenant=tenant,
+            cost_center=cost_center
+        )
+        lemon_assets_list = lemon_data.get("lemonAssets", [])
+
+        budget_forecast = BudgetForecast.all_objects.create(
+            tenant=tenant,
+            cost_center_snapshot=cost_center,
+            forecast_period=period,
+            forecast_method=forecast_result["forecastMethod"],
+            approved_budget=forecast_result["approvedBudget"],
+            planned_pm_budget=forecast_result["plannedPmBudget"],
+            predicted_cm_median=forecast_result["predictedCmMedian"],
+            predicted_cm_lower_p10=forecast_result["predictedCmLowerP10"],
+            predicted_cm_upper_p90=forecast_result["predictedCmUpperP90"],
+            contingency_buffer=forecast_result["contingencyBuffer"],
+            total_forecast_median=forecast_result["totalForecastMedian"],
+            total_forecast_p90=forecast_result["totalForecastP90"],
+            budget_usage_ratio=forecast_result["budgetUsageRatio"],
+            budget_status=forecast_result["budgetStatus"],
+            inflation_rate_applied=forecast_result["inflationRateApplied"],
+            backlog_work_orders_count=forecast_result["backlogOrdersCount"],
+            deferred_maintenance_hours=forecast_result["deferredMaintenanceHours"],
+            rul_critical_liability=forecast_result["rulCriticalLiability"],
+            lemon_assets_detected=lemon_assets_list,
+            top_cost_drivers=forecast_result["topCostDrivers"],
+            is_ai_fallback=forecast_result["isAiFallback"],
+            fallback_reason=forecast_result.get("fallbackReason"),
+            is_manually_approved=forecast_result.get("isManuallyApproved", False)
+        )
+        return budget_forecast
 
     @classmethod
     def get_lemon_assets(cls, tenant, cost_center: Optional[str] = None) -> Dict[str, Any]:
@@ -295,11 +363,12 @@ class CostForecastingService:
     def get_historical_trends(
         cls,
         tenant,
+        period: Optional[str] = None,
         cost_center: Optional[str] = None,
         months: int = 12
     ) -> Dict[str, Any]:
         """
-        Lấy chuỗi lịch sử chi phí thực tế đối sánh với kịch bản dự báo P10, P50, P90.
+        Lấy chuỗi lịch sử chi phí thực tế đối sánh với kịch bản dự báo P10, P50, P90 của kỳ được chọn.
         """
         today = timezone.now().date()
         hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
@@ -309,8 +378,8 @@ class CostForecastingService:
         labels = [item[0] for item in hist_costs]
         actual_values = [float(item[1]) for item in hist_costs]
 
-        # Lấy dự báo hiện tại để nối tiếp chuỗi
-        cur_forecast = cls.get_current_forecast(tenant, cost_center=cost_center)
+        # Lấy dự báo đúng kỳ được yêu cầu
+        cur_forecast = cls.get_current_forecast(tenant, period=period, cost_center=cost_center)
         p10_val = float(cur_forecast.predicted_cm_lower_p10 + cur_forecast.planned_pm_budget)
         p50_val = float(cur_forecast.total_forecast_median)
         p90_val = float(cur_forecast.total_forecast_p90)
@@ -330,32 +399,50 @@ class CostForecastingService:
     @classmethod
     def check_readiness(cls, tenant) -> Dict[str, Any]:
         """
-        Kiểm tra tính sẵn sàng của dữ liệu và trạng thái quản trị AI của Tenant.
+        Kiểm tra tính sẵn sàng của dữ liệu thực tế và trạng thái quản trị AI của Tenant.
         """
         ai_enabled = getattr(tenant, 'enable_ai_cost_forecasting', True)
         today = timezone.now().date()
 
         hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
-            tenant, reference_date=today, months_back=6
+            tenant, reference_date=today, months_back=12
         )
         months_with_data = sum(1 for _, cost in hist_costs if cost > Decimal('0'))
-        is_ready = bool(ai_enabled and months_with_data >= MIN_MONTHS_TRAINING_DATA)
+
+        X_real, y_real, _ = CostFeaturePipeline.build_historical_training_dataset(
+            tenant=tenant,
+            reference_date=today,
+            months_back=24
+        )
+        usable_samples = len(y_real)
+        positive_samples = sum(1 for y in y_real if y > 0)
+        is_ready = bool(ai_enabled and usable_samples >= MIN_HISTORICAL_PERIODS_FOR_ML and positive_samples >= 3)
 
         active_assets_count = Asset.all_objects.filter(
             tenant=tenant,
             status__in=['OPERATIONAL', 'OPERATING']
         ).count()
 
+        if not ai_enabled:
+            status_label = "AI Tắt theo cấu hình Quản trị viên"
+            fallback_reason = "AI_DISABLED"
+        elif not is_ready:
+            status_label = f"Chế độ Fallback Heuristic (Cần tối thiểu {MIN_HISTORICAL_PERIODS_FOR_ML} kỳ lịch sử có nhãn để học 16 đặc trưng; hiện có {usable_samples} kỳ)"
+            fallback_reason = "INSUFFICIENT_HISTORICAL_DATA"
+        else:
+            status_label = "Sẵn sàng chạy Rừng hồi quy phân vị (QRF) trên dữ liệu thực tế"
+            fallback_reason = None
+
         return {
             "aiEnabled": ai_enabled,
             "monthsWithData": months_with_data,
-            "minMonthsRequired": MIN_MONTHS_TRAINING_DATA,
+            "usableHistoricalPeriods": usable_samples,
+            "minMonthsRequired": MIN_HISTORICAL_PERIODS_FOR_ML,
             "isReadyForAiQrf": is_ready,
+            "fallbackReason": fallback_reason,
             "activeAssetsCount": active_assets_count,
             "activePmPlansCount": PmPlan.all_objects.filter(tenant=tenant, is_active=True).count(),
-            "statusLabel": "Sẵn sàng chạy Rừng hồi quy phân vị (QRF)" if is_ready else (
-                "Chế độ Fallback Heuristic (Chưa đủ 3 tháng dữ liệu)" if ai_enabled else "AI Tắt theo cấu hình Quản trị viên"
-            )
+            "statusLabel": status_label
         }
 
     @classmethod
@@ -399,6 +486,7 @@ class CostForecastingService:
     def update_financial_settings(cls, tenant, data: Dict[str, Any], user=None) -> Dict[str, Any]:
         """
         Cập nhật cấu hình tài chính linh hoạt cấp Tenant và lưu hạn mức ngân sách được duyệt thực tế.
+        Xác thực chặt chẽ, không tự ý gán đè số 0 hợp lệ thành mặc định.
         """
         from analytics.models import TenantFinancialSetting, PeriodApprovedBudget
         setting, _ = TenantFinancialSetting.all_objects.get_or_create(tenant=tenant)
@@ -406,43 +494,66 @@ class CostForecastingService:
         if "defaultLaborHourlyRate" in data and data["defaultLaborHourlyRate"] is not None:
             raw_rate = str(data["defaultLaborHourlyRate"]).replace(',', '').replace(' ', '')
             try:
-                setting.default_labor_hourly_rate = Decimal(raw_rate)
-            except Exception:
-                pass
+                dec_rate = Decimal(raw_rate)
+                if dec_rate < 0:
+                    raise ValueError("Đơn giá giờ công không được là số âm.")
+                setting.default_labor_hourly_rate = dec_rate
+            except Exception as e:
+                raise ValueError(f"Đơn giá giờ công không hợp lệ: {e}")
+
         if "defaultInflationRate" in data and data["defaultInflationRate"] is not None:
-            val = float(data["defaultInflationRate"])
-            setting.default_inflation_rate = val / 100.0 if val > 1.0 else val
+            try:
+                val = float(data["defaultInflationRate"])
+                if val < 0 or val > 100:
+                    raise ValueError("Tỷ lệ lạm phát phải từ 0% đến 100%.")
+                setting.default_inflation_rate = val / 100.0 if val > 1.0 else val
+            except Exception as e:
+                raise ValueError(f"Tỷ lệ lạm phát không hợp lệ: {e}")
+
         if "defaultContingencyRate" in data and data["defaultContingencyRate"] is not None:
-            val = float(data["defaultContingencyRate"])
-            setting.default_contingency_rate = val / 100.0 if val > 1.0 else val
+            try:
+                val = float(data["defaultContingencyRate"])
+                if val < 0 or val > 100:
+                    raise ValueError("Tỷ lệ dự phòng rủi ro phải từ 0% đến 100%.")
+                setting.default_contingency_rate = val / 100.0 if val > 1.0 else val
+            except Exception as e:
+                raise ValueError(f"Tỷ lệ dự phòng không hợp lệ: {e}")
+
         if "criticalSparePartRatio" in data and data["criticalSparePartRatio"] is not None:
-            val = float(data["criticalSparePartRatio"])
-            setting.critical_spare_part_ratio = val / 100.0 if val > 1.0 else val
+            try:
+                val = float(data["criticalSparePartRatio"])
+                if val < 0 or val > 100:
+                    raise ValueError("Tỷ lệ linh kiện cốt lõi phải từ 0% đến 100%.")
+                setting.critical_spare_part_ratio = val / 100.0 if val > 1.0 else val
+            except Exception as e:
+                raise ValueError(f"Tỷ lệ linh kiện cốt lõi không hợp lệ: {e}")
+
         setting.save()
 
         period = data.get("period")
-        cost_center = data.get("costCenter") or data.get("cost_center")
+        cost_center = data.get("costCenter") or data.get("cost_center") or None
         approved_budget_raw = data.get("approvedBudget") or data.get("approved_budget")
 
-        if period and approved_budget_raw is not None:
+        if period and approved_budget_raw is not None and str(approved_budget_raw).strip() != '':
             raw_app = str(approved_budget_raw).replace(',', '').replace(' ', '')
             if raw_app.count('.') > 1:
                 raw_app = raw_app.replace('.', '')
             try:
                 dec_app = Decimal(raw_app)
-                if dec_app > 0:
-                    PeriodApprovedBudget.all_objects.update_or_create(
-                        tenant=tenant,
-                        period=period,
-                        cost_center=cost_center,
-                        defaults={
-                            "approved_budget": dec_app,
-                            "is_manually_approved": True,
-                            "approved_by": user if user and user.is_authenticated else None,
-                            "notes": data.get("notes")
-                        }
-                    )
-            except Exception:
-                pass
+                if dec_app < 0:
+                    raise ValueError("Hạn mức ngân sách duyệt không được là số âm.")
+                PeriodApprovedBudget.all_objects.update_or_create(
+                    tenant=tenant,
+                    period=period,
+                    cost_center=cost_center,
+                    defaults={
+                        "approved_budget": dec_app,
+                        "is_manually_approved": True,
+                        "approved_by": user if user and user.is_authenticated else None,
+                        "notes": data.get("notes")
+                    }
+                )
+            except Exception as e:
+                raise ValueError(f"Hạn mức ngân sách duyệt không hợp lệ: {e}")
 
         return cls.get_financial_settings(tenant, period=period, cost_center=cost_center)

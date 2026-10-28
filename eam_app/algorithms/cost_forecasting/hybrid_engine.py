@@ -19,10 +19,12 @@ from algorithms.cost_forecasting.constants import (
     DEFAULT_LABOR_HOURLY_RATE,
     WARNING_BUDGET_USAGE_RATIO,
     CRITICAL_BUDGET_USAGE_RATIO,
-    MIN_MONTHS_TRAINING_DATA
+    MIN_MONTHS_TRAINING_DATA,
+    MIN_HISTORICAL_PERIODS_FOR_ML
 )
 from algorithms.cost_forecasting.feature_pipeline import CostFeaturePipeline
 from algorithms.cost_forecasting.qrf_model import QuantileRegressionForestEngine
+from workorders.models import WorkOrder
 
 
 def round_vnd(val: Decimal | float | int) -> Decimal:
@@ -57,15 +59,19 @@ class HybridBudgetingEngine:
             setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
             hourly_rate = setting.default_labor_hourly_rate if setting else DEFAULT_LABOR_HOURLY_RATE
 
+        disposed_asset_ids = set(Asset.all_objects.filter(
+            tenant=tenant,
+            status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD']
+        ).values_list('id', flat=True))
+
         assignments_qs = PmPlanAssignment.all_objects.filter(
             tenant=tenant,
             status='ACTIVE'
-        ).select_related('pm_plan', 'asset')
+        ).exclude(asset_id__in=disposed_asset_ids).select_related('pm_plan', 'asset')
 
         if cost_center:
             assignments_qs = assignments_qs.filter(asset__location__name=cost_center)
 
-        period_days = max(1, (end_date - start_date).days + 1)
         total_pm_cost = Decimal('0')
 
         for assign in assignments_qs:
@@ -73,9 +79,19 @@ class HybridBudgetingEngine:
             if not plan.is_active:
                 continue
 
-            # Ước tính số lần kích hoạt trong kỳ dựa trên tần suất interval
+            # Miễn trừ kích hoạt nếu có lệnh bảo trì đang tồn đọng
+            if plan.suppress_if_pending:
+                pending_pm = WorkOrder.all_objects.filter(
+                    tenant=tenant,
+                    asset=assign.asset,
+                    type='PREVENTIVE',
+                    status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']
+                ).exists()
+                if pending_pm:
+                    continue
+
             val = float(plan.interval_value or 30.0)
-            unit = plan.interval_unit or 'DAYS'
+            unit = (plan.interval_unit or 'DAYS').upper()
 
             if unit == 'DAYS':
                 cycle_days = max(1.0, val)
@@ -88,7 +104,31 @@ class HybridBudgetingEngine:
             else:
                 cycle_days = 30.0
 
-            occurrences = max(1.0, round(period_days / cycle_days, 1))
+            # Xác định mốc thời gian cơ sở
+            if assign.last_triggered_at:
+                ref_date = assign.last_triggered_at.date()
+            elif assign.assigned_at:
+                ref_date = assign.assigned_at.date()
+            else:
+                ref_date = plan.created_at.date() if hasattr(plan, 'created_at') and plan.created_at else start_date
+
+            # Tính các lần kích hoạt đến hạn thực tế trong kỳ [start_date, end_date]
+            next_due = ref_date + datetime.timedelta(days=int(cycle_days))
+            while next_due < start_date:
+                next_due += datetime.timedelta(days=int(cycle_days))
+
+            occurrences = 0
+            while start_date <= next_due <= end_date:
+                occurrences += 1
+                next_due += datetime.timedelta(days=int(cycle_days))
+
+            # Nếu chưa từng chạy và ngày gán kế hoạch rơi vào đúng kỳ này
+            if occurrences == 0 and not assign.last_triggered_at and assign.assigned_at:
+                if start_date <= assign.assigned_at.date() <= end_date:
+                    occurrences = 1
+
+            if occurrences <= 0:
+                continue
 
             # Chi phí vật tư định mức tiêu chuẩn
             materials_cost = Decimal('0')
@@ -174,29 +214,43 @@ class HybridBudgetingEngine:
         rul_liability = feature_data["rul_critical_liability"]
         total_rav = feature_data["total_fleet_rav"]
 
-        # Kiểm tra cờ AI Governance của Tenant và điều kiện khởi động nguội
+        # Kiểm tra cờ AI Governance của Tenant và dữ liệu huấn luyện thực tế
         ai_enabled = getattr(tenant, 'enable_ai_cost_forecasting', True)
-        valid_history_count = sum(1 for _, cost in historical_costs if cost > Decimal('0'))
-        is_cold_start = (valid_history_count < MIN_MONTHS_TRAINING_DATA)
+
+        X_real, y_real, history_records = CostFeaturePipeline.build_historical_training_dataset(
+            tenant=tenant,
+            reference_date=start_date,
+            months_back=24,
+            cost_center=cost_center
+        )
+
+        usable_samples = len(y_real)
+        positive_cost_samples = sum(1 for y in y_real if y > 0)
+        has_sufficient_data = (usable_samples >= MIN_HISTORICAL_PERIODS_FOR_ML and positive_cost_samples >= 3)
 
         top_cost_drivers = []
         is_ai_fallback = False
+        fallback_reason = None
+        eval_metrics = {}
 
-        if ai_enabled and not is_cold_start:
-            # Huấn luyện mô hình QRF và trích xuất phân vị P10, P50, P90
+        if not ai_enabled:
+            is_ai_fallback = True
+            forecast_method = 'DETERMINISTIC_FALLBACK'
+            fallback_reason = 'AI_DISABLED'
+        elif not has_sufficient_data:
+            is_ai_fallback = True
+            forecast_method = 'DETERMINISTIC_FALLBACK'
+            fallback_reason = 'INSUFFICIENT_HISTORICAL_DATA'
+        else:
             forecast_method = 'HYBRID_QRF'
-            recent_avg_cost = feature_vector[3]  # sma_3_cost
-            if recent_avg_cost <= 0:
-                recent_avg_cost = feature_vector[0] if feature_vector[0] > 0 else 50000000.0
+            fallback_reason = None
 
-            X_train, y_train = CostFeaturePipeline.generate_synthetic_training_data(
-                base_features=feature_vector,
-                base_cost=recent_avg_cost,
-                num_samples=48
-            )
-
+        if not is_ai_fallback:
+            # Huấn luyện mô hình QRF trên dữ liệu thực tế đã kiểm định
             qrf_engine = QuantileRegressionForestEngine()
-            qrf_engine.fit(X_train, y_train)
+            qrf_engine.fit(X_real, y_real)
+
+            eval_metrics = qrf_engine.evaluate_backtest_performance(X_real, y_real)
 
             quantiles = qrf_engine.predict_quantiles(feature_vector)
             cm_p10_base = quantiles["p10"]
@@ -294,6 +348,8 @@ class HybridBudgetingEngine:
             "costCenter": cost_center,
             "forecastMethod": forecast_method,
             "isAiFallback": is_ai_fallback,
+            "fallbackReason": fallback_reason,
+            "evaluationMetrics": eval_metrics,
             "isManuallyApproved": is_manually_approved,
             "approvedBudget": approved_budget,
             "plannedPmBudget": planned_pm_cost,
