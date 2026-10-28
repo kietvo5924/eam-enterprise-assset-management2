@@ -422,7 +422,10 @@ class WorkOrderStatusView(APIView):
                 maintenance_action=data.get('maintenanceAction') or wo.maintenance_action or 'GENERAL',
                 actual_duration_minutes=data.get('actualDurationMinutes'),
                 post_repair_data=post_repair_payload,
-                tenant_id=request.user.tenant_id
+                tenant_id=request.user.tenant_id,
+                warranty_covered_amount=data.get('warrantyCoveredAmount') or data.get('warranty_covered_amount'),
+                insurance_covered_amount=data.get('insuranceCoveredAmount') or data.get('insurance_covered_amount'),
+                vendor_cost=data.get('vendorCost') or data.get('vendorServiceCost') or data.get('vendor_cost')
             )
             return success_response(WorkOrderSerializer(wo).data)
 

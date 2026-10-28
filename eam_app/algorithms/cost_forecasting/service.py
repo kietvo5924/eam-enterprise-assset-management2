@@ -96,14 +96,34 @@ class CostForecastingService:
                 cost_center_snapshot = work_order.asset.location.name
 
         # 3. Chi phí thuê ngoài dịch vụ
-        v_cost = vendor_cost or Decimal('0')
+        if vendor_cost is not None:
+            v_cost = Decimal(str(vendor_cost))
+        elif existing and existing.vendor_cost:
+            v_cost = existing.vendor_cost
+        else:
+            v_cost = Decimal('0.00')
 
         # 4. Chi phí gộp Gross Cost
         gross_cost = max(Decimal('0'), material_cost + labor_cost + v_cost)
 
         # 5. Chi phí bảo hành & bảo hiểm
-        w_cost = warranty_covered_amount or getattr(work_order, 'warranty_covered_amount', None) or Decimal('0')
-        i_cost = insurance_covered_amount or getattr(work_order, 'insurance_covered_amount', None) or Decimal('0')
+        if warranty_covered_amount is not None:
+            w_cost = Decimal(str(warranty_covered_amount))
+        elif existing and existing.warranty_covered_amount:
+            w_cost = existing.warranty_covered_amount
+        elif hasattr(work_order, 'warranty_covered_amount') and getattr(work_order, 'warranty_covered_amount', None):
+            w_cost = Decimal(str(work_order.warranty_covered_amount))
+        else:
+            w_cost = Decimal('0.00')
+
+        if insurance_covered_amount is not None:
+            i_cost = Decimal(str(insurance_covered_amount))
+        elif existing and existing.insurance_covered_amount:
+            i_cost = existing.insurance_covered_amount
+        elif hasattr(work_order, 'insurance_covered_amount') and getattr(work_order, 'insurance_covered_amount', None):
+            i_cost = Decimal(str(work_order.insurance_covered_amount))
+        else:
+            i_cost = Decimal('0.00')
 
         # 6. Chi phí ròng Net Cost (có thể = 0 nếu bảo hành/bảo hiểm 100%)
         net_cost = max(Decimal('0'), gross_cost - (w_cost + i_cost))
@@ -209,6 +229,7 @@ class CostForecastingService:
             rul_critical_liability=forecast_result["rulCriticalLiability"],
             lemon_assets_detected=lemon_assets_list,
             top_cost_drivers=forecast_result["topCostDrivers"],
+            evaluation_metrics=forecast_result.get("evaluationMetrics", {}),
             is_ai_fallback=forecast_result["isAiFallback"],
             fallback_reason=forecast_result.get("fallbackReason"),
             is_manually_approved=forecast_result.get("isManuallyApproved", False)
@@ -226,16 +247,22 @@ class CostForecastingService:
         Gửi thông báo Real-time cho Admin và Kế toán trưởng khi ngân sách chạm ngưỡng nguy hiểm.
         Kiểm tra chống spam thông báo trùng lặp cho cùng một kỳ và trạng thái trong 24 giờ.
         """
-        # Deduplication check
+        # Deduplication check: Kiểm tra theo Tenant, Kỳ, Trạng thái VÀ Cost Center trong 24 giờ
         recent_threshold = timezone.now() - datetime.timedelta(hours=24)
-        already_sent = Notification.objects.filter(
+        cc_val = forecast.cost_center_snapshot or ""
+        dedup_qs = Notification.objects.filter(
             tenant=tenant,
             event_type='BUDGET_OVERRUN_ALERT',
             created_at__gte=recent_threshold,
             metadata__period=forecast.forecast_period,
             metadata__budgetStatus=forecast.budget_status
-        ).exists()
-        if already_sent:
+        )
+        if cc_val:
+            dedup_qs = dedup_qs.filter(metadata__costCenter=cc_val)
+        else:
+            dedup_qs = dedup_qs.filter(Q(metadata__costCenter__isnull=True) | Q(metadata__costCenter=""))
+
+        if dedup_qs.exists():
             return
 
         severity = 'CRITICAL' if forecast.budget_status == 'CRITICAL_OVERRUN' else 'WARNING'
@@ -247,20 +274,19 @@ class CostForecastingService:
             f"đã đạt {forecast.budget_usage_ratio}% hạn mức được duyệt ({int(forecast.approved_budget):,} VNĐ)."
         )
 
-        # Tìm các user có quyền quản lý tài chính hoặc admin
+        # Tìm các user có quyền quản lý tài chính hoặc admin chính tắc
+        # Tuyệt đối không fallback sang toàn bộ nhân sự trong tenant để tránh rò rỉ thông tin tài chính
         recipients = User.objects.filter(
             tenant=tenant,
             status='ACTIVE'
         ).filter(
             Q(is_superuser=True)
-            | Q(roles__name__icontains='Admin')
-            | Q(roles__name__icontains='Finance')
-            | Q(roles__name__icontains='Manager')
+            | Q(roles__permissions__id__in=['tenant:update', 'reports:read', 'system:admin'])
+            | Q(roles__name__in=['TENANT_ADMIN', 'SUPER_ADMIN', 'Finance Manager', 'Finance Director', 'CFO'])
         ).distinct()
 
-        # Fallback nếu tenant chưa phân quyền chi tiết vai trò
         if not recipients.exists():
-            recipients = User.objects.filter(tenant=tenant, status='ACTIVE')
+            return
 
         for recipient in recipients[:10]:
             Notification.objects.create(
@@ -275,6 +301,7 @@ class CostForecastingService:
                 metadata={
                     "forecastId": str(forecast.id),
                     "period": forecast.forecast_period,
+                    "costCenter": cc_val,
                     "budgetUsageRatio": forecast.budget_usage_ratio,
                     "budgetStatus": forecast.budget_status
                 }
@@ -348,6 +375,7 @@ class CostForecastingService:
             rul_critical_liability=forecast_result["rulCriticalLiability"],
             lemon_assets_detected=lemon_assets_list,
             top_cost_drivers=forecast_result["topCostDrivers"],
+            evaluation_metrics=forecast_result.get("evaluationMetrics", {}),
             is_ai_fallback=forecast_result["isAiFallback"],
             fallback_reason=forecast_result.get("fallbackReason"),
             is_manually_approved=forecast_result.get("isManuallyApproved", False)
@@ -371,8 +399,28 @@ class CostForecastingService:
         Lấy chuỗi lịch sử chi phí thực tế đối sánh với kịch bản dự báo P10, P50, P90 của kỳ được chọn.
         """
         today = timezone.now().date()
+        reference_date = today
+        if period:
+            if '-Q' in period:
+                try:
+                    parts = period.split('-Q')
+                    y = int(parts[0])
+                    q = int(parts[1])
+                    start_month = (q - 1) * 3 + 1
+                    reference_date = datetime.date(y, start_month, 1)
+                except Exception:
+                    reference_date = today
+            elif '-' in period:
+                try:
+                    parts = period.split('-')
+                    y = int(parts[0])
+                    m = int(parts[1])
+                    reference_date = datetime.date(y, m, 1)
+                except Exception:
+                    reference_date = today
+
         hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
-            tenant, reference_date=today, months_back=months, cost_center=cost_center
+            tenant, reference_date=reference_date, months_back=months, cost_center=cost_center
         )
 
         labels = [item[0] for item in hist_costs]
@@ -380,7 +428,7 @@ class CostForecastingService:
 
         # Lấy dự báo đúng kỳ được yêu cầu
         cur_forecast = cls.get_current_forecast(tenant, period=period, cost_center=cost_center)
-        p10_val = float(cur_forecast.predicted_cm_lower_p10 + cur_forecast.planned_pm_budget)
+        p10_val = float(cur_forecast.planned_pm_budget + cur_forecast.predicted_cm_lower_p10 + cur_forecast.contingency_buffer)
         p50_val = float(cur_forecast.total_forecast_median)
         p90_val = float(cur_forecast.total_forecast_p90)
 

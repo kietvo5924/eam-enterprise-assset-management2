@@ -35,15 +35,57 @@ class LemonAssetDetector:
         """
         cutoff_date = timezone.now().date() - timedelta(days=days_window)
 
-        # 1. Danh sách tài sản đang vận hành (loại trừ đã thanh lý)
-        assets_qs = Asset.all_objects.filter(
+        # 1. Danh sách tài sản cơ sở
+        assets_base_qs = Asset.all_objects.filter(
             tenant=tenant
         ).exclude(status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD'])
 
         if cost_center:
-            assets_qs = assets_qs.filter(location__name=cost_center)
+            current_location_assets = assets_base_qs.filter(location__name=cost_center)
+        else:
+            current_location_assets = assets_base_qs
 
-        total_assets_count = assets_qs.count()
+        # 2. Thu thập chi phí theo đúng snapshot trung tâm chi phí phát sinh
+        # Tránh lỗi tài sản điều chuyển khiến chi phí biến mất khỏi cả hai trung tâm chi phí
+        frozen_costs = WorkOrderCost.all_objects.filter(
+            tenant=tenant,
+            is_cost_frozen=True,
+            is_capital_overhaul=False,
+            work_order__status='COMPLETED',
+            work_order__completed_at__date__gte=cutoff_date
+        ).select_related('work_order', 'work_order__asset')
+
+        if cost_center:
+            frozen_costs = frozen_costs.filter(cost_center_snapshot=cost_center)
+
+        processed_wo_ids = set(frozen_costs.values_list('work_order_id', flat=True))
+
+        other_wos = WorkOrder.all_objects.filter(
+            tenant=tenant,
+            status='COMPLETED',
+            is_capitalized=False,
+            completed_at__date__gte=cutoff_date
+        ).exclude(id__in=processed_wo_ids).select_related('asset')
+
+        if cost_center:
+            other_wos = other_wos.filter(
+                Q(incident_location__name=cost_center) | Q(asset__location__name=cost_center)
+            )
+
+        # Tập hợp tất cả các tài sản liên quan (gồm tài sản hiện tại và tài sản từng phát sinh chi phí tại cost center này)
+        relevant_asset_ids = set(current_location_assets.values_list('id', flat=True))
+        for fc in frozen_costs:
+            if fc.work_order and fc.work_order.asset_id:
+                relevant_asset_ids.add(fc.work_order.asset_id)
+        for wo in other_wos:
+            if wo.asset_id:
+                relevant_asset_ids.add(wo.asset_id)
+
+        all_relevant_assets = {
+            str(ast.id): ast for ast in Asset.all_objects.filter(id__in=relevant_asset_ids)
+        }
+
+        total_assets_count = len(all_relevant_assets)
         if total_assets_count == 0:
             return {
                 "isConcentrationDetected": False,
@@ -52,52 +94,22 @@ class LemonAssetDetector:
                 "topLemonAsset": None
             }
 
-        # 2. Tổng hợp chi phí OpEx theo từng tài sản
-        asset_costs: Dict[str, Dict[str, Any]] = {}
-        for ast in assets_qs:
-            asset_costs[str(ast.id)] = {
-                "asset": ast,
-                "cost": Decimal('0')
-            }
-
-        # Truy vấn từ WorkOrderCost nếu có
-        frozen_costs = WorkOrderCost.all_objects.filter(
-            tenant=tenant,
-            is_cost_frozen=True,
-            is_capital_overhaul=False,
-            work_order__status='COMPLETED',
-            work_order__completed_at__date__gte=cutoff_date,
-            work_order__asset_id__in=asset_costs.keys()
-        ).select_related('work_order')
-
-        if cost_center:
-            frozen_costs = frozen_costs.filter(cost_center_snapshot=cost_center)
+        asset_costs: Dict[str, Dict[str, Any]] = {
+            ast_id: {"asset": ast_obj, "cost": Decimal('0')}
+            for ast_id, ast_obj in all_relevant_assets.items()
+        }
 
         for fc in frozen_costs:
-            ast_id = str(fc.work_order.asset_id)
-            if ast_id in asset_costs:
-                asset_costs[ast_id]["cost"] += (fc.net_cost or Decimal('0'))
-
-        # Đồng thời kiểm tra các WorkOrder chưa có WorkOrderCost
-        processed_wo_ids = set(frozen_costs.values_list('work_order_id', flat=True))
-        other_wos = WorkOrder.all_objects.filter(
-            tenant=tenant,
-            status='COMPLETED',
-            is_capitalized=False,
-            completed_at__date__gte=cutoff_date,
-            asset_id__in=asset_costs.keys()
-        ).exclude(id__in=processed_wo_ids)
-
-        if cost_center:
-            other_wos = other_wos.filter(
-                Q(incident_location__name=cost_center) | Q(asset__location__name=cost_center)
-            )
+            if fc.work_order and fc.work_order.asset_id:
+                ast_id = str(fc.work_order.asset_id)
+                if ast_id in asset_costs:
+                    asset_costs[ast_id]["cost"] += (fc.net_cost or Decimal('0'))
 
         for wo in other_wos:
-            ast_id = str(wo.asset_id)
-            wo_cost = wo.actual_cost or Decimal('0')
-            if ast_id in asset_costs:
-                asset_costs[ast_id]["cost"] += wo_cost
+            if wo.asset_id:
+                ast_id = str(wo.asset_id)
+                if ast_id in asset_costs:
+                    asset_costs[ast_id]["cost"] += (wo.actual_cost or Decimal('0'))
 
         # 3. Tính tổng chi phí toàn xưởng / toàn công ty
         total_maintenance_cost = sum((item["cost"] for item in asset_costs.values()), Decimal('0'))

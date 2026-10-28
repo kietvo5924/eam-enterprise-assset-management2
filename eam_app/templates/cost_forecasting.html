@@ -49,13 +49,20 @@
 
       <button id="btnOpenSettings" onclick="openSettingsModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer">
         <i class="ph-bold ph-sliders-horizontal text-sm text-slate-500"></i>
-        <span>Cấu Hình Tham Số</span>
+        <span>{% if can_write %}Cấu Hình Tham Số{% else %}Xem Tham Số Chính Sách{% endif %}</span>
       </button>
 
+      {% if can_write %}
       <button id="btnRunForecast" onclick="triggerRunForecast()" class="px-4 py-2 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer">
         <i class="ph-bold ph-arrows-clockwise text-sm"></i>
         <span>Tính Toán Dự Báo</span>
       </button>
+      {% else %}
+      <button id="btnRunForecast" disabled title="Chỉ người dùng có quyền Quản trị viên/Tài chính mới có thể thực thi dự báo lại" class="px-4 py-2 bg-slate-200 text-slate-400 font-bold text-xs rounded-xl flex items-center gap-2 shadow-xs shrink-0 cursor-not-allowed">
+        <i class="ph-bold ph-lock-simple text-sm"></i>
+        <span>Tính Toán Dự Báo</span>
+      </button>
+      {% endif %}
     </div>
   </div>
 
@@ -243,6 +250,51 @@
     </div>
   </div>
 
+  <!-- AI Backtesting & Model Validation Card (Task 11.6 Out-of-Sample Evaluation) -->
+  <div id="aiBacktestContainer" class="hidden bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
+      <div>
+        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <i class="ph-bold ph-chart-polar text-indigo-600"></i>
+          <span>Kiểm Định Backtest Chuỗi Thời Gian Ngoài Mẫu (Out-of-Sample Time-Series Validation)</span>
+          <span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full uppercase">Audited QRF</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Mô hình được huấn luyện trên giai đoạn trước và kiểm thử trên các kỳ lịch sử chưa tham gia học (loại trừ rò rỉ dữ liệu).</p>
+      </div>
+      <div class="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60 flex items-center gap-1.5 shrink-0">
+        <i class="ph-bold ph-info text-slate-400"></i>
+        <span>Độ bao phủ mục tiêu P10–P90: 80.0%</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+        <div class="text-[11px] text-slate-500 font-semibold">Sai số tuyệt đối (MAE)</div>
+        <div id="metricMae" class="text-base font-black text-slate-800 mt-0.5">--</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Mean Absolute Error</div>
+      </div>
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+        <div class="text-[11px] text-slate-500 font-semibold">Tỷ lệ sai số WAPE</div>
+        <div id="metricWape" class="text-base font-black text-slate-800 mt-0.5">--</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Weighted Abs % Error</div>
+      </div>
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+        <div class="text-[11px] text-slate-500 font-semibold">Căn bậc hai sai số (RMSE)</div>
+        <div id="metricRmse" class="text-base font-black text-slate-800 mt-0.5">--</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Root Mean Squared Error</div>
+      </div>
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+        <div class="text-[11px] text-slate-500 font-semibold">Độ bao phủ P10–P90</div>
+        <div id="metricCoverage" class="text-base font-black text-slate-800 mt-0.5">--</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Target: 80% trong dải dự báo</div>
+      </div>
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+        <div class="text-[11px] text-slate-500 font-semibold">Cải thiện vs SMA-3 Baseline</div>
+        <div id="metricImprovement" class="text-base font-black text-emerald-600 mt-0.5">--</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">So sánh trung bình trượt</div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 
@@ -283,6 +335,22 @@
         </div>
       </div>
 
+      <!-- Slider Section for Interactive Assumption -->
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+        <div class="flex justify-between items-center">
+          <label for="inputSimReductionRate" class="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Tỷ lệ cắt giảm sự cố giả định:
+          </label>
+          <span id="txtSimReductionRate" class="text-xs font-black text-primary bg-primary-50 px-2 py-0.5 rounded-full">70%</span>
+        </div>
+        <input type="range" id="inputSimReductionRate" min="10" max="100" step="5" value="70" oninput="onReductionRateChange(this.value)" class="w-full accent-primary cursor-pointer" />
+        <div class="flex justify-between text-[10px] text-slate-400">
+          <span>10% (Thận trọng)</span>
+          <span>50% (Trung bình)</span>
+          <span>100% (Loại bỏ triệt để)</span>
+        </div>
+      </div>
+
       <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
         <h4 class="text-xs font-bold uppercase text-slate-700 tracking-wider">Kịch Bản Giả Định: Sau Khi Thay Mới / Thanh Lý</h4>
         <div class="flex justify-between items-center text-xs">
@@ -301,7 +369,7 @@
 
       <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
         <i class="ph-bold ph-info text-base text-amber-600 shrink-0 mt-0.5"></i>
-        <span>Lưu ý: Đây là phép tính mô phỏng giả định phục vụ phân tích tài chính. Thao tác này tuyệt đối KHÔNG làm thay đổi trạng thái, danh mục hay dữ liệu tài sản thực tế trong hệ thống.</span>
+        <span id="simDisclaimerText">Giả định kịch bản: ước tính giảm 70% chi phí sự cố lịch sử của thiết bị này trong kỳ tới (tham số mô phỏng giả định, không đảm bảo chắc chắn). Thao tác này tuyệt đối KHÔNG làm thay đổi trạng thái, danh mục hay dữ liệu tài sản thực tế trong hệ thống.</span>
       </div>
 
       <div class="pt-2 flex justify-end">
@@ -340,6 +408,13 @@
 
     <!-- Modal Body -->
     <form id="formSettings" onsubmit="saveFinancialSettings(event)" class="p-6 space-y-4">
+      {% if not can_write %}
+      <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+        <i class="ph-bold ph-lock-simple text-base text-amber-600 shrink-0"></i>
+        <span>Chế độ chỉ xem: Bạn không có quyền thay đổi hạn mức ngân sách hoặc tham số tài chính của doanh nghiệp.</span>
+      </div>
+      {% endif %}
+
       <!-- Input 1: Ngân sách được duyệt cho kỳ đang chọn -->
       <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
         <div class="flex items-center justify-between mb-1.5">
@@ -350,15 +425,17 @@
           <span class="text-[10px] text-slate-400 font-semibold" id="modalCostCenterLabel">Toàn nhà máy</span>
         </div>
         <div class="relative">
-          <input type="text" id="inputApprovedBudget" oninput="formatNumberInput(this)" placeholder="Ví dụ: 1,500,000,000" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-14" />
+          <input type="text" id="inputApprovedBudget" {% if not can_write %}disabled{% endif %} oninput="formatNumberInput(this)" placeholder="Ví dụ: 1,500,000,000" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-14 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
           <div class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">VNĐ</div>
         </div>
         <div class="flex items-center justify-between mt-2">
           <span class="text-[11px] text-slate-500">Hạn mức tài chính thực tế do Ban Giám đốc duyệt</span>
+          {% if can_write %}
           <button type="button" onclick="suggestApprovedBudget()" class="text-[11px] text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer">
             <i class="ph-bold ph-magic-wand"></i>
             <span>Gợi ý: PM + 10%</span>
           </button>
+          {% endif %}
         </div>
       </div>
 
@@ -368,7 +445,7 @@
           Đơn Giá Giờ Công Thợ Tiêu Chuẩn (VNĐ / Giờ)
         </label>
         <div class="relative">
-          <input type="text" id="inputHourlyRate" oninput="formatNumberInput(this)" placeholder="150,000" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-20" />
+          <input type="text" id="inputHourlyRate" {% if not can_write %}disabled{% endif %} oninput="formatNumberInput(this)" placeholder="150,000" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-20 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
           <div class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">VNĐ / h</div>
         </div>
         <p class="text-[11px] text-slate-500 mt-1">Dùng để tính định mức giờ công bảo dưỡng PM và giờ thợ sửa sự cố.</p>
@@ -381,7 +458,7 @@
             Lạm Phát Vật Tư (%/năm)
           </label>
           <div class="relative">
-            <input type="number" step="0.1" min="0" max="30" id="inputInflationRate" placeholder="4.5" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8" />
+            <input type="number" step="0.1" min="0" max="30" id="inputInflationRate" {% if not can_write %}disabled{% endif %} placeholder="4.5" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
             <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
           </div>
         </div>
@@ -390,7 +467,7 @@
             Quỹ Dự Phòng Khẩn Cấp (%)
           </label>
           <div class="relative">
-            <input type="number" step="0.5" min="0" max="30" id="inputContingencyRate" placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8" />
+            <input type="number" step="0.5" min="0" max="30" id="inputContingencyRate" {% if not can_write %}disabled{% endif %} placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
             <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
           </div>
         </div>
@@ -402,7 +479,7 @@
           Ước Tính Linh Kiện Máy Nguy Cấp RUL (% Nguyên Giá)
         </label>
         <div class="relative">
-          <input type="number" step="0.5" min="1" max="50" id="inputSpareRatio" placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8" />
+          <input type="number" step="0.5" min="1" max="50" id="inputSpareRatio" {% if not can_write %}disabled{% endif %} placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
           <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
         </div>
         <p class="text-[11px] text-slate-500 mt-1">Khi máy sắp hỏng (Task 11.5) nhưng chưa có BOM, ước tính phụ tùng = % nguyên giá máy.</p>
@@ -411,12 +488,14 @@
       <!-- Modal Footer Actions -->
       <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
         <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer">
-          Hủy Bỏ
+          {% if can_write %}Hủy Bỏ{% else %}Đóng{% endif %}
         </button>
+        {% if can_write %}
         <button type="submit" id="btnSaveSettings" class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer">
           <i class="ph-bold ph-check text-sm"></i>
           <span>Lưu & Áp Dụng Ngay</span>
         </button>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -426,6 +505,8 @@
 <script>
 let costChartInstance = null;
 let currentForecastData = null;
+let currentSimLemonCost = 0;
+let currentSimCmP50 = 0;
 
 function formatVND(val) {
   if (val === null || val === undefined) return "0 VNĐ";
@@ -499,21 +580,40 @@ function openLemonSimulationModal() {
     return;
   }
   const topLemon = currentForecastData.lemonAssetsAlert.topLemonAsset;
-  const cmP50 = (currentForecastData.budgetOverview && currentForecastData.budgetOverview.predictedCmMedianP50) || 0;
-  const lemonCost = topLemon.totalMaintenanceCost || 0;
-
-  // Tính toán mô phỏng toán học: loại bỏ chi phí máy bad actor khỏi nhu cầu sửa chữa sự cố
-  const simNewCm = Math.max(0, cmP50 - (lemonCost * 0.7)); // Ước tính giảm 70% chi phí sự cố phát sinh từ máy này
-  const savings = cmP50 - simNewCm;
+  currentSimCmP50 = (currentForecastData.budgetOverview && currentForecastData.budgetOverview.predictedCmMedianP50) || 0;
+  currentSimLemonCost = topLemon.totalMaintenanceCost || 0;
 
   document.getElementById('simAssetName').textContent = `${topLemon.assetName} (${topLemon.costCenter || 'Xưởng'})`;
-  document.getElementById('simAssetCost').textContent = formatVND(lemonCost);
+  document.getElementById('simAssetCost').textContent = formatVND(currentSimLemonCost);
   document.getElementById('simAssetRrr').textContent = (topLemon.rrrPercent || 0) + '%';
-  document.getElementById('simCurrentCm').textContent = formatVND(cmP50);
-  document.getElementById('simNewCm').textContent = formatVND(simNewCm);
-  document.getElementById('simSavings').textContent = '-' + formatVND(savings);
+  document.getElementById('simCurrentCm').textContent = formatVND(currentSimCmP50);
+
+  const slider = document.getElementById('inputSimReductionRate');
+  if (slider) slider.value = 70;
+  onReductionRateChange(70);
 
   document.getElementById('lemonSimulationModal').classList.remove('hidden');
+}
+
+function onReductionRateChange(rateVal) {
+  const rate = parseInt(rateVal, 10) || 70;
+  const rateFraction = rate / 100.0;
+  const txtRate = document.getElementById('txtSimReductionRate');
+  if (txtRate) txtRate.textContent = rate + '%';
+  
+  const estimatedDeduction = currentSimLemonCost * rateFraction;
+  const simNewCm = Math.max(0, currentSimCmP50 - estimatedDeduction);
+  const savings = currentSimCmP50 - simNewCm;
+
+  const elNewCm = document.getElementById('simNewCm');
+  if (elNewCm) elNewCm.textContent = formatVND(simNewCm);
+  const elSavings = document.getElementById('simSavings');
+  if (elSavings) elSavings.textContent = '-' + formatVND(savings);
+  
+  const disclaimer = document.getElementById('simDisclaimerText');
+  if (disclaimer) {
+    disclaimer.textContent = `Giả định kịch bản: ước tính giảm ${rate}% chi phí sự cố lịch sử của thiết bị này trong kỳ tới (tham số mô phỏng giả định, không đảm bảo chắc chắn). Thao tác này tuyệt đối KHÔNG làm thay đổi trạng thái, danh mục hay dữ liệu tài sản thực tế trong hệ thống.`;
+  }
 }
 
 function closeLemonSimulationModal() {
@@ -560,6 +660,10 @@ function suggestApprovedBudget() {
 
 async function saveFinancialSettings(e) {
   e.preventDefault();
+  {% if not can_write %}
+  showToast('Chỉ Quản trị viên hoặc Quản lý Tài chính mới có quyền lưu cấu hình.', 'warning');
+  return;
+  {% endif %}
   const period = document.getElementById('selectPeriod').value;
   const costCenter = document.getElementById('selectCostCenter').value || null;
   const btn = document.getElementById('btnSaveSettings');
@@ -746,6 +850,46 @@ function renderForecastView(data) {
 
   // Top Cost Drivers
   renderCostDrivers(data.topCostDrivers || []);
+
+  // Backtest Metrics (Task 11.6 Out-of-Sample Validation)
+  renderBacktestMetrics(data.evaluationMetrics, data.isAiFallback);
+}
+
+function renderBacktestMetrics(metrics, isAiFallback) {
+  const container = document.getElementById('aiBacktestContainer');
+  if (!container) return;
+
+  if (isAiFallback || !metrics || !metrics.test_samples_count) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+  const maeEl = document.getElementById('metricMae');
+  const wapeEl = document.getElementById('metricWape');
+  const rmseEl = document.getElementById('metricRmse');
+  const covEl = document.getElementById('metricCoverage');
+  const impEl = document.getElementById('metricImprovement');
+
+  if (maeEl) maeEl.textContent = formatVND(metrics.mae);
+  if (wapeEl) wapeEl.textContent = (metrics.wape || 0).toFixed(1) + '%';
+  if (rmseEl) rmseEl.textContent = formatVND(metrics.rmse);
+  if (covEl) covEl.textContent = (metrics.coverage_p10_p90 || 0).toFixed(1) + '%';
+  
+  if (impEl) {
+    const imp = metrics.improvement_vs_sma_percent;
+    if (imp !== undefined && imp !== null) {
+      if (imp >= 0) {
+        impEl.textContent = '+' + imp.toFixed(1) + '%';
+        impEl.className = 'text-base font-black text-emerald-600 mt-0.5';
+      } else {
+        impEl.textContent = imp.toFixed(1) + '%';
+        impEl.className = 'text-base font-black text-amber-600 mt-0.5';
+      }
+    } else {
+      impEl.textContent = 'N/A';
+    }
+  }
 }
 
 function renderCostDrivers(drivers) {

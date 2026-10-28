@@ -201,11 +201,19 @@ class CostFeaturePipeline:
         rolling_std_3 = float(np.std(costs_float[-3:])) if len(costs_float) >= 3 else 0.0
 
         # 7 - 8: Bẫy bảo trì hoãn lại (Deferred Maintenance Trap - Rule 3)
-        # WO quá hạn chưa hoàn thành
+        # Tính toán Backlog chuẩn xác tại mốc target_date (chống rò rỉ dữ liệu tương lai)
+        target_dt = timezone.make_aware(
+            datetime.datetime.combine(target_date, datetime.time.max)
+        ) if timezone.is_naive(datetime.datetime.combine(target_date, datetime.time.max)) else datetime.datetime.combine(target_date, datetime.time.max)
+
         overdue_wo_qs = WorkOrder.all_objects.filter(
             tenant=tenant,
-            deadline__lt=timezone.now(),
-            status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS', 'ON_HOLD']
+            created_at__lte=target_dt,
+            deadline__lt=target_dt
+        ).filter(
+            Q(completed_at__isnull=True) | Q(completed_at__gt=target_dt)
+        ).exclude(
+            Q(status__in=['CANCELLED', 'CANCELED']) & Q(updated_at__lte=target_dt)
         )
         if cost_center:
             overdue_wo_qs = overdue_wo_qs.filter(
@@ -218,16 +226,19 @@ class CostFeaturePipeline:
         )['s'] or 0
         deferred_maintenance_hours = round(float(deferred_hours_val) / 60.0, 1)
 
-        # 9: Tổng số lượng thiết bị đang hoạt động
+        # 9: Tổng số lượng thiết bị đang hoạt động tại thời điểm target_date
         active_assets_qs = Asset.all_objects.filter(
-            tenant=tenant,
-            status__in=['OPERATIONAL', 'OPERATING']
+            tenant=tenant
+        ).filter(
+            Q(purchase_date__lte=target_date) | Q(created_at__date__lte=target_date)
+        ).exclude(
+            Q(status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD']) & Q(updated_at__date__lte=target_date)
         )
         if cost_center:
             active_assets_qs = active_assets_qs.filter(location__name=cost_center)
         active_assets_count = active_assets_qs.count()
 
-        # 10: Độ tuổi trung bình dàn máy móc (năm)
+        # 10: Độ tuổi trung bình dàn máy móc (năm) tính tại target_date
         assets_with_date = active_assets_qs.exclude(purchase_date__isnull=True)
         total_age_days = 0
         valid_assets_count = 0
@@ -239,7 +250,7 @@ class CostFeaturePipeline:
         if valid_assets_count > 0:
             avg_asset_age_years = round((total_age_days / (valid_assets_count * 365.25)), 1)
         else:
-            # Fallback: Tính theo ngày tạo hồ sơ tài sản (created_at) thay vì gán số cố định 3.5
+            # Fallback: Tính theo ngày tạo hồ sơ tài sản (created_at) tại mốc target_date
             created_age_days = 0
             created_count = 0
             for ast in active_assets_qs:
@@ -251,7 +262,7 @@ class CostFeaturePipeline:
                         created_count += 1
             avg_asset_age_years = round((created_age_days / (created_count * 365.25)), 1) if created_count > 0 else 0.0
 
-        # 11: Tỷ lệ sự cố đột xuất 3 tháng gần nhất (Rule 8)
+        # 11: Tỷ lệ sự cố đột xuất 3 tháng gần nhất tính ngược từ target_date (Rule 8)
         recent_90d = target_date - datetime.timedelta(days=90)
         recent_wos = WorkOrder.all_objects.filter(
             tenant=tenant,
@@ -267,23 +278,34 @@ class CostFeaturePipeline:
         breakdown_cm_ratio = round(float(cm_wos) / total_recent_wos, 2) if total_recent_wos > 0 else 0.0
 
         # 12: Nghĩa vụ tài chính vật tư từ máy RUL Critical Task 11.5 (Rule 10)
-        critical_assets = Asset.all_objects.filter(
-            tenant=tenant,
-            status__in=['OPERATIONAL', 'OPERATING']
-        ).filter(
-            Q(rul_risk_level='CRITICAL') | Q(rapid_degradation_alert=True)
-        ).select_related('primary_spare_part')
-
-        if cost_center:
-            critical_assets = critical_assets.filter(location__name=cost_center)
-
-        # Nạp cấu hình tỷ lệ linh kiện cốt lõi cấp Tenant
+        # Sử dụng lịch sử dự đoán RUL tại thời điểm target_date để chống rò rỉ tương lai
         from analytics.models import TenantFinancialSetting
         fin_setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
         spare_ratio = fin_setting.critical_spare_part_ratio if fin_setting else 0.05
 
+        today = timezone.now().date()
+        is_current_or_future = (target_date >= today.replace(day=1))
+        critical_assets_list = []
+
+        if is_current_or_future:
+            critical_assets_qs = active_assets_qs.filter(
+                Q(rul_risk_level='CRITICAL') | Q(rapid_degradation_alert=True)
+            ).select_related('primary_spare_part')
+            critical_assets_list = list(critical_assets_qs)
+        else:
+            # Tra cứu từ bảng AssetRulPrediction tính đến mốc target_dt
+            from assets.models import AssetRulPrediction
+            for ast in active_assets_qs.select_related('primary_spare_part'):
+                latest_pred = AssetRulPrediction.all_objects.filter(
+                    tenant=tenant,
+                    asset=ast,
+                    created_at__lte=target_dt
+                ).order_by('-created_at').first()
+                if latest_pred and latest_pred.risk_level == 'CRITICAL':
+                    critical_assets_list.append(ast)
+
         rul_critical_liability = Decimal('0')
-        for ca in critical_assets:
+        for ca in critical_assets_list:
             if ca.primary_spare_part and ca.primary_spare_part.unit_cost:
                 rul_critical_liability += ca.primary_spare_part.unit_cost
             else:
@@ -396,6 +418,7 @@ class CostFeaturePipeline:
 
         cur_year = reference_date.year
         cur_month = reference_date.month
+        tenant_created_date = tenant.created_at.date() if hasattr(tenant, 'created_at') and tenant.created_at else None
 
         for i in range(months_back, 0, -1):
             m = cur_month - i
@@ -407,6 +430,15 @@ class CostFeaturePipeline:
             start_t = datetime.date(y, m, 1)
             _, last_day = calendar.monthrange(y, m)
             end_t = datetime.date(y, m, last_day)
+
+            # Kiểm tra xem trong kỳ này có tài sản nào thuộc đối tượng bảo trì hay không (chống coi kỳ chưa có thiết bị là nhãn 0)
+            assets_existed = Asset.all_objects.filter(
+                tenant=tenant
+            ).filter(
+                Q(purchase_date__lte=end_t) | (Q(purchase_date__isnull=True) & Q(created_at__date__lte=end_t))
+            ).exists()
+            if not assets_existed:
+                continue
 
             # Target y_t: Chi phí thực tế tháng t
             target_cost = get_actual_consumption_net_cost(tenant, start_t, end_t, cost_center)

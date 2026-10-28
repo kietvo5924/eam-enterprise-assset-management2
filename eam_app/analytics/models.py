@@ -87,6 +87,7 @@ class BudgetForecast(BaseTenantModel):
     rul_critical_liability = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
     lemon_assets_detected = models.JSONField(default=list, blank=True)
     top_cost_drivers = models.JSONField(default=list, blank=True)
+    evaluation_metrics = models.JSONField(default=dict, blank=True, help_text="Chỉ số kiểm định Backtest chuỗi thời gian (MAE, WAPE, RMSE, Coverage)")
     is_ai_fallback = models.BooleanField(default=False)
     fallback_reason = models.CharField(max_length=64, null=True, blank=True, help_text="Lý do chuyển sang chế độ Fallback nếu có")
     is_manually_approved = models.BooleanField(default=False, help_text='True nếu hạn mức ngân sách được người dùng nhập tay phê duyệt')

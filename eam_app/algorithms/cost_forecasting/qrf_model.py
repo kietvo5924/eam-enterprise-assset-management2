@@ -193,12 +193,17 @@ class QuantileRegressionForestEngine:
         sma_improvement_pct = round(((sma_mae - mae) / sma_mae * 100.0), 1) if sma_mae > 0 else 0.0
 
         return {
+            "is_evaluated": True,
+            "test_samples_count": n_samples,
             "sampleCount": n_samples,
             "mae": round(mae, 2),
+            "wape": round(wape, 2),
             "wapePercent": round(wape, 2),
             "rmse": round(rmse, 2),
+            "coverage_p10_p90": round(coverage_rate, 1),
             "coverageP10P90Percent": round(coverage_rate, 1),
             "baselineSmaMae": round(sma_mae, 2),
+            "improvement_vs_sma_percent": sma_improvement_pct,
             "improvementOverBaselinePercent": sma_improvement_pct
         }
 

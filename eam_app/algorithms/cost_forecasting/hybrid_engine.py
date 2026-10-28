@@ -122,11 +122,6 @@ class HybridBudgetingEngine:
                 occurrences += 1
                 next_due += datetime.timedelta(days=int(cycle_days))
 
-            # Nếu chưa từng chạy và ngày gán kế hoạch rơi vào đúng kỳ này
-            if occurrences == 0 and not assign.last_triggered_at and assign.assigned_at:
-                if start_date <= assign.assigned_at.date() <= end_date:
-                    occurrences = 1
-
             if occurrences <= 0:
                 continue
 
@@ -203,9 +198,10 @@ class HybridBudgetingEngine:
             tenant, start_date=start_date, end_date=end_date, cost_center=cost_center, hourly_rate=hourly_rate
         )
 
-        # 3. Trích xuất đặc trưng chuỗi thời gian đa biến
+        # 3. Trích xuất đặc trưng chuỗi thời gian đa biến (nếu kỳ hiện tại, lấy mốc thời gian cập nhật nhất)
+        target_feature_date = max(today, start_date)
         feature_data = CostFeaturePipeline.extract_features(
-            tenant, target_date=start_date, cost_center=cost_center
+            tenant, target_date=target_feature_date, cost_center=cost_center
         )
         feature_vector = feature_data["feature_vector"]
         historical_costs = feature_data["historical_costs"]
@@ -246,11 +242,24 @@ class HybridBudgetingEngine:
             fallback_reason = None
 
         if not is_ai_fallback:
-            # Huấn luyện mô hình QRF trên dữ liệu thực tế đã kiểm định
+            # Đánh giá Backtest độc lập theo thời gian (Out-of-sample Time-Series Validation):
+            # Huấn luyện trên các kỳ trước, kiểm định sai số trên các kỳ sau chưa tham gia fit
+            k_test = max(3, int(len(y_real) * 0.25))
+            if len(y_real) > k_test:
+                X_train_split = X_real[:-k_test]
+                y_train_split = y_real[:-k_test]
+                X_test_split = X_real[-k_test:]
+                y_test_split = y_real[-k_test:]
+
+                backtest_engine = QuantileRegressionForestEngine()
+                backtest_engine.fit(X_train_split, y_train_split)
+                eval_metrics = backtest_engine.evaluate_backtest_performance(X_test_split, y_test_split)
+            else:
+                eval_metrics = {}
+
+            # Huấn luyện mô hình sản xuất trên toàn bộ dữ liệu lịch sử hợp lệ
             qrf_engine = QuantileRegressionForestEngine()
             qrf_engine.fit(X_real, y_real)
-
-            eval_metrics = qrf_engine.evaluate_backtest_performance(X_real, y_real)
 
             quantiles = qrf_engine.predict_quantiles(feature_vector)
             cm_p10_base = quantiles["p10"]
@@ -308,6 +317,7 @@ class HybridBudgetingEngine:
 
         contingency_buffer = round_vnd((planned_pm_cost + cm_p50_dec) * Decimal(str(contingency_rate)))
 
+        total_forecast_p10 = round_vnd(planned_pm_cost + cm_p10_dec + contingency_buffer)
         total_forecast_median = round_vnd(planned_pm_cost + cm_p50_dec + contingency_buffer)
         total_forecast_p90 = round_vnd(planned_pm_cost + cm_p90_dec + contingency_buffer)
 
@@ -357,6 +367,7 @@ class HybridBudgetingEngine:
             "predictedCmLowerP10": cm_p10_dec,
             "predictedCmUpperP90": cm_p90_dec,
             "contingencyBuffer": contingency_buffer,
+            "totalForecastP10": total_forecast_p10,
             "totalForecastMedian": total_forecast_median,
             "totalForecastP90": total_forecast_p90,
             "budgetUsageRatio": usage_ratio,

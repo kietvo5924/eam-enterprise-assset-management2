@@ -16,17 +16,16 @@ from algorithms.cost_forecasting import CostForecastingService
 
 def has_cost_forecasting_read_permission(user) -> bool:
     """
-    Quy định quyền xem dự báo tài chính, báo cáo ngân sách và dữ liệu xu hướng.
-    Chỉ cho phép Superuser, quản trị viên Tenant, vai trò Quản lý/Tài chính/Kế toán,
-    hoặc người dùng sở hữu quyền 'reports:read' / 'tenant:read' / 'system:admin'.
-    Kỹ thuật viên thuần túy không có quyền sẽ bị chặn 403.
+    Quy định quyền truy cập xem dự báo, báo cáo xu hướng chi phí và danh sách Lemon Asset.
+    Yêu cầu quyền 'reports:read', 'tenant:read' hoặc 'system:admin', hoặc vai trò quản trị/tài chính chính tắc.
+    Loại bỏ hoàn toàn việc khớp chuỗi mơ hồ ('admin', 'manager') để tránh rò rỉ quyền.
     """
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser or user.is_staff:
         return True
 
-    # 1. Kiểm tra quyền gán qua các vai trò
+    # 1. Kiểm tra permission chính thống
     perms = set()
     for role in user.roles.prefetch_related('permissions').all():
         for p in role.permissions.all():
@@ -35,9 +34,13 @@ def has_cost_forecasting_read_permission(user) -> bool:
     if any(p in perms for p in ('reports:read', 'tenant:read', 'system:admin')):
         return True
 
-    # 2. Kiểm tra tên vai trò quản lý / tài chính
-    role_names = [r.name.lower() for r in user.roles.all()]
-    if any(k in ' '.join(role_names) for k in ('admin', 'finance', 'manager', 'director', 'accountant')):
+    # 2. Kiểm tra tên vai trò quản trị / tài chính chính quy chuẩn mực
+    canonical_roles = {
+        'tenant_admin', 'super_admin', 'finance manager', 'finance director',
+        'cfo', 'chief accountant', 'plant manager'
+    }
+    role_names = {r.name.lower().strip() for r in user.roles.all()}
+    if role_names.intersection(canonical_roles):
         return True
 
     return False
@@ -47,7 +50,7 @@ def has_cost_forecasting_write_permission(user) -> bool:
     """
     Quy định quyền thay đổi cấu hình tài chính, đơn giá giờ công, tỷ lệ lạm phát,
     quỹ dự phòng và hạn mức ngân sách được duyệt.
-    Yêu cầu quyền 'tenant:update' hoặc 'system:admin', hoặc vai trò Admin / Finance Manager.
+    Yêu cầu quyền 'tenant:update' hoặc 'system:admin', hoặc vai trò Admin / Finance Manager chính tắc.
     """
     if not user or not user.is_authenticated:
         return False
@@ -62,8 +65,11 @@ def has_cost_forecasting_write_permission(user) -> bool:
     if any(p in perms for p in ('tenant:update', 'system:admin')):
         return True
 
-    role_names = [r.name.lower() for r in user.roles.all()]
-    if any(k in ' '.join(role_names) for k in ('admin', 'finance', 'manager', 'director')):
+    canonical_write_roles = {
+        'tenant_admin', 'super_admin', 'finance manager', 'finance director', 'cfo'
+    }
+    role_names = {r.name.lower().strip() for r in user.roles.all()}
+    if role_names.intersection(canonical_write_roles):
         return True
 
     return False
@@ -182,7 +188,8 @@ class CurrentForecastView(APIView):
                 "totalBadActorsCount": lemon_data.get("totalBadActorsCount", 0),
                 "topLemonAsset": top_lemon
             },
-            "topCostDrivers": forecast.top_cost_drivers
+            "topCostDrivers": forecast.top_cost_drivers,
+            "evaluationMetrics": getattr(forecast, 'evaluation_metrics', {}) or {}
         }
 
         return Response({'success': True, 'data': data})
@@ -263,7 +270,8 @@ class RunForecastView(APIView):
                 'totalForecastP90': float(forecast.total_forecast_p90),
                 'usageRatioPercent': forecast.budget_usage_ratio,
                 'isAiFallback': forecast.is_ai_fallback,
-                'fallbackReason': getattr(forecast, 'fallback_reason', None)
+                'fallbackReason': getattr(forecast, 'fallback_reason', None),
+                'evaluationMetrics': getattr(forecast, 'evaluation_metrics', {}) or {}
             }
         })
 

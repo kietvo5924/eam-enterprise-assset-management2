@@ -2881,7 +2881,7 @@ def portal_reports(request):
 def portal_cost_forecasting(request):
     if not request.user.is_authenticated:
         return redirect('portal_login')
-    from analytics.cost_forecasting_views import has_cost_forecasting_read_permission
+    from analytics.cost_forecasting_views import has_cost_forecasting_read_permission, has_cost_forecasting_write_permission
     if not has_cost_forecasting_read_permission(request.user):
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied("Bạn không có quyền truy cập trang Dự báo Chi phí & Ngân sách Bảo trì.")
@@ -2891,6 +2891,7 @@ def portal_cost_forecasting(request):
     tenant = getattr(request.user, 'tenant', None)
     locations = Location.objects.filter(tenant=tenant, is_active=True) if tenant else []
     readiness = CostForecastingService.check_readiness(tenant=tenant) if tenant else {}
+    can_write = has_cost_forecasting_write_permission(request.user)
     
     today = timezone.now().date()
     quarter = (today.month - 1) // 3 + 1
@@ -2901,6 +2902,7 @@ def portal_cost_forecasting(request):
         'current_period': current_period,
         'readiness': readiness,
         'ai_enabled': getattr(tenant, 'enable_ai_cost_forecasting', True) if tenant else False,
+        'can_write': can_write,
         'theme_color': getattr(tenant, 'theme_color', 'cyan') if tenant else 'cyan',
     }
     return render(request, 'cost_forecasting.html', context)

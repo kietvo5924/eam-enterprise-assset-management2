@@ -25,14 +25,24 @@ class WorkOrderTransitionService:
     @transaction.atomic
     def complete_work_order(
         cls,
-        work_order_id,
+        work_order_id=None,
         user=None,
         resolution_notes='',
         maintenance_action=None,
         actual_duration_minutes=None,
         post_repair_data=None,
-        tenant_id=None
+        tenant_id=None,
+        warranty_covered_amount=None,
+        insurance_covered_amount=None,
+        vendor_cost=None,
+        work_order=None,
+        performed_by=None
     ):
+        if work_order is not None and work_order_id is None:
+            work_order_id = work_order.id if hasattr(work_order, 'id') else work_order
+        if performed_by is not None and user is None:
+            user = performed_by
+
         query = WorkOrder.objects.select_for_update()
         if tenant_id:
             query = query.filter(tenant_id=tenant_id)
@@ -41,8 +51,16 @@ class WorkOrderTransitionService:
         if not wo:
             raise NotFound("Work Order not found")
 
-        # 1. Idempotency Check: Nếu đã COMPLETED trước đó, trả về luôn không thực hiện lại
+        # 1. Idempotency Check: Nếu đã COMPLETED trước đó
         if wo.status == 'COMPLETED':
+            # Cơ chế tự phục hồi (self-healing): nếu snapshot chi phí bị thiếu do lỗi trước đó, đóng băng ngay
+            from algorithms.cost_forecasting import CostForecastingService
+            CostForecastingService.freeze_work_order_cost(
+                wo,
+                warranty_covered_amount=warranty_covered_amount,
+                insurance_covered_amount=insurance_covered_amount,
+                vendor_cost=vendor_cost
+            )
             return wo
 
         # 2. State Validation: Chỉ có thể hoàn thành từ IN_PROGRESS
@@ -140,12 +158,14 @@ class WorkOrderTransitionService:
                 Q(draft_work_order=wo) | Q(draft_work_order__isnull=True)
             ).update(status='RESOLVED')
 
-        # 11. Task 11.6: Đóng băng bất biến snapshot chi phí và phân tách Gross vs Net Cost
-        try:
-            from algorithms.cost_forecasting import CostForecastingService
-            CostForecastingService.freeze_work_order_cost(wo)
-        except Exception as ex:
-            logger.error(f"Failed to freeze work order cost for completed WO {wo.id}: {ex}")
+        # 11. Task 11.6: Đóng băng bất biến snapshot chi phí và phân tách Gross vs Net Cost (Atomic)
+        from algorithms.cost_forecasting import CostForecastingService
+        CostForecastingService.freeze_work_order_cost(
+            wo,
+            warranty_covered_amount=warranty_covered_amount,
+            insurance_covered_amount=insurance_covered_amount,
+            vendor_cost=vendor_cost
+        )
 
         logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}, action={wo.maintenance_action}")
         return wo

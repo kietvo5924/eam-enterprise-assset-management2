@@ -998,3 +998,313 @@ class MaintenanceCostForecastingTests(TestCase):
         ).count()
         self.assertEqual(count_1, count_3)
 
+    def test_tc_cost_25_work_order_completion_atomicity_and_retry_self_healing(self):
+        """
+        TC-COST-25 (Fix A): Tính toàn vẹn dữ liệu Work Order Cost - Atomicity & Self-healing retry.
+        1. Khi hoàn thành Work Order, freeze_work_order_cost thực hiện nguyên tử.
+        2. Nếu freeze lỗi, giao dịch rollback, WO không bị đổi sang COMPLETED.
+        3. Idempotency: gọi hoàn thành lại không tạo bản ghi snapshot trùng.
+        4. Tự khắc phục (self-healing): nếu WO đã COMPLETED nhưng thiếu snapshot, gọi retry sẽ tự động freeze.
+        """
+        from workorders.services import WorkOrderTransitionService
+        from workorders.models import WorkOrderAttachment
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Test Atomicity Work Order',
+            type='CORRECTIVE',
+            status='IN_PROGRESS'
+        )
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url='https://minio.local/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=1024
+        )
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            spare_part=self.spare_part,
+            work_order=wo,
+            transaction_type='ISSUE',
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('1500000.00'),
+            total_amount=Decimal('1500000.00'),
+            issue_date=timezone.now()
+        )
+
+        # 1. Thử nghiệm rollback nguyên tử khi freeze lỗi
+        with patch.object(CostForecastingService, 'freeze_work_order_cost', side_effect=RuntimeError("Simulated Freeze DB Failure")):
+            with self.assertRaises(RuntimeError):
+                WorkOrderTransitionService.complete_work_order(
+                    work_order=wo,
+                    performed_by=self.user
+                )
+
+        wo.refresh_from_db()
+        # Trạng thái WO phải được rollback, không được để lửng lơ ở trạng thái COMPLETED
+        self.assertEqual(wo.status, 'IN_PROGRESS')
+        self.assertFalse(WorkOrderCost.all_objects.filter(tenant=self.tenant, work_order=wo).exists())
+
+        # 2. Hoàn thành thành công kèm khấu trừ bảo hành và bảo hiểm
+        completed_wo = WorkOrderTransitionService.complete_work_order(
+            work_order=wo,
+            performed_by=self.user,
+            warranty_covered_amount=Decimal('500000.00'),
+            insurance_covered_amount=Decimal('200000.00'),
+            vendor_cost=Decimal('300000.00')
+        )
+        self.assertEqual(completed_wo.status, 'COMPLETED')
+        self.assertIsNotNone(completed_wo.completed_at)
+
+        cost_snapshot = WorkOrderCost.all_objects.filter(tenant=self.tenant, work_order=wo).first()
+        self.assertIsNotNone(cost_snapshot)
+        self.assertTrue(cost_snapshot.is_cost_frozen)
+        self.assertEqual(cost_snapshot.warranty_covered_amount, Decimal('500000.00'))
+        self.assertEqual(cost_snapshot.insurance_covered_amount, Decimal('200000.00'))
+        self.assertEqual(cost_snapshot.vendor_cost, Decimal('300000.00'))
+        # Gross = 1.5M (vật tư) + 0.3M (vendor) = 1.8M
+        self.assertEqual(cost_snapshot.gross_cost, Decimal('1800000.00'))
+        # Net = Gross - (0.5M + 0.2M) = 1.1M
+        self.assertEqual(cost_snapshot.net_cost, Decimal('1100000.00'))
+        self.assertEqual(completed_wo.actual_cost, Decimal('1100000.00'))
+
+        # 3. Idempotency: Gọi lại lần 2 không sinh bản ghi duplicate
+        retry_wo = WorkOrderTransitionService.complete_work_order(
+            work_order=wo,
+            performed_by=self.user
+        )
+        self.assertEqual(retry_wo.status, 'COMPLETED')
+        self.assertEqual(WorkOrderCost.all_objects.filter(tenant=self.tenant, work_order=wo).count(), 1)
+
+        # 4. Self-healing: Giả sử bản ghi WorkOrderCost bị xóa ngoài ý muốn, gọi lại sẽ tự động đóng băng lại
+        WorkOrderCost.all_objects.filter(tenant=self.tenant, work_order=wo).delete()
+        self.assertFalse(WorkOrderCost.all_objects.filter(tenant=self.tenant, work_order=wo).exists())
+
+        healed_wo = WorkOrderTransitionService.complete_work_order(
+            work_order=wo,
+            performed_by=self.user
+        )
+        self.assertEqual(healed_wo.status, 'COMPLETED')
+        self.assertTrue(WorkOrderCost.all_objects.filter(tenant=self.tenant, work_order=wo, is_cost_frozen=True).exists())
+
+    def test_tc_cost_26_point_in_time_reconstruction_no_future_leakage(self):
+        """
+        TC-COST-26 (Fix B): Chống rò rỉ dữ liệu tương lai trong mô hình dự báo.
+        Đặc trưng backlog và RUL tại mốc lịch sử target_date chỉ phản ánh trạng thái đúng tại mốc đó.
+        """
+        target_past_date = timezone.now().date() - datetime.timedelta(days=90)
+        target_past_dt = timezone.make_aware(datetime.datetime.combine(target_past_date, datetime.time.min))
+
+        # WO quá khứ: tạo trước target_past_date, deadline trước target_past_date, nhưng hoàn thành SAU target_past_date
+        past_wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='WO Overdue at target_past_date',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            deadline=target_past_dt - datetime.timedelta(days=5),
+            completed_at=target_past_dt + datetime.timedelta(days=10)
+        )
+        # Giả lập created_at trong quá khứ
+        WorkOrder.objects.filter(id=past_wo.id).update(created_at=target_past_dt - datetime.timedelta(days=15))
+
+        # Trích xuất đặc trưng tại thời điểm quá khứ target_past_date
+        feat_past = CostFeaturePipeline.extract_features(self.tenant, target_date=target_past_date)
+        # Tại target_past_date, past_wo chưa hoàn thành và đã quá hạn -> phải được tính vào backlog
+        self.assertGreaterEqual(feat_past["backlog_orders_count"], 1)
+
+        # Trích xuất đặc trưng tại ngày hiện tại
+        feat_now = CostFeaturePipeline.extract_features(self.tenant, target_date=timezone.now().date())
+        # Tại thời điểm hiện tại, past_wo đã hoàn tất từ lâu -> không nằm trong backlog hiện tại
+        self.assertEqual(feat_now["backlog_orders_count"], 0)
+
+    def test_tc_cost_27_out_of_sample_timeseries_backtesting(self):
+        """
+        TC-COST-27 (Fix C): Backtest đánh giá ngoài mẫu (Out-of-sample time-series validation).
+        Kiểm định QRF trên tập test riêng biệt, tính toán MAE, WAPE, RMSE, Coverage P10-P90
+        và so sánh cải thiện với Baseline SMA-3.
+        """
+        # Tạo chuỗi 16 tháng lịch sử có chi phí thực tế
+        today = timezone.now().date()
+        self.asset.purchase_date = today - datetime.timedelta(days=1200)
+        self.asset.save()
+        for i in range(16, 0, -1):
+            m = today.month - i
+            y = today.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            wo_date = timezone.make_aware(datetime.datetime(y, m, 15, 10, 0))
+            wo_hist = WorkOrder.objects.create(
+                tenant=self.tenant,
+                asset=self.asset,
+                title=f'Hist WO {y}-{m}',
+                type='CORRECTIVE',
+                status='COMPLETED',
+                completed_at=wo_date
+            )
+            WorkOrder.objects.filter(id=wo_hist.id).update(created_at=wo_date - datetime.timedelta(days=2))
+            WorkOrderCost.all_objects.create(
+                tenant=self.tenant,
+                work_order=wo_hist,
+                net_cost=Decimal(str(10000000 + i * 500000)),
+                is_cost_frozen=True,
+                is_capital_overhaul=False,
+                cost_frozen_at=wo_date
+            )
+
+        res = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-Q4')
+        self.assertEqual(res["forecastMethod"], 'HYBRID_QRF')
+        self.assertFalse(res["isAiFallback"])
+
+        metrics = res.get("evaluationMetrics", {})
+        self.assertTrue(metrics.get("is_evaluated", False))
+        self.assertIn("mae", metrics)
+        self.assertIn("wape", metrics)
+        self.assertIn("rmse", metrics)
+        self.assertIn("coverage_p10_p90", metrics)
+        self.assertIn("improvement_vs_sma_percent", metrics)
+        self.assertGreater(metrics["test_samples_count"], 0)
+
+    def test_tc_cost_28_notification_dedup_cost_center_and_recipient_security(self):
+        """
+        TC-COST-28 (Fix E): Cảnh báo bội chi phân lập theo Cost Center và không phát tán cho user thiếu thẩm quyền.
+        1. Cảnh báo vượt ngân sách ở Xưởng A không làm chặn cảnh báo ở Xưởng B.
+        2. Người dùng kỹ thuật viên thông thường tuyệt đối không nhận được thông báo tài chính.
+        """
+        loc_b = Location.objects.create(name='Phân Xưởng Đúc Mạ', code='WORKSHOP_CAST_02', tenant=self.tenant)
+        tech_user = User.objects.create_user(
+            username=f'tech_sec_{uuid.uuid4().hex[:6]}',
+            email='tech_sec@test.com',
+            password='password123',
+            tenant=self.tenant,
+            status='ACTIVE'
+        )
+
+        # 1. Chạy cảnh báo cho Xưởng Cơ Điện
+        f_a = CostForecastingService.run_forecast(
+            tenant=self.tenant,
+            period='2026-Q4',
+            cost_center=self.loc.name,
+            approved_budget=Decimal('100.00')
+        )
+        self.assertEqual(f_a.budget_status, 'CRITICAL_OVERRUN')
+
+        # 2. Chạy cảnh báo cho Xưởng Đúc Mạ trong cùng một kỳ
+        f_b = CostForecastingService.run_forecast(
+            tenant=self.tenant,
+            period='2026-Q4',
+            cost_center=loc_b.name,
+            approved_budget=Decimal('100.00')
+        )
+        self.assertEqual(f_b.budget_status, 'CRITICAL_OVERRUN')
+
+        # Cả 2 xưởng đều phải có thông báo riêng biệt (không bị deduplication nuốt mất)
+        notifs_a = Notification.objects.filter(tenant=self.tenant, metadata__costCenter=self.loc.name)
+        notifs_b = Notification.objects.filter(tenant=self.tenant, metadata__costCenter=loc_b.name)
+        self.assertTrue(notifs_a.exists())
+        self.assertTrue(notifs_b.exists())
+
+        # 3. Kỹ thuật viên không có quyền không được nhận thông báo
+        tech_notifs = Notification.objects.filter(tenant=self.tenant, recipient=tech_user)
+        self.assertFalse(tech_notifs.exists())
+
+    def test_tc_cost_29_lemon_detector_asset_transfer_between_cost_centers(self):
+        """
+        TC-COST-29 (Fix F): Điều chuyển tài sản giữa các phân xưởng không làm mất lịch sử chi phí.
+        Máy phát sinh chi phí tại Xưởng A, sau đó chuyển sang Xưởng B:
+        Kiểm định Bad Actor tại Xưởng A vẫn ghi nhận đúng chi phí phát sinh tại Xưởng A.
+        """
+        loc_b = Location.objects.create(name='Phân Xưởng Ép Phôi', code='WORKSHOP_PRESS_03', tenant=self.tenant)
+        transfer_asset = Asset.objects.create(
+            name='Máy nén khí di động AC-200',
+            category=self.cat,
+            location=self.loc, # Ban đầu tại Xưởng Cơ Điện
+            qr_code=f"QR-{uuid.uuid4().hex[:8]}",
+            status='OPERATIONAL',
+            purchase_cost=Decimal('50000000.00'),
+            purchase_date=timezone.now().date() - datetime.timedelta(days=400),
+            tenant=self.tenant
+        )
+
+        # Phát sinh sửa chữa lớn tại Xưởng Cơ Điện
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=transfer_asset,
+            incident_location=self.loc,
+            title='Đại tu máy nén khí tại Xưởng Cơ Điện',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.now() - datetime.timedelta(days=60)
+        )
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            cost_center_snapshot=self.loc.name,
+            net_cost=Decimal('35000000.00'),
+            is_cost_frozen=True,
+            is_capital_overhaul=False,
+            cost_frozen_at=timezone.now() - datetime.timedelta(days=60)
+        )
+
+        # Sau đó tài sản được điều chuyển sang Phân Xưởng Ép Phôi
+        transfer_asset.location = loc_b
+        transfer_asset.save()
+
+        # Kiểm tra Lemon Detector cho Xưởng Cơ Điện: chi phí lịch sử 35M tại Xưởng Cơ Điện vẫn phải được thống kê
+        lemon_a = LemonAssetDetector.audit_lemon_assets(self.tenant, cost_center=self.loc.name)
+        lemon_assets_a = lemon_a.get("lemonAssets", [])
+        transferred_ids = [la["assetId"] for la in lemon_assets_a]
+        self.assertIn(str(transfer_asset.id), transferred_ids)
+
+    def test_tc_cost_30_deterministic_pm_intervals_and_quantile_total_consistency(self):
+        """
+        TC-COST-30 (Fix G & H): Chu kỳ PM mới gán không bị kích hoạt sai và tính nhất quán P10, P50, P90.
+        1. Kế hoạch PM định kỳ 1 năm được gán 5 ngày trước không bị tính chi phí trong tháng này.
+        2. Kịch bản P10, P50, P90 có cùng cơ sở chi phí xác định (Planned PM + Quantile CM + Buffer).
+        """
+        # Gán kế hoạch PM 1 năm
+        yearly_plan = PmPlan.objects.create(
+            tenant=self.tenant,
+            name='Bảo dưỡng tổng thể hàng năm',
+            interval_value=Decimal('1.0'),
+            interval_unit='YEARS',
+            estimated_duration_minutes=360,
+            is_active=True
+        )
+        PmPlanAssignment.objects.create(
+            tenant=self.tenant,
+            pm_plan=yearly_plan,
+            asset=self.asset,
+            status='ACTIVE',
+            assigned_at=timezone.now() - datetime.timedelta(days=5)
+        )
+
+        today = timezone.now().date()
+        start_d = today
+        end_d = today + datetime.timedelta(days=30)
+        pm_cost = HybridBudgetingEngine.calculate_deterministic_pm_budget(self.tenant, start_d, end_d)
+        # Kế hoạch năm (365 ngày) mới gán 5 ngày trước -> Chưa đến hạn trong 30 ngày tới
+        self.assertEqual(pm_cost, Decimal('0.00'))
+
+        # Kiểm tra tính nhất quán công thức P10, P50, P90
+        forecast_res = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-Q4')
+        pm = forecast_res["plannedPmBudget"]
+        buf = forecast_res["contingencyBuffer"]
+        cm_p10 = forecast_res["predictedCmLowerP10"]
+        cm_p50 = forecast_res["predictedCmMedian"]
+        cm_p90 = forecast_res["predictedCmUpperP90"]
+
+        tot_p10 = forecast_res["totalForecastP10"]
+        tot_p50 = forecast_res["totalForecastMedian"]
+        tot_p90 = forecast_res["totalForecastP90"]
+
+        self.assertEqual(tot_p10, pm + cm_p10 + buf)
+        self.assertEqual(tot_p50, pm + cm_p50 + buf)
+        self.assertEqual(tot_p90, pm + cm_p90 + buf)
+        self.assertLessEqual(tot_p10, tot_p50)
+        self.assertLessEqual(tot_p50, tot_p90)
+
