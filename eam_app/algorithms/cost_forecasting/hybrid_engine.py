@@ -1,0 +1,316 @@
+"""
+Động cơ Lập Ngân Sách Lai Ghép Hai Nhịp (Two-Step Hybrid Budgeting Engine) (Task 11.6).
+Tách bạch ngân sách bảo trì định kỳ xác định (Deterministic PM) và ngân sách sự cố (Stochastic CM QRF),
+kết hợp chỉ số trượt giá lạm phát, quỹ dự phòng rủi ro và cơ chế Fallback an toàn.
+"""
+import calendar
+import datetime
+from decimal import Decimal
+from typing import Dict, List, Optional, Any, Tuple
+
+from django.utils import timezone
+from django.db.models import Sum, Q
+
+from maintenance.models import PmPlan, PmPlanAssignment, PmPlanMaterial
+from assets.models import Asset
+from algorithms.cost_forecasting.constants import (
+    DEFAULT_INFLATION_RATE,
+    DEFAULT_CONTINGENCY_BUFFER_RATE,
+    DEFAULT_LABOR_HOURLY_RATE,
+    WARNING_BUDGET_USAGE_RATIO,
+    CRITICAL_BUDGET_USAGE_RATIO,
+    MIN_MONTHS_TRAINING_DATA
+)
+from algorithms.cost_forecasting.feature_pipeline import CostFeaturePipeline
+from algorithms.cost_forecasting.qrf_model import QuantileRegressionForestEngine
+
+
+def round_vnd(val: Decimal | float | int) -> Decimal:
+    """Làm tròn tiền tệ VNĐ không có phần thập phân theo chuẩn ROUND_HALF_UP."""
+    if val is None:
+        return Decimal('0')
+    d = Decimal(str(val)) if not isinstance(d := val, Decimal) else d
+    return d.quantize(Decimal('1'), rounding='ROUND_HALF_UP')
+
+
+class HybridBudgetingEngine:
+    """
+    Engine thực hiện quy trình dự báo tài chính hai nhịp kết hợp PM và CM.
+    """
+
+    @classmethod
+    def calculate_deterministic_pm_budget(
+        cls,
+        tenant,
+        start_date: datetime.date,
+        end_date: datetime.date,
+        cost_center: Optional[str] = None,
+        hourly_rate: Optional[Decimal] = None
+    ) -> Decimal:
+        """
+        Nhịp 1: Tính toán chính xác 100% ngân sách bảo trì định kỳ PM trong kỳ tới.
+        Dựa trên các PmPlanAssignment đang ACTIVE, định mức linh kiện PmPlanMaterial
+        và đơn giá giờ công thợ cấu hình động cấp Tenant.
+        """
+        if hourly_rate is None:
+            from analytics.models import TenantFinancialSetting
+            setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
+            hourly_rate = setting.default_labor_hourly_rate if setting else DEFAULT_LABOR_HOURLY_RATE
+
+        assignments_qs = PmPlanAssignment.all_objects.filter(
+            tenant=tenant,
+            status='ACTIVE'
+        ).select_related('pm_plan', 'asset')
+
+        if cost_center:
+            assignments_qs = assignments_qs.filter(asset__location__name=cost_center)
+
+        period_days = max(1, (end_date - start_date).days + 1)
+        total_pm_cost = Decimal('0')
+
+        for assign in assignments_qs:
+            plan = assign.pm_plan
+            if not plan.is_active:
+                continue
+
+            # Ước tính số lần kích hoạt trong kỳ dựa trên tần suất interval
+            val = float(plan.interval_value or 30.0)
+            unit = plan.interval_unit or 'DAYS'
+
+            if unit == 'DAYS':
+                cycle_days = max(1.0, val)
+            elif unit == 'WEEKS':
+                cycle_days = max(1.0, val * 7.0)
+            elif unit == 'MONTHS':
+                cycle_days = max(1.0, val * 30.0)
+            elif unit == 'YEARS':
+                cycle_days = max(1.0, val * 365.0)
+            else:
+                cycle_days = 30.0
+
+            occurrences = max(1.0, round(period_days / cycle_days, 1))
+
+            # Chi phí vật tư định mức tiêu chuẩn
+            materials_cost = Decimal('0')
+            for mat in plan.materials.all().select_related('spare_part'):
+                qty = mat.quantity or Decimal('1.0')
+                u_cost = mat.spare_part.unit_cost or Decimal('0')
+                materials_cost += (qty * u_cost)
+
+            # Chi phí giờ công tiêu chuẩn theo đơn giá động của Tenant
+            duration_mins = plan.estimated_duration_minutes or 120
+            labor_hours = Decimal(str(duration_mins / 60.0))
+            labor_cost = labor_hours * hourly_rate
+
+            one_time_cost = materials_cost + labor_cost
+            total_pm_cost += (one_time_cost * Decimal(str(occurrences)))
+
+        return round_vnd(total_pm_cost)
+
+    @classmethod
+    def execute_forecast(
+        cls,
+        tenant,
+        period_str: str,
+        cost_center: Optional[str] = None,
+        approved_budget: Optional[Decimal] = None,
+        inflation_rate: Optional[float] = None,
+        contingency_rate: Optional[float] = None,
+        hourly_rate: Optional[Decimal] = None
+    ) -> Dict[str, Any]:
+        """
+        Chạy toàn bộ quy trình dự báo lai ghép cho kỳ được chỉ định (e.g. '2026-Q4' hoặc '2026-11').
+        Tự động nạp tham số tài chính cấu hình động cấp Tenant và hạn mức ngân sách phê duyệt thực tế.
+        """
+        today = timezone.now().date()
+
+        # 0. Nạp cấu hình tài chính cấp Tenant (nếu chưa truyền tham số ghi đè)
+        from analytics.models import TenantFinancialSetting, PeriodApprovedBudget
+        setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
+
+        if hourly_rate is None:
+            hourly_rate = setting.default_labor_hourly_rate if setting else DEFAULT_LABOR_HOURLY_RATE
+        if inflation_rate is None:
+            inflation_rate = setting.default_inflation_rate if setting else DEFAULT_INFLATION_RATE
+        if contingency_rate is None:
+            contingency_rate = setting.default_contingency_rate if setting else DEFAULT_CONTINGENCY_BUFFER_RATE
+
+        # 1. Xác định khung thời gian start_date, end_date của kỳ dự báo
+        if '-Q' in period_str:
+            # Ví dụ: 2026-Q4
+            parts = period_str.split('-Q')
+            y = int(parts[0])
+            q = int(parts[1])
+            start_month = (q - 1) * 3 + 1
+            end_month = start_month + 2
+            start_date = datetime.date(y, start_month, 1)
+            _, last_day = calendar.monthrange(y, end_month)
+            end_date = datetime.date(y, end_month, last_day)
+        elif '-' in period_str:
+            # Ví dụ: 2026-11
+            parts = period_str.split('-')
+            y = int(parts[0])
+            m = int(parts[1])
+            start_date = datetime.date(y, m, 1)
+            _, last_day = calendar.monthrange(y, m)
+            end_date = datetime.date(y, m, last_day)
+        else:
+            start_date = today
+            end_date = today + datetime.timedelta(days=90)
+
+        # 2. Nhịp 1: Tính toán chi phí bảo trì định kỳ PM xác định 100% theo đơn giá giờ công của Tenant
+        planned_pm_cost = cls.calculate_deterministic_pm_budget(
+            tenant, start_date=start_date, end_date=end_date, cost_center=cost_center, hourly_rate=hourly_rate
+        )
+
+        # 3. Trích xuất đặc trưng chuỗi thời gian đa biến
+        feature_data = CostFeaturePipeline.extract_features(
+            tenant, target_date=start_date, cost_center=cost_center
+        )
+        feature_vector = feature_data["feature_vector"]
+        historical_costs = feature_data["historical_costs"]
+        backlog_count = feature_data["backlog_orders_count"]
+        deferred_hours = feature_data["deferred_maintenance_hours"]
+        rul_liability = feature_data["rul_critical_liability"]
+        total_rav = feature_data["total_fleet_rav"]
+
+        # Kiểm tra cờ AI Governance của Tenant và điều kiện khởi động nguội
+        ai_enabled = getattr(tenant, 'enable_ai_cost_forecasting', True)
+        valid_history_count = sum(1 for _, cost in historical_costs if cost > Decimal('0'))
+        is_cold_start = (valid_history_count < MIN_MONTHS_TRAINING_DATA)
+
+        top_cost_drivers = []
+        is_ai_fallback = False
+
+        if ai_enabled and not is_cold_start:
+            # Huấn luyện mô hình QRF và trích xuất phân vị P10, P50, P90
+            forecast_method = 'HYBRID_QRF'
+            recent_avg_cost = feature_vector[3]  # sma_3_cost
+            if recent_avg_cost <= 0:
+                recent_avg_cost = feature_vector[0] if feature_vector[0] > 0 else 50000000.0
+
+            X_train, y_train = CostFeaturePipeline.generate_synthetic_training_data(
+                base_features=feature_vector,
+                base_cost=recent_avg_cost,
+                num_samples=48
+            )
+
+            qrf_engine = QuantileRegressionForestEngine()
+            qrf_engine.fit(X_train, y_train)
+
+            quantiles = qrf_engine.predict_quantiles(feature_vector)
+            cm_p10_base = quantiles["p10"]
+            cm_p50_base = quantiles["p50"]
+            cm_p90_base = quantiles["p90"]
+
+            # Nhịp 2 (Hậu xử lý tài chính - Rule 4): Áp dụng chỉ số trượt giá lạm phát
+            inflation_factor = 1.0 + float(inflation_rate)
+            cm_p10 = cm_p10_base * inflation_factor
+            cm_p50 = cm_p50_base * inflation_factor
+            cm_p90 = cm_p90_base * inflation_factor
+
+            # Cộng thêm nghĩa vụ tài chính vật tư từ Task 11.5 nếu có
+            if rul_liability > Decimal('0'):
+                rul_liability_float = float(rul_liability)
+                cm_p50 += rul_liability_float
+                cm_p90 += rul_liability_float
+
+            top_cost_drivers = qrf_engine.get_top_cost_drivers(top_n=5)
+        else:
+            # Cơ chế Fallback xác định an toàn (Rule 12 & Governance)
+            forecast_method = 'DETERMINISTIC_FALLBACK'
+            is_ai_fallback = True
+
+            # Lấy trung bình trượt SMA3 hoặc định mức kinh nghiệm 3.5% RAV / năm quy đổi
+            base_cm = Decimal('0')
+            if feature_vector[3] > 0:
+                base_cm = Decimal(str(feature_vector[3]))
+            elif total_rav > Decimal('0'):
+                # 3.5% RAV phân bổ cho kỳ 3 tháng (1/4 năm)
+                base_cm = round_vnd((total_rav * Decimal('0.035')) / Decimal('4.0'))
+            else:
+                base_cm = Decimal('45000000.00')
+
+            inflation_factor = Decimal(str(1.0 + float(inflation_rate)))
+            base_cm_adjusted = base_cm * inflation_factor
+
+            if rul_liability > Decimal('0'):
+                base_cm_adjusted += rul_liability
+
+            cm_p50 = float(base_cm_adjusted)
+            cm_p10 = cm_p50 * 0.85
+            cm_p90 = cm_p50 * 1.25
+
+            top_cost_drivers = [
+                {"feature": "Kế hoạch bảo trì định kỳ xác định (Deterministic PM)", "raw_key": "planned_pm", "importance": 0.45},
+                {"feature": "Định mức bảo trì theo giá trị thay thế (RAV Benchmark)", "raw_key": "total_fleet_rav", "importance": 0.35},
+                {"feature": "Chỉ số trượt giá lạm phát kỳ vọng", "raw_key": "inflation", "importance": 0.20}
+            ]
+
+        # 4. Quỹ dự phòng khẩn cấp & Tổng hợp ngân sách
+        cm_p10_dec = round_vnd(cm_p10)
+        cm_p50_dec = round_vnd(cm_p50)
+        cm_p90_dec = round_vnd(cm_p90)
+
+        contingency_buffer = round_vnd((planned_pm_cost + cm_p50_dec) * Decimal(str(contingency_rate)))
+
+        total_forecast_median = round_vnd(planned_pm_cost + cm_p50_dec + contingency_buffer)
+        total_forecast_p90 = round_vnd(planned_pm_cost + cm_p90_dec + contingency_buffer)
+
+        # 5. So sánh hạn mức ngân sách và đánh giá cảnh báo sớm bội chi (Rule 11)
+        is_manually_approved = False
+        if approved_budget is not None and approved_budget > Decimal('0'):
+            is_manually_approved = True
+        else:
+            # Tra cứu bảng PeriodApprovedBudget xem ban giám đốc đã duyệt ngân sách cho kỳ/xưởng này chưa
+            pab_qs = PeriodApprovedBudget.all_objects.filter(tenant=tenant, period=period_str)
+            if cost_center:
+                pab_qs = pab_qs.filter(cost_center=cost_center)
+            else:
+                pab_qs = pab_qs.filter(cost_center__isnull=True)
+            pab = pab_qs.first()
+
+            if pab and pab.approved_budget > Decimal('0'):
+                approved_budget = pab.approved_budget
+                is_manually_approved = True
+            else:
+                # Ngân sách mặc định ước tính bằng 105% kịch bản trung vị nếu chưa cấu hình
+                approved_budget = round_vnd(total_forecast_median * Decimal('1.05'))
+                is_manually_approved = False
+
+        usage_ratio = 0.0
+        if approved_budget > Decimal('0'):
+            usage_ratio = round(float((total_forecast_median / approved_budget) * Decimal('100.0')), 1)
+
+        if usage_ratio > CRITICAL_BUDGET_USAGE_RATIO:
+            budget_status = 'CRITICAL_OVERRUN'
+        elif usage_ratio >= WARNING_BUDGET_USAGE_RATIO:
+            budget_status = 'WARNING'
+        else:
+            budget_status = 'HEALTHY'
+
+        return {
+            "period": period_str,
+            "costCenter": cost_center,
+            "forecastMethod": forecast_method,
+            "isAiFallback": is_ai_fallback,
+            "isManuallyApproved": is_manually_approved,
+            "approvedBudget": approved_budget,
+            "plannedPmBudget": planned_pm_cost,
+            "predictedCmMedian": cm_p50_dec,
+            "predictedCmLowerP10": cm_p10_dec,
+            "predictedCmUpperP90": cm_p90_dec,
+            "contingencyBuffer": contingency_buffer,
+            "totalForecastMedian": total_forecast_median,
+            "totalForecastP90": total_forecast_p90,
+            "budgetUsageRatio": usage_ratio,
+            "budgetStatus": budget_status,
+            "inflationRateApplied": inflation_rate,
+            "hourlyRateApplied": float(hourly_rate),
+            "backlogOrdersCount": backlog_count,
+            "deferredMaintenanceHours": deferred_hours,
+            "rulCriticalLiability": rul_liability,
+            "topCostDrivers": top_cost_drivers,
+            "totalFleetRav": total_rav
+        }
+

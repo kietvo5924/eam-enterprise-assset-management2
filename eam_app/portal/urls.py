@@ -19,6 +19,8 @@ urlpatterns = [
     path('locations/api/', views.portal_locations_api, name='locations_api'),
     path('assets/', views.portal_asset_registry, name='portal_asset_registry'),
     path('work-orders/', views.portal_work_orders, name='portal_work_orders'),
+    path('workorders/', views.portal_work_orders, name='portal_workorders_alias'),
+    path('notifications/', views.portal_notifications, name='portal_notifications'),
     path('workforce-tools/', views.portal_workforce_tools, name='portal_workforce_tools'),
     path('workforce-tools/api/skills/', views.portal_workforce_skills_api, name='portal_workforce_skills_api'),
     path('workforce-tools/api/cert-types/', views.portal_cert_types_api, name='portal_cert_types_api'),
@@ -34,4 +36,5 @@ urlpatterns = [
     path('pm-plans/assignments/<uuid:assignment_id>/', views.portal_pm_plan_assignments, name='portal_pm_plan_assignments_detail'),
     path('audit-logs/', views.portal_audit_logs, name='portal_audit_logs'),
     path('reports/', views.portal_reports, name='portal_reports'),
+    path('cost-forecasting/', views.portal_cost_forecasting, name='portal_cost_forecasting'),
 ]

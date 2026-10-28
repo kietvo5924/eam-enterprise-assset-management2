@@ -245,6 +245,10 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
                     <span>Khẩn cấp</span>
                   </button>
+                  <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="finance" title="Cảnh báo ngân sách và chi phí tài chính">
+                    <i class="ph ph-currency-circle-dollar text-xs text-emerald-600"></i>
+                    <span>Ngân sách</span>
+                  </button>
                   <button type="button" class="notif-tab shrink-0 px-2.5 py-1 rounded-md text-neutral-500 hover:bg-neutral-200/70 transition-colors flex items-center gap-1 select-none cursor-pointer" data-tab="incident" title="Báo cáo sự cố phát sinh tại hiện trường">
                     <i class="ph ph-warning-octagon text-xs text-amber-600"></i>
                     <span>Sự cố</span>
@@ -398,6 +402,14 @@
                 <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Báo cáo</span>
                 <i class="ph ph-lock-key text-xs text-neutral-400 ml-auto shrink-0 sidebar-text"></i>
               </div>
+              {% endif %}
+
+              <!-- Cost Forecasting (Task 11.6) -->
+              {% if 'cost_forecast:read' in user_permissions or 'reports:read' in user_permissions or is_system_admin %}
+              <a href="{% url 'portal_cost_forecasting' %}" class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group h-10 overflow-hidden {% if request.resolver_match.url_name == 'portal_cost_forecasting' %}bg-primary-50 text-primary font-semibold{% else %}text-neutral-600 hover:bg-neutral-100{% endif %}">
+                <i class="{% if request.resolver_match.url_name == 'portal_cost_forecasting' %}ph-fill{% else %}ph group-hover:text-primary transition-colors{% endif %} ph-trend-up text-lg shrink-0"></i>
+                <span class="sidebar-text font-medium text-sm whitespace-nowrap transition-opacity duration-300 opacity-100">Dự báo chi phí</span>
+              </a>
               {% endif %}
 
               <!-- Inventory -->
@@ -864,6 +876,8 @@
                   endpoint += '&is_actionable=true&action_status=PENDING';
               } else if (this.currentTab === 'urgent') {
                   endpoint += '&severity=CRITICAL,URGENT';
+              } else if (this.currentTab === 'finance') {
+                  endpoint += '&category=FINANCE';
               } else if (this.currentTab === 'incident') {
                   endpoint += '&event_type=WO_INCIDENT_REPORTED,WO_EMERGENCY_CREATED,WO_ESCALATED,ANOMALY_DETECTED';
               } else if (this.currentTab === 'work_order') {
@@ -1422,6 +1436,17 @@
 
           const currentTheme = localStorage.getItem('eam_theme') || currentUserTheme;
           updateThemeUI(currentTheme);
+
+          // Auto open notification bell if requested via url param or hash
+          try {
+              const urlParams = new URLSearchParams(window.location.search);
+              if (urlParams.get('open_notifications') === '1' || window.location.hash === '#notifications') {
+                  const bellBtn = document.getElementById('notification-bell-btn');
+                  if (bellBtn) {
+                      setTimeout(() => bellBtn.click(), 350);
+                  }
+              }
+          } catch (e) {}
       });
 
       // Delegate item clicks inside notification list: open detail modal

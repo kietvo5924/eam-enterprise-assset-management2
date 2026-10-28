@@ -1,0 +1,448 @@
+"""
+Orchestrator Service cho Phân hệ Quản lý & Dự báo Chi phí Bảo trì (Task 11.6).
+Tích hợp ORM, đóng băng chi phí bất biến, liên kết cảnh báo bội chi và thông báo Real-time.
+"""
+import calendar
+import datetime
+from decimal import Decimal
+from typing import Dict, List, Optional, Any
+
+from django.utils import timezone
+from django.db import transaction
+from django.db.models import Sum, Q
+
+from analytics.models import BudgetForecast
+from workorders.models import WorkOrder, WorkOrderCost, LaborLog
+from assets.models import Asset, StockTransaction
+from users.models import User
+from maintenance.models import PmPlan
+from notifications.models import Notification
+from algorithms.cost_forecasting.constants import (
+    DEFAULT_INFLATION_RATE,
+    DEFAULT_CONTINGENCY_BUFFER_RATE,
+    MIN_MONTHS_TRAINING_DATA
+)
+from algorithms.cost_forecasting.feature_pipeline import CostFeaturePipeline, get_actual_consumption_net_cost
+from algorithms.cost_forecasting.lemon_detector import LemonAssetDetector
+from algorithms.cost_forecasting.hybrid_engine import HybridBudgetingEngine, round_vnd
+
+
+class CostForecastingService:
+    """
+    Dịch vụ điều phối cấp cao cho bài toán Quản lý & Dự báo Chi phí Doanh nghiệp.
+    """
+
+    @classmethod
+    @transaction.atomic
+    def freeze_work_order_cost(
+        cls,
+        work_order: WorkOrder,
+        warranty_covered_amount: Optional[Decimal] = None,
+        insurance_covered_amount: Optional[Decimal] = None,
+        vendor_cost: Optional[Decimal] = None
+    ) -> WorkOrderCost:
+        """
+        Quy tắc 1: Khóa bất biến đơn giá snapshot tại thời điểm hoàn tất nghiệm thu Work Order.
+        Quy tắc 2: Tách bạch CapEx vs OpEx.
+        Quy tắc 6: Bóc tách Gross vs Net Cost (trừ bảo hành & bảo hiểm).
+        """
+        tenant = work_order.tenant
+
+        # 1. Tính toán chi phí vật tư từ các giao dịch StockTransaction liên kết
+        mat_txs = StockTransaction.all_objects.filter(
+            tenant=tenant,
+            work_order=work_order
+        )
+        material_cost = Decimal('0')
+        cost_center_snapshot = None
+
+        for tx in mat_txs:
+            amt = tx.total_amount or Decimal('0')
+            if tx.transaction_type == 'RETURN':
+                material_cost -= amt
+            else:
+                material_cost += amt
+
+            if tx.cost_center_snapshot and not cost_center_snapshot:
+                cost_center_snapshot = tx.cost_center_snapshot
+
+        # 2. Tính toán chi phí giờ công thợ từ LaborLog
+        labor_logs = LaborLog.all_objects.filter(
+            tenant=tenant,
+            work_order=work_order
+        )
+        labor_cost = labor_logs.aggregate(s=Sum('total_cost'))['s'] or Decimal('0')
+        if not cost_center_snapshot:
+            first_ll = labor_logs.filter(cost_center_snapshot__isnull=False).first()
+            if first_ll:
+                cost_center_snapshot = first_ll.cost_center_snapshot
+
+        if not cost_center_snapshot and work_order.asset and work_order.asset.location:
+            cost_center_snapshot = work_order.asset.location.name
+
+        # 3. Chi phí thuê ngoài dịch vụ
+        v_cost = vendor_cost or Decimal('0')
+
+        # 4. Chi phí gộp Gross Cost
+        gross_cost = max(Decimal('0'), material_cost + labor_cost + v_cost)
+
+        # 5. Chi phí bảo hành & bảo hiểm
+        w_cost = warranty_covered_amount or Decimal('0')
+        i_cost = insurance_covered_amount or Decimal('0')
+
+        # 6. Chi phí ròng Net Cost
+        net_cost = max(Decimal('0'), gross_cost - (w_cost + i_cost))
+
+        # 7. Cờ đại tu lớn CapEx
+        is_cap = bool(
+            work_order.is_capitalized
+            or work_order.maintenance_action == 'CORE_REPLACEMENT'
+        )
+
+        cost_obj, _ = WorkOrderCost.all_objects.update_or_create(
+            tenant=tenant,
+            work_order=work_order,
+            defaults={
+                "cost_center_snapshot": cost_center_snapshot,
+                "material_cost": round_vnd(material_cost),
+                "labor_cost": round_vnd(labor_cost),
+                "vendor_cost": round_vnd(v_cost),
+                "gross_cost": round_vnd(gross_cost),
+                "warranty_covered_amount": round_vnd(w_cost),
+                "insurance_covered_amount": round_vnd(i_cost),
+                "net_cost": round_vnd(net_cost),
+                "is_capital_overhaul": is_cap,
+                "is_cost_frozen": True,
+                "cost_frozen_at": timezone.now()
+            }
+        )
+
+        # Đồng bộ ngược vào WorkOrder.actual_cost
+        work_order.actual_cost = cost_obj.net_cost
+        work_order.save(update_fields=['actual_cost'])
+
+        return cost_obj
+
+    @classmethod
+    def run_forecast(
+        cls,
+        tenant,
+        period: Optional[str] = None,
+        cost_center: Optional[str] = None,
+        approved_budget: Optional[Decimal] = None,
+        inflation_rate: float = DEFAULT_INFLATION_RATE,
+        contingency_rate: float = DEFAULT_CONTINGENCY_BUFFER_RATE
+    ) -> BudgetForecast:
+        """
+        Kích hoạt tác vụ tính toán dự báo ngân sách mới và lưu trữ vào database.
+        Phát cảnh báo sớm Real-time nếu ngân sách vượt ngưỡng.
+        """
+        if not period:
+            today = timezone.now().date()
+            quarter = (today.month - 1) // 3 + 1
+            period = f"{today.year}-Q{quarter}"
+
+        # 1. Chạy động cơ dự báo lai ghép
+        forecast_result = HybridBudgetingEngine.execute_forecast(
+            tenant=tenant,
+            period_str=period,
+            cost_center=cost_center,
+            approved_budget=approved_budget,
+            inflation_rate=inflation_rate,
+            contingency_rate=contingency_rate
+        )
+
+        # 2. Kiểm định tài sản chanh chua Lemon Assets
+        lemon_data = LemonAssetDetector.audit_lemon_assets(
+            tenant=tenant,
+            cost_center=cost_center
+        )
+        lemon_assets_list = lemon_data.get("lemonAssets", [])
+
+        # Nếu người dùng có nhập approved_budget > 0, cập nhật vào PeriodApprovedBudget
+        if approved_budget is not None and approved_budget > Decimal('0'):
+            from analytics.models import PeriodApprovedBudget
+            PeriodApprovedBudget.all_objects.update_or_create(
+                tenant=tenant,
+                period=period,
+                cost_center=cost_center,
+                defaults={
+                    'approved_budget': approved_budget,
+                    'is_manually_approved': True
+                }
+            )
+
+        # 3. Lưu vào cơ sở dữ liệu bảng budget_forecasts
+        budget_forecast = BudgetForecast.all_objects.create(
+            tenant=tenant,
+            cost_center_snapshot=cost_center,
+            forecast_period=period,
+            forecast_method=forecast_result["forecastMethod"],
+            approved_budget=forecast_result["approvedBudget"],
+            planned_pm_budget=forecast_result["plannedPmBudget"],
+            predicted_cm_median=forecast_result["predictedCmMedian"],
+            predicted_cm_lower_p10=forecast_result["predictedCmLowerP10"],
+            predicted_cm_upper_p90=forecast_result["predictedCmUpperP90"],
+            contingency_buffer=forecast_result["contingencyBuffer"],
+            total_forecast_median=forecast_result["totalForecastMedian"],
+            total_forecast_p90=forecast_result["totalForecastP90"],
+            budget_usage_ratio=forecast_result["budgetUsageRatio"],
+            budget_status=forecast_result["budgetStatus"],
+            inflation_rate_applied=forecast_result["inflationRateApplied"],
+            backlog_work_orders_count=forecast_result["backlogOrdersCount"],
+            deferred_maintenance_hours=forecast_result["deferredMaintenanceHours"],
+            rul_critical_liability=forecast_result["rulCriticalLiability"],
+            lemon_assets_detected=lemon_assets_list,
+            top_cost_drivers=forecast_result["topCostDrivers"],
+            is_ai_fallback=forecast_result["isAiFallback"],
+            is_manually_approved=forecast_result.get("isManuallyApproved", False)
+        )
+
+        # 4. Kích hoạt cảnh báo Real-time (Task 10.1) nếu vượt ngưỡng
+        if budget_forecast.budget_status in ['WARNING', 'CRITICAL_OVERRUN']:
+            cls._dispatch_overrun_notifications(tenant, budget_forecast)
+
+        return budget_forecast
+
+    @classmethod
+    def _dispatch_overrun_notifications(cls, tenant, forecast: BudgetForecast) -> None:
+        """
+        Gửi thông báo Real-time cho Admin và Kế toán trưởng khi ngân sách chạm ngưỡng nguy hiểm.
+        """
+        severity = 'CRITICAL' if forecast.budget_status == 'CRITICAL_OVERRUN' else 'WARNING'
+        status_text = "Bội chi nghiêm trọng" if severity == 'CRITICAL' else "Tiệm cận hạn mức"
+
+        title = f"Cảnh báo Ngân sách {forecast.forecast_period}: {status_text} ({forecast.budget_usage_ratio}%)"
+        message = (
+            f"Tổng ngân sách bảo trì dự báo ({int(forecast.total_forecast_median):,} VNĐ) "
+            f"đã đạt {forecast.budget_usage_ratio}% hạn mức được duyệt ({int(forecast.approved_budget):,} VNĐ)."
+        )
+
+        # Tìm các user có quyền quản lý tài chính hoặc admin
+        recipients = User.objects.filter(
+            tenant=tenant,
+            status='ACTIVE'
+        ).filter(
+            Q(is_superuser=True)
+            | Q(roles__name__icontains='Admin')
+            | Q(roles__name__icontains='Finance')
+            | Q(roles__name__icontains='Manager')
+        ).distinct()
+
+        # Fallback nếu tenant chưa phân quyền chi tiết vai trò
+        if not recipients.exists():
+            recipients = User.objects.filter(tenant=tenant, status='ACTIVE')
+
+        for recipient in recipients[:10]:
+            Notification.objects.create(
+                tenant=tenant,
+                recipient=recipient,
+                event_type='BUDGET_OVERRUN_ALERT',
+                category='FINANCE',
+                severity=severity,
+                title=title,
+                message=message,
+                link='/portal/cost-forecasting/',
+                metadata={
+                    "forecastId": str(forecast.id),
+                    "period": forecast.forecast_period,
+                    "budgetUsageRatio": forecast.budget_usage_ratio,
+                    "budgetStatus": forecast.budget_status
+                }
+            )
+
+    @classmethod
+    def get_current_forecast(
+        cls,
+        tenant,
+        period: Optional[str] = None,
+        cost_center: Optional[str] = None
+    ) -> BudgetForecast:
+        """
+        Lấy bản ghi dự báo ngân sách hiện hành gần nhất, hoặc tự động chạy mới nếu chưa có.
+        """
+        if not period:
+            today = timezone.now().date()
+            quarter = (today.month - 1) // 3 + 1
+            period = f"{today.year}-Q{quarter}"
+
+        qs = BudgetForecast.all_objects.filter(
+            tenant=tenant,
+            forecast_period=period
+        )
+        if cost_center:
+            qs = qs.filter(cost_center_snapshot=cost_center)
+        else:
+            qs = qs.filter(cost_center_snapshot__isnull=True)
+
+        latest = qs.order_by('-created_at').first()
+        if latest:
+            return latest
+
+        # Nếu chưa có, chạy tính toán tức thời
+        return cls.run_forecast(
+            tenant=tenant,
+            period=period,
+            cost_center=cost_center
+        )
+
+    @classmethod
+    def get_lemon_assets(cls, tenant, cost_center: Optional[str] = None) -> Dict[str, Any]:
+        """Lấy danh sách thiết bị quả chanh & Bad Actors theo kiểm định Pareto 80/20 & RRR."""
+        return LemonAssetDetector.audit_lemon_assets(tenant=tenant, cost_center=cost_center)
+
+    @classmethod
+    def get_historical_trends(
+        cls,
+        tenant,
+        cost_center: Optional[str] = None,
+        months: int = 12
+    ) -> Dict[str, Any]:
+        """
+        Lấy chuỗi lịch sử chi phí thực tế đối sánh với kịch bản dự báo P10, P50, P90.
+        """
+        today = timezone.now().date()
+        hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
+            tenant, reference_date=today, months_back=months, cost_center=cost_center
+        )
+
+        labels = [item[0] for item in hist_costs]
+        actual_values = [float(item[1]) for item in hist_costs]
+
+        # Lấy dự báo hiện tại để nối tiếp chuỗi
+        cur_forecast = cls.get_current_forecast(tenant, cost_center=cost_center)
+        p10_val = float(cur_forecast.predicted_cm_lower_p10 + cur_forecast.planned_pm_budget)
+        p50_val = float(cur_forecast.total_forecast_median)
+        p90_val = float(cur_forecast.total_forecast_p90)
+
+        return {
+            "labels": labels,
+            "actualSeries": actual_values,
+            "forecastProjections": {
+                "period": cur_forecast.forecast_period,
+                "p10": p10_val,
+                "p50": p50_val,
+                "p90": p90_val,
+                "status": cur_forecast.budget_status
+            }
+        }
+
+    @classmethod
+    def check_readiness(cls, tenant) -> Dict[str, Any]:
+        """
+        Kiểm tra tính sẵn sàng của dữ liệu và trạng thái quản trị AI của Tenant.
+        """
+        ai_enabled = getattr(tenant, 'enable_ai_cost_forecasting', True)
+        today = timezone.now().date()
+
+        hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
+            tenant, reference_date=today, months_back=6
+        )
+        months_with_data = sum(1 for _, cost in hist_costs if cost > Decimal('0'))
+        is_ready = bool(ai_enabled and months_with_data >= MIN_MONTHS_TRAINING_DATA)
+
+        active_assets_count = Asset.all_objects.filter(
+            tenant=tenant,
+            status__in=['OPERATIONAL', 'OPERATING']
+        ).count()
+
+        return {
+            "aiEnabled": ai_enabled,
+            "monthsWithData": months_with_data,
+            "minMonthsRequired": MIN_MONTHS_TRAINING_DATA,
+            "isReadyForAiQrf": is_ready,
+            "activeAssetsCount": active_assets_count,
+            "activePmPlansCount": PmPlan.all_objects.filter(tenant=tenant, is_active=True).count(),
+            "statusLabel": "Sẵn sàng chạy Rừng hồi quy phân vị (QRF)" if is_ready else (
+                "Chế độ Fallback Heuristic (Chưa đủ 3 tháng dữ liệu)" if ai_enabled else "AI Tắt theo cấu hình Quản trị viên"
+            )
+        }
+
+    @classmethod
+    def get_financial_settings(cls, tenant, period: Optional[str] = None, cost_center: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Lấy thiết lập chính sách tài chính của Tenant và hạn mức ngân sách đã duyệt theo kỳ/phân xưởng.
+        """
+        from analytics.models import TenantFinancialSetting, PeriodApprovedBudget
+        setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
+
+        default_rate = float(setting.default_labor_hourly_rate) if setting else 150000.0
+        default_inflation = setting.default_inflation_rate if setting else 0.045
+        default_contingency = setting.default_contingency_rate if setting else 0.05
+        spare_ratio = setting.critical_spare_part_ratio if setting else 0.05
+
+        pab_val = None
+        is_manual = False
+        if period:
+            pab_qs = PeriodApprovedBudget.all_objects.filter(tenant=tenant, period=period)
+            if cost_center:
+                pab_qs = pab_qs.filter(cost_center=cost_center)
+            else:
+                pab_qs = pab_qs.filter(cost_center__isnull=True)
+            pab = pab_qs.first()
+            if pab:
+                pab_val = float(pab.approved_budget)
+                is_manual = pab.is_manually_approved
+
+        return {
+            "defaultLaborHourlyRate": default_rate,
+            "defaultInflationRatePercent": round(default_inflation * 100.0, 1),
+            "defaultContingencyRatePercent": round(default_contingency * 100.0, 1),
+            "criticalSparePartRatioPercent": round(spare_ratio * 100.0, 1),
+            "approvedBudget": pab_val,
+            "isManuallyApproved": is_manual,
+            "currency": setting.currency if setting else "VND"
+        }
+
+    @classmethod
+    @transaction.atomic
+    def update_financial_settings(cls, tenant, data: Dict[str, Any], user=None) -> Dict[str, Any]:
+        """
+        Cập nhật cấu hình tài chính linh hoạt cấp Tenant và lưu hạn mức ngân sách được duyệt thực tế.
+        """
+        from analytics.models import TenantFinancialSetting, PeriodApprovedBudget
+        setting, _ = TenantFinancialSetting.all_objects.get_or_create(tenant=tenant)
+
+        if "defaultLaborHourlyRate" in data and data["defaultLaborHourlyRate"] is not None:
+            raw_rate = str(data["defaultLaborHourlyRate"]).replace(',', '').replace(' ', '')
+            try:
+                setting.default_labor_hourly_rate = Decimal(raw_rate)
+            except Exception:
+                pass
+        if "defaultInflationRate" in data and data["defaultInflationRate"] is not None:
+            val = float(data["defaultInflationRate"])
+            setting.default_inflation_rate = val / 100.0 if val > 1.0 else val
+        if "defaultContingencyRate" in data and data["defaultContingencyRate"] is not None:
+            val = float(data["defaultContingencyRate"])
+            setting.default_contingency_rate = val / 100.0 if val > 1.0 else val
+        if "criticalSparePartRatio" in data and data["criticalSparePartRatio"] is not None:
+            val = float(data["criticalSparePartRatio"])
+            setting.critical_spare_part_ratio = val / 100.0 if val > 1.0 else val
+        setting.save()
+
+        period = data.get("period")
+        cost_center = data.get("costCenter") or data.get("cost_center")
+        approved_budget_raw = data.get("approvedBudget") or data.get("approved_budget")
+
+        if period and approved_budget_raw is not None:
+            raw_app = str(approved_budget_raw).replace(',', '').replace(' ', '')
+            if raw_app.count('.') > 1:
+                raw_app = raw_app.replace('.', '')
+            try:
+                dec_app = Decimal(raw_app)
+                if dec_app > 0:
+                    PeriodApprovedBudget.all_objects.update_or_create(
+                        tenant=tenant,
+                        period=period,
+                        cost_center=cost_center,
+                        defaults={
+                            "approved_budget": dec_app,
+                            "is_manually_approved": True,
+                            "approved_by": user if user and user.is_authenticated else None,
+                            "notes": data.get("notes")
+                        }
+                    )
+            except Exception:
+                pass
+
+        return cls.get_financial_settings(tenant, period=period, cost_center=cost_center)

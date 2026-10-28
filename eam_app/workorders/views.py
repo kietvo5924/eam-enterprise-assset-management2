@@ -466,6 +466,13 @@ class WorkOrderStatusView(APIView):
             logger = logging.getLogger(__name__)
             logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}")
             
+            # Task 11.6: Khóa bất biến đơn giá snapshot và phân tách Gross vs Net Cost
+            try:
+                from algorithms.cost_forecasting import CostForecastingService
+                CostForecastingService.freeze_work_order_cost(wo)
+            except Exception as e:
+                logger.error(f"Failed to freeze work order cost for WO {wo.id}: {e}")
+            
         return success_response(WorkOrderSerializer(wo).data)
 
 class WorkOrderReportIncidentView(APIView):

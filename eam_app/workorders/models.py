@@ -276,3 +276,36 @@ class GAOptimizationJob(BaseTenantModel):
 
     def __str__(self):
         return f"GA Job {self.id} [{self.status}] Gen: {self.current_generation}/{self.max_generations}"
+
+
+class WorkOrderCost(BaseTenantModel):
+    """
+    Task 11.6: Lưu trữ snapshot chi phí bất biến, phân tách Gross vs Net Cost
+    và cờ vốn hóa CapEx khi Work Order nghiệm thu hoàn tất.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    work_order = models.OneToOneField(WorkOrder, on_delete=models.CASCADE, related_name='cost_breakdown')
+    cost_center_snapshot = models.CharField(max_length=255, null=True, blank=True)
+    material_cost = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    labor_cost = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    vendor_cost = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    gross_cost = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    warranty_covered_amount = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    insurance_covered_amount = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    net_cost = models.DecimalField(max_digits=19, decimal_places=2, default=0.00)
+    is_capital_overhaul = models.BooleanField(default=False)
+    is_cost_frozen = models.BooleanField(default=False)
+    cost_frozen_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'work_order_costs'
+        indexes = [
+            models.Index(fields=['tenant', 'is_cost_frozen', 'created_at']),
+            models.Index(fields=['tenant', 'cost_center_snapshot']),
+        ]
+
+    def __str__(self):
+        return f"Cost of {self.work_order.title} (Gross: {self.gross_cost}, Net: {self.net_cost})"
+
