@@ -1308,3 +1308,151 @@ class MaintenanceCostForecastingTests(TestCase):
         self.assertLessEqual(tot_p10, tot_p50)
         self.assertLessEqual(tot_p50, tot_p90)
 
+    def test_tc_cost_31_post_freeze_return_adjustment_accounted(self):
+        """
+        TC-COST-31: Xử lý biến động sau khi đã khóa snapshot chi phí:
+        Xuất trả phụ tùng dư thừa (RETURN) phát sinh sau mốc cost_frozen_at
+        được trừ giảm chính xác khi tính tiêu hao thực tế, đồng thời bảo toàn tính bất biến
+        của bản ghi WorkOrderCost ban đầu (không sửa đè snapshot cũ).
+        """
+        start_d = datetime.date(2026, 8, 1)
+        end_d = datetime.date(2026, 8, 31)
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Lệnh bảo trì có hoàn trả sau nghiệm thu',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.make_aware(datetime.datetime(2026, 8, 10, 10, 0))
+        )
+        # Đóng băng snapshot với vật tư 10M, giờ công 2M -> Net = 12M
+        cost_snap = WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            material_cost=Decimal('10000000.00'),
+            labor_cost=Decimal('2000000.00'),
+            gross_cost=Decimal('12000000.00'),
+            net_cost=Decimal('12000000.00'),
+            is_cost_frozen=True,
+            cost_frozen_at=timezone.make_aware(datetime.datetime(2026, 8, 10, 11, 0))
+        )
+
+        # 3 ngày sau, trả lại kho 1 phụ tùng dư trị giá 3M (RETURN)
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='RETURN',
+            quantity=Decimal('-1.00'),
+            unit_price=Decimal('3000000.00'),
+            total_amount=Decimal('3000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 8, 13, 14, 0)),
+            created_at=timezone.make_aware(datetime.datetime(2026, 8, 13, 14, 0))
+        )
+
+        # Chi phí tiêu hao thực tế kỳ tháng 8 phải phản ánh khoản giảm 3M: 12M - 3M = 9,000,000 VNĐ
+        actual_net = get_actual_consumption_net_cost(self.tenant, start_d, end_d)
+        self.assertEqual(actual_net, Decimal('9000000.00'))
+
+        # Snapshot gốc ban đầu phải được giữ nguyên vẹn không bị ghi đè
+        cost_snap.refresh_from_db()
+        self.assertEqual(cost_snap.net_cost, Decimal('12000000.00'))
+        self.assertEqual(cost_snap.material_cost, Decimal('10000000.00'))
+
+    def test_tc_cost_32_capex_completion_updates_asset_capitalized_cost(self):
+        """
+        TC-COST-32: Kế thừa cờ CapEx khi hoàn thành đại tu lớn (Rule 2):
+        Cập nhật lũy kế chi phí vốn hóa vào Asset.capitalized_cost.
+        """
+        initial_cap = self.asset.capitalized_cost or Decimal('0.00')
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Đại tu thay thế cụm trục chính CapEx',
+            type='CORRECTIVE',
+            status='IN_PROGRESS',
+            is_capitalized=True,
+            maintenance_action='CORE_REPLACEMENT'
+        )
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='ISSUE',
+            quantity=Decimal('10.00'),
+            unit_price=Decimal('5000000.00'),
+            total_amount=Decimal('50000000.00'),
+            issue_date=timezone.now()
+        )
+
+        cost_obj = CostForecastingService.freeze_work_order_cost(wo)
+        self.assertTrue(cost_obj.is_capital_overhaul)
+        self.assertEqual(cost_obj.net_cost, Decimal('50000000.00'))
+
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.capitalized_cost, initial_cap + Decimal('50000000.00'))
+
+    def test_tc_cost_33_lemon_assets_strictly_excludes_disposed_machines(self):
+        """
+        TC-COST-33: Kiểm định Lemon Asset loại bỏ 100% thiết bị đã thanh lý (Rule 7):
+        Thiết bị đã chuyển trạng thái DISPOSED tuyệt đối không xuất hiện trong danh sách Bad Actor.
+        """
+        scrap_asset = Asset.objects.create(
+            name='Máy tiện cũ đã thanh lý',
+            category=self.cat,
+            location=self.loc,
+            qr_code=f"QR-SCRAP-{uuid.uuid4().hex[:6]}",
+            status='OPERATIONAL',
+            purchase_cost=Decimal('50000000.00'),
+            tenant=self.tenant
+        )
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=scrap_asset,
+            title='Sửa chữa máy tiện cũ',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.now() - datetime.timedelta(days=20)
+        )
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            net_cost=Decimal('45000000.00'),
+            is_cost_frozen=True
+        )
+
+        # Chuyển trạng thái máy sang SCRAPPED / DISPOSED
+        scrap_asset.status = 'DISPOSED'
+        scrap_asset.save()
+
+        lemon_res = LemonAssetDetector.audit_lemon_assets(self.tenant)
+        lemon_ids = [la["assetId"] for la in lemon_res["lemonAssets"]]
+        self.assertNotIn(str(scrap_asset.id), lemon_ids)
+        if lemon_res["topLemonAsset"]:
+            self.assertNotEqual(lemon_res["topLemonAsset"]["assetId"], str(scrap_asset.id))
+
+    def test_tc_cost_34_default_estimated_budget_status_healthy_and_no_notification_spam(self):
+        """
+        TC-COST-34: Ngân sách ước tính mặc định (120% kịch bản trung vị) giữ trạng thái HEALTHY,
+        không tự động kích hoạt cảnh báo WARNING hay phát tán Notification bội chi giả mạo.
+        """
+        # Chạy dự báo mà không truyền approved_budget
+        forecast = CostForecastingService.run_forecast(
+            tenant=self.tenant,
+            period='2026-Q4'
+        )
+
+        # Ngân sách mặc định 120% -> tỷ lệ sử dụng ~ 83.3% (< 85% Warning) -> HEALTHY
+        self.assertFalse(forecast.is_manually_approved)
+        self.assertEqual(forecast.budget_status, 'HEALTHY')
+        self.assertLess(forecast.budget_usage_ratio, 85.0)
+
+        # Không phát sinh Notification WARNING nào
+        notifs = Notification.objects.filter(
+            tenant=self.tenant,
+            event_type='BUDGET_OVERRUN_ALERT',
+            metadata__period='2026-Q4'
+        )
+        self.assertFalse(notifs.exists())
+

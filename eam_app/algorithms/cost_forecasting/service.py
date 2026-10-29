@@ -156,9 +156,17 @@ class CostForecastingService:
         work_order.actual_cost = cost_obj.net_cost
         work_order.save(update_fields=['actual_cost'])
 
+        # Rule 2: Kế thừa cờ CapEx và cập nhật giá trị vốn hóa vào Asset.capitalized_cost
+        if is_cap and work_order.asset_id:
+            asset = work_order.asset
+            current_cap = asset.capitalized_cost or Decimal('0.00')
+            asset.capitalized_cost = current_cap + cost_obj.net_cost
+            asset.save(update_fields=['capitalized_cost'])
+
         return cost_obj
 
     @classmethod
+    @transaction.atomic
     def run_forecast(
         cls,
         tenant,
@@ -246,7 +254,11 @@ class CostForecastingService:
         """
         Gửi thông báo Real-time cho Admin và Kế toán trưởng khi ngân sách chạm ngưỡng nguy hiểm.
         Kiểm tra chống spam thông báo trùng lặp cho cùng một kỳ và trạng thái trong 24 giờ.
+        Không tự phát cảnh báo WARNING nếu ngân sách chỉ là con số ước tính mặc định chưa phê duyệt.
         """
+        if not forecast.is_manually_approved and forecast.budget_status == 'WARNING':
+            return
+
         # Deduplication check: Kiểm tra theo Tenant, Kỳ, Trạng thái VÀ Cost Center trong 24 giờ
         recent_threshold = timezone.now() - datetime.timedelta(hours=24)
         cc_val = forecast.cost_center_snapshot or ""

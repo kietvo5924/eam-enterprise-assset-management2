@@ -35,10 +35,15 @@ class LemonAssetDetector:
         """
         cutoff_date = timezone.now().date() - timedelta(days=days_window)
 
-        # 1. Danh sách tài sản cơ sở
+        # 1. Danh sách tài sản đã thanh lý cần cắt tỉa triệt để (Rule 7)
+        disposed_asset_ids = set(Asset.all_objects.filter(
+            tenant=tenant,
+            status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD']
+        ).values_list('id', flat=True))
+
         assets_base_qs = Asset.all_objects.filter(
             tenant=tenant
-        ).exclude(status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD'])
+        ).exclude(id__in=disposed_asset_ids)
 
         if cost_center:
             current_location_assets = assets_base_qs.filter(location__name=cost_center)
@@ -53,6 +58,8 @@ class LemonAssetDetector:
             is_capital_overhaul=False,
             work_order__status='COMPLETED',
             work_order__completed_at__date__gte=cutoff_date
+        ).exclude(
+            work_order__asset_id__in=disposed_asset_ids
         ).select_related('work_order', 'work_order__asset')
 
         if cost_center:
@@ -65,24 +72,33 @@ class LemonAssetDetector:
             status='COMPLETED',
             is_capitalized=False,
             completed_at__date__gte=cutoff_date
-        ).exclude(id__in=processed_wo_ids).select_related('asset')
+        ).exclude(
+            id__in=processed_wo_ids
+        ).exclude(
+            asset_id__in=disposed_asset_ids
+        ).select_related('asset', 'incident_location', 'asset__location')
 
         if cost_center:
+            # Ưu tiên incident_location tại thời điểm phát sinh sự cố, chỉ fallback sang asset.location khi incident_location là NULL
+            # Tránh lỗi tính trùng chi phí khi tài sản đã điều chuyển sang xưởng mới
             other_wos = other_wos.filter(
-                Q(incident_location__name=cost_center) | Q(asset__location__name=cost_center)
+                Q(incident_location__name=cost_center) |
+                (Q(incident_location__isnull=True) & Q(asset__location__name=cost_center))
             )
 
-        # Tập hợp tất cả các tài sản liên quan (gồm tài sản hiện tại và tài sản từng phát sinh chi phí tại cost center này)
+        # Tập hợp tất cả các tài sản liên quan (loại trừ tài sản đã thanh lý)
         relevant_asset_ids = set(current_location_assets.values_list('id', flat=True))
         for fc in frozen_costs:
-            if fc.work_order and fc.work_order.asset_id:
+            if fc.work_order and fc.work_order.asset_id and fc.work_order.asset_id not in disposed_asset_ids:
                 relevant_asset_ids.add(fc.work_order.asset_id)
         for wo in other_wos:
-            if wo.asset_id:
+            if wo.asset_id and wo.asset_id not in disposed_asset_ids:
                 relevant_asset_ids.add(wo.asset_id)
 
         all_relevant_assets = {
-            str(ast.id): ast for ast in Asset.all_objects.filter(id__in=relevant_asset_ids)
+            str(ast.id): ast for ast in Asset.all_objects.filter(
+                id__in=relevant_asset_ids
+            ).exclude(id__in=disposed_asset_ids)
         }
 
         total_assets_count = len(all_relevant_assets)
@@ -141,14 +157,22 @@ class LemonAssetDetector:
             cumulative_cost_pct = round(float((running_cost / total_maintenance_cost) * Decimal('100.0')), 1)
             asset_rank_pct = round((rank / total_assets_count), 3)
 
-            # Tính RRR (Repair-to-Replacement Ratio)
+            # Tính RRR (Repair-to-Replacement Ratio - Rule 7):
+            # Tỷ lệ giữa chi phí sửa chữa lũy kế trên giá trị thay thế/nguyên giá
             base_cost = ast.effective_purchase_cost
             if not isinstance(base_cost, Decimal):
                 base_cost = Decimal(str(base_cost or 0))
 
             rrr_pct = 0.0
             if base_cost > Decimal('0'):
-                rrr_pct = round(float((cost / base_cost) * Decimal('100.0')), 1)
+                lifecycle_frozen = WorkOrderCost.all_objects.filter(
+                    tenant=tenant,
+                    work_order__asset=ast,
+                    work_order__status='COMPLETED',
+                    is_capital_overhaul=False
+                ).aggregate(s=Sum('net_cost'))['s'] or Decimal('0')
+                effective_repair_cost = max(cost, lifecycle_frozen)
+                rrr_pct = round(float((effective_repair_cost / base_cost) * Decimal('100.0')), 1)
 
             # Điều kiện nhận diện Lemon Asset / Bad Actor:
             # 1. RRR >= 70%
@@ -161,7 +185,7 @@ class LemonAssetDetector:
                 is_concentration_detected = True
                 recommendation = (
                     f"Thiết bị chiếm {cost_pct}% chi phí sửa chữa toàn danh mục"
-                    + (f" (RRR = {rrr_pct}% nguyên giá)." if rrr_pct > 0 else ".")
+                    + (f" (Tỷ lệ sửa chữa/nguyên giá RRR = {rrr_pct}%)." if rrr_pct > 0 else ".")
                     + f" Đề xuất ban giám đốc xem xét phương án thanh lý/thay mới để giảm ngay {int(cost):,} VNĐ dự báo ngân sách."
                 )
 

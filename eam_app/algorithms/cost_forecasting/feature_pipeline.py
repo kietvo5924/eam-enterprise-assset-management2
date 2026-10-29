@@ -69,7 +69,27 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
             # Lọc theo Cost Center snapshot
             if cost_center and fc.cost_center_snapshot != cost_center:
                 continue
-            total_net += (fc.net_cost or Decimal('0.00'))
+            base_net = fc.net_cost or Decimal('0.00')
+
+            # Rule 1, Điểm 4: Xử lý biến động sau nghiệm thu (RETURN, ADJUSTMENT, is_variance_adjustment)
+            # Không sửa đè snapshot gốc nhưng hạch toán chính xác giao dịch điều chỉnh phát sinh sau mốc cost_frozen_at
+            if fc.cost_frozen_at:
+                post_txs = StockTransaction.all_objects.filter(
+                    tenant=tenant,
+                    work_order=wo,
+                    created_at__gt=fc.cost_frozen_at,
+                    transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
+                )
+                post_adjustment = Decimal('0.00')
+                for tx in post_txs:
+                    amt = tx.total_amount or Decimal('0.00')
+                    if tx.transaction_type == 'RETURN':
+                        post_adjustment -= amt
+                    else:
+                        post_adjustment += amt
+                base_net = max(Decimal('0.00'), base_net + post_adjustment)
+
+            total_net += base_net
 
         # Trường hợp 2: Chưa khóa snapshot
         else:
@@ -295,12 +315,19 @@ class CostFeaturePipeline:
         else:
             # Tra cứu từ bảng AssetRulPrediction tính đến mốc target_dt
             from assets.models import AssetRulPrediction
+            # Bulk query để tránh N+1 queries khi duyệt qua danh sách tài sản
+            hist_preds = AssetRulPrediction.all_objects.filter(
+                tenant=tenant,
+                asset__in=active_assets_qs,
+                created_at__lte=target_dt
+            ).order_by('-created_at')
+            latest_pred_map = {}
+            for p in hist_preds:
+                if p.asset_id not in latest_pred_map:
+                    latest_pred_map[p.asset_id] = p
+
             for ast in active_assets_qs.select_related('primary_spare_part'):
-                latest_pred = AssetRulPrediction.all_objects.filter(
-                    tenant=tenant,
-                    asset=ast,
-                    created_at__lte=target_dt
-                ).order_by('-created_at').first()
+                latest_pred = latest_pred_map.get(ast.id)
                 if latest_pred and latest_pred.risk_level == 'CRITICAL':
                     critical_assets_list.append(ast)
 
@@ -330,12 +357,26 @@ class CostFeaturePipeline:
         total_fleet_rav = float(total_rav_decimal)
 
         # 14: Tỷ trọng chi phí thuộc nhóm thiết bị Class A / Bad Actors (%)
-        # Tính theo tỷ trọng chi phí thực tế của nhóm thiết bị rủi ro nguy cấp (RUL Critical / Rapid Degradation)
+        # Tái dựng Point-in-Time Reconstruction để loại trừ hoàn toàn rò rỉ dữ liệu tương lai (Data Leakage)
         class_a_cost_ratio = 0.0
         if total_recent_wos > 0:
-            bad_actor_ids = active_assets_qs.filter(
-                Q(rul_risk_level='CRITICAL') | Q(rapid_degradation_alert=True)
-            ).values_list('id', flat=True)
+            if is_current_or_future:
+                bad_actor_ids = set(active_assets_qs.filter(
+                    Q(rul_risk_level='CRITICAL') | Q(rapid_degradation_alert=True)
+                ).values_list('id', flat=True))
+            else:
+                # Tại mốc lịch sử, lấy các máy từng có dự đoán CRITICAL tại hoặc trước target_dt
+                from assets.models import AssetRulPrediction
+                hist_preds_bad = AssetRulPrediction.all_objects.filter(
+                    tenant=tenant,
+                    asset__in=active_assets_qs,
+                    created_at__lte=target_dt
+                ).order_by('-created_at')
+                bad_map = {}
+                for p in hist_preds_bad:
+                    if p.asset_id not in bad_map:
+                        bad_map[p.asset_id] = p
+                bad_actor_ids = {aid for aid, p in bad_map.items() if p.risk_level == 'CRITICAL'}
 
             recent_costs_all = WorkOrderCost.all_objects.filter(
                 tenant=tenant,
@@ -418,7 +459,6 @@ class CostFeaturePipeline:
 
         cur_year = reference_date.year
         cur_month = reference_date.month
-        tenant_created_date = tenant.created_at.date() if hasattr(tenant, 'created_at') and tenant.created_at else None
 
         for i in range(months_back, 0, -1):
             m = cur_month - i

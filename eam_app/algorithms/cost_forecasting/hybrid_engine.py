@@ -67,7 +67,7 @@ class HybridBudgetingEngine:
         assignments_qs = PmPlanAssignment.all_objects.filter(
             tenant=tenant,
             status='ACTIVE'
-        ).exclude(asset_id__in=disposed_asset_ids).select_related('pm_plan', 'asset')
+        ).exclude(asset_id__in=disposed_asset_ids).select_related('pm_plan', 'asset').prefetch_related('pm_plan__materials__spare_part')
 
         if cost_center:
             assignments_qs = assignments_qs.filter(asset__location__name=cost_center)
@@ -266,15 +266,26 @@ class HybridBudgetingEngine:
             cm_p50_base = quantiles["p50"]
             cm_p90_base = quantiles["p90"]
 
-            # Nhịp 2 (Hậu xử lý tài chính - Rule 4): Áp dụng chỉ số trượt giá lạm phát
+            # Nhịp 2 (Hậu xử lý tài chính - Rule 4): Tách bạch dòng vật tư (chịu lạm phát) và dòng giờ công (theo đơn giá giờ công hiện hành của Tenant)
             inflation_factor = 1.0 + float(inflation_rate)
-            cm_p10 = cm_p10_base * inflation_factor
-            cm_p50 = cm_p50_base * inflation_factor
-            cm_p90 = cm_p90_base * inflation_factor
+            labor_rate_ratio = float(hourly_rate / DEFAULT_LABOR_HOURLY_RATE) if DEFAULT_LABOR_HOURLY_RATE > 0 else 1.0
 
-            # Cộng thêm nghĩa vụ tài chính vật tư từ Task 11.5 nếu có
+            mat_weight = 0.65
+            lab_weight = 0.35
+
+            def price_cm(base_val):
+                mat_cost = (base_val * mat_weight) * inflation_factor
+                lab_cost = (base_val * lab_weight) * labor_rate_ratio
+                return mat_cost + lab_cost
+
+            cm_p10 = price_cm(cm_p10_base)
+            cm_p50 = price_cm(cm_p50_base)
+            cm_p90 = price_cm(cm_p90_base)
+
+            # Cộng thêm nghĩa vụ tài chính vật tư từ Task 11.5 nếu có (nhất quán P10, P50, P90)
             if rul_liability > Decimal('0'):
                 rul_liability_float = float(rul_liability)
+                cm_p10 += rul_liability_float
                 cm_p50 += rul_liability_float
                 cm_p90 += rul_liability_float
 
@@ -284,25 +295,38 @@ class HybridBudgetingEngine:
             forecast_method = 'DETERMINISTIC_FALLBACK'
             is_ai_fallback = True
 
-            # Lấy trung bình trượt SMA3 hoặc định mức kinh nghiệm 3.5% RAV / năm quy đổi
+            # Xác định số tháng trong kỳ dự báo để quy đổi chính xác
+            period_months = 3.0 if '-Q' in period_str else 1.0
+
+            # Lấy trung bình trượt SMA3 quy đổi theo độ dài kỳ, hoặc định mức kinh nghiệm 3.5% RAV / năm
             base_cm = Decimal('0')
             if feature_vector[3] > 0:
-                base_cm = Decimal(str(feature_vector[3]))
+                base_cm = Decimal(str(feature_vector[3])) * Decimal(str(period_months))
             elif total_rav > Decimal('0'):
-                # 3.5% RAV phân bổ cho kỳ 3 tháng (1/4 năm)
-                base_cm = round_vnd((total_rav * Decimal('0.035')) / Decimal('4.0'))
+                base_cm = round_vnd((total_rav * Decimal('0.035') * Decimal(str(period_months))) / Decimal('12.0'))
             else:
-                base_cm = Decimal('45000000.00')
+                if planned_pm_cost > Decimal('0'):
+                    base_cm = round_vnd(planned_pm_cost * Decimal('0.60'))
+                else:
+                    active_count = max(1, int(feature_vector[8]))
+                    base_cm = Decimal(str(active_count * 2000000 * int(period_months)))
 
             inflation_factor = Decimal(str(1.0 + float(inflation_rate)))
-            base_cm_adjusted = base_cm * inflation_factor
-
-            if rul_liability > Decimal('0'):
-                base_cm_adjusted += rul_liability
+            labor_rate_ratio = Decimal(str(hourly_rate / DEFAULT_LABOR_HOURLY_RATE)) if DEFAULT_LABOR_HOURLY_RATE > 0 else Decimal('1.0')
+            base_mat = base_cm * Decimal('0.65') * inflation_factor
+            base_lab = base_cm * Decimal('0.35') * labor_rate_ratio
+            base_cm_adjusted = base_mat + base_lab
 
             cm_p50 = float(base_cm_adjusted)
             cm_p10 = cm_p50 * 0.85
             cm_p90 = cm_p50 * 1.25
+
+            # Nhất quán nghĩa vụ RUL cho P10, P50, P90
+            if rul_liability > Decimal('0'):
+                rul_liability_float = float(rul_liability)
+                cm_p10 += rul_liability_float
+                cm_p50 += rul_liability_float
+                cm_p90 += rul_liability_float
 
             top_cost_drivers = [
                 {"feature": "Kế hoạch bảo trì định kỳ xác định (Deterministic PM)", "raw_key": "planned_pm", "importance": 0.45},
@@ -338,15 +362,16 @@ class HybridBudgetingEngine:
                 approved_budget = pab.approved_budget
                 is_manually_approved = True
             else:
-                # Ngân sách mặc định ước tính bằng 105% kịch bản trung vị nếu chưa cấu hình
-                approved_budget = round_vnd(total_forecast_median * Decimal('1.05'))
+                # Ngân sách mặc định ước tính bằng 120% kịch bản trung vị nếu chưa cấu hình để giữ an toàn (Usage ~ 83.3% < 85% Warning)
+                # Tránh việc hệ thống tự phát cảnh báo Warning mặc định khi ban giám đốc chưa thiết lập hạn mức
+                approved_budget = round_vnd(total_forecast_median * Decimal('1.20'))
                 is_manually_approved = False
 
         usage_ratio = 0.0
         if approved_budget > Decimal('0'):
             usage_ratio = round(float((total_forecast_median / approved_budget) * Decimal('100.0')), 1)
 
-        if usage_ratio > CRITICAL_BUDGET_USAGE_RATIO:
+        if usage_ratio >= CRITICAL_BUDGET_USAGE_RATIO:
             budget_status = 'CRITICAL_OVERRUN'
         elif usage_ratio >= WARNING_BUDGET_USAGE_RATIO:
             budget_status = 'WARNING'

@@ -18,16 +18,16 @@
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
       <div>
         <div class="flex items-center gap-2 mb-0.5">
-          <span class="text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Enterprise Analytics</span>
-          <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">VAS 03 Compliant</span>
+          <span class="text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Báo Cáo Kế Toán Doanh Nghiệp</span>
+          <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Chuẩn Mực VAS 03</span>
         </div>
         <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
           <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-indigo-700 flex items-center justify-center text-white shadow-xs shadow-primary/20 shrink-0">
             <i class="ph-fill ph-chart-line-up text-lg"></i>
           </div>
-          Phân Hệ Báo Cáo & Xuất Tệp Doanh Nghiệp
+          Báo Cáo Tài Chính & Hiệu Suất Tài Sản
         </h1>
-        <p class="text-xs text-slate-500 mt-0.5">Động cơ tính toán khấu hao tài sản chặn sàn VAS 03, tuân thủ PM 10%, tiêu hao phụ tùng và kế toán dồn tích đa kỳ.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Theo dõi khấu hao tài sản, hiệu suất bảo trì định kỳ, xuất nhập tồn phụ tùng và tổng hợp chi phí thực tế đã hạch toán.</p>
       </div>
 
       <div class="flex items-center gap-3 self-stretch md:self-auto">
@@ -46,19 +46,19 @@
     <div class="flex border-b border-slate-200 mt-6 gap-2 overflow-x-auto no-scrollbar">
       <button onclick="switchTab('ASSET_VALUATION')" id="tab-ASSET_VALUATION" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
         <i class="ph-bold ph-money text-base"></i>
-        <span>1. Khấu Hao & Định Giá Tài Sản (VAS 03)</span>
+        <span>1. Khấu Hao & Giá Trị Tài Sản</span>
       </button>
       <button onclick="switchTab('MAINTENANCE_PERFORMANCE')" id="tab-MAINTENANCE_PERFORMANCE" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
         <i class="ph-bold ph-gauge text-base"></i>
-        <span>2. Hiệu Suất Bảo Trì & Tuân Thủ PM</span>
+        <span>2. Hiệu Suất & Tiến Độ Bảo Trì Định Kỳ</span>
       </button>
       <button onclick="switchTab('SPARE_PARTS')" id="tab-SPARE_PARTS" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
         <i class="ph-bold ph-package text-base"></i>
-        <span>3. Tiêu Hao Phụ Tùng & Kho</span>
+        <span>3. Tiêu Hao Vật Tư & Phụ Tùng Kho</span>
       </button>
       <button onclick="switchTab('COST_SUMMARY')" id="tab-COST_SUMMARY" class="report-tab px-4 py-3 font-bold text-xs rounded-t-xl transition-all flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
         <i class="ph-bold ph-chart-pie-slice text-base"></i>
-        <span>4. Tổng Hợp Chi Phí Đa Kỳ (Accrual)</span>
+        <span>4. Tổng Hợp Chi Phí Thực Tế Đã Chi</span>
       </button>
     </div>
   </div>
@@ -115,6 +115,26 @@
 
   <!-- Main Scrollable Content -->
   <div class="flex-1 overflow-y-auto p-6 space-y-6">
+
+    <!-- Smart AI Bridge Banner (Appears on Tab 4: Cost Summary) -->
+    <div id="aiForecastingBridge" class="hidden bg-gradient-to-r from-primary-50 via-indigo-50 to-blue-50 border border-primary-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-sm">
+          <i class="ph-fill ph-trend-up text-lg"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span>Lập Kế Hoạch & Dự Báo Ngân Sách Cho Kỳ Tiếp Theo Bằng AI</span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 uppercase tracking-wider">Trí Tuệ Nhân Tạo</span>
+          </h4>
+          <p class="text-xs text-slate-500 mt-0.5">Sử dụng chuỗi dữ liệu chi phí thực tế đã hạch toán ở trên để huấn luyện mô hình máy học và lập ngân sách bảo trì cho kỳ tới.</p>
+        </div>
+      </div>
+      <a href="{% url 'portal_cost_forecasting' %}" class="px-4 py-2 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-95 shrink-0">
+        <span>Sang Hoạch Định Ngân Sách AI</span>
+        <i class="ph-bold ph-arrow-right"></i>
+      </a>
+    </div>
 
     <!-- Dynamic KPI Summary Cards -->
     <div id="kpiContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -375,14 +395,23 @@
     }
 
     const tabTitles = {
-      'ASSET_VALUATION': 'Bảng Chi Tiết Khấu Hao & Định Giá Tài Sản (VAS 03)',
-      'MAINTENANCE_PERFORMANCE': 'Bảng Theo Dõi Lệnh Bảo Trì & Tuân Thủ PM',
-      'SPARE_PARTS': 'Bảng Danh Mục Phụ Tùng & Tồn Kho',
-      'COST_SUMMARY': 'Bảng Tổng Hợp Chi Phí Đa Kỳ Theo Phân Xưởng'
+      'ASSET_VALUATION': 'Bảng Chi Tiết Khấu Hao & Giá Trị Tài Sản Theo Sổ Sách',
+      'MAINTENANCE_PERFORMANCE': 'Bảng Theo Dõi Tiến Độ & Hiệu Suất Bảo Trì Định Kỳ',
+      'SPARE_PARTS': 'Bảng Chi Tiết Tiêu Hao & Tồn Kho Phụ Tùng',
+      'COST_SUMMARY': 'Bảng Tổng Hợp Chi Phí Thực Tế Đã Chi Theo Phân Xưởng'
     };
     const titleEl = document.getElementById('reportViewTitle');
     if (titleEl) {
       titleEl.innerText = tabTitles[tabKey] || 'Bảng Dữ Liệu Chi Tiết';
+    }
+
+    const bridgeEl = document.getElementById('aiForecastingBridge');
+    if (bridgeEl) {
+      if (tabKey === 'COST_SUMMARY') {
+        bridgeEl.classList.remove('hidden');
+      } else {
+        bridgeEl.classList.add('hidden');
+      }
     }
 
     // Toggle specific filter visibility
@@ -547,9 +576,9 @@
           <p class="text-[10px] text-slate-500 mt-1">Chặn sàn VAS 03 không bị âm</p>
         </div>
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm ${summary.badActorCount > 0 ? 'ring-2 ring-rose-500/20 bg-rose-50/20' : ''}">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Đề Xuất Thanh Lý (RRR >= 70%)</p>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Thiết Bị Chi Phí Cao (RRR >= 70%)</p>
           <h3 class="text-2xl font-black ${summary.badActorCount > 0 ? 'text-rose-600' : 'text-slate-900'}">${summary.badActorCount || 0}</h3>
-          <p class="text-[10px] ${summary.badActorCount > 0 ? 'text-rose-600 font-bold' : 'text-slate-500'} mt-1">Thiết bị hỏng vặt chi phí cao</p>
+          <p class="text-[10px] ${summary.badActorCount > 0 ? 'text-rose-600 font-bold' : 'text-slate-500'} mt-1">Chi phí sửa chữa vượt 70% nguyên giá</p>
         </div>
       `;
     } else if (currentTab === 'MAINTENANCE_PERFORMANCE') {
@@ -560,7 +589,7 @@
           <p class="text-[10px] text-slate-500 mt-1">Tỷ lệ: ${summary.totalOrders ? Math.round((summary.completedOrders/summary.totalOrders)*100) : 100}%</p>
         </div>
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tuân Thủ PM (Quy Tắc 10%)</p>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tỷ Lệ Đúng Hạn Bảo Trì (PM)</p>
           <h3 class="text-2xl font-black text-emerald-600">${summary.pmComplianceRate || 100}%</h3>
           <p class="text-[10px] text-slate-500 mt-1">Đã loại trừ ${summary.skippedDueToOverlap || 0} phiếu trùng lặp</p>
         </div>
@@ -601,9 +630,9 @@
     } else { // COST_SUMMARY
       kpiBox.innerHTML = `
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Chi Phí Thực Tế</p>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tổng Chi Phí Thực Tế Đã Chi</p>
           <h3 class="text-2xl font-black text-slate-900">${formatVnd(summary.totalCost)}</h3>
-          <p class="text-[10px] text-slate-500 mt-1">Theo kế toán dồn tích (Accrual)</p>
+          <p class="text-[10px] text-slate-500 mt-1">Hạch toán theo chứng từ & phiếu xuất</p>
         </div>
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Chi Phí Vật Tư</p>
@@ -616,9 +645,9 @@
           <p class="text-[10px] text-slate-500 mt-1">Tính theo ngày chấm công kỹ thuật</p>
         </div>
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Trung Tâm Chi Phí</p>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Phân Xưởng Phát Sinh</p>
           <h3 class="text-2xl font-black text-slate-900">${summary.costCenterCount || 0}</h3>
-          <p class="text-[10px] text-slate-500 mt-1">Cắt lớp lịch sử luân chuyển</p>
+          <p class="text-[10px] text-slate-500 mt-1">Các trung tâm chi phí trong kỳ</p>
         </div>
       `;
     }

@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
 {% block title %}Dự Báo Chi Phí & Ngân Sách Bảo Trì — Enterprise Asset Management{% endblock %}
-{% block breadcrumb %}Dự báo chi phí & Ngân sách (Task 11.6){% endblock %}
+{% block breadcrumb %}Dự Báo Chi Phí & Ngân Sách Bảo Trì{% endblock %}
 
 {% block content %}
 {% csrf_token %}
-<div class="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50/50 p-4 sm:p-6 space-y-6">
+<div class="flex-1 flex flex-col h-full overflow-y-auto bg-slate-50/50 p-4 sm:p-6 space-y-6" data-tenant-theme="{{ theme_color|default:'cyan' }}">
 
   <!-- Header Section -->
   <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
     <div>
       <div class="flex items-center gap-2 mb-1">
-        <span class="text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Task 11.6 AI Engine</span>
+        <span class="text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Hệ Thống Phân Tích AI</span>
         <span id="aiGovernanceBadge" class="text-[10px] font-bold {% if ai_enabled %}text-emerald-700 bg-emerald-50 border border-emerald-200{% else %}text-amber-700 bg-amber-50 border border-amber-200{% endif %} px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
           <i class="ph-bold {% if ai_enabled %}ph-sparkle{% else %}ph-shield-warning{% endif %}"></i>
-          <span id="aiGovernanceText">{% if ai_enabled %}AI Engine Active (Quantile Forest){% else %}Heuristic Fallback Mode{% endif %}</span>
+          <span id="aiGovernanceText">{% if ai_enabled %}Mô Hình AI Học Máy Đang Hoạt Động (QRF){% else %}Chế Độ Quy Chuẩn Doanh Nghiệp{% endif %}</span>
         </span>
       </div>
       <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
@@ -23,7 +23,7 @@
         </div>
         Quản Lý & Dự Báo Ngân Sách Bảo Trì
       </h1>
-      <p class="text-xs text-slate-500 mt-1">Động cơ lai ghép hai nhịp: Lịch PM xác định 100% kết hợp Rừng ngẫu nhiên phân vị (QRF) P10/P50/P90 và chống bẫy bảo trì hoãn lại.</p>
+      <p class="text-xs text-slate-500 mt-1">Hoạch định ngân sách bảo trì định kỳ và dự báo chi phí sự cố đột xuất ứng dụng mô hình học máy phân vị và cảnh báo rủi ro kỹ thuật.</p>
     </div>
 
     <!-- Filters & Action Controls -->
@@ -46,6 +46,11 @@
           {% endfor %}
         </select>
       </div>
+
+      <a href="{% url 'portal_reports' %}" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 shadow-xs transition-all active:scale-95 shrink-0" title="Chuyển sang Báo cáo Kế toán thực chi để đối soát">
+        <i class="ph-bold ph-chart-pie-slice text-sm text-slate-500"></i>
+        <span>Đối Chiếu Chi Phí Đã Chi</span>
+      </a>
 
       <button id="btnOpenSettings" onclick="openSettingsModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-200 shadow-xs transition-all active:scale-95 shrink-0 cursor-pointer">
         <i class="ph-bold ph-sliders-horizontal text-sm text-slate-500"></i>
@@ -74,18 +79,14 @@
       </div>
       <div class="flex-1">
         <h3 class="text-sm font-bold text-rose-900 flex items-center gap-2">
-          <span>Phát Hiện Thiết Bị "Quả Chanh" Chiếm Dụng Ngân Sách (Kiểm định Pareto 80/20)</span>
-          <span class="text-[10px] bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full uppercase font-black tracking-wider">Bad Actor Alert</span>
+          <span>Cảnh Báo Thiết Bị Kém Hiệu Quả / Chi Phí Đột Biến (Nguyên Lý 80/20)</span>
+          <span class="text-[10px] bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full uppercase font-black tracking-wider">Cảnh Báo Chi Phí Cao</span>
         </h3>
         <p id="lemonAssetDescription" class="text-xs text-rose-700 mt-1">
-          Thiết bị chiếm tỷ trọng chi phí bảo trì bất thường so với danh mục. Đề xuất kiểm định hoặc thanh lý thực tế để tối ưu ngân sách kỳ tới.
+          Thiết bị có chi phí sửa chữa đột biến so với toàn danh mục. Đề xuất Ban Giám Đốc xem xét phương án đại tu hoặc thay mới để cắt giảm dự báo chi phí rủi ro.
         </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button type="button" onclick="openLemonSimulationModal()" class="px-3.5 py-1.5 bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer">
-          <i class="ph-bold ph-chart-polar text-sm"></i>
-          <span>Mô Phỏng Cắt Giảm Chi Phí</span>
-        </button>
         <a href="{% url 'portal_asset_registry' %}" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-all shadow-xs flex items-center gap-1.5">
           <span>Xem Hồ Sơ Thiết Bị</span>
           <i class="ph-bold ph-arrow-square-out text-sm"></i>
@@ -105,7 +106,7 @@
       <div>
         <div id="valApprovedBudget" class="text-2xl font-black text-slate-800 tracking-tight">0 VNĐ</div>
         <div class="flex items-center gap-1.5 mt-1">
-          <span id="badgeApprovedSource" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">Ước tính (+5%)</span>
+          <span id="badgeApprovedSource" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">Ước tính (+20%)</span>
           <button onclick="openSettingsModal()" class="text-[11px] text-primary hover:underline font-bold flex items-center gap-0.5 cursor-pointer">
             <span>Sửa</span>
             <i class="ph-bold ph-pencil-simple text-[10px]"></i>
@@ -117,43 +118,44 @@
     <!-- Card 2: Lịch PM xác định -->
     <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
       <div class="flex items-center justify-between text-blue-600 mb-2">
-        <span class="text-xs font-bold uppercase tracking-wider">Kế Hoạch PM Xác Định</span>
+        <span class="text-xs font-bold uppercase tracking-wider">Bảo Trì Định Kỳ (PM)</span>
         <i class="ph-bold ph-calendar-check text-lg text-blue-500"></i>
       </div>
       <div>
         <div id="valPlannedPm" class="text-2xl font-black text-blue-700 tracking-tight">0 VNĐ</div>
-        <div class="text-[11px] text-slate-500 mt-0.5">100% định mức từ BOM vật tư</div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Chi phí kế hoạch từ danh mục vật tư & định mức</div>
       </div>
     </div>
 
     <!-- Card 3: Dự báo sự cố CM (QRF P50 & P90) -->
     <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
       <div class="flex items-center justify-between text-amber-600 mb-2">
-        <span class="text-xs font-bold uppercase tracking-wider">Dự Báo Sự Cố CM (QRF)</span>
+        <span class="text-xs font-bold uppercase tracking-wider">Dự Phòng Sự Cố Đột Xuất (CM)</span>
         <i class="ph-bold ph-chart-scatter text-lg text-amber-500"></i>
       </div>
       <div>
         <div class="flex items-baseline gap-2">
           <span id="valPredictedCmP50" class="text-2xl font-black text-amber-700 tracking-tight">0 VNĐ</span>
-          <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">P50</span>
+          <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">Trung Vị P50</span>
         </div>
-        <div class="text-[11px] text-slate-500 mt-0.5">Rủi ro xấu nhất (P90): <span id="valPredictedCmP90" class="font-bold text-slate-700">0 VNĐ</span></div>
+        <div class="text-[11px] text-slate-500 mt-0.5">Kịch bản rủi ro cao (P90): <span id="valPredictedCmP90" class="font-bold text-slate-700">0 VNĐ</span></div>
       </div>
     </div>
 
     <!-- Card 4: Tổng ngân sách dự báo & Tỷ lệ áp lực -->
     <div id="cardTotalForecast" class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Tổng Dự Báo (P50 + Buffer)</span>
-        <span id="badgeBudgetStatus" class="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-slate-100 text-slate-700">HEALTHY</span>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Tổng Dự Báo Ngân Sách</span>
+        <span id="badgeBudgetStatus" class="text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-slate-100 text-slate-700">AN TOÀN</span>
       </div>
       <div>
         <div id="valTotalForecast" class="text-2xl font-black text-slate-900 tracking-tight">0 VNĐ</div>
+        <div class="text-[11px] text-slate-500 mt-1">Kịch bản phòng thủ P90: <span id="valTotalForecastP90" class="font-bold text-slate-700">0 VNĐ</span></div>
         <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
           <div id="barBudgetUsage" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
         </div>
         <div class="flex justify-between items-center text-[10px] font-bold text-slate-500 mt-1">
-          <span>Áp lực ngân sách:</span>
+          <span>Tỷ lệ sử dụng ngân sách:</span>
           <span id="txtUsageRatio" class="text-slate-800 font-black">0%</span>
         </div>
       </div>
@@ -168,11 +170,11 @@
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
             <i class="ph-bold ph-hourglass-high text-amber-500"></i>
-            <span>Bẫy Bảo Trì Hoãn Lại (Backlog Trap)</span>
+            <span>Theo Dõi Rủi Ro Bảo Trì Tồn Đọng (Backlog)</span>
           </h2>
-          <span id="valSurgeRisk" class="text-[10px] font-black px-2 py-0.5 rounded-full uppercase bg-slate-100 text-slate-700">LOW</span>
+          <span id="valSurgeRisk" class="text-[10px] font-black px-2 py-0.5 rounded-full uppercase bg-slate-100 text-slate-700">THẤP / AN TOÀN</span>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Nhận diện sự tích tụ nợ kỹ thuật vật lý để phòng ngừa cú sốc chi phí bùng nổ khi bảo dưỡng bị trì hoãn.</p>
+        <p class="text-xs text-slate-500 mb-4">Nhận diện sự tích tụ nợ kỹ thuật để phòng ngừa cú sốc chi phí khi lịch bảo trì bị trì hoãn dồn ứ.</p>
         <div class="space-y-3">
           <div class="flex items-center justify-between text-xs p-2.5 bg-slate-50 rounded-xl">
             <span class="text-slate-500 font-medium">Phiếu bảo trì quá hạn tồn đọng:</span>
@@ -185,24 +187,24 @@
         </div>
       </div>
       <div class="pt-3 border-t border-slate-100 text-[11px] text-slate-400 mt-4">
-        Tác động: Đẩy dự báo CM tăng lũy tiến khi Backlog > 10 đơn.
+        Tác động: Đẩy dự báo CM tăng lũy tiến khi phiếu tồn đọng > 10 đơn.
       </div>
     </div>
 
-    <!-- Sub-card 2: Cầu nối rủi ro RUL 11.5 & Định mức RAV -->
+    <!-- Sub-card 2: Cầu nối rủi ro RUL & Định mức RAV -->
     <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
       <div>
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
             <i class="ph-bold ph-activity text-rose-500"></i>
-            <span>Cầu Nối Rủi Ro RUL & Định Mức RAV</span>
+            <span>Rủi Ro Thiết Bị Suy Thoái & Tỷ Lệ RAV</span>
           </h2>
-          <span class="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full uppercase">Task 11.5</span>
+          <span class="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full uppercase">DỰ ĐOÁN RUL</span>
         </div>
         <p class="text-xs text-slate-500 mb-4">Tự động liên kết nghĩa vụ tài chính vật tư từ thiết bị sắp hỏng nguy cấp và chuẩn hóa % RAV toàn xưởng.</p>
         <div class="space-y-3">
           <div class="flex items-center justify-between text-xs p-2.5 bg-slate-50 rounded-xl">
-            <span class="text-slate-500 font-medium">Nghĩa vụ vật tư máy RUL Critical:</span>
+            <span class="text-slate-500 font-medium">Dự phòng vật tư máy cảnh báo nguy cấp:</span>
             <span id="valRulLiability" class="font-bold text-rose-700">0 VNĐ</span>
           </div>
           <div class="flex items-center justify-between text-xs p-2.5 bg-slate-50 rounded-xl">
@@ -222,7 +224,7 @@
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
             <i class="ph-bold ph-chart-line-up text-primary"></i>
-            <span>Xu Hướng Thực Tế vs Dự Báo QRF</span>
+            <span>Biểu Đồ So Sánh Chi Phí Thực Tế & Dự Báo</span>
           </h2>
         </div>
         <div class="relative w-full h-44">
@@ -239,8 +241,8 @@
   <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="text-sm font-bold text-slate-800">Top Yếu Tố Thúc Đẩy Chi Phí (Feature Importance XAI)</h2>
-        <p class="text-xs text-slate-400">Mức độ ảnh hưởng tương quan giải thích bởi mô hình Rừng Hồi Quy Phân Vị.</p>
+        <h2 class="text-sm font-bold text-slate-800">Các Yếu Tố Tác Động Lớn Nhất Đến Chi Phí Dự Báo</h2>
+        <p class="text-xs text-slate-400">Mức độ ảnh hưởng tương quan được mô hình phân tích và xếp hạng trọng số.</p>
       </div>
     </div>
 
@@ -256,10 +258,10 @@
       <div>
         <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
           <i class="ph-bold ph-chart-polar text-indigo-600"></i>
-          <span>Kiểm Định Backtest Chuỗi Thời Gian Ngoài Mẫu (Out-of-Sample Time-Series Validation)</span>
-          <span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full uppercase">Audited QRF</span>
+          <span>Đánh Giá Độ Chính Xác Mô Hình Trên Dữ Liệu Lịch Sử</span>
+          <span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full uppercase">Kiểm Định QRF</span>
         </h2>
-        <p class="text-xs text-slate-400 mt-0.5">Mô hình được huấn luyện trên giai đoạn trước và kiểm thử trên các kỳ lịch sử chưa tham gia học (loại trừ rò rỉ dữ liệu).</p>
+        <p class="text-xs text-slate-400 mt-0.5">Mô hình được huấn luyện trên giai đoạn trước và kiểm thử trên các kỳ lịch sử độc lập để đảm bảo độ tin cậy.</p>
       </div>
       <div class="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60 flex items-center gap-1.5 shrink-0">
         <i class="ph-bold ph-info text-slate-400"></i>
@@ -285,12 +287,12 @@
       <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
         <div class="text-[11px] text-slate-500 font-semibold">Độ bao phủ P10–P90</div>
         <div id="metricCoverage" class="text-base font-black text-slate-800 mt-0.5">--</div>
-        <div class="text-[10px] text-slate-400 mt-0.5">Target: 80% trong dải dự báo</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">Mục tiêu: 80% trong dải dự báo</div>
       </div>
       <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
-        <div class="text-[11px] text-slate-500 font-semibold">Cải thiện vs SMA-3 Baseline</div>
+        <div class="text-[11px] text-slate-500 font-semibold">Cải thiện vs Trung bình trượt</div>
         <div id="metricImprovement" class="text-base font-black text-emerald-600 mt-0.5">--</div>
-        <div class="text-[10px] text-slate-400 mt-0.5">So sánh trung bình trượt</div>
+        <div class="text-[10px] text-slate-400 mt-0.5">So sánh baseline 3 kỳ</div>
       </div>
     </div>
   </div>
@@ -298,7 +300,7 @@
 </div>
 
 
-<!-- Modal: Mô Phỏng Tác Động Chi Phí Thiết Bị Quả Chanh (Lemon Asset Simulation) -->
+<!-- Modal: Mô Phỏng Tác Động Chi Phí Thiết Bị (Simulation) -->
 <div id="lemonSimulationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
   <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
     <div class="px-6 py-4.5 bg-white border-b border-slate-100 flex items-center justify-between">
@@ -308,10 +310,10 @@
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h3 class="text-base font-black text-slate-900 tracking-tight m-0">Mô Phỏng Cắt Giảm Chi Phí Bad Actor</h3>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 uppercase tracking-wider">Simulation Only</span>
+            <h3 class="text-base font-black text-slate-900 tracking-tight m-0">Mô Phỏng Kịch Bản Giảm Chi Phí Thiết Bị</h3>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 uppercase tracking-wider">Mô Phỏng Kịch Bản</span>
           </div>
-          <p class="text-xs text-slate-500 m-0 mt-0.5">Phân tích tác động tài chính nếu thay thế hoặc thanh lý thiết bị quả chanh</p>
+          <p class="text-xs text-slate-500 m-0 mt-0.5">Phân tích tác động tài chính nếu thay thế hoặc đại tu lớn thiết bị kém hiệu quả</p>
         </div>
       </div>
       <button type="button" onclick="closeLemonSimulationModal()" class="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer">
@@ -772,15 +774,15 @@ function renderForecastView(data) {
     if (data.isAiFallback) {
       if (data.fallbackReason === 'AI_DISABLED') {
         aiBadge.className = 'text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-        aiBadge.innerHTML = '<i class="ph-bold ph-power text-slate-500"></i><span id="aiGovernanceText">AI Engine Tắt (Cấu hình Quản trị viên)</span>';
+        aiBadge.innerHTML = '<i class="ph-bold ph-power text-slate-500"></i><span id="aiGovernanceText">Hệ Thống AI Đang Tắt</span>';
       } else {
         aiBadge.className = 'text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-        const reasonText = 'Heuristic Fallback Mode (Chưa đủ kỳ dữ liệu lịch sử thực tế có nhãn)';
+        const reasonText = 'Chế Độ Quy Chuẩn Doanh Nghiệp (Đang tích lũy chu kỳ dữ liệu lịch sử)';
         aiBadge.innerHTML = `<i class="ph-bold ph-shield-warning"></i><span id="aiGovernanceText">${reasonText}</span>`;
       }
     } else {
       aiBadge.className = 'text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-      aiBadge.innerHTML = '<i class="ph-bold ph-sparkle"></i><span id="aiGovernanceText">AI Engine Hoạt Động (Rừng hồi quy phân vị QRF)</span>';
+      aiBadge.innerHTML = '<i class="ph-bold ph-sparkle"></i><span id="aiGovernanceText">Mô Hình AI Học Máy Đang Hoạt Động (QRF)</span>';
     }
   }
 
@@ -790,10 +792,10 @@ function renderForecastView(data) {
   if (srcBadge) {
     if (b.isManuallyApproved) {
       srcBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200';
-      srcBadge.textContent = 'Đã duyệt thủ công';
+      srcBadge.textContent = 'Đã duyệt chính thức';
     } else {
       srcBadge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200';
-      srcBadge.textContent = 'Ước tính (+5%)';
+      srcBadge.textContent = 'Ước tính (+20%)';
     }
   }
 
@@ -801,6 +803,8 @@ function renderForecastView(data) {
   document.getElementById('valPredictedCmP50').textContent = formatVND(b.predictedCmMedianP50);
   document.getElementById('valPredictedCmP90').textContent = formatVND(b.predictedCmRiskP90);
   document.getElementById('valTotalForecast').textContent = formatVND(b.totalForecastMedian);
+  const p90El = document.getElementById('valTotalForecastP90');
+  if (p90El) p90El.textContent = formatVND(b.totalForecastP90);
 
   // Status & Progress bar
   const ratio = b.usageRatioPercent || 0;
@@ -809,18 +813,21 @@ function renderForecastView(data) {
   bar.style.width = Math.min(100, ratio) + '%';
 
   const badge = document.getElementById('badgeBudgetStatus');
-  badge.textContent = b.budgetStatus;
-
+  let statusText = 'AN TOÀN';
   if (b.budgetStatus === 'CRITICAL_OVERRUN') {
+    statusText = 'VƯỢT NGÂN SÁCH';
     badge.className = 'text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-rose-100 text-rose-700';
     bar.className = 'bg-rose-500 h-full rounded-full transition-all duration-500';
   } else if (b.budgetStatus === 'WARNING') {
+    statusText = 'CẢNH BÁO CAO';
     badge.className = 'text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-amber-100 text-amber-700';
     bar.className = 'bg-amber-500 h-full rounded-full transition-all duration-500';
   } else {
+    statusText = 'AN TOÀN';
     badge.className = 'text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-emerald-100 text-emerald-700';
     bar.className = 'bg-emerald-500 h-full rounded-full transition-all duration-500';
   }
+  badge.textContent = statusText;
 
   // Risk Factors
   document.getElementById('valBacklogCount').textContent = r.backlogOrdersCount + ' phiếu';
@@ -830,14 +837,18 @@ function renderForecastView(data) {
   document.getElementById('valRavRatio').textContent = (r.fleetRavCostRatioPercent || 3.5) + '%';
 
   const surgeRiskSpan = document.getElementById('valSurgeRisk');
-  surgeRiskSpan.textContent = r.postDeferralSurgeRisk;
+  let surgeText = 'THẤP / AN TOÀN';
   if (r.postDeferralSurgeRisk === 'HIGH') {
+    surgeText = 'NGUY CƠ CAO';
     surgeRiskSpan.className = 'px-2 py-0.5 rounded text-rose-700 bg-rose-100 uppercase font-black';
   } else if (r.postDeferralSurgeRisk === 'MEDIUM') {
+    surgeText = 'TRUNG BÌNH';
     surgeRiskSpan.className = 'px-2 py-0.5 rounded text-amber-700 bg-amber-100 uppercase font-black';
   } else {
+    surgeText = 'THẤP / AN TOÀN';
     surgeRiskSpan.className = 'px-2 py-0.5 rounded text-emerald-700 bg-emerald-100 uppercase font-black';
   }
+  surgeRiskSpan.textContent = surgeText;
 
   // Lemon Alert Banner
   const banner = document.getElementById('lemonAssetBanner');
@@ -1051,7 +1062,41 @@ async function triggerRunForecast() {
   }
 }
 
+function initPeriodDropdown() {
+  const select = document.getElementById('selectPeriod');
+  if (!select) return;
+  const currentPeriod = "{{ current_period }}";
+  const curYear = new Date().getFullYear();
+  const periods = [];
+
+  // Thêm các quý của năm trước, năm hiện tại và năm tiếp theo
+  for (let y = curYear - 1; y <= curYear + 1; y++) {
+    for (let q = 1; q <= 4; q++) {
+      periods.push(`${y}-Q${q}`);
+    }
+  }
+  // Thêm các tháng của năm hiện tại
+  for (let m = 1; m <= 12; m++) {
+    const mm = m < 10 ? '0' + m : '' + m;
+    periods.push(`${curYear}-${mm}`);
+  }
+
+  if (!periods.includes(currentPeriod)) {
+    periods.unshift(currentPeriod);
+  }
+
+  select.innerHTML = '';
+  periods.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = (p === currentPeriod) ? `${p} (Kỳ hiện tại)` : p;
+    if (p === currentPeriod) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initPeriodDropdown();
   loadForecastData();
   loadHistoricalTrends();
 
@@ -1062,6 +1107,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('selectCostCenter').addEventListener('change', () => {
     loadForecastData();
     loadHistoricalTrends();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeSettingsModal();
+      closeLemonSimulationModal();
+    }
   });
 });
 </script>

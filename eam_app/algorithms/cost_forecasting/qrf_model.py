@@ -126,14 +126,11 @@ class QuantileRegressionForestEngine:
         if cum_weights[-1] > 0:
             cum_weights = cum_weights / cum_weights[-1]
 
-        # Trích xuất phân vị tự nhiên (tính đơn điệu P10 <= P50 <= P90 được đảm bảo bởi CDF)
-        p10_idx = min(len(y_sorted) - 1, int(np.searchsorted(cum_weights, quantiles[0])))
-        p50_idx = min(len(y_sorted) - 1, int(np.searchsorted(cum_weights, quantiles[1])))
-        p90_idx = min(len(y_sorted) - 1, int(np.searchsorted(cum_weights, quantiles[2])))
-
-        p10 = float(y_sorted[p10_idx])
-        p50 = float(y_sorted[p50_idx])
-        p90 = float(y_sorted[p90_idx])
+        # Trích xuất phân vị liên tục (Continuous Quantile Interpolation) từ hàm phân phối thực nghiệm có trọng số
+        # Đảm bảo tính đơn điệu toán học P10 <= P50 <= P90 và không bị khóa cứng vào các mẫu rời rạc
+        p10 = float(np.interp(quantiles[0], cum_weights, y_sorted))
+        p50 = float(np.interp(quantiles[1], cum_weights, y_sorted))
+        p90 = float(np.interp(quantiles[2], cum_weights, y_sorted))
 
         return {
             "p10": p10,
