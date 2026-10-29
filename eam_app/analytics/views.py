@@ -43,39 +43,58 @@ def error_response(code: str, message: str, http_status=status.HTTP_400_BAD_REQU
     }, status=http_status)
 
 
-def check_report_permission(user, report_type: str) -> bool:
-    """
-    Enforces Section 5 RBAC rules:
-    - Superusers / Admins / Maintenance Managers: Full access to all 4 reports.
-    - Warehouse Keepers: Access to SPARE_PARTS.
-    - Technicians: Access to hours and work orders, forbidden from ASSET_VALUATION.
-    """
+def is_admin_or_manager(user) -> bool:
+    """Helper to check if user has admin or manager level privileges."""
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser or user.is_staff:
         return True
-
     role_names = set(r.name.upper() for r in user.roles.all()) if hasattr(user, 'roles') else set()
     if any(r in role_names for r in ['ADMIN', 'TENANT_ADMIN', 'MAINTENANCE_MANAGER', 'SYSTEM_ADMIN']):
         return True
-
     perms = set()
     if hasattr(user, 'roles'):
         for role in user.roles.prefetch_related('permissions').all():
             for perm in role.permissions.all():
                 perms.add(perm.id)
-    if 'system:admin' in perms or 'reports:read' in perms:
+    if 'system:admin' in perms:
         return True
+    return False
 
-    # Role specific boundaries
-    if report_type == 'SPARE_PARTS' and any('WAREHOUSE' in r or 'KEEPER' in r for r in role_names):
-        return True
-    if report_type == 'ASSET_VALUATION' and any('TECHNICIAN' in r for r in role_names):
+
+def check_report_permission(user, report_type: str) -> bool:
+    """
+    Enforces Section 5 RBAC rules per scenarios/phase_10_3_reports_export_engine.md:
+    - Superusers / Admins / Maintenance Managers: Full access to all 4 reports.
+    - Warehouse Keepers: Access to SPARE_PARTS only.
+    - Technicians: Access to MAINTENANCE_PERFORMANCE only (Forbidden from ASSET_VALUATION & COST_SUMMARY).
+    - Unauthenticated, unhandled or unauthorized roles: Access denied (return False).
+    """
+    if not user or not user.is_authenticated:
         return False
-    if report_type in ['MAINTENANCE_PERFORMANCE', 'SPARE_PARTS', 'COST_SUMMARY'] and any('TECHNICIAN' in r for r in role_names):
+    if is_admin_or_manager(user):
         return True
 
-    return True
+    role_names = set(r.name.upper() for r in user.roles.all()) if hasattr(user, 'roles') else set()
+    is_warehouse = any('WAREHOUSE' in r or 'KEEPER' in r for r in role_names)
+    is_technician = any('TECHNICIAN' in r for r in role_names)
+
+    if is_warehouse:
+        return report_type == 'SPARE_PARTS'
+
+    if is_technician:
+        return report_type == 'MAINTENANCE_PERFORMANCE'
+
+    # Check explicit permission reports:read if user is not in a restricted role
+    perms = set()
+    if hasattr(user, 'roles'):
+        for role in user.roles.prefetch_related('permissions').all():
+            for perm in role.permissions.all():
+                perms.add(perm.id)
+    if 'reports:read' in perms:
+        return True
+
+    return False
 
 
 class DashboardSummaryView(APIView):
@@ -177,11 +196,20 @@ class ReportPreviewView(APIView):
                 result['transactions'] = result.get('transactions', [])[:50]
 
             elif report_type == 'COST_SUMMARY':
+                cost_center = filters.get('costCenter')
+                location_id = filters.get('locationId')
+                if not cost_center and location_id:
+                    from assets.models import Location
+                    loc = Location.all_objects.filter(id=location_id, tenant=tenant).first()
+                    if loc:
+                        cost_center = loc.name
+
                 result = CostSummaryEngine.get_cost_summary_data(
                     tenant=tenant,
                     date_from=parse_date_safe(filters.get('dateFrom')),
                     date_to=parse_date_safe(filters.get('dateTo')),
-                    cost_center=filters.get('costCenter'),
+                    cost_center=cost_center,
+                    location_id=location_id,
                     include_capex=filters.get('includeCapex', False)
                 )
                 result['costCenters'] = result.get('costCenters', [])[:50]
@@ -213,6 +241,12 @@ class ReportExportView(APIView):
         report_type = data.get('reportType', 'ASSET_VALUATION').upper()
         file_format = data.get('fileFormat', 'XLSX').upper()
         filters = data.get('filters', {})
+
+        if report_type == 'COST_SUMMARY' and filters.get('locationId') and not filters.get('costCenter'):
+            from assets.models import Location
+            loc = Location.all_objects.filter(id=filters.get('locationId'), tenant=tenant).first()
+            if loc:
+                filters['costCenter'] = loc.name
 
         if not check_report_permission(request.user, report_type):
             return error_response(
@@ -314,6 +348,22 @@ class ReportExportJobDetailView(APIView):
                 http_status=status.HTTP_404_NOT_FOUND
             )
 
+        # RBAC and IDOR guard: Verify permission for this report type
+        if not check_report_permission(request.user, job.report_type):
+            return error_response(
+                "FORBIDDEN_REPORT_ACCESS",
+                "Bạn không có quyền truy cập loại báo cáo này.",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Non-managers cannot view or download other users' jobs
+        if not is_admin_or_manager(request.user) and job.user_id != request.user.id:
+            return error_response(
+                "FORBIDDEN_REPORT_ACCESS",
+                "Bạn chỉ có thể xem thông tin tác vụ xuất do chính bạn khởi tạo.",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+
         download_url = None
         friendly_filename = job.file_name or f"{job.report_type}_{str(job.id)[:8]}.{job.file_format.lower()}"
         if job.status == 'COMPLETED' and job.minio_object_key:
@@ -360,6 +410,22 @@ class ReportExportJobDownloadView(APIView):
                 "JOB_NOT_FOUND",
                 "Tác vụ xuất không tồn tại hoặc bạn không có quyền truy cập.",
                 http_status=status.HTTP_404_NOT_FOUND
+            )
+
+        # RBAC and IDOR guard: Verify permission for this report type
+        if not check_report_permission(request.user, job.report_type):
+            return error_response(
+                "FORBIDDEN_REPORT_ACCESS",
+                "Bạn không có quyền truy cập hoặc tải báo cáo này.",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Non-managers cannot download other users' jobs
+        if not is_admin_or_manager(request.user) and job.user_id != request.user.id:
+            return error_response(
+                "FORBIDDEN_REPORT_ACCESS",
+                "Bạn chỉ có thể tải báo cáo do chính bạn khởi tạo.",
+                http_status=status.HTTP_403_FORBIDDEN
             )
 
         if job.status != 'COMPLETED' or not job.minio_object_key:
@@ -417,7 +483,16 @@ class ReportExportJobHistoryView(APIView):
         if not tenant:
             return error_response("NO_TENANT", "Tenant not associated with user")
 
-        jobs = ExportJob.all_objects.filter(tenant=tenant).order_by('-created_at')[:20]
+        qs = ExportJob.all_objects.filter(tenant=tenant)
+        if not is_admin_or_manager(request.user):
+            qs = qs.filter(user=request.user)
+
+        # Filter out report types user lacks permission to access
+        allowed_types = [
+            rtype for rtype, _ in ExportJob.REPORT_TYPE_CHOICES
+            if check_report_permission(request.user, rtype)
+        ]
+        jobs = qs.filter(report_type__in=allowed_types).order_by('-created_at')[:20]
 
         data = []
         for j in jobs:

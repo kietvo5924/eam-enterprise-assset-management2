@@ -152,9 +152,13 @@ class CostForecastingService:
             }
         )
 
-        # Đồng bộ ngược vào WorkOrder.actual_cost
+        # Đồng bộ ngược vào WorkOrder.actual_cost và is_capitalized (loại trừ OPEX)
         work_order.actual_cost = cost_obj.net_cost
-        work_order.save(update_fields=['actual_cost'])
+        update_fields = ['actual_cost']
+        if is_cap and not work_order.is_capitalized:
+            work_order.is_capitalized = True
+            update_fields.append('is_capitalized')
+        work_order.save(update_fields=update_fields)
 
         # Rule 2: Kế thừa cờ CapEx và cập nhật giá trị vốn hóa vào Asset.capitalized_cost
         if is_cap and work_order.asset_id:
@@ -533,9 +537,9 @@ class CostForecastingService:
 
         return {
             "defaultLaborHourlyRate": default_rate,
-            "defaultInflationRatePercent": round(default_inflation * 100.0, 1),
-            "defaultContingencyRatePercent": round(default_contingency * 100.0, 1),
-            "criticalSparePartRatioPercent": round(spare_ratio * 100.0, 1),
+            "defaultInflationRatePercent": round(default_inflation * 100.0, 2),
+            "defaultContingencyRatePercent": round(default_contingency * 100.0, 2),
+            "criticalSparePartRatioPercent": round(spare_ratio * 100.0, 2),
             "approvedBudget": pab_val,
             "isManuallyApproved": is_manual,
             "currency": setting.currency if setting else "VND"
@@ -547,6 +551,7 @@ class CostForecastingService:
         """
         Cập nhật cấu hình tài chính linh hoạt cấp Tenant và lưu hạn mức ngân sách được duyệt thực tế.
         Xác thực chặt chẽ, không tự ý gán đè số 0 hợp lệ thành mặc định.
+        Quy ước: defaultInflationRate, defaultContingencyRate, criticalSparePartRatio là số phần trăm (0 - 100%).
         """
         from analytics.models import TenantFinancialSetting, PeriodApprovedBudget
         setting, _ = TenantFinancialSetting.all_objects.get_or_create(tenant=tenant)
@@ -566,7 +571,7 @@ class CostForecastingService:
                 val = float(data["defaultInflationRate"])
                 if val < 0 or val > 100:
                     raise ValueError("Tỷ lệ lạm phát phải từ 0% đến 100%.")
-                setting.default_inflation_rate = val / 100.0 if val > 1.0 else val
+                setting.default_inflation_rate = val / 100.0
             except Exception as e:
                 raise ValueError(f"Tỷ lệ lạm phát không hợp lệ: {e}")
 
@@ -575,7 +580,7 @@ class CostForecastingService:
                 val = float(data["defaultContingencyRate"])
                 if val < 0 or val > 100:
                     raise ValueError("Tỷ lệ dự phòng rủi ro phải từ 0% đến 100%.")
-                setting.default_contingency_rate = val / 100.0 if val > 1.0 else val
+                setting.default_contingency_rate = val / 100.0
             except Exception as e:
                 raise ValueError(f"Tỷ lệ dự phòng không hợp lệ: {e}")
 
@@ -584,7 +589,7 @@ class CostForecastingService:
                 val = float(data["criticalSparePartRatio"])
                 if val < 0 or val > 100:
                     raise ValueError("Tỷ lệ linh kiện cốt lõi phải từ 0% đến 100%.")
-                setting.critical_spare_part_ratio = val / 100.0 if val > 1.0 else val
+                setting.critical_spare_part_ratio = val / 100.0
             except Exception as e:
                 raise ValueError(f"Tỷ lệ linh kiện cốt lõi không hợp lệ: {e}")
 

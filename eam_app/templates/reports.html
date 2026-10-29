@@ -653,6 +653,16 @@
     }
   }
 
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function renderTable(data) {
     const thead = document.getElementById('reportTableHead');
     const tbody = document.getElementById('reportTableBody');
@@ -689,12 +699,12 @@
         tr.className = `hover:bg-slate-50 transition-colors ${row.isBadActor ? 'bg-rose-50/30' : ''}`;
         tr.innerHTML = `
           <td class="px-4 py-3 font-bold text-slate-900">
-            <div>${row.name}</div>
-            <div class="text-[10px] font-medium text-slate-400">${row.serialNumber}</div>
+            <div>${escapeHtml(row.name)}</div>
+            <div class="text-[10px] font-medium text-slate-400">${escapeHtml(row.serialNumber)}</div>
           </td>
           <td class="px-4 py-3 text-slate-600">
-            <div>${row.locationName}</div>
-            <div class="text-[10px] text-slate-400">${row.categoryName}</div>
+            <div>${escapeHtml(row.locationName)}</div>
+            <div class="text-[10px] text-slate-400">${escapeHtml(row.categoryName)}</div>
           </td>
           <td class="px-4 py-3 text-right font-medium">${formatVnd(row.originalCost)}</td>
           <td class="px-4 py-3 text-right font-medium text-indigo-600">+${formatVnd(row.capexCost)}</td>
@@ -702,12 +712,12 @@
           <td class="px-4 py-3 text-right font-bold text-emerald-700">${formatVnd(row.netBookValue)}</td>
           <td class="px-4 py-3 text-center">
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${row.isBadActor ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">
-              ${row.rrrPercent}%
+              ${Number(row.rrrPercent || 0).toFixed(1)}%
             </span>
           </td>
           <td class="px-4 py-3">
             <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${row.monthsInService >= row.usefulLifeYears * 12 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}">
-              ${row.financialStatus}
+              ${escapeHtml(row.financialStatus)}
             </span>
             ${row.isBadActor ? `<div class="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1"><i class="ph-fill ph-warning-circle"></i> Đề xuất thanh lý</div>` : ''}
           </td>
@@ -740,27 +750,28 @@
       items.forEach(row => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors';
+        const shortId = row.id ? String(row.id).substring(0, 8) : '';
         tr.innerHTML = `
           <td class="px-4 py-3 font-bold text-slate-900">
-            <div>${row.title}</div>
-            <div class="text-[10px] font-mono text-slate-400">#${row.id.substring(0,8)}</div>
+            <div>${escapeHtml(row.title)}</div>
+            <div class="text-[10px] font-mono text-slate-400">#${escapeHtml(shortId)}</div>
           </td>
-          <td class="px-4 py-3 font-medium text-slate-700">${row.assetName}</td>
+          <td class="px-4 py-3 font-medium text-slate-700">${escapeHtml(row.assetName)}</td>
           <td class="px-4 py-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">${row.type}</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ml-1 ${row.priority === 'URGENT' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">${row.priority}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">${escapeHtml(row.type)}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ml-1 ${row.priority === 'URGENT' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}">${escapeHtml(row.priority)}</span>
           </td>
-          <td class="px-4 py-3 text-slate-600">${row.assignedTo}</td>
+          <td class="px-4 py-3 text-slate-600">${escapeHtml(row.assignedTo)}</td>
           <td class="px-4 py-3 text-[10px] text-slate-500">
-            <div>Hạn: ${row.dueDate}</div>
-            <div>Xong: ${row.completedAt}</div>
+            <div>Hạn: ${escapeHtml(row.dueDate)}</div>
+            <div>Xong: ${escapeHtml(row.completedAt)}</div>
           </td>
-          <td class="px-4 py-3 text-center font-bold text-slate-700">${row.durationHours}h</td>
+          <td class="px-4 py-3 text-center font-bold text-slate-700">${Number(row.durationHours || 0)}h</td>
           <td class="px-4 py-3">
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${row.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}">
-              ${row.status}
+              ${escapeHtml(row.status)}
             </span>
-            ${row.skippedReason !== 'N/A' ? `<div class="text-[9px] text-amber-600 font-semibold mt-0.5">${row.skippedReason}</div>` : ''}
+            ${row.skippedReason && row.skippedReason !== 'N/A' ? `<div class="text-[9px] text-amber-600 font-semibold mt-0.5">${escapeHtml(row.skippedReason)}</div>` : ''}
           </td>
         `;
         tbody.appendChild(tr);
@@ -791,8 +802,8 @@
         tr.className = `hover:bg-slate-50 transition-colors ${row.isNegative ? 'bg-rose-50/40' : ''}`;
         tr.innerHTML = `
           <td class="px-4 py-3 font-bold text-slate-900">
-            <div>${row.name}</div>
-            <div class="text-[10px] font-mono text-slate-400">${row.partNumber}</div>
+            <div>${escapeHtml(row.name)}</div>
+            <div class="text-[10px] font-mono text-slate-400">${escapeHtml(row.partNumber)}</div>
           </td>
           <td class="px-4 py-3 text-right font-black ${row.isNegative ? 'text-rose-600' : 'text-slate-800'}">${row.quantityInStock}</td>
           <td class="px-4 py-3 text-right font-medium">${formatVnd(row.unitCost)}</td>
@@ -829,7 +840,7 @@
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition-colors';
         tr.innerHTML = `
-          <td class="px-4 py-3 font-black text-slate-800">${row.costCenter}</td>
+          <td class="px-4 py-3 font-black text-slate-800">${escapeHtml(row.costCenter)}</td>
           <td class="px-4 py-3 text-right font-medium text-blue-600">${formatVnd(row.materialCost)}</td>
           <td class="px-4 py-3 text-right font-medium text-indigo-600">${formatVnd(row.laborCost)}</td>
           <td class="px-4 py-3 text-right font-black text-slate-900">${formatVnd(row.totalCost)}</td>
@@ -1094,21 +1105,28 @@
         jobs.forEach(j => {
           const item = document.createElement('div');
           item.className = 'py-3.5 flex justify-between items-center';
+          const rName = escapeHtml(j.reportTypeName || j.reportType || '');
+          const fFormat = escapeHtml(j.fileFormat || '');
+          const jStatus = escapeHtml(j.status || '');
+          const cAt = escapeHtml(j.createdAt || '');
+          const eAt = escapeHtml(j.expiresAt || '');
+          const dlName = j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase());
+
           item.innerHTML = `
             <div>
               <div class="font-bold text-xs text-slate-800 flex items-center gap-2">
-                <span>${j.reportTypeName || j.reportType}</span>
-                <span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono rounded font-bold">${j.fileFormat}</span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${j.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : j.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">${j.status}</span>
+                <span>${rName}</span>
+                <span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono rounded font-bold">${fFormat}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${j.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' : j.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">${jStatus}</span>
               </div>
               <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-3">
-                <span>Khởi tạo: ${j.createdAt}</span>
-                ${j.expiresAt ? `<span>Hết hạn: ${j.expiresAt}</span>` : ''}
+                <span>Khởi tạo: ${cAt}</span>
+                ${j.expiresAt ? `<span>Hết hạn: ${eAt}</span>` : ''}
               </div>
             </div>
             <div>
               ${j.status === 'COMPLETED' ? `
-                <a href="/api/v1/reports/export-jobs/${j.jobId}/download/${encodeURIComponent(j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase()))}" download="${j.fileName || (j.reportType + '.' + (j.fileFormat || 'xlsx').toLowerCase())}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5">
+                <a href="/api/v1/reports/export-jobs/${encodeURIComponent(j.jobId)}/download/${encodeURIComponent(dlName)}" download="${escapeHtml(dlName)}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5">
                   <i class="ph-bold ph-download-simple"></i> Tải Lại
                 </a>
               ` : ''}

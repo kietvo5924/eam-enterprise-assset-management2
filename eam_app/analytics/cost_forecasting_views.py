@@ -223,20 +223,20 @@ class RunForecastView(APIView):
         approved_budget_raw = payload.get('approvedBudget') or payload.get('approved_budget')
         approved_budget = parse_numeric_input(approved_budget_raw)
 
-        # Xử lý tỷ lệ lạm phát: hỗ trợ cả 0%, tỷ lệ % hoặc phân số
+        # Xử lý tỷ lệ lạm phát: quy ước đầu vào là phần trăm (0% - 100%)
         raw_inf = payload.get('inflationRate') if payload.get('inflationRate') is not None else payload.get('inflation_rate')
         if raw_inf is not None and str(raw_inf).strip() != '':
             try:
                 inf_val = float(raw_inf)
                 if inf_val < 0 or inf_val > 100:
                     return Response({'success': False, 'error': 'Tỷ lệ lạm phát phải nằm trong khoảng 0% - 100%.'}, status=status.HTTP_400_BAD_REQUEST)
-                inflation_rate = inf_val / 100.0 if inf_val > 1.0 else inf_val
+                inflation_rate = inf_val / 100.0
             except ValueError:
                 return Response({'success': False, 'error': 'Tỷ lệ lạm phát không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
         else:
             inflation_rate = default_inf
 
-        # Xử lý tỷ lệ dự phòng
+        # Xử lý tỷ lệ dự phòng: quy ước đầu vào là phần trăm (0% - 100%)
         raw_ctg = payload.get('contingencyBufferPercent') if payload.get('contingencyBufferPercent') is not None else (
             payload.get('contingency_rate') if payload.get('contingency_rate') is not None else payload.get('contingencyRate')
         )
@@ -245,7 +245,7 @@ class RunForecastView(APIView):
                 ctg_val = float(raw_ctg)
                 if ctg_val < 0 or ctg_val > 100:
                     return Response({'success': False, 'error': 'Tỷ lệ quỹ dự phòng phải nằm trong khoảng 0% - 100%.'}, status=status.HTTP_400_BAD_REQUEST)
-                contingency_rate = ctg_val / 100.0 if ctg_val > 1.0 else ctg_val
+                contingency_rate = ctg_val / 100.0
             except ValueError:
                 return Response({'success': False, 'error': 'Tỷ lệ quỹ dự phòng không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
         else:

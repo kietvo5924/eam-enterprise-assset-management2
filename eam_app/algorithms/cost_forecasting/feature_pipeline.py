@@ -72,13 +72,17 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
             base_net = fc.net_cost or Decimal('0.00')
 
             # Rule 1, Điểm 4: Xử lý biến động sau nghiệm thu (RETURN, ADJUSTMENT, is_variance_adjustment)
-            # Không sửa đè snapshot gốc nhưng hạch toán chính xác giao dịch điều chỉnh phát sinh sau mốc cost_frozen_at
+            # Không sửa đè snapshot gốc nhưng hạch toán chính xác giao dịch điều chỉnh phát sinh sau mốc cost_frozen_at.
+            # Ràng buộc issue_date__date__lte=end_date để hạch toán chuẩn dồn tích và chống rò rỉ dữ liệu tương lai.
             if fc.cost_frozen_at:
                 post_txs = StockTransaction.all_objects.filter(
                     tenant=tenant,
                     work_order=wo,
-                    created_at__gt=fc.cost_frozen_at,
                     transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
+                ).filter(
+                    Q(issue_date__gt=fc.cost_frozen_at) | Q(created_at__gt=fc.cost_frozen_at)
+                ).filter(
+                    issue_date__date__lte=end_date
                 )
                 post_adjustment = Decimal('0.00')
                 for tx in post_txs:
@@ -108,10 +112,11 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
             if cost_center and wo_cc != cost_center:
                 continue
 
-            # Tính vật tư: Chỉ ISSUE, ADJUSTMENT (+), trừ RETURN (-) gắn với WO
+            # Tính vật tư: Chỉ ISSUE, ADJUSTMENT (+), trừ RETURN (-) gắn với WO, hạch toán theo issue_date dồn tích
             mat_qs = StockTransaction.all_objects.filter(
                 tenant=tenant,
                 work_order=wo,
+                issue_date__date__lte=end_date,
                 transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
             )
             mat_total = Decimal('0.00')
@@ -125,7 +130,8 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
             # Tính giờ công thợ
             lab_total = LaborLog.all_objects.filter(
                 tenant=tenant,
-                work_order=wo
+                work_order=wo,
+                work_date__lte=end_date
             ).aggregate(s=Sum('total_cost'))['s'] or Decimal('0.00')
 
             gross = max(Decimal('0.00'), mat_total + lab_total)
@@ -460,6 +466,10 @@ class CostFeaturePipeline:
         cur_year = reference_date.year
         cur_month = reference_date.month
 
+        # Mốc ngày bắt đầu vận hành bảo trì thực tế của tenant (tránh gắn nhãn 0 trước ngày go-live)
+        earliest_wo = WorkOrder.all_objects.filter(tenant=tenant).order_by('created_at').first()
+        earliest_activity_date = earliest_wo.created_at.date().replace(day=1) if earliest_wo else None
+
         for i in range(months_back, 0, -1):
             m = cur_month - i
             y = cur_year
@@ -471,7 +481,11 @@ class CostFeaturePipeline:
             _, last_day = calendar.monthrange(y, m)
             end_t = datetime.date(y, m, last_day)
 
-            # Kiểm tra xem trong kỳ này có tài sản nào thuộc đối tượng bảo trì hay không (chống coi kỳ chưa có thiết bị là nhãn 0)
+            # 1. Bỏ qua các tháng trước khi doanh nghiệp bắt đầu triển khai/ghi nhận dữ liệu bảo trì thực tế
+            if earliest_activity_date and end_t < earliest_activity_date:
+                continue
+
+            # 2. Kiểm tra xem trong kỳ này có tài sản nào thuộc đối tượng bảo trì hay không (chống coi kỳ chưa có thiết bị là nhãn 0)
             assets_existed = Asset.all_objects.filter(
                 tenant=tenant
             ).filter(

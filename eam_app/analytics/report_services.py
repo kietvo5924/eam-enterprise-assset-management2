@@ -408,16 +408,12 @@ class SparePartsValuationEngine:
         if date_to:
             tx_qs = tx_qs.filter(issue_date__date__lte=date_to)
 
-        price_variance_total = Decimal('0')
-        surplus_returned_total = Decimal('0')
+        # Fix: Calculate total price variance and surplus returned across entire filtered queryset
+        price_variance_total = tx_qs.filter(is_variance_adjustment=True).aggregate(s=Sum('total_amount'))['s'] or Decimal('0')
+        surplus_returned_total = tx_qs.filter(transaction_type='RETURN').aggregate(s=Sum('total_amount'))['s'] or Decimal('0')
         transaction_rows = []
 
         for tx in tx_qs.order_by('-issue_date')[:100]:
-            if tx.is_variance_adjustment:
-                price_variance_total += tx.total_amount
-            if tx.transaction_type == 'RETURN':
-                surplus_returned_total += tx.total_amount
-
             transaction_rows.append({
                 "id": str(tx.id),
                 "partName": tx.spare_part.name if tx.spare_part else "N/A",
@@ -620,6 +616,7 @@ class CostSummaryEngine:
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
         cost_center: Optional[str] = None,
+        location_id: Optional[Any] = None,
         include_capex: bool = False
     ) -> Dict[str, Any]:
         now = timezone.now().date()
@@ -627,6 +624,11 @@ class CostSummaryEngine:
             date_from = now.replace(day=1)
         if not date_to:
             date_to = now
+
+        if not cost_center and location_id:
+            loc = Location.all_objects.filter(id=location_id, tenant=tenant).first()
+            if loc:
+                cost_center = loc.name
 
         # Rule 3: Accrual Accounting
         # Materials cost based on StockTransaction.issue_date
@@ -638,11 +640,19 @@ class CostSummaryEngine:
         ).select_related('spare_part', 'work_order')
 
         if cost_center:
-            material_qs = material_qs.filter(cost_center_snapshot=cost_center)
+            material_qs = material_qs.filter(
+                Q(cost_center_snapshot=cost_center) |
+                Q(work_order__incident_location__name=cost_center) |
+                Q(work_order__asset__location__name=cost_center)
+            )
 
         if not include_capex:
-            # Rule 2 & Rule 3: Exclude CAPEX work orders if specified
-            material_qs = material_qs.exclude(work_order__is_capitalized=True)
+            # Rule 2 & Rule 3: Exclude CAPEX work orders (is_capitalized, CORE_REPLACEMENT, or is_capital_overhaul)
+            material_qs = material_qs.exclude(
+                Q(work_order__is_capitalized=True) |
+                Q(work_order__maintenance_action='CORE_REPLACEMENT') |
+                Q(work_order__cost_breakdown__is_capital_overhaul=True)
+            )
 
         # Labor cost based on LaborLog.work_date
         labor_qs = LaborLog.all_objects.filter(
@@ -652,10 +662,18 @@ class CostSummaryEngine:
         ).select_related('technician', 'work_order')
 
         if cost_center:
-            labor_qs = labor_qs.filter(cost_center_snapshot=cost_center)
+            labor_qs = labor_qs.filter(
+                Q(cost_center_snapshot=cost_center) |
+                Q(work_order__incident_location__name=cost_center) |
+                Q(work_order__asset__location__name=cost_center)
+            )
 
         if not include_capex:
-            labor_qs = labor_qs.exclude(work_order__is_capitalized=True)
+            labor_qs = labor_qs.exclude(
+                Q(work_order__is_capitalized=True) |
+                Q(work_order__maintenance_action='CORE_REPLACEMENT') |
+                Q(work_order__cost_breakdown__is_capital_overhaul=True)
+            )
 
         # Group by cost center snapshot (Rule 6: Temporal Slicing)
         cost_center_aggregates = {}

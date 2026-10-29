@@ -137,15 +137,19 @@ class ExportEngineService:
         local_path = os.path.join(temp_dir, temp_filename)
 
         try:
+            is_truncated = False
             if file_format == 'XLSX':
                 cls._export_xlsx(headers, row_generator, local_path, report_type)
                 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             elif file_format == 'PDF':
-                cls._export_pdf(headers, row_generator, local_path, report_type)
+                is_truncated = cls._export_pdf(headers, row_generator, local_path, report_type)
                 content_type = "application/pdf"
             else:  # CSV
                 cls._export_csv(headers, row_generator, local_path)
                 content_type = "text/csv; charset=utf-8"
+
+            if is_truncated and not job.error_message:
+                job.error_message = "Tệp PDF giới hạn tối đa 1.000 dòng. Vui lòng xuất XLSX hoặc CSV để xem toàn bộ dữ liệu."
 
             if progress_callback:
                 progress_callback(75)
@@ -320,11 +324,20 @@ class ExportEngineService:
             "Tổng Chi Phí Thực Tế (VNĐ)"
         ]
 
+        cost_center = filters.get('costCenter')
+        location_id = filters.get('locationId')
+        if not cost_center and location_id:
+            from assets.models import Location
+            loc = Location.all_objects.filter(id=location_id, tenant=tenant).first()
+            if loc:
+                cost_center = loc.name
+
         data = CostSummaryEngine.get_cost_summary_data(
             tenant=tenant,
             date_from=parse_date_safe(filters.get('dateFrom')),
             date_to=parse_date_safe(filters.get('dateTo')),
-            cost_center=filters.get('costCenter'),
+            cost_center=cost_center,
+            location_id=location_id,
             include_capex=filters.get('includeCapex', False)
         )
 
@@ -503,12 +516,19 @@ class ExportEngineService:
         table_data.append([Paragraph(html.escape(str(sanitize_cell_value(h))), th_style) for h in headers])
 
         count = 0
-        for r in rows:
+        has_more = False
+        row_iter = iter(rows)
+        for r in row_iter:
             table_data.append([
                 Paragraph(html.escape(str(sanitize_cell_value(c))), td_style) for c in r
             ])
             count += 1
             if count >= 1000:
+                try:
+                    next(row_iter)
+                    has_more = True
+                except StopIteration:
+                    has_more = False
                 break
 
         t = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -524,4 +544,22 @@ class ExportEngineService:
         ]))
 
         elements.append(t)
+
+        if has_more:
+            warn_style = ParagraphStyle(
+                'PDFTruncateWarning',
+                fontName=font_bold,
+                fontSize=9,
+                leading=13,
+                textColor=colors.HexColor('#b91c1c'),
+                spaceBefore=12,
+                alignment=0
+            )
+            elements.append(Paragraph(
+                "LƯU Ý: Tệp PDF này đã được giới hạn hiển thị tối đa 1.000 dòng để đảm bảo hiệu năng và định dạng trang in. "
+                "Để phân tích đầy đủ toàn bộ dữ liệu báo cáo, vui lòng chọn xuất định dạng XLSX hoặc CSV.",
+                warn_style
+            ))
+
         doc.build(elements)
+        return has_more

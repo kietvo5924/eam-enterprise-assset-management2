@@ -1456,3 +1456,153 @@ class MaintenanceCostForecastingTests(TestCase):
         )
         self.assertFalse(notifs.exists())
 
+    def test_tc_cost_35_rate_conversion_0_to_100_percent(self):
+        """
+        TC-COST-35: Xác minh chuyển đổi chính xác các tỷ lệ phần trăm (0%, 0.5%, 1%, 1.5%, 5%, 100%):
+        Không bị bẫy `if val > 1.0` biến giá trị 1 thành 100% thay vì 1%, hoặc 0.5 thành 50% thay vì 0.5%.
+        """
+        from analytics.models import TenantFinancialSetting
+
+        test_cases = [
+            (0.0, 0.0),
+            (0.5, 0.005),
+            (1.0, 0.01),
+            (1.5, 0.015),
+            (5.0, 0.05),
+            (100.0, 1.0),
+        ]
+
+        for percent_input, expected_coeff in test_cases:
+            res = CostForecastingService.update_financial_settings(
+                self.tenant,
+                {
+                    "defaultInflationRate": percent_input,
+                    "defaultContingencyRate": percent_input,
+                    "criticalSparePartRatio": percent_input
+                },
+                user=self.user
+            )
+            setting = TenantFinancialSetting.all_objects.get(tenant=self.tenant)
+            self.assertAlmostEqual(setting.default_inflation_rate, expected_coeff, places=6)
+            self.assertAlmostEqual(setting.default_contingency_rate, expected_coeff, places=6)
+            self.assertAlmostEqual(setting.critical_spare_part_ratio, expected_coeff, places=6)
+            self.assertAlmostEqual(res["defaultInflationRatePercent"], percent_input, places=2)
+
+    def test_tc_cost_36_core_replacement_capex_opex_no_double_counting(self):
+        """
+        TC-COST-36: Kiểm tra quy tắc CAPEX/OPEX khi đại tu lớn CORE_REPLACEMENT:
+        Khi freeze_work_order_cost() chạy, nó đồng bộ work_order.is_capitalized = True,
+        cộng vào Asset.capitalized_cost, đồng thời CostSummaryEngine (include_capex=False)
+        loại trừ hoàn toàn khỏi chi phí sửa chữa vận hành (OPEX), chống tính trùng hai lần.
+        """
+        from analytics.report_services import CostSummaryEngine
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Thay thế động cơ cốt lõi CORE_REPLACEMENT',
+            type='CORRECTIVE',
+            maintenance_action='CORE_REPLACEMENT',
+            status='COMPLETED',
+            is_capitalized=False,  # Chưa đánh dấu lúc đầu
+            completed_at=timezone.make_aware(datetime.datetime(2026, 11, 10, 10, 0))
+        )
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='ISSUE',
+            quantity=Decimal('1.0'),
+            total_amount=Decimal('50000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 11, 10, 8, 0))
+        )
+        LaborLog.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            technician=self.user,
+            work_date=datetime.date(2026, 11, 10),
+            hours_worked=Decimal('10.0'),
+            total_cost=Decimal('5000000.00')
+        )
+
+        initial_cap = self.asset.capitalized_cost or Decimal('0.00')
+
+        # Đóng băng chi phí
+        cost_obj = CostForecastingService.freeze_work_order_cost(wo)
+
+        # 1. work_order.is_capitalized phải được tự động đồng bộ thành True
+        wo.refresh_from_db()
+        self.assertTrue(wo.is_capitalized)
+        self.assertTrue(cost_obj.is_capital_overhaul)
+
+        # 2. Asset.capitalized_cost được cộng thêm chi phí vốn hóa (55M)
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.capitalized_cost, initial_cap + Decimal('55000000.00'))
+
+        # 3. CostSummaryEngine với include_capex=False phải loại trừ 100% chi phí này khỏi OPEX
+        summary_opex = CostSummaryEngine.get_cost_summary_data(
+            tenant=self.tenant,
+            date_from=datetime.date(2026, 11, 1),
+            date_to=datetime.date(2026, 11, 30),
+            include_capex=False
+        )
+        self.assertEqual(summary_opex["summary"]["totalCost"], 0.0)
+
+        # 4. Khi include_capex=True thì mới được tính
+        summary_all = CostSummaryEngine.get_cost_summary_data(
+            tenant=self.tenant,
+            date_from=datetime.date(2026, 11, 1),
+            date_to=datetime.date(2026, 11, 30),
+            include_capex=True
+        )
+        self.assertEqual(summary_all["summary"]["totalCost"], 55000000.0)
+
+    def test_tc_cost_37_future_transactions_do_not_leak_into_past_training_cost(self):
+        """
+        TC-COST-37: Chống rò rỉ dữ liệu tương lai (No Future Data Leakage):
+        Giao dịch RETURN/ADJUSTMENT phát sinh ở tháng sau (tháng 9) tuyệt đối không
+        được làm thay đổi nhãn chi phí thực tế của kỳ huấn luyện tháng trước (tháng 8).
+        """
+        start_d = datetime.date(2026, 8, 1)
+        end_d = datetime.date(2026, 8, 31)
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title='Sửa chữa máy dập tháng 8',
+            type='CORRECTIVE',
+            status='COMPLETED',
+            completed_at=timezone.make_aware(datetime.datetime(2026, 8, 20, 16, 0))
+        )
+        cost_snap = WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            gross_cost=Decimal('20000000.00'),
+            net_cost=Decimal('20000000.00'),
+            is_cost_frozen=True,
+            cost_frozen_at=timezone.make_aware(datetime.datetime(2026, 8, 20, 17, 0))
+        )
+
+        # Giao dịch hoàn trả kho phát sinh vào THÁNG 9 (2026-09-15)
+        StockTransaction.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.spare_part,
+            transaction_type='RETURN',
+            quantity=Decimal('-1.00'),
+            unit_price=Decimal('5000000.00'),
+            total_amount=Decimal('5000000.00'),
+            issue_date=timezone.make_aware(datetime.datetime(2026, 9, 15, 10, 0))
+        )
+
+        # Khi tính chi phí thực tế cho tháng 8, khoản giảm 5M của tháng 9 KHÔNG được trừ vào tháng 8
+        cost_aug = get_actual_consumption_net_cost(self.tenant, start_d, end_d)
+        self.assertEqual(cost_aug, Decimal('20000000.00'))
+
+        # Còn khi tính cho tháng 9 (hoặc kỳ gồm cả tháng 9):
+        start_sep = datetime.date(2026, 9, 1)
+        end_sep = datetime.date(2026, 9, 30)
+        cost_both = get_actual_consumption_net_cost(self.tenant, start_d, end_sep)
+        self.assertEqual(cost_both, Decimal('15000000.00'))
+
+

@@ -1130,3 +1130,307 @@ def test_tc_rep_18_depreciation_with_none_capitalized_cost(test_setup):
     # Monthly = 60m / 60 months = 1,000,000 VNĐ. 12 months = 12,000,000 VNĐ.
     assert item["accumulatedDepreciation"] == 12000000.0
     assert item["netBookValue"] == 48000000.0
+
+
+def test_tc_rep_19_check_report_permission_unrecognized_role_denied(test_setup):
+    """
+    TC-REP-19: Xác minh ma trận phân quyền báo cáo (RBAC Matrix):
+    - Vai trò không hợp lệ / không khai báo (GUEST, OPERATOR): từ chối (False).
+    - Technician: chỉ được xem MAINTENANCE_PERFORMANCE, bị cấm ASSET_VALUATION và COST_SUMMARY.
+    - Warehouse keeper: chỉ được xem SPARE_PARTS.
+    - Admin / Manager: xem được toàn bộ 4 báo cáo.
+    """
+    from analytics.views import check_report_permission
+    tenant = test_setup["tenant"]
+
+    # 1. Unauthenticated or None
+    assert check_report_permission(None, "ASSET_VALUATION") is False
+
+    # 2. Guest user with invalid/unrecognized role
+    guest_user = User.objects.create_user(
+        username="guest_user_19",
+        email="guest19@steel.vn",
+        password="password123",
+        tenant=tenant
+    )
+    guest_role = Role.objects.create(name="GUEST_VIEWER", tenant=tenant)
+    guest_user.roles.add(guest_role)
+
+    for r_type in ["ASSET_VALUATION", "COST_SUMMARY", "SPARE_PARTS", "MAINTENANCE_PERFORMANCE"]:
+        assert check_report_permission(guest_user, r_type) is False, f"Role {guest_role.name} must be denied for {r_type}"
+
+    # 3. Technician user
+    tech_user = test_setup["tech_user"]
+    assert check_report_permission(tech_user, "MAINTENANCE_PERFORMANCE") is True
+    assert check_report_permission(tech_user, "COST_SUMMARY") is False
+    assert check_report_permission(tech_user, "ASSET_VALUATION") is False
+    assert check_report_permission(tech_user, "SPARE_PARTS") is False
+
+    # 4. Warehouse user
+    wh_user = User.objects.create_user(
+        username="wh_user_19",
+        email="wh19@steel.vn",
+        password="password123",
+        tenant=tenant
+    )
+    wh_role = Role.objects.create(name="WAREHOUSE_KEEPER", tenant=tenant)
+    wh_user.roles.add(wh_role)
+
+    assert check_report_permission(wh_user, "SPARE_PARTS") is True
+    assert check_report_permission(wh_user, "COST_SUMMARY") is False
+    assert check_report_permission(wh_user, "ASSET_VALUATION") is False
+    assert check_report_permission(wh_user, "MAINTENANCE_PERFORMANCE") is False
+
+    # 5. Admin user
+    admin_user = test_setup["admin_user"]
+    for r_type in ["ASSET_VALUATION", "COST_SUMMARY", "SPARE_PARTS", "MAINTENANCE_PERFORMANCE"]:
+        assert check_report_permission(admin_user, r_type) is True
+
+
+def test_tc_rep_20_export_job_detail_download_history_rbac_and_ownership(test_setup):
+    """
+    TC-REP-20: Bảo vệ chống IDOR và vi phạm RBAC khi truy cập ExportJob:
+    - Kỹ thuật viên không được xem thông tin hoặc tải tệp báo cáo COST_SUMMARY của người khác.
+    - Kỹ thuật viên không xem được job của người khác trong cùng tenant nếu không phải admin.
+    - History view chỉ trả về job mà người dùng có quyền và sở hữu.
+    """
+    tenant = test_setup["tenant"]
+    admin_user = test_setup["admin_user"]
+    tech_user = test_setup["tech_user"]
+
+    # Admin tạo một job báo cáo COST_SUMMARY
+    cost_job = ExportJob.all_objects.create(
+        tenant=tenant,
+        user=admin_user,
+        report_type="COST_SUMMARY",
+        file_format="XLSX",
+        status="COMPLETED",
+        minio_object_key=f"{tenant.id}/2026/10/cost_job.xlsx",
+        file_name="BaoCao_ChiPhi_2026.xlsx"
+    )
+
+    # Tech tạo một job báo cáo MAINTENANCE_PERFORMANCE
+    tech_job = ExportJob.all_objects.create(
+        tenant=tenant,
+        user=tech_user,
+        report_type="MAINTENANCE_PERFORMANCE",
+        file_format="PDF",
+        status="COMPLETED",
+        minio_object_key=f"{tenant.id}/2026/10/tech_job.pdf",
+        file_name="BaoCao_HieuSuat_2026.pdf"
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=tech_user)
+
+    # 1. Tech cố xem detail job COST_SUMMARY của admin -> Phải bị 403 Forbidden
+    res_detail = client.get(f"/api/v1/reports/export-jobs/{cost_job.id}/")
+    assert res_detail.status_code == status.HTTP_403_FORBIDDEN
+
+    # 2. Tech cố tải download tệp COST_SUMMARY của admin -> Phải bị 403 Forbidden
+    res_down = client.get(f"/api/v1/reports/export-jobs/{cost_job.id}/download/")
+    assert res_down.status_code == status.HTTP_403_FORBIDDEN
+
+    # 3. Tech xem lịch sử export jobs -> Chỉ thấy tech_job của chính mình, không thấy cost_job của admin
+    res_history = client.get("/api/v1/reports/export-jobs/")
+    assert res_history.status_code == status.HTTP_200_OK
+    job_ids = [j["jobId"] for j in res_history.data["data"]]
+    assert str(tech_job.id) in job_ids
+    assert str(cost_job.id) not in job_ids
+
+    # 4. Admin xem lịch sử export jobs -> Thấy cả hai vì có thẩm quyền quản trị
+    admin_client = APIClient()
+    admin_client.force_authenticate(user=admin_user)
+    res_admin_hist = admin_client.get("/api/v1/reports/export-jobs/")
+    assert res_admin_hist.status_code == status.HTTP_200_OK
+    admin_job_ids = [j["jobId"] for j in res_admin_hist.data["data"]]
+    assert str(cost_job.id) in admin_job_ids
+    assert str(tech_job.id) in admin_job_ids
+
+
+def test_tc_rep_21_spare_parts_kpi_calculated_across_all_transactions_over_100(test_setup):
+    """
+    TC-REP-21: Xác minh tính đúng đắn KPI kho phụ tùng khi có > 100 giao dịch:
+    - Tổng chênh lệch giá (priceVarianceTotal) và tổng nhập trả thừa (surplusReturnedTotal)
+      phải được tính trên toàn bộ tập dữ liệu phù hợp, không bị giới hạn cắt ngọn [:100].
+    """
+    tenant = test_setup["tenant"]
+    asset = Asset.all_objects.create(
+        tenant=tenant,
+        name="Máy Phay CNC 21",
+        qr_code="CNC-21",
+        purchase_cost=Decimal("100000000.00"),
+        location=test_setup["location_a"],
+        category=test_setup["category"]
+    )
+    part = SparePart.all_objects.create(
+        tenant=tenant,
+        name="Vòng Bi SKF 21",
+        part_number="SKF-6205-21",
+        unit_cost=Decimal("50000.00"),
+        quantity_in_stock=Decimal("100.00")
+    )
+    wo = WorkOrder.objects.create(
+        tenant=tenant,
+        asset=asset,
+        title="Bảo dưỡng máy CNC 21",
+        type="PREVENTIVE",
+        status="COMPLETED",
+        completed_at=timezone.now()
+    )
+
+    # Tạo 120 giao dịch điều chỉnh giá (is_variance_adjustment=True), mỗi giao dịch 10,000 VNĐ -> Tổng = 1,200,000 VNĐ
+    txs_to_create = []
+    base_dt = datetime(2026, 9, 1, 8, 0, tzinfo=dt_timezone.utc)
+    for i in range(120):
+        txs_to_create.append(
+            StockTransaction(
+                tenant=tenant,
+                spare_part=part,
+                work_order=wo,
+                transaction_type="ADJUSTMENT",
+                quantity=Decimal("1.00"),
+                unit_price=Decimal("10000.00"),
+                total_amount=Decimal("10000.00"),
+                is_variance_adjustment=True,
+                issue_date=base_dt + timedelta(minutes=i)
+            )
+        )
+    # Thêm 30 giao dịch hoàn trả thừa (RETURN), mỗi giao dịch 50,000 VNĐ -> Tổng = 1,500,000 VNĐ
+    for i in range(30):
+        txs_to_create.append(
+            StockTransaction(
+                tenant=tenant,
+                spare_part=part,
+                work_order=wo,
+                transaction_type="RETURN",
+                quantity=Decimal("-1.00"),
+                unit_price=Decimal("50000.00"),
+                total_amount=Decimal("50000.00"),
+                issue_date=base_dt + timedelta(hours=i + 3)
+            )
+        )
+    StockTransaction.all_objects.bulk_create(txs_to_create)
+
+    data = SparePartsValuationEngine.get_spare_parts_data(
+        tenant=tenant,
+        date_from=date(2026, 9, 1),
+        date_to=date(2026, 9, 30)
+    )
+
+    summary = data["summary"]
+    # Tổng variance phải đúng 1,200,000 VNĐ (trên toàn bộ 120 bản ghi, không bị cắt còn 100)
+    assert summary["priceVarianceTotal"] == 1200000.0
+    # Tổng returned phải đúng 1,500,000 VNĐ
+    assert summary["surplusReturnedTotal"] == 1500000.0
+    # Danh sách giao dịch chi tiết hiển thị tối đa 100 dòng cho UI
+    assert len(data["transactions"]) == 100
+
+
+def test_tc_rep_22_cost_summary_location_id_filtering(test_setup):
+    """
+    TC-REP-22: Bộ lọc locationId trong Cost Summary:
+    Khi chọn một location cụ thể, dữ liệu trả về chỉ chứa chi phí thuộc phân xưởng/vị trí đó.
+    """
+    tenant = test_setup["tenant"]
+    loc_a = test_setup["location_a"]
+    loc_b = test_setup["location_b"]
+
+    asset_a = Asset.all_objects.create(
+        tenant=tenant,
+        name="Thiết Bị Phân Xưởng A",
+        qr_code="ASSET-LOC-A",
+        purchase_cost=Decimal("50000000.00"),
+        location=loc_a,
+        category=test_setup["category"]
+    )
+    asset_b = Asset.all_objects.create(
+        tenant=tenant,
+        name="Thiết Bị Phân Xưởng B",
+        qr_code="ASSET-LOC-B",
+        purchase_cost=Decimal("50000000.00"),
+        location=loc_b,
+        category=test_setup["category"]
+    )
+
+    part = SparePart.all_objects.create(
+        tenant=tenant,
+        name="Phụ Tùng Lọc Dầu",
+        part_number="FILTER-LOC",
+        unit_cost=Decimal("100000.00"),
+        quantity_in_stock=Decimal("50.00")
+    )
+
+    wo_a = WorkOrder.objects.create(
+        tenant=tenant,
+        asset=asset_a,
+        title="Bảo dưỡng Phân Xưởng A",
+        type="PREVENTIVE",
+        status="COMPLETED",
+        incident_location=loc_a,
+        completed_at=timezone.now()
+    )
+    wo_b = WorkOrder.objects.create(
+        tenant=tenant,
+        asset=asset_b,
+        title="Bảo dưỡng Phân Xưởng B",
+        type="PREVENTIVE",
+        status="COMPLETED",
+        incident_location=loc_b,
+        completed_at=timezone.now()
+    )
+
+    StockTransaction.all_objects.create(
+        tenant=tenant,
+        work_order=wo_a,
+        spare_part=part,
+        transaction_type="ISSUE",
+        quantity=Decimal("1.0"),
+        total_amount=Decimal("4000000.00"),
+        cost_center_snapshot=loc_a.name,
+        issue_date=timezone.now()
+    )
+    StockTransaction.all_objects.create(
+        tenant=tenant,
+        work_order=wo_b,
+        spare_part=part,
+        transaction_type="ISSUE",
+        quantity=Decimal("1.0"),
+        total_amount=Decimal("7000000.00"),
+        cost_center_snapshot=loc_b.name,
+        issue_date=timezone.now()
+    )
+
+    # Lọc theo locationId của phân xưởng A
+    data_a = CostSummaryEngine.get_cost_summary_data(
+        tenant=tenant,
+        location_id=str(loc_a.id)
+    )
+    assert len(data_a["costCenters"]) == 1
+    assert data_a["costCenters"][0]["costCenter"] == loc_a.name
+    assert data_a["costCenters"][0]["materialCost"] == 4000000.0
+
+    # Lọc theo locationId của phân xưởng B
+    data_b = CostSummaryEngine.get_cost_summary_data(
+        tenant=tenant,
+        location_id=str(loc_b.id)
+    )
+    assert len(data_b["costCenters"]) == 1
+    assert data_b["costCenters"][0]["costCenter"] == loc_b.name
+    assert data_b["costCenters"][0]["materialCost"] == 7000000.0
+
+
+def test_tc_rep_23_pdf_export_warning_banner_when_truncated(tmp_path):
+    """
+    TC-REP-23: Thông báo rõ ràng khi xuất PDF bị giới hạn 1.000 dòng:
+    _export_pdf trả về is_truncated = True và chèn đoạn văn cảnh báo trong tài liệu PDF.
+    """
+    headers = ["Cột 1", "Cột 2"]
+    # Sinh 1050 dòng
+    rows = [[f"Dữ liệu {i}", f"Giá trị {i}"] for i in range(1050)]
+    pdf_path = str(tmp_path / "test_report_truncated.pdf")
+
+    is_truncated = ExportEngineService._export_pdf(headers, rows, pdf_path, "TEST_REPORT")
+    assert is_truncated is True
+    assert os.path.exists(pdf_path)
+    assert os.path.getsize(pdf_path) > 0
