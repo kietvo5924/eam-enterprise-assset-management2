@@ -187,6 +187,15 @@ class WorkOrderListView(APIView):
                 issue_date=timezone.now(),
                 is_variance_adjustment=False
             )
+
+        # Initialize vendor_cost if specified during Work Order creation
+        if 'vendorCost' in data and data['vendorCost'] is not None:
+            from workorders.models import WorkOrderCost
+            WorkOrderCost.objects.update_or_create(
+                work_order=wo,
+                tenant=wo.tenant,
+                defaults={'vendor_cost': data['vendorCost']}
+            )
         
         # Mock Async Event
         import logging
@@ -263,8 +272,19 @@ class WorkOrderDetailView(APIView):
             
             # Save new materials
             for pm in data['materials']:
-                part = get_object_or_404(SparePart, id=pm.get('sparePartId'), tenant_id=wo.tenant_id)
-                req_qty = Decimal(str(pm.get('quantity')))
+                part_id = pm.get('sparePartId')
+                part = SparePart.objects.select_for_update().filter(id=part_id, tenant_id=wo.tenant_id).first()
+                if not part:
+                    raise ValidationError(f"Phụ tùng/vật tư không tồn tại trong kho của tổ chức: {part_id}")
+                req_qty_raw = pm.get('quantity')
+                if req_qty_raw is None:
+                    raise ValidationError(f"Số lượng yêu cầu cho vật tư {part.name} không được để trống.")
+                try:
+                    req_qty = Decimal(str(req_qty_raw))
+                except Exception:
+                    raise ValidationError(f"Số lượng yêu cầu không hợp lệ: {req_qty_raw}")
+                if req_qty <= Decimal('0'):
+                    raise ValidationError(f"Số lượng yêu cầu cho vật tư {part.name} phải lớn hơn 0.")
                 new_u_cost = part.unit_cost or Decimal('0.00')
                 new_mat_cost = (req_qty * new_u_cost).quantize(Decimal('0.01'))
                 if part.quantity_in_stock is not None:
@@ -272,6 +292,8 @@ class WorkOrderDetailView(APIView):
                         raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name}")
                     part.quantity_in_stock -= req_qty
                     part.save()
+                    from notifications.services import notify_spare_part_low_stock
+                    notify_spare_part_low_stock(part)
                     
                 WorkOrderMaterial.objects.create(
                     work_order=wo,
@@ -291,6 +313,14 @@ class WorkOrderDetailView(APIView):
                     issue_date=timezone.now(),
                     is_variance_adjustment=False
                 )
+
+        if 'vendorCost' in data and data['vendorCost'] is not None:
+            from workorders.models import WorkOrderCost
+            WorkOrderCost.objects.update_or_create(
+                work_order=wo,
+                tenant=wo.tenant,
+                defaults={'vendor_cost': data['vendorCost']}
+            )
         
         return success_response(WorkOrderSerializer(wo).data)
         

@@ -33,9 +33,13 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
   final Map<String, Timer> _debounceTimers = {};
   String? _selectedMachineState;
   double _selectedLoadFactor = 1.0;
+  final TextEditingController _vibrationController = TextEditingController();
+  final TextEditingController _temperatureController = TextEditingController();
 
   @override
   void dispose() {
+    _vibrationController.dispose();
+    _temperatureController.dispose();
     for (var timer in _debounceTimers.values) {
       timer.cancel();
     }
@@ -1178,12 +1182,16 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                         return false;
                       }
 
+                      final vibText = _vibrationController.text.trim().replaceAll(',', '.');
+                      final tempText = _temperatureController.text.trim().replaceAll(',', '.');
                       final success = await _service.updateStatus(
                         widget.workOrderId,
                         'COMPLETED',
                         resolutionNotes: _workOrder?.resolutionNotes,
                         machineState: _selectedMachineState,
                         loadFactor: _selectedLoadFactor,
+                        postRepairVibration: vibText.isNotEmpty ? double.tryParse(vibText) : null,
+                        postRepairTemperature: tempText.isNotEmpty ? double.tryParse(tempText) : null,
                       );
                       if (mounted) {
                         if (success) {
@@ -1903,6 +1911,48 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                                   _selectedLoadFactor = val ?? 1.0;
                                 });
                               },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _vibrationController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              enabled: _workOrder!.status != 'COMPLETED',
+                              decoration: InputDecoration(
+                                labelText: 'Độ rung (mm/s)',
+                                hintText: 'VD: 2.5',
+                                filled: true,
+                                fillColor: const Color(0xFFf8fafc),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppTheme.neutral300),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _temperatureController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              enabled: _workOrder!.status != 'COMPLETED',
+                              decoration: InputDecoration(
+                                labelText: 'Nhiệt độ (°C)',
+                                hintText: 'VD: 45.0',
+                                filled: true,
+                                fillColor: const Color(0xFFf8fafc),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppTheme.neutral300),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],

@@ -172,11 +172,11 @@ class WorkOrderChecklist {
     return WorkOrderChecklist(
       id: json['id'] ?? '',
       itemName: json['itemName'] ?? '',
-      isCompleted: json['completed'] ?? false,
+      isCompleted: json['isCompleted'] ?? json['completed'] ?? false,
       inputType: json['inputType'] ?? 'PASS_FAIL',
       expectedValue: json['expectedValue'],
       actualValue: json['actualValue'],
-      isMandatory: json['isMandatory'] ?? false,
+      isMandatory: json['isMandatory'] ?? json['is_mandatory'] ?? false,
     );
   }
 

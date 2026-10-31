@@ -149,6 +149,7 @@ class WorkOrderCreateSerializer(serializers.Serializer):
         child=serializers.CharField(), required=False, default=list
     )
     maintenanceAction = serializers.CharField(required=False, default='GENERAL')
+    vendorCost = serializers.DecimalField(max_digits=19, decimal_places=2, required=False, allow_null=True)
 
 class WorkOrderAssignSerializer(serializers.Serializer):
     assignedTo = serializers.UUIDField()

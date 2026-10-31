@@ -607,7 +607,7 @@ class CostForecastingService:
 
         period = data.get("period")
         cost_center = data.get("costCenter") or data.get("cost_center") or None
-        approved_budget_raw = data.get("approvedBudget") or data.get("approved_budget")
+        approved_budget_raw = data.get("approvedBudget") if "approvedBudget" in data else data.get("approved_budget")
 
         if period and approved_budget_raw is not None and str(approved_budget_raw).strip() != '':
             raw_app = str(approved_budget_raw).replace(',', '').replace(' ', '')

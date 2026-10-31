@@ -1880,12 +1880,12 @@ def portal_work_orders(request):
                 )
 
                 # Initialize vendor_cost if specified during Work Order creation by supervisor
-                raw_vcost = data.get('vendor_cost') or data.get('vendorCost')
+                raw_vcost = data.get('vendor_cost') if 'vendor_cost' in data else data.get('vendorCost')
                 if raw_vcost is not None and str(raw_vcost).strip() != '':
                     try:
                         from decimal import Decimal
                         v_dec = Decimal(str(raw_vcost))
-                        if v_dec > 0:
+                        if v_dec >= Decimal('0'):
                             from workorders.models import WorkOrderCost
                             WorkOrderCost.objects.update_or_create(
                                 work_order=wo,

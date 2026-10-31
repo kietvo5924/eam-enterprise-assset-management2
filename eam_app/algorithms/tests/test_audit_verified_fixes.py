@@ -825,4 +825,282 @@ class DeepAuditVerifiedFixesTests(TestCase):
         self.assertTrue(ser.data['isCapitalized'])
         self.assertEqual(ser.data['costBreakdown']['materialCost'], '1000000.00')
 
+    def test_15_work_order_put_materials_validation_and_multi_line_idempotency(self):
+        """Fix 7: Sửa Work Order (PUT) với nhiều dòng cùng sparePartId, kiểm tra hoàn kho cũ, xuất kho mới và chặn số lượng âm."""
+        initial_stock = Decimal('40.00')
+        self.part.quantity_in_stock = initial_stock
+        self.part.save(update_fields=['quantity_in_stock'])
+
+        p_upd, _ = Permission.objects.get_or_create(id='work_order:update', defaults={'name': 'Update WO'})
+        p_read, _ = Permission.objects.get_or_create(id='work_order:read', defaults={'name': 'Read WO'})
+        self.role_tech.permissions.add(p_upd, p_read)
+
+        wo = WorkOrder.objects.create(
+            title="Phiếu chuẩn bị cập nhật vật tư",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='CREATED',
+            assigned_to=self.tech_user
+        )
+        # Giả lập ban đầu đã xuất 4 cái
+        qty_old = Decimal('4.00')
+        self.part.quantity_in_stock -= qty_old
+        self.part.save(update_fields=['quantity_in_stock'])
+        StockTransaction.objects.create(
+            tenant=self.tenant,
+            spare_part=self.part,
+            work_order=wo,
+            transaction_type='ISSUE',
+            quantity=qty_old,
+            unit_price=self.part.unit_cost,
+            total_amount=qty_old * self.part.unit_cost,
+            issue_date=timezone.now()
+        )
+        WorkOrderMaterial.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.part,
+            quantity=qty_old,
+            actual_cost=qty_old * self.part.unit_cost
+        )
+
+        from workorders.views import WorkOrderDetailView
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        factory = APIRequestFactory()
+
+        # 1. Thử gửi số lượng âm -> phải bị ValidationError từ chối (HTTP 400)
+        bad_put_data = {
+            'assetId': str(self.asset.id),
+            'title': 'Phiếu cập nhật vật tư lỗi',
+            'priority': 'HIGH',
+            'materials': [
+                {'sparePartId': str(self.part.id), 'quantity': '-2.00'}
+            ]
+        }
+        req_bad = factory.put(f'/api/v1/work-orders/{wo.id}', data=bad_put_data, format='json')
+        force_authenticate(req_bad, user=self.tech_user)
+        view = WorkOrderDetailView.as_view()
+        resp_bad = view(req_bad, wo_id=wo.id)
+        self.assertEqual(resp_bad.status_code, 400)
+
+        # 2. Cập nhật hợp lệ với 2 dòng cùng 1 loại vật tư (2 cái + 3 cái = 5 cái)
+        valid_put_data = {
+            'assetId': str(self.asset.id),
+            'title': 'Phiếu cập nhật vật tư hợp lệ',
+            'priority': 'HIGH',
+            'materials': [
+                {'sparePartId': str(self.part.id), 'quantity': '2.00'},
+                {'sparePartId': str(self.part.id), 'quantity': '3.00'},
+            ]
+        }
+        req_valid = factory.put(f'/api/v1/work-orders/{wo.id}', data=valid_put_data, format='json')
+        force_authenticate(req_valid, user=self.tech_user)
+        resp = view(req_valid, wo_id=wo.id)
+        self.assertEqual(resp.status_code, 200)
+
+        # Kiểm tra tồn kho: Ban đầu 40 -> cũ xuất 4 (còn 36) -> PUT hoàn 4 (về 40) -> xuất mới 5 -> còn đúng 35!
+        self.part.refresh_from_db()
+        self.assertEqual(self.part.quantity_in_stock, Decimal('35.00'))
+
+        # Kiểm tra StockTransaction: Phải có 1 RETURN (4 cái) và 2 ISSUE mới (2 cái và 3 cái)
+        returns = StockTransaction.objects.filter(tenant=self.tenant, work_order=wo, transaction_type='RETURN')
+        self.assertEqual(returns.count(), 1)
+        self.assertEqual(returns.first().quantity, Decimal('4.00'))
+
+        issues = StockTransaction.objects.filter(tenant=self.tenant, work_order=wo, transaction_type='ISSUE')
+        self.assertEqual(issues.count(), 3)  # 1 issue cũ + 2 issue mới
+        total_mat = sum(m.quantity for m in wo.materials.all())
+        self.assertEqual(total_mat, Decimal('5.00'))
+
+    def test_16_create_work_order_with_explicit_zero_vendor_cost_persists(self):
+        """Fix 8: Tạo Work Order với vendorCost = 0.00 qua API và Portal phải lưu và bảo toàn đúng 0.00."""
+        p_create, _ = Permission.objects.get_or_create(id='work_order:create', defaults={'name': 'Create WO'})
+        p_read, _ = Permission.objects.get_or_create(id='work_order:read', defaults={'name': 'Read WO'})
+        self.role_tech.permissions.add(p_create, p_read)
+
+        # 1. Qua API WorkOrderListView
+        from workorders.views import WorkOrderListView
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        factory = APIRequestFactory()
+        post_data = {
+            'assetId': str(self.asset.id),
+            'title': 'WO chi phí vendor 0',
+            'priority': 'LOW',
+            'vendorCost': '0.00'
+        }
+        req = factory.post('/api/v1/work-orders', data=post_data, format='json')
+        force_authenticate(req, user=self.tech_user)
+        resp = WorkOrderListView.as_view()(req)
+        self.assertEqual(resp.status_code, 200)
+
+        wo_id = resp.data['data']['id']
+        wo = WorkOrder.objects.get(id=wo_id)
+        cost_snap = WorkOrderCost.objects.filter(work_order=wo).first()
+        self.assertIsNotNone(cost_snap)
+        self.assertEqual(cost_snap.vendor_cost, Decimal('0.00'))
+
+        # 2. Qua Portal WorkOrder creation với vendor_cost = 0
+        from portal.views import portal_work_orders
+        from django.test import RequestFactory
+        import json
+
+        rf = RequestFactory()
+        portal_post_data = {
+            'asset_id': str(self.asset.id),
+            'title': 'WO Portal chi phí vendor 0',
+            'priority': 'LOW',
+            'vendor_cost': '0.00'
+        }
+        portal_req = rf.post('/portal/work-orders/', data=json.dumps(portal_post_data), content_type='application/json')
+        portal_req.user = self.tech_user
+        setattr(portal_req, '_cached_tenant', self.tenant)
+        portal_req.session = {}
+
+        portal_resp = portal_work_orders(portal_req)
+        portal_json = json.loads(portal_resp.content)
+        self.assertTrue(portal_json['success'])
+
+        portal_wo = WorkOrder.objects.get(id=portal_json['id'])
+        portal_cost = WorkOrderCost.objects.filter(work_order=portal_wo).first()
+        self.assertIsNotNone(portal_cost)
+        self.assertEqual(portal_cost.vendor_cost, Decimal('0.00'))
+
+    def test_17_capex_freezing_idempotency_does_not_duplicate_asset_capitalized_cost(self):
+        """Fix 9: Đóng băng chi phí CapEx (CORE_REPLACEMENT) đảm bảo tính Idempotent, không cộng trùng Asset.capitalized_cost."""
+        initial_cap = Decimal('100000000.00')
+        self.asset.capitalized_cost = initial_cap
+        self.asset.save(update_fields=['capitalized_cost'])
+
+        wo_capex = WorkOrder.objects.create(
+            title="Đại tu động cơ máy bơm (CapEx)",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='IN_PROGRESS',
+            maintenance_action='CORE_REPLACEMENT',
+            assigned_to=self.tech_user
+        )
+        from workorders.models import WorkOrderAttachment
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo_capex,
+            file_url='/media/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=1024
+        )
+        # Giả lập vật tư 20 triệu
+        StockTransaction.objects.create(
+            tenant=self.tenant,
+            spare_part=self.part,
+            work_order=wo_capex,
+            transaction_type='ISSUE',
+            quantity=Decimal('80.00'),
+            unit_price=self.part.unit_cost,
+            total_amount=Decimal('20000000.00'),
+            issue_date=timezone.now()
+        )
+
+        # Lần 1: Hoàn thành và đóng băng chi phí CapEx
+        wo_comp_1 = WorkOrderTransitionService.complete_work_order(
+            work_order_id=wo_capex.id,
+            user=self.tech_user,
+            vendor_cost=Decimal('10000000.00')
+        )
+        cost_1 = wo_comp_1.cost_breakdown
+        self.assertTrue(cost_1.is_capital_overhaul)
+        self.assertTrue(cost_1.is_cost_frozen)
+        # Net = 20M vật tư + 10M vendor = 30,000,000
+        self.assertEqual(cost_1.net_cost, Decimal('30000000.00'))
+
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.capitalized_cost, initial_cap + Decimal('30000000.00'))
+
+        # Lần 2: Gọi lại freeze_work_order_cost trực tiếp
+        cost_2 = CostForecastingService.freeze_work_order_cost(wo_capex)
+        self.assertEqual(cost_2.id, cost_1.id)
+        self.asset.refresh_from_db()
+        # Giá trị vốn hóa Asset KHÔNG ĐƯỢC CỘNG THÊM
+        self.assertEqual(self.asset.capitalized_cost, initial_cap + Decimal('30000000.00'))
+
+        # Lần 3: Gọi lại complete_work_order (Idempotency handler)
+        wo_comp_3 = WorkOrderTransitionService.complete_work_order(
+            work_order_id=wo_capex.id,
+            user=self.tech_user
+        )
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.capitalized_cost, initial_cap + Decimal('30000000.00'))
+
+    def test_18_mobile_offline_completion_payload_all_fields_preserved(self):
+        """Fix 10: Quy trình hoàn thành Work Order bảo toàn đầy đủ machineState, loadFactor, notes, số đo nghiệm thu rung & nhiệt."""
+        wo = WorkOrder.objects.create(
+            title="Phiếu bảo trì nghiệm thu toàn diện",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='IN_PROGRESS',
+            assigned_to=self.tech_user
+        )
+        from workorders.models import WorkOrderAttachment
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url='/media/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=1024
+        )
+
+        p_exec, _ = Permission.objects.get_or_create(id='work_order:execute', defaults={'name': 'Execute WO'})
+        p_upd, _ = Permission.objects.get_or_create(id='work_order:update', defaults={'name': 'Update WO'})
+        self.role_tech.permissions.add(p_exec, p_upd)
+
+        from workorders.views import WorkOrderStatusView
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        factory = APIRequestFactory()
+        payload = {
+            'status': 'COMPLETED',
+            'resolutionNotes': 'Máy đã căn chỉnh trục đạt chuẩn, vận hành êm ái.',
+            'machineState': 'RUNNING',
+            'postRepairLoadFactor': 1.2,
+            'postRepairVibration': 1.85,
+            'postRepairTemperature': 48.5,
+            'vendorCost': '0.00',
+            'warrantyCoveredAmount': '0.00',
+            'insuranceCoveredAmount': '0.00'
+        }
+        req = factory.put(f'/api/v1/work-orders/{wo.id}/status', data=payload, format='json')
+        force_authenticate(req, user=self.tech_user)
+
+        resp = WorkOrderStatusView.as_view()(req, wo_id=wo.id)
+        self.assertEqual(resp.status_code, 200)
+
+        wo.refresh_from_db()
+        self.assertEqual(wo.status, 'COMPLETED')
+        self.assertEqual(wo.resolution_notes, 'Máy đã căn chỉnh trục đạt chuẩn, vận hành êm ái.')
+        self.assertEqual(wo.post_repair_load_factor, 1.2)
+        self.assertEqual(wo.post_repair_vibration, 1.85)
+        self.assertEqual(wo.post_repair_temperature, 48.5)
+
+        # Kiểm tra MeterReading nghiệm thu sau sửa chữa (POST_REPAIR_ACCEPTANCE)
+        readings = MeterReading.objects.filter(
+            work_order=wo,
+            measurement_phase='POST_REPAIR_ACCEPTANCE'
+        ).order_by('metric_code')
+        self.assertEqual(readings.count(), 2)
+        temp_reading = readings.filter(metric_code='TEMPERATURE').first()
+        vib_reading = readings.filter(metric_code='VIBRATION').first()
+
+        self.assertIsNotNone(temp_reading)
+        self.assertEqual(float(temp_reading.reading_value), 48.5)
+        self.assertEqual(temp_reading.load_factor, 1.2)
+        self.assertEqual(temp_reading.machine_state, 'RUNNING')
+
+        self.assertIsNotNone(vib_reading)
+        self.assertEqual(float(vib_reading.reading_value), 1.85)
+        self.assertEqual(vib_reading.load_factor, 1.2)
+        self.assertEqual(vib_reading.machine_state, 'RUNNING')
+
+
 

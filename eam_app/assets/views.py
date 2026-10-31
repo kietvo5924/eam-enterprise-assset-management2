@@ -808,7 +808,16 @@ class MeterReadingListView(APIView):
 
         machine_state = data.get('machineState', 'RUNNING')
         ambient_temp = data.get('ambientTemperature')
-        load_factor = data.get('loadFactor') or data.get('load_factor') or request.data.get('loadFactor') or request.data.get('load_factor') or 1.0
+        load_factor = None
+        for _lf_k in ('loadFactor', 'load_factor'):
+            if _lf_k in data and data[_lf_k] is not None:
+                load_factor = data[_lf_k]
+                break
+            if _lf_k in request.data and request.data[_lf_k] is not None:
+                load_factor = request.data[_lf_k]
+                break
+        if load_factor is None:
+            load_factor = 1.0
         rec_time = data.get('recordedAt') or data.get('readingDate') or timezone.now()
 
         # Liên kết với Work Order nếu được gửi lên từ quy trình bảo dưỡng
