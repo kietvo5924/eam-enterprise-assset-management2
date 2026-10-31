@@ -86,8 +86,12 @@ class UserPreferencesAndFileUploadTestCase(TestCase):
         # Cookie googtrans should be deleted
         self.assertEqual(logout_res.cookies['googtrans']['expires'], 'Thu, 01 Jan 1970 00:00:00 GMT')
 
-    def test_file_upload_logo_success(self):
+    @patch('core.views.files.Minio')
+    def test_file_upload_logo_success(self, mock_minio_cls):
         """Upload logo ảnh hợp lệ (.png) thành công và trả về URL."""
+        mock_client = mock_minio_cls.return_value
+        mock_client.bucket_exists.return_value = True
+
         self.client.force_authenticate(user=self.user)
         dummy_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
         file_obj = SimpleUploadedFile("brand_logo.png", dummy_png, content_type="image/png")
@@ -95,7 +99,8 @@ class UserPreferencesAndFileUploadTestCase(TestCase):
         res = self.client.post('/api/v1/files/upload/logo', {'file': file_obj}, format='multipart')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(res.data['success'])
-        self.assertIn('logos/', res.data['data']['url'])
+        self.assertIn('tenant-assets/logos/', res.data['data']['url'])
+        self.assertTrue(mock_client.put_object.called)
 
     def test_file_upload_invalid_extension_rejected(self):
         """Tệp không đúng định dạng ảnh bị chặn với mã lỗi 400."""
@@ -138,11 +143,16 @@ class UserPreferencesAndFileUploadTestCase(TestCase):
         self.assertEqual(self.tenant.name, 'Updated Factory Name')
         self.assertEqual(self.tenant.logo_url, 'http://localhost:9900/tenant-assets/logos/test_logo.png')
 
-    def test_sync_and_purge_local_fallback_task(self):
+    @patch('core.tasks.Minio')
+    def test_sync_and_purge_local_fallback_task(self, mock_minio_cls):
         """Celery task sync_and_purge_local_fallback_files tự động đẩy ảnh local lên MinIO và xóa file trên ổ cứng."""
+        from django.conf import settings
         from django.core.files.base import ContentFile
         from django.core.files.storage import default_storage
         from core.tasks import sync_and_purge_local_fallback_files
+
+        mock_client = mock_minio_cls.return_value
+        mock_client.bucket_exists.return_value = True
 
         # 1. Tạo file giả lập rơi vào fallback local
         dummy_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
@@ -163,5 +173,16 @@ class UserPreferencesAndFileUploadTestCase(TestCase):
 
         # 5. Kiểm tra URL Tenant đã được cập nhật sang MinIO
         self.tenant.refresh_from_db()
-        self.assertTrue(self.tenant.logo_url.startswith('http://localhost:9900/tenant-assets/logos/'))
+        self.assertTrue(self.tenant.logo_url.startswith(f"{settings.MINIO_PUBLIC_URL}/tenant-assets/logos/"))
+        self.assertTrue(mock_client.put_object.called)
+
+    @patch('core.tasks.Minio')
+    def test_sync_and_purge_local_fallback_task_minio_offline(self, mock_minio_cls):
+        """Khi MinIO chưa chạy hoặc mất kết nối, task sync_and_purge trả về status='skipped' an toàn."""
+        from core.tasks import sync_and_purge_local_fallback_files
+        mock_minio_cls.side_effect = Exception("Connection Refused")
+
+        result = sync_and_purge_local_fallback_files()
+        self.assertEqual(result.get('status'), 'skipped')
+        self.assertIn('MinIO unreachable', result.get('reason', ''))
 
