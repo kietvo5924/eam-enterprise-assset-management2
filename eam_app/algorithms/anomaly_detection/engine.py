@@ -257,7 +257,7 @@ class ConditionMonitoringEngine:
             rec_has_anomaly = False
             rec_severity = 'NORMAL'
 
-            # Lấy lịch sử đo hợp lệ (chỉ lấy RUNNING, không pre_repair, không suppressed)
+            # Lấy lịch sử đo hợp lệ (chỉ lấy RUNNING, không pre_repair, không suppressed, loại trừ POST_REPAIR_ACCEPTANCE)
             historical_readings = list(
                 MeterReading.objects.filter(
                     asset=asset,
@@ -266,6 +266,8 @@ class ConditionMonitoringEngine:
                     is_pre_repair=False,
                     is_suppressed=False,
                     reading_date__lt=rec_time
+                ).exclude(
+                    measurement_phase='POST_REPAIR_ACCEPTANCE'
                 ).order_by('reading_date')
             )
 
@@ -292,7 +294,7 @@ class ConditionMonitoringEngine:
 
             # 2. ISO 10816-3 (Quy Tắc 9, TC-ANOM-11)
             if metric == 'VIBRATION':
-                iso_status_info = evaluate_iso_10816('VIBRATION', val)
+                iso_status_info = evaluate_iso_10816('VIBRATION', val, asset=asset)
                 if iso_status_info and iso_status_info.get('severity') == 'CRITICAL':
                     has_anomaly = True
                     rec_has_anomaly = True
@@ -315,7 +317,8 @@ class ConditionMonitoringEngine:
                 if oem_entry and 'critical' in oem_entry:
                     limit_v = float(oem_entry['critical'])
                 elif metric == 'VIBRATION':
-                    limit_v = 7.1
+                    iso_cfg = get_iso_thresholds_for_asset(asset)
+                    limit_v = float(iso_cfg.get('zone_c_limit', 7.1))
                 elif metric == 'TEMPERATURE':
                     limit_v = 90.0
                 else:
@@ -364,7 +367,7 @@ class ConditionMonitoringEngine:
                 else:
                     channel_vals[ch] = default_val
 
-        # Huấn luyện Isolation Forest bằng dữ liệu vector đa biến thực tế nếu có
+        # Huấn luyện Isolation Forest bằng dữ liệu vector đa biến thực tế nếu có (loại bỏ POST_REPAIR_ACCEPTANCE)
         hist_records = list(
             MeterReading.objects.filter(
                 tenant=cur_tenant,
@@ -373,26 +376,37 @@ class ConditionMonitoringEngine:
                 is_pre_repair=False,
                 is_suppressed=False,
                 reading_date__lt=rec_time
+            ).exclude(
+                measurement_phase='POST_REPAIR_ACCEPTANCE'
             ).order_by('-reading_date')[:120]
         )
         hist_by_round = {}
         for hr in hist_records:
             rk = hr.round_id or hr.reading_date.strftime('%Y-%m-%d %H')
             if rk not in hist_by_round:
-                hist_by_round[rk] = {}
-            hist_by_round[rk][hr.metric_code] = float(hr.reading_value)
+                hist_by_round[rk] = {
+                    'metrics': {},
+                    'ambient_temperature': hr.ambient_temperature
+                }
+            hist_by_round[rk]['metrics'][hr.metric_code] = float(hr.reading_value)
+            if hr.ambient_temperature is not None and hist_by_round[rk]['ambient_temperature'] is None:
+                hist_by_round[rk]['ambient_temperature'] = hr.ambient_temperature
 
         historical_vectors = []
-        for rk, vals in hist_by_round.items():
+        for rk, rdata in hist_by_round.items():
+            vals = rdata['metrics']
             if 'VIBRATION' in vals and 'TEMPERATURE' in vals:
                 h_v = vals.get('VIBRATION', 2.0)
                 h_t = vals.get('TEMPERATURE', 65.0)
-                h_p = vals.get('PRESSURE', channel_vals.get('PRESSURE', 2.5))
-                h_c = vals.get('CURRENT', channel_vals.get('CURRENT', 15.0))
+                # Sử dụng giá trị chuẩn trung tính của kênh khi thiếu, TUYỆT ĐỐI không lấy giá trị của lần đo hiện tại
+                h_p = vals.get('PRESSURE', 2.5)
+                h_c = vals.get('CURRENT', 15.0)
+                # Dùng đúng nhiệt độ môi trường của chính lần đo lịch sử đó
+                h_amb = rdata['ambient_temperature'] if rdata['ambient_temperature'] is not None else 25.0
                 historical_vectors.append(multi_detector.build_vector(
                     vibration=h_v,
                     temperature=h_t,
-                    ambient_temperature=ambient_temperature,
+                    ambient_temperature=h_amb,
                     pressure=h_p,
                     current=h_c
                 ))

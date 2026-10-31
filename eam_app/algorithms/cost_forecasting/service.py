@@ -68,15 +68,23 @@ class CostForecastingService:
         material_cost = Decimal('0')
         cost_center_snapshot = None
 
-        for tx in mat_txs:
-            amt = tx.total_amount or Decimal('0')
-            if tx.transaction_type == 'RETURN':
-                material_cost -= amt
-            else:
-                material_cost += amt
+        if mat_txs.exists():
+            for tx in mat_txs:
+                amt = tx.total_amount or Decimal('0')
+                if tx.transaction_type == 'RETURN':
+                    material_cost -= amt
+                else:
+                    material_cost += amt
 
-            if tx.cost_center_snapshot and not cost_center_snapshot:
-                cost_center_snapshot = tx.cost_center_snapshot
+                if tx.cost_center_snapshot and not cost_center_snapshot:
+                    cost_center_snapshot = tx.cost_center_snapshot
+        elif work_order.materials.exists():
+            # Fallback an toàn cho dữ liệu lịch sử chưa có StockTransaction
+            for wm in work_order.materials.select_related('spare_part').all():
+                if wm.actual_cost is not None and wm.actual_cost > Decimal('0'):
+                    material_cost += wm.actual_cost
+                elif wm.spare_part and wm.spare_part.unit_cost:
+                    material_cost += Decimal(str(wm.quantity)) * wm.spare_part.unit_cost
 
         # 2. Tính toán chi phí giờ công thợ từ LaborLog
         labor_logs = LaborLog.all_objects.filter(

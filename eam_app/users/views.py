@@ -349,7 +349,7 @@ class UserInviteView(APIView):
         from django.core.mail import send_mail
         from django.conf import settings
         
-        login_link = "http://localhost:5173/login"
+        login_link = request.build_absolute_uri('/portal/login/') if request else "http://localhost:8000/portal/login/"
         message = (
             f"You have been invited to join the EAM System.\n\n"
             f"Here are your login credentials:\n"

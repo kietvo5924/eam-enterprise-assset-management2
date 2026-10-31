@@ -461,6 +461,17 @@
           </select>
         </div>
 
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i class="ph-fill ph-receipt text-primary text-sm"></i>
+              <span>Chi phí thuê ngoài / dịch vụ ngoài dự kiến (VNĐ)</span>
+            </span>
+            <span class="text-[11px] text-neutral-400 font-normal">Tùy chọn (Nếu thuê nhà thầu/hãng ngoài)</span>
+          </label>
+          <input type="number" id="wo-vendor-cost" min="0" step="1000" placeholder="0 (Mặc định tự sửa nội bộ)" class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-bold text-neutral-700 mb-1.5">Priority</label>
@@ -1139,6 +1150,15 @@
           <option value="STANDBY">STANDBY (Chế độ chờ sẵn sàng)</option>
           <option value="STOPPED">STOPPED (Đang dừng máy / bảo dưỡng tiếp)</option>
           <option value="DEGRADED">DEGRADED (Vận hành tải giới hạn)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Loại hình bảo trì (Maintenance Action)</label>
+        <select id="wo-complete-maintenance-action" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 focus:outline-none focus:border-primary">
+          <option value="GENERAL">GENERAL (Bảo dưỡng thông thường)</option>
+          <option value="MICRO_MAINTENANCE">MICRO_MAINTENANCE (Bôi trơn, siết ốc, hiệu chỉnh nhỏ)</option>
+          <option value="CORE_REPLACEMENT">CORE_REPLACEMENT (Đại tu thay thế phụ tùng cốt lõi / CapEx)</option>
         </select>
       </div>
 
@@ -3067,6 +3087,10 @@
           document.getElementById('wo-maintenance-action').value = (id && meta.maintenance_action) ? meta.maintenance_action : (maintenanceAction || 'GENERAL');
       }
 
+      if (document.getElementById('wo-vendor-cost')) {
+          document.getElementById('wo-vendor-cost').value = (id && meta.vendor_cost !== undefined && meta.vendor_cost !== null && meta.vendor_cost !== '') ? meta.vendor_cost : '';
+      }
+
       if (document.getElementById('wo-min-skill-level')) {
           document.getElementById('wo-min-skill-level').value = (id && meta.min_skill_level) ? meta.min_skill_level : '';
           
@@ -3403,6 +3427,7 @@
           coords_y: parseFloat(document.getElementById('wo-coords-y')?.value || '0'),
           checklists: getModalChecklistsData(),
           alert_id: document.getElementById('wo-alert-id')?.value || '',
+          vendor_cost: parseFloat(document.getElementById('wo-vendor-cost')?.value) || 0,
       };
       
       const method = id ? 'PUT' : 'POST';
@@ -4245,6 +4270,8 @@
       document.getElementById('wo-complete-notes').value = '';
       const mStateEl = document.getElementById('wo-complete-machine-state');
       if (mStateEl) mStateEl.value = '';
+      const mActionEl = document.getElementById('wo-complete-maintenance-action');
+      if (mActionEl) mActionEl.value = currentWo.maintenance_action || 'GENERAL';
       document.getElementById('wo-complete-error').classList.add('hidden');
       document.getElementById('wo-complete-modal').classList.remove('hidden');
   }
@@ -4273,6 +4300,8 @@
           return;
       }
 
+      const mAction = document.getElementById('wo-complete-maintenance-action')?.value || currentWo.maintenance_action || 'GENERAL';
+
       const btn = document.getElementById('btn-confirm-complete-wo');
       btn.disabled = true;
       btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Đang xử lý...';
@@ -4289,7 +4318,9 @@
               resolution_notes: notes,
               machine_state: machineState,
               machineState: machineState,
-              postRepairMachineState: machineState
+              postRepairMachineState: machineState,
+              maintenance_action: mAction,
+              maintenanceAction: mAction
           })
       })
       .then(res => res.json())
@@ -4297,7 +4328,12 @@
           if (data.success) {
               window.location.reload();
           } else {
-              errEl.innerText = data.error || 'Có lỗi xảy ra khi hoàn thành Work Order';
+              let msg = data.error || 'Có lỗi xảy ra khi hoàn thành Work Order';
+              if (typeof msg === 'string' && msg.includes("ErrorDetail(string='")) {
+                  const m = msg.match(/string='([^']+)'/);
+                  if (m) msg = m[1];
+              }
+              errEl.innerText = msg;
               errEl.classList.remove('hidden');
           }
       })

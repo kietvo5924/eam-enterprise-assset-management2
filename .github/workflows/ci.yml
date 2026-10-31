@@ -50,6 +50,12 @@ jobs:
       env:
         SECRET_KEY: ci-test-secret-key-12345
         DEBUG: "True"
+        DATABASE_URL: postgres://postgres:password@localhost:5432/eam_db
+        POSTGRES_DB: eam_db
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
         DB_NAME: eam_db
         DB_USER: postgres
         DB_PASSWORD: password
@@ -58,17 +64,23 @@ jobs:
       run: |
         python eam_app/manage.py check
 
-    - name: Run Unit & Algorithm Tests
+    - name: Run Unit, Algorithm, Analytics & Core Tests
       env:
         SECRET_KEY: ci-test-secret-key-12345
         DEBUG: "True"
+        DATABASE_URL: postgres://postgres:password@localhost:5432/eam_db
+        POSTGRES_DB: eam_db
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
         DB_NAME: eam_db
         DB_USER: postgres
         DB_PASSWORD: password
         DB_HOST: localhost
         DB_PORT: 5432
       run: |
-        python eam_app/manage.py test algorithms.tests --noinput
+        python eam_app/manage.py test algorithms.tests analytics core notifications --noinput
 
   mobile-checks:
     runs-on: ubuntu-latest
@@ -83,4 +95,4 @@ jobs:
       run: flutter pub get
     - name: Analyze
       working-directory: ./mobile_app
-      run: flutter analyze || true
+      run: flutter analyze

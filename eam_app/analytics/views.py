@@ -49,15 +49,19 @@ def is_admin_or_manager(user) -> bool:
         return False
     if user.is_superuser or user.is_staff:
         return True
-    role_names = set(r.name.upper() for r in user.roles.all()) if hasattr(user, 'roles') else set()
-    if any(r in role_names for r in ['ADMIN', 'TENANT_ADMIN', 'MAINTENANCE_MANAGER', 'SYSTEM_ADMIN']):
+    raw_names = set(r.name for r in user.roles.all()) if hasattr(user, 'roles') else set()
+    role_names = set(n.upper().strip() for n in raw_names) | set(n.upper().strip().replace(' ', '_') for n in raw_names)
+    if any(r in role_names for r in [
+        'ADMIN', 'TENANT_ADMIN', 'MAINTENANCE_MANAGER', 'FINANCE_MANAGER',
+        'SYSTEM_ADMIN', 'PLANT_MANAGER', 'CFO', 'CHIEF_ACCOUNTANT', 'FINANCE_DIRECTOR'
+    ]):
         return True
     perms = set()
     if hasattr(user, 'roles'):
         for role in user.roles.prefetch_related('permissions').all():
             for perm in role.permissions.all():
                 perms.add(perm.id)
-    if 'system:admin' in perms:
+    if 'system:admin' in perms or 'tenant:update' in perms:
         return True
     return False
 
@@ -65,7 +69,8 @@ def is_admin_or_manager(user) -> bool:
 def check_report_permission(user, report_type: str) -> bool:
     """
     Enforces Section 5 RBAC rules per scenarios/phase_10_3_reports_export_engine.md:
-    - Superusers / Admins / Maintenance Managers: Full access to all 4 reports.
+    - Superusers / Admins / Maintenance Managers / Finance Managers: Full access to relevant reports.
+    - Finance Managers: Access to COST_SUMMARY, ASSET_VALUATION, SPARE_PARTS, MAINTENANCE_PERFORMANCE.
     - Warehouse Keepers: Access to SPARE_PARTS only.
     - Technicians: Access to MAINTENANCE_PERFORMANCE only (Forbidden from ASSET_VALUATION & COST_SUMMARY).
     - Unauthenticated, unhandled or unauthorized roles: Access denied (return False).
@@ -75,15 +80,20 @@ def check_report_permission(user, report_type: str) -> bool:
     if is_admin_or_manager(user):
         return True
 
-    role_names = set(r.name.upper() for r in user.roles.all()) if hasattr(user, 'roles') else set()
+    raw_names = set(r.name for r in user.roles.all()) if hasattr(user, 'roles') else set()
+    role_names = set(n.upper().strip() for n in raw_names) | set(n.upper().strip().replace(' ', '_') for n in raw_names)
     is_warehouse = any('WAREHOUSE' in r or 'KEEPER' in r for r in role_names)
     is_technician = any('TECHNICIAN' in r for r in role_names)
+    is_finance = any('FINANCE' in r or 'ACCOUNTANT' in r or 'CFO' in r for r in role_names)
 
     if is_warehouse:
         return report_type == 'SPARE_PARTS'
 
     if is_technician:
         return report_type == 'MAINTENANCE_PERFORMANCE'
+
+    if is_finance:
+        return report_type in ('COST_SUMMARY', 'ASSET_VALUATION', 'SPARE_PARTS', 'MAINTENANCE_PERFORMANCE')
 
     # Check explicit permission reports:read if user is not in a restricted role
     perms = set()
@@ -256,12 +266,12 @@ class ReportExportView(APIView):
             )
 
         # Rule 7: Concurrency Limit (Max 3 concurrent jobs per tenant)
-        # Auto-recover jobs that were stuck for > 3 minutes so user is never blocked
-        stale_cutoff = timezone.now() - timedelta(minutes=3)
+        # Auto-recover zombie jobs that had no progress/heartbeat update for > 15 minutes
+        stale_cutoff = timezone.now() - timedelta(minutes=15)
         ExportJob.all_objects.filter(
             tenant=tenant,
             status__in=['PENDING', 'PROCESSING'],
-            created_at__lt=stale_cutoff
+            updated_at__lt=stale_cutoff
         ).update(status='FAILED', error_message='Tác vụ quá thời gian chờ (Timeout)')
 
         active_jobs_count = ExportJob.all_objects.filter(
@@ -364,6 +374,11 @@ class ReportExportJobDetailView(APIView):
                 http_status=status.HTTP_403_FORBIDDEN
             )
 
+        # Check if job has expired (7 days retention)
+        if job.status == 'COMPLETED' and job.expires_at and timezone.now() > job.expires_at:
+            job.status = 'EXPIRED'
+            job.save(update_fields=['status', 'updated_at'])
+
         download_url = None
         friendly_filename = job.file_name or f"{job.report_type}_{str(job.id)[:8]}.{job.file_format.lower()}"
         if job.status == 'COMPLETED' and job.minio_object_key:
@@ -428,10 +443,20 @@ class ReportExportJobDownloadView(APIView):
                 http_status=status.HTTP_403_FORBIDDEN
             )
 
+        if job.status == 'EXPIRED' or (job.expires_at and timezone.now() > job.expires_at):
+            if job.status != 'EXPIRED':
+                job.status = 'EXPIRED'
+                job.save(update_fields=['status', 'updated_at'])
+            return error_response(
+                "JOB_EXPIRED",
+                "Tệp báo cáo đã hết hạn lưu trữ (7 ngày). Vui lòng tạo yêu cầu xuất mới.",
+                http_status=status.HTTP_410_GONE
+            )
+
         if job.status != 'COMPLETED' or not job.minio_object_key:
             return error_response(
                 "JOB_NOT_READY",
-                "Tệp báo cáo chưa hoàn tất hoặc đã hết hạn.",
+                "Tệp báo cáo chưa hoàn tất hoặc đã bị hủy.",
                 http_status=status.HTTP_400_BAD_REQUEST
             )
 

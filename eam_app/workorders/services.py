@@ -51,6 +51,18 @@ class WorkOrderTransitionService:
         if not wo:
             raise NotFound("Work Order not found")
 
+        # Resolve vendor_cost from existing pre-configured cost breakdown if not explicitly supplied
+        from decimal import Decimal
+        if vendor_cost is None:
+            if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.vendor_cost:
+                vendor_cost = wo.cost_breakdown.vendor_cost
+            else:
+                vendor_cost = Decimal('0.00')
+        if warranty_covered_amount is None:
+            warranty_covered_amount = Decimal('0.00')
+        if insurance_covered_amount is None:
+            insurance_covered_amount = Decimal('0.00')
+
         # 1. Idempotency Check: Nếu đã COMPLETED trước đó
         if wo.status == 'COMPLETED':
             # Cơ chế tự phục hồi (self-healing): nếu snapshot chi phí bị thiếu do lỗi trước đó, đóng băng ngay
@@ -160,71 +172,81 @@ class WorkOrderTransitionService:
 
         # 11. Task 11.6: Đóng băng bất biến snapshot chi phí và phân tách Gross vs Net Cost (Atomic)
         from algorithms.cost_forecasting import CostForecastingService
-        CostForecastingService.freeze_work_order_cost(
+        cost_obj = CostForecastingService.freeze_work_order_cost(
             wo,
             warranty_covered_amount=warranty_covered_amount,
             insurance_covered_amount=insurance_covered_amount,
             vendor_cost=vendor_cost
         )
+        wo.cost_breakdown = cost_obj
 
         logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}, action={wo.maintenance_action}")
         return wo
 
     @classmethod
     def _record_post_repair_acceptance(cls, wo, post_repair_data, user, recorded_at):
+        from algorithms.anomaly_detection.physical_bounds import validate_physical_bounds
+
         round_uuid = uuid.uuid4()
-        load_f = float(post_repair_data.get('load_factor') or 1.0)
+        load_f_raw = post_repair_data.get('load_factor')
+        load_f = float(load_f_raw) if load_f_raw is not None else 1.0
+        import math
+        if math.isnan(load_f) or math.isinf(load_f) or load_f < 0.0:
+            raise ValidationError("Hệ số tải trọng (load_factor) không hợp lệ.")
+
         amb_t = post_repair_data.get('ambient_temperature')
-        amb_t_val = float(amb_t) if amb_t is not None else None
+        amb_t_val = None
+        if amb_t is not None and str(amb_t).strip() != '':
+            amb_t_val = float(amb_t)
+            validate_physical_bounds('TEMPERATURE', amb_t_val)
+
         m_state = str(post_repair_data.get('machine_state') or 'RUNNING')
 
-        # Rung sau sửa chữa
+        # Rung sau sửa chữa (kiểm tra giới hạn vật lý bắt buộc)
         vib_val = post_repair_data.get('vibration')
-        if vib_val is not None:
-            try:
-                MeterReading.objects.create(
-                    tenant=wo.tenant,
-                    asset=wo.asset,
-                    work_order=wo,
-                    metric_code='VIBRATION',
-                    reading_value=float(vib_val),
-                    reading_date=recorded_at,
-                    unit='mm/s',
-                    ambient_temperature=amb_t_val,
-                    load_factor=load_f,
-                    machine_state=m_state,
-                    measurement_phase='POST_REPAIR_ACCEPTANCE',
-                    is_pre_repair=False,
-                    recorded_by=user if (user and user.is_authenticated) else None,
-                    round_id=round_uuid,
-                    remarks=f"Nghiệm thu sau sửa chữa cho phiếu {wo.code or wo.title}"
-                )
-            except Exception as ex:
-                logger.warning(f"Lỗi lưu số đo nghiệm thu rung: {ex}")
+        if vib_val is not None and str(vib_val).strip() != '':
+            vib_f = float(vib_val)
+            validate_physical_bounds('VIBRATION', vib_f)
+            MeterReading.objects.create(
+                tenant=wo.tenant,
+                asset=wo.asset,
+                work_order=wo,
+                metric_code='VIBRATION',
+                reading_value=vib_f,
+                reading_date=recorded_at,
+                unit='mm/s',
+                ambient_temperature=amb_t_val,
+                load_factor=load_f,
+                machine_state=m_state,
+                measurement_phase='POST_REPAIR_ACCEPTANCE',
+                is_pre_repair=False,
+                recorded_by=user if (user and user.is_authenticated) else None,
+                round_id=round_uuid,
+                remarks=f"Nghiệm thu sau sửa chữa cho phiếu {wo.code or wo.title}"
+            )
 
-        # Nhiệt độ sau sửa chữa
+        # Nhiệt độ sau sửa chữa (kiểm tra giới hạn vật lý bắt buộc)
         temp_val = post_repair_data.get('temperature')
-        if temp_val is not None:
-            try:
-                MeterReading.objects.create(
-                    tenant=wo.tenant,
-                    asset=wo.asset,
-                    work_order=wo,
-                    metric_code='TEMPERATURE',
-                    reading_value=float(temp_val),
-                    reading_date=recorded_at,
-                    unit='°C',
-                    ambient_temperature=amb_t_val,
-                    load_factor=load_f,
-                    machine_state=m_state,
-                    measurement_phase='POST_REPAIR_ACCEPTANCE',
-                    is_pre_repair=False,
-                    recorded_by=user if (user and user.is_authenticated) else None,
-                    round_id=round_uuid,
-                    remarks=f"Nghiệm thu sau sửa chữa cho phiếu {wo.code or wo.title}"
-                )
-            except Exception as ex:
-                logger.warning(f"Lỗi lưu số đo nghiệm thu nhiệt: {ex}")
+        if temp_val is not None and str(temp_val).strip() != '':
+            temp_f = float(temp_val)
+            validate_physical_bounds('TEMPERATURE', temp_f)
+            MeterReading.objects.create(
+                tenant=wo.tenant,
+                asset=wo.asset,
+                work_order=wo,
+                metric_code='TEMPERATURE',
+                reading_value=temp_f,
+                reading_date=recorded_at,
+                unit='°C',
+                ambient_temperature=amb_t_val,
+                load_factor=load_f,
+                machine_state=m_state,
+                measurement_phase='POST_REPAIR_ACCEPTANCE',
+                is_pre_repair=False,
+                recorded_by=user if (user and user.is_authenticated) else None,
+                round_id=round_uuid,
+                remarks=f"Nghiệm thu sau sửa chữa cho phiếu {wo.code or wo.title}"
+            )
 
     @classmethod
     def _release_tool_reservations(cls, wo, returned_at):

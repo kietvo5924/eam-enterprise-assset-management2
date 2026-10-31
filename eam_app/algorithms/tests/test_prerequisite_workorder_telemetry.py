@@ -353,13 +353,13 @@ class PrerequisiteWorkOrderTelemetryTests(TestCase):
         })
         self.assertTrue(s1.is_valid(), s1.errors)
 
-        # Hỗ trợ backward-compatible payload không có trường mới
+        # Hỗ trợ backward-compatible payload không có trường mới (không ghi đè loại bảo trì có sẵn)
         s2 = WorkOrderStatusUpdateSerializer(data={
             'status': 'COMPLETED',
             'resolutionNotes': 'Phiếu từ Mobile cũ'
         })
         self.assertTrue(s2.is_valid(), s2.errors)
-        self.assertEqual(s2.validated_data.get('maintenanceAction'), 'GENERAL')
+        self.assertIsNone(s2.validated_data.get('maintenanceAction'))
 
         # Kiểm tra ISO thresholds
         thresholds = get_iso_thresholds_for_asset(self.asset)

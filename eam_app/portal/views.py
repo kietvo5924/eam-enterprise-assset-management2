@@ -1879,6 +1879,22 @@ def portal_work_orders(request):
                     maintenance_window_end=parse_time_val(data.get('maintenance_window_end')),
                 )
 
+                # Initialize vendor_cost if specified during Work Order creation by supervisor
+                raw_vcost = data.get('vendor_cost') or data.get('vendorCost')
+                if raw_vcost is not None and str(raw_vcost).strip() != '':
+                    try:
+                        from decimal import Decimal
+                        v_dec = Decimal(str(raw_vcost))
+                        if v_dec > 0:
+                            from workorders.models import WorkOrderCost
+                            WorkOrderCost.objects.update_or_create(
+                                work_order=wo,
+                                tenant=wo.tenant,
+                                defaults={'vendor_cost': v_dec}
+                            )
+                    except Exception:
+                        pass
+
                 # Save initial checklists if provided
                 if 'checklists' in data and isinstance(data['checklists'], list):
                     from workorders.models import WorkOrderChecklistItem
@@ -1995,7 +2011,10 @@ def portal_work_orders(request):
                             maintenance_action=data.get('maintenance_action') or data.get('maintenanceAction') or wo.maintenance_action or 'GENERAL',
                             actual_duration_minutes=data.get('actual_duration_minutes') or data.get('actualDurationMinutes'),
                             post_repair_data=post_repair_payload,
-                            tenant_id=tenant_id
+                            tenant_id=tenant_id,
+                            warranty_covered_amount=data.get('warranty_covered_amount') or data.get('warrantyCoveredAmount'),
+                            insurance_covered_amount=data.get('insurance_covered_amount') or data.get('insuranceCoveredAmount'),
+                            vendor_cost=data.get('vendor_cost') or data.get('vendorCost') or data.get('vendorServiceCost')
                         )
 
                     elif new_status in ['CANCELED', 'CANCELLED']:
@@ -2003,11 +2022,31 @@ def portal_work_orders(request):
                             raise Exception("Cannot cancel a COMPLETED Work Order")
                         if current_status not in ['CANCELED', 'CANCELLED']:
                             from decimal import Decimal
-                            # Restore inventory stock for reserved materials
+                            from assets.models import StockTransaction
+                            cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+                            # Restore inventory stock for reserved materials and record RETURN idempotently
                             for wm in wo.materials.select_related('spare_part').all():
                                 if wm.spare_part and wm.spare_part.quantity_in_stock is not None:
-                                    wm.spare_part.quantity_in_stock += Decimal(str(wm.quantity))
+                                    ret_qty = Decimal(str(wm.quantity))
+                                    wm.spare_part.quantity_in_stock += ret_qty
                                     wm.spare_part.save()
+                                    unit_c = wm.spare_part.unit_cost or Decimal('0.00')
+                                    ret_amt = (ret_qty * unit_c).quantize(Decimal('0.01'))
+                                    issues_cnt = StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=wm.spare_part, transaction_type='ISSUE').count()
+                                    returns_cnt = StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=wm.spare_part, transaction_type='RETURN').count()
+                                    if issues_cnt > returns_cnt:
+                                        StockTransaction.all_objects.create(
+                                            tenant=wo.tenant,
+                                            spare_part=wm.spare_part,
+                                            work_order=wo,
+                                            transaction_type='RETURN',
+                                            quantity=ret_qty,
+                                            unit_price=unit_c,
+                                            total_amount=ret_amt,
+                                            cost_center_snapshot=cost_center_str,
+                                            issue_date=timezone.now(),
+                                            is_variance_adjustment=False
+                                        )
                             # Cancel tool reservations and release tools
                             try:
                                 from assets.models import ToolReservation
@@ -2125,6 +2164,22 @@ def portal_work_orders(request):
 
                 wo.save()
 
+                # Update vendor_cost if modified during Work Order editing
+                if 'vendor_cost' in data or 'vendorCost' in data:
+                    raw_vcost = data.get('vendor_cost') if 'vendor_cost' in data else data.get('vendorCost')
+                    if raw_vcost is not None and str(raw_vcost).strip() != '':
+                        try:
+                            from decimal import Decimal
+                            v_dec = Decimal(str(raw_vcost))
+                            from workorders.models import WorkOrderCost
+                            WorkOrderCost.objects.update_or_create(
+                                work_order=wo,
+                                tenant=wo.tenant,
+                                defaults={'vendor_cost': v_dec}
+                            )
+                        except Exception:
+                            pass
+
                 # Sync checklists if provided
                 if 'checklists' in data and isinstance(data['checklists'], list):
                     from workorders.models import WorkOrderChecklistItem
@@ -2166,7 +2221,16 @@ def portal_work_orders(request):
 
                 return JsonResponse({'success': True})
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            err_msg = str(e)
+            if hasattr(e, 'detail'):
+                detail = e.detail
+                if isinstance(detail, list) and len(detail) > 0:
+                    err_msg = str(detail[0])
+                elif isinstance(detail, dict):
+                    err_msg = '; '.join([f"{k}: {v[0] if isinstance(v, list) else v}" for k, v in detail.items()])
+                elif isinstance(detail, str):
+                    err_msg = detail
+            return JsonResponse({'success': False, 'error': err_msg}, status=400)
             
     elif request.method == 'DELETE':
         try:
@@ -2190,7 +2254,7 @@ def portal_work_orders(request):
     from assets.models import Tool
     now = timezone.now()
 
-    work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by').prefetch_related('checklists', 'follow_up_work_orders').order_by('-created_at')
+    work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by', 'cost_breakdown').prefetch_related('checklists', 'follow_up_work_orders').order_by('-created_at')
     
     # Permission-based scope filtering (strictly permission-based, no role checks):
     # Users with 'work_order:reassign' or 'system:admin' (dispatchers/managers) can view all work orders in the tenant.
@@ -2224,6 +2288,7 @@ def portal_work_orders(request):
         wo_metadata[str(wo.id)] = {
             'checklists': checklists,
             'maintenance_action': getattr(wo, 'maintenance_action', 'GENERAL') or 'GENERAL',
+            'vendor_cost': float(wo.cost_breakdown.vendor_cost) if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.vendor_cost else 0.0,
             'required_skill': wo.required_skill or '',
             'min_skill_level': wo.min_skill_level if wo.min_skill_level is not None else '',
             'required_certification': wo.required_certification or '',

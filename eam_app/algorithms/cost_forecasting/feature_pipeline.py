@@ -44,7 +44,36 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
         completed_at__date__lte=end_date
     ).exclude(asset_id__in=disposed_asset_ids).select_related('asset', 'incident_location', 'asset__location')
 
-    if not completed_wos.exists():
+    # Hạch toán các giao dịch biến động sau nghiệm thu (RETURN, ADJUSTMENT) phát sinh TRONG KỲ [start_date, end_date]
+    # đối với các Work Order đã hoàn thành trước start_date
+    prior_completed_wos = WorkOrder.all_objects.filter(
+        tenant=tenant,
+        status='COMPLETED',
+        completed_at__date__lt=start_date
+    ).exclude(asset_id__in=disposed_asset_ids)
+
+    if cost_center:
+        prior_completed_wos = prior_completed_wos.filter(
+            Q(cost_breakdown__cost_center_snapshot=cost_center) |
+            Q(incident_location__name=cost_center) |
+            Q(asset__location__name=cost_center)
+        )
+
+    prior_completed_wos = prior_completed_wos.exclude(
+        Q(is_capitalized=True) |
+        Q(maintenance_action='CORE_REPLACEMENT') |
+        Q(cost_breakdown__is_capital_overhaul=True)
+    )
+
+    prior_post_txs = StockTransaction.all_objects.filter(
+        tenant=tenant,
+        work_order__in=prior_completed_wos,
+        transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN'],
+        issue_date__date__gte=start_date,
+        issue_date__date__lte=end_date
+    )
+
+    if not completed_wos.exists() and not prior_post_txs.exists():
         return Decimal('0.00')
 
     # Bản đồ snapshot chi phí đã khóa
@@ -82,6 +111,7 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
                 ).filter(
                     Q(issue_date__gt=fc.cost_frozen_at) | Q(created_at__gt=fc.cost_frozen_at)
                 ).filter(
+                    issue_date__date__gte=start_date,
                     issue_date__date__lte=end_date
                 )
                 post_adjustment = Decimal('0.00')
@@ -140,6 +170,14 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
             net = max(Decimal('0.00'), gross - (w_cov + i_cov))
 
             total_net += net
+
+    # Cộng dồn các giao dịch điều chỉnh phát sinh trong kỳ đối với các Work Order hoàn thành trước đó
+    for ptx in prior_post_txs:
+        p_amt = ptx.total_amount or Decimal('0.00')
+        if ptx.transaction_type == 'RETURN':
+            total_net = max(Decimal('0.00'), total_net - p_amt)
+        else:
+            total_net += p_amt
 
     return total_net.quantize(Decimal('0.01'))
 
@@ -252,13 +290,13 @@ class CostFeaturePipeline:
         )['s'] or 0
         deferred_maintenance_hours = round(float(deferred_hours_val) / 60.0, 1)
 
-        # 9: Tổng số lượng thiết bị đang hoạt động tại thời điểm target_date
+        # 9: Tổng số lượng thiết bị đang hoạt động tại thời điểm target_date (loại bỏ tài sản thanh lý, hủy bỏ, dừng hoạt động hoặc nháp)
         active_assets_qs = Asset.all_objects.filter(
             tenant=tenant
         ).filter(
             Q(purchase_date__lte=target_date) | Q(created_at__date__lte=target_date)
         ).exclude(
-            Q(status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD']) & Q(updated_at__date__lte=target_date)
+            Q(status__in=['DISPOSED', 'RETIRED', 'SCRAPPED', 'SOLD', 'DECOMMISSIONED', 'LOST', 'DRAFT']) & Q(updated_at__date__lte=target_date)
         )
         if cost_center:
             active_assets_qs = active_assets_qs.filter(location__name=cost_center)

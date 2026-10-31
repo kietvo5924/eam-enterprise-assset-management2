@@ -989,6 +989,7 @@
     {% for asset in assets %}
     "{{ asset.id }}": {
       name: "{{ asset.name|escapejs }}",
+      serial: "{{ asset.serial_number|default:'-'|escapejs }}",
       status: "{{ asset.status }}",
       location: "{% if asset.location.parent %}{{ asset.location.parent.name|escapejs }}.{% endif %}{{ asset.location.name|default:'Chưa gán vị trí'|escapejs }}",
       template: "{{ asset.hierarchy_template.name|default:'Chưa gán cấu trúc'|escapejs }}",
@@ -1065,7 +1066,7 @@
         }
       }
       
-      document.getElementById('detail-serial').innerText = data.serial;
+      document.getElementById('detail-serial').innerText = data.serial || '-';
       document.getElementById('detail-location').innerText = data.location.includes('.') ? data.location.split('.').join(' > ') : data.location;
       document.getElementById('detail-template').innerText = data.template;
       
@@ -1724,7 +1725,7 @@
     btn.disabled = true;
     btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Đang tải...';
     
-    fetch('/api/assets/import', {
+    fetch('/api/v1/assets/import/', {
       method: 'POST',
       headers: {
         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value

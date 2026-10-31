@@ -152,11 +152,31 @@ def evaluate_triggers():
                         # Check low-stock warning
                         notify_spare_part_low_stock(part)
                             
+                    from decimal import Decimal
+                    from assets.models import StockTransaction
+                    unit_c = part.unit_cost or Decimal('0.00')
+                    pm_mat_cost = (Decimal(str(req_qty)) * unit_c).quantize(Decimal('0.01'))
+
                     WorkOrderMaterial.objects.create(
                         tenant_id=assignment.tenant_id,
                         work_order=wo,
                         spare_part=part,
-                        quantity=req_qty
+                        quantity=req_qty,
+                        actual_cost=pm_mat_cost
                     )
+                    cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+                    if not StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=part, transaction_type='ISSUE').exists():
+                        StockTransaction.all_objects.create(
+                            tenant=wo.tenant,
+                            spare_part=part,
+                            work_order=wo,
+                            transaction_type='ISSUE',
+                            quantity=req_qty,
+                            unit_price=unit_c,
+                            total_amount=pm_mat_cost,
+                            cost_center_snapshot=cost_center_str,
+                            issue_date=timezone.now(),
+                            is_variance_adjustment=False
+                        )
                 
                 logger.info(f"Created PM Work Order {wo.id} from Plan {pm_plan.id}")

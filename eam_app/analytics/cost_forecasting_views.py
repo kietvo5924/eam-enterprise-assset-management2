@@ -36,10 +36,13 @@ def has_cost_forecasting_read_permission(user) -> bool:
 
     # 2. Kiểm tra tên vai trò quản trị / tài chính chính quy chuẩn mực
     canonical_roles = {
-        'tenant_admin', 'super_admin', 'finance manager', 'finance director',
-        'cfo', 'chief accountant', 'plant manager'
+        'tenant_admin', 'super_admin', 'admin', 'system_admin',
+        'finance_manager', 'finance manager', 'finance_director', 'finance director',
+        'cfo', 'chief_accountant', 'chief accountant',
+        'plant_manager', 'plant manager', 'maintenance_manager', 'maintenance manager'
     }
-    role_names = {r.name.lower().strip() for r in user.roles.all()}
+    raw_names = {r.name.lower().strip() for r in user.roles.all()}
+    role_names = raw_names | {n.replace(' ', '_') for n in raw_names}
     if role_names.intersection(canonical_roles):
         return True
 
@@ -66,9 +69,11 @@ def has_cost_forecasting_write_permission(user) -> bool:
         return True
 
     canonical_write_roles = {
-        'tenant_admin', 'super_admin', 'finance manager', 'finance director', 'cfo'
+        'tenant_admin', 'super_admin', 'admin', 'system_admin',
+        'finance_manager', 'finance manager', 'finance_director', 'finance director', 'cfo'
     }
-    role_names = {r.name.lower().strip() for r in user.roles.all()}
+    raw_names = {r.name.lower().strip() for r in user.roles.all()}
+    role_names = raw_names | {n.replace(' ', '_') for n in raw_names}
     if role_names.intersection(canonical_write_roles):
         return True
 

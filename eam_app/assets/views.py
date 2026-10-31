@@ -817,6 +817,12 @@ class MeterReadingListView(APIView):
         if work_order_id:
             from workorders.models import WorkOrder
             work_order = WorkOrder.objects.filter(id=work_order_id, tenant_id=asset.tenant_id).first()
+            if not work_order:
+                raise ValidationError("Work Order không tồn tại hoặc không thuộc phân vùng dữ liệu của tài sản.")
+            if work_order.asset_id != asset.id:
+                raise ValidationError(f"Work Order {work_order.code or work_order_id} không thuộc tài sản này ({asset.code or asset.id}).")
+            if work_order.status in ('CANCELLED', 'CANCELED'):
+                raise ValidationError(f"Không thể liên kết số đo với Work Order đã bị hủy ({work_order.code or work_order_id}).")
 
         # Thực thi qua ConditionMonitoringEngine
         result = ConditionMonitoringEngine.process_readings(
@@ -856,12 +862,18 @@ class AssetAnomalyHistoryView(APIView):
             is_suppressed=False
         ).order_by('reading_date'))
 
+        from algorithms.anomaly_detection.iso_standards import get_iso_thresholds_for_asset
+        iso_cfg = get_iso_thresholds_for_asset(asset)
+        ab_lim = iso_cfg.get("zone_ab_limit", 2.8)
+        c_lim = iso_cfg.get("zone_c_limit", 7.1)
+        std_name = iso_cfg.get("standard", "ISO 10816-3")
+
         trend_summary = None
         if len(vib_readings) >= 5:
             trend_summary = evaluate_trend_drift(
                 timestamps=[r.reading_date for r in vib_readings],
                 values=[float(r.reading_value) for r in vib_readings],
-                limit_value=7.1
+                limit_value=c_lim
             )
 
         data = {
@@ -872,12 +884,12 @@ class AssetAnomalyHistoryView(APIView):
             "alerts": AssetAnomalyAlertSerializer(alerts, many=True).data,
             "trendDrift": trend_summary,
             "isoBenchmark": {
-                "standard": "ISO 10816-3",
+                "standard": std_name,
                 "metric": "VIBRATION",
                 "zones": [
-                    {"zone": "ZONE_AB", "range": "< 2.8 mm/s", "label": "Tốt / Đạt chuẩn", "color": "green"},
-                    {"zone": "ZONE_C", "range": "2.8 - 7.1 mm/s", "label": "Cảnh báo - Cần theo dõi", "color": "yellow"},
-                    {"zone": "ZONE_D", "range": "> 7.1 mm/s", "label": "Nguy hiểm - Dừng máy khẩn cấp", "color": "red"}
+                    {"zone": "ZONE_AB", "range": f"< {ab_lim} mm/s", "label": "Tốt / Đạt chuẩn", "color": "green"},
+                    {"zone": "ZONE_C", "range": f"{ab_lim} - {c_lim} mm/s", "label": "Cảnh báo - Cần theo dõi", "color": "yellow"},
+                    {"zone": "ZONE_D", "range": f"> {c_lim} mm/s", "label": "Nguy hiểm - Dừng máy khẩn cấp", "color": "red"}
                 ]
             }
         }

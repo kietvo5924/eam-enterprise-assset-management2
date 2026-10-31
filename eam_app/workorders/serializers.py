@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 from workorders.models import WorkOrder, WorkOrderChecklistItem, WorkOrderAttachment, WorkOrderMaterial
 from assets.serializers import AssetSerializer, SparePartSerializer
@@ -133,13 +134,22 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     maintenanceAction = serializers.ChoiceField(
         choices=WorkOrder.MAINTENANCE_ACTION_CHOICES,
         required=False,
-        default='GENERAL'
+        allow_null=True
     )
     postRepairVibration = serializers.FloatField(required=False, allow_null=True)
     postRepairTemperature = serializers.FloatField(required=False, allow_null=True)
     postRepairLoadFactor = serializers.FloatField(required=False, allow_null=True, default=1.0)
     machineState = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     postRepairMachineState = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    warrantyCoveredAmount = serializers.DecimalField(
+        required=False, allow_null=True, max_digits=19, decimal_places=2, min_value=Decimal('0.00')
+    )
+    insuranceCoveredAmount = serializers.DecimalField(
+        required=False, allow_null=True, max_digits=19, decimal_places=2, min_value=Decimal('0.00')
+    )
+    vendorCost = serializers.DecimalField(
+        required=False, allow_null=True, max_digits=19, decimal_places=2, min_value=Decimal('0.00')
+    )
 
 
 class WorkOrderRequestReassignmentSerializer(serializers.Serializer):

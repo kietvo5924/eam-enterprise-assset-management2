@@ -5,6 +5,8 @@ kết hợp chỉ số trượt giá lạm phát, quỹ dự phòng rủi ro và
 """
 import calendar
 import datetime
+import math
+import numpy as np
 from decimal import Decimal
 from typing import Dict, List, Optional, Any, Tuple
 
@@ -278,9 +280,22 @@ class HybridBudgetingEngine:
                 lab_cost = (base_val * lab_weight) * labor_rate_ratio
                 return mat_cost + lab_cost
 
-            cm_p10 = price_cm(cm_p10_base)
-            cm_p50 = price_cm(cm_p50_base)
-            cm_p90 = price_cm(cm_p90_base)
+            # Quy đổi chuỗi tháng sang độ dài kỳ dự báo (Tháng vs Quý)
+            period_months = 3.0 if '-Q' in period_str else 1.0
+            m10 = price_cm(cm_p10_base)
+            m50 = price_cm(cm_p50_base)
+            m90 = price_cm(cm_p90_base)
+
+            if period_months > 1.0:
+                cm_p50 = m50 * float(period_months)
+                spread_10 = (m50 - m10) * np.sqrt(float(period_months))
+                spread_90 = (m90 - m50) * np.sqrt(float(period_months))
+                cm_p10 = max(0.0, cm_p50 - spread_10)
+                cm_p90 = cm_p50 + spread_90
+            else:
+                cm_p10 = m10
+                cm_p50 = m50
+                cm_p90 = m90
 
             # Cộng thêm nghĩa vụ tài chính vật tư từ Task 11.5 nếu có (nhất quán P10, P50, P90)
             if rul_liability > Decimal('0'):

@@ -625,10 +625,9 @@ class CostSummaryEngine:
         if not date_to:
             date_to = now
 
-        if not cost_center and location_id:
+        loc = None
+        if location_id:
             loc = Location.all_objects.filter(id=location_id, tenant=tenant).first()
-            if loc:
-                cost_center = loc.name
 
         # Rule 3: Accrual Accounting
         # Materials cost based on StockTransaction.issue_date
@@ -639,21 +638,6 @@ class CostSummaryEngine:
             transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
         ).select_related('spare_part', 'work_order')
 
-        if cost_center:
-            material_qs = material_qs.filter(
-                Q(cost_center_snapshot=cost_center) |
-                Q(work_order__incident_location__name=cost_center) |
-                Q(work_order__asset__location__name=cost_center)
-            )
-
-        if not include_capex:
-            # Rule 2 & Rule 3: Exclude CAPEX work orders (is_capitalized, CORE_REPLACEMENT, or is_capital_overhaul)
-            material_qs = material_qs.exclude(
-                Q(work_order__is_capitalized=True) |
-                Q(work_order__maintenance_action='CORE_REPLACEMENT') |
-                Q(work_order__cost_breakdown__is_capital_overhaul=True)
-            )
-
         # Labor cost based on LaborLog.work_date
         labor_qs = LaborLog.all_objects.filter(
             tenant=tenant,
@@ -661,11 +645,34 @@ class CostSummaryEngine:
             work_date__lte=date_to
         ).select_related('technician', 'work_order')
 
-        if cost_center:
-            labor_qs = labor_qs.filter(
+        if loc:
+            # Ưu tiên lọc định danh chính xác theo location_id của Work Order hoặc Asset,
+            # kết hợp với snapshot tên hoặc mã phân xưởng tại thời điểm phát sinh giao dịch.
+            loc_filter = (
+                Q(work_order__incident_location_id=loc.id) |
+                Q(work_order__asset__location_id=loc.id) |
+                Q(cost_center_snapshot=loc.name) |
+                Q(cost_center_snapshot=loc.code)
+            )
+            material_qs = material_qs.filter(loc_filter)
+            labor_qs = labor_qs.filter(loc_filter)
+        elif cost_center:
+            cc_filter = (
                 Q(cost_center_snapshot=cost_center) |
                 Q(work_order__incident_location__name=cost_center) |
-                Q(work_order__asset__location__name=cost_center)
+                Q(work_order__asset__location__name=cost_center) |
+                Q(work_order__incident_location__code=cost_center) |
+                Q(work_order__asset__location__code=cost_center)
+            )
+            material_qs = material_qs.filter(cc_filter)
+            labor_qs = labor_qs.filter(cc_filter)
+
+        if not include_capex:
+            # Rule 2 & Rule 3: Exclude CAPEX work orders (is_capitalized, CORE_REPLACEMENT, or is_capital_overhaul)
+            material_qs = material_qs.exclude(
+                Q(work_order__is_capitalized=True) |
+                Q(work_order__maintenance_action='CORE_REPLACEMENT') |
+                Q(work_order__cost_breakdown__is_capital_overhaul=True)
             )
 
         if not include_capex:

@@ -155,6 +155,8 @@ class WorkOrderListView(APIView):
                 raise ValidationError(f"Số lượng yêu cầu không hợp lệ: {req_qty}")
             if dec_qty <= Decimal('0'):
                 raise ValidationError(f"Số lượng yêu cầu cho vật tư {part.name} phải lớn hơn 0.")
+            unit_cost = part.unit_cost or Decimal('0.00')
+            mat_cost = (dec_qty * unit_cost).quantize(Decimal('0.01'))
             if part.quantity_in_stock is not None:
                 if part.quantity_in_stock < dec_qty:
                     raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name} (Tồn hiện tại: {part.quantity_in_stock}, Yêu cầu: {dec_qty})")
@@ -166,8 +168,26 @@ class WorkOrderListView(APIView):
             WorkOrderMaterial.objects.create(
                 work_order=wo,
                 spare_part=part,
-                quantity=dec_qty
+                quantity=dec_qty,
+                actual_cost=mat_cost
             )
+
+            # Tạo StockTransaction ISSUE tương ứng (chống trừ kho mà không ghi nhận sổ kế toán vật tư)
+            from assets.models import StockTransaction
+            cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+            if not StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=part, transaction_type='ISSUE').exists():
+                StockTransaction.all_objects.create(
+                    tenant=wo.tenant,
+                    spare_part=part,
+                    work_order=wo,
+                    transaction_type='ISSUE',
+                    quantity=dec_qty,
+                    unit_price=unit_cost,
+                    total_amount=mat_cost,
+                    cost_center_snapshot=cost_center_str,
+                    issue_date=timezone.now(),
+                    is_variance_adjustment=False
+                )
         
         # Mock Async Event
         import logging
@@ -234,19 +254,39 @@ class WorkOrderDetailView(APIView):
                 
         # Update Materials
         if 'materials' in data:
-            # Restore old inventory
+            from decimal import Decimal
+            from assets.models import StockTransaction
+            cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+            # Restore old inventory and create RETURN transactions if an ISSUE existed
             old_materials = wo.materials.all()
             for old_wm in old_materials:
                 part = old_wm.spare_part
                 if part.quantity_in_stock is not None:
                     part.quantity_in_stock += old_wm.quantity
                     part.save()
+                old_u_cost = part.unit_cost or Decimal('0.00')
+                old_amt = (Decimal(str(old_wm.quantity)) * old_u_cost).quantize(Decimal('0.01'))
+                if StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=part, transaction_type='ISSUE').exists():
+                    StockTransaction.all_objects.create(
+                        tenant=wo.tenant,
+                        spare_part=part,
+                        work_order=wo,
+                        transaction_type='RETURN',
+                        quantity=Decimal(str(old_wm.quantity)),
+                        unit_price=old_u_cost,
+                        total_amount=old_amt,
+                        cost_center_snapshot=cost_center_str,
+                        issue_date=timezone.now(),
+                        is_variance_adjustment=False
+                    )
             old_materials.delete()
             
             # Save new materials
             for pm in data['materials']:
                 part = get_object_or_404(SparePart, id=pm.get('sparePartId'), tenant_id=wo.tenant_id)
-                req_qty = pm.get('quantity')
+                req_qty = Decimal(str(pm.get('quantity')))
+                new_u_cost = part.unit_cost or Decimal('0.00')
+                new_mat_cost = (req_qty * new_u_cost).quantize(Decimal('0.01'))
                 if part.quantity_in_stock is not None:
                     if part.quantity_in_stock < req_qty:
                         raise ValidationError(f"Không đủ số lượng trong kho cho vật tư: {part.name}")
@@ -256,7 +296,20 @@ class WorkOrderDetailView(APIView):
                 WorkOrderMaterial.objects.create(
                     work_order=wo,
                     spare_part=part,
-                    quantity=req_qty
+                    quantity=req_qty,
+                    actual_cost=new_mat_cost
+                )
+                StockTransaction.all_objects.create(
+                    tenant=wo.tenant,
+                    spare_part=part,
+                    work_order=wo,
+                    transaction_type='ISSUE',
+                    quantity=req_qty,
+                    unit_price=new_u_cost,
+                    total_amount=new_mat_cost,
+                    cost_center_snapshot=cost_center_str,
+                    issue_date=timezone.now(),
+                    is_variance_adjustment=False
                 )
         
         return success_response(WorkOrderSerializer(wo).data)
@@ -275,9 +328,30 @@ class WorkOrderDetailView(APIView):
             raise ValidationError('Only CREATED or ASSIGNED Work Orders can be deleted')
             
         # Restore inventory
+        from decimal import Decimal
+        from assets.models import StockTransaction
+        cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
         old_materials = wo.materials.all()
         for old_wm in old_materials:
             part = old_wm.spare_part
+            if part.quantity_in_stock is not None:
+                part.quantity_in_stock += old_wm.quantity
+                part.save()
+            old_u_cost = part.unit_cost or Decimal('0.00')
+            old_amt = (Decimal(str(old_wm.quantity)) * old_u_cost).quantize(Decimal('0.01'))
+            if StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=part, transaction_type='ISSUE').exists():
+                StockTransaction.all_objects.create(
+                    tenant=wo.tenant,
+                    spare_part=part,
+                    work_order=wo,
+                    transaction_type='RETURN',
+                    quantity=Decimal(str(old_wm.quantity)),
+                    unit_price=old_u_cost,
+                    total_amount=old_amt,
+                    cost_center_snapshot=cost_center_str,
+                    issue_date=timezone.now(),
+                    is_variance_adjustment=False
+                )
             if part.quantity_in_stock is not None:
                 part.quantity_in_stock += old_wm.quantity
                 part.save()
@@ -435,11 +509,31 @@ class WorkOrderStatusView(APIView):
             if wo.status in ['CANCELLED', 'CANCELED']:
                 return success_response(WorkOrderSerializer(wo).data)
             from decimal import Decimal
-            # Restore inventory stock for reserved materials
+            from assets.models import StockTransaction
+            cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+            # Restore inventory stock for reserved materials and record RETURN transaction idempotently
             for wm in wo.materials.select_related('spare_part').all():
                 if wm.spare_part and wm.spare_part.quantity_in_stock is not None:
-                    wm.spare_part.quantity_in_stock += Decimal(str(wm.quantity))
+                    ret_qty = Decimal(str(wm.quantity))
+                    wm.spare_part.quantity_in_stock += ret_qty
                     wm.spare_part.save()
+                    unit_c = wm.spare_part.unit_cost or Decimal('0.00')
+                    ret_amt = (ret_qty * unit_c).quantize(Decimal('0.01'))
+                    issues_cnt = StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=wm.spare_part, transaction_type='ISSUE').count()
+                    returns_cnt = StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=wm.spare_part, transaction_type='RETURN').count()
+                    if issues_cnt > returns_cnt:
+                        StockTransaction.all_objects.create(
+                            tenant=wo.tenant,
+                            spare_part=wm.spare_part,
+                            work_order=wo,
+                            transaction_type='RETURN',
+                            quantity=ret_qty,
+                            unit_price=unit_c,
+                            total_amount=ret_amt,
+                            cost_center_snapshot=cost_center_str,
+                            issue_date=timezone.now(),
+                            is_variance_adjustment=False
+                        )
             # Cancel tool reservations and release tools
             try:
                 from assets.models import ToolReservation
