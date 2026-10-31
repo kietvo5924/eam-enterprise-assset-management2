@@ -189,11 +189,28 @@ class SyncEngine {
 
   Future<bool> _syncStatus(Map<String, dynamic> payload, Options options) async {
     final String woId = payload['woId'];
+    final data = <String, dynamic>{
+      'status': payload['status'],
+    };
+    if (payload.containsKey('resolutionNotes') && payload['resolutionNotes'] != null) {
+      data['resolutionNotes'] = payload['resolutionNotes'];
+    }
+    if (payload.containsKey('machineState') && payload['machineState'] != null) {
+      data['machineState'] = payload['machineState'];
+    }
+    if (payload.containsKey('postRepairLoadFactor') && payload['postRepairLoadFactor'] != null) {
+      data['postRepairLoadFactor'] = payload['postRepairLoadFactor'];
+    }
+    if (payload.containsKey('postRepairVibration') && payload['postRepairVibration'] != null) {
+      data['postRepairVibration'] = payload['postRepairVibration'];
+    }
+    if (payload.containsKey('postRepairTemperature') && payload['postRepairTemperature'] != null) {
+      data['postRepairTemperature'] = payload['postRepairTemperature'];
+    }
+
     final response = await _dio.put(
       '/api/v1/work-orders/$woId/status',
-      data: {
-        'status': payload['status'],
-      },
+      data: data,
       options: options,
     );
     return response.statusCode == 200 && response.data['success'] == true;

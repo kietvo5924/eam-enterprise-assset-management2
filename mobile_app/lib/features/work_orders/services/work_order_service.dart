@@ -629,6 +629,8 @@ class WorkOrderService {
     String? resolutionNotes,
     String? machineState,
     double? loadFactor,
+    double? postRepairVibration,
+    double? postRepairTemperature,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -680,6 +682,12 @@ class WorkOrderService {
           if (loadFactor != null) {
             putData['postRepairLoadFactor'] = loadFactor;
           }
+          if (postRepairVibration != null) {
+            putData['postRepairVibration'] = postRepairVibration;
+          }
+          if (postRepairTemperature != null) {
+            putData['postRepairTemperature'] = postRepairTemperature;
+          }
 
           final response = await _dio.put(
             '/api/v1/work-orders/$woId/status',
@@ -698,7 +706,21 @@ class WorkOrderService {
         _updateLocalWorkOrder(woId);
         return true;
       } else {
-        final payload = jsonEncode({'woId': woId, 'status': status});
+        final Map<String, dynamic> statusPayload = {
+          'woId': woId,
+          'status': status,
+          if (resolutionNotes != null && resolutionNotes.trim().isNotEmpty)
+            'resolutionNotes': resolutionNotes.trim(),
+          if (machineState != null && machineState.trim().isNotEmpty)
+            'machineState': machineState.trim(),
+          if (loadFactor != null)
+            'postRepairLoadFactor': loadFactor,
+          if (postRepairVibration != null)
+            'postRepairVibration': postRepairVibration,
+          if (postRepairTemperature != null)
+            'postRepairTemperature': postRepairTemperature,
+        };
+        final payload = jsonEncode(statusPayload);
         await AppDatabase.instance.syncQueueDao.addSyncTask(
           SyncQueuesCompanion.insert(
             actionType: 'UPDATE_STATUS',
@@ -712,7 +734,12 @@ class WorkOrderService {
         );
         if (wo != null) {
           await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
-            wo.copyWith(status: status),
+            wo.copyWith(
+              status: status,
+              resolutionNotes: resolutionNotes != null && resolutionNotes.trim().isNotEmpty
+                  ? drift.Value(resolutionNotes.trim())
+                  : const drift.Value.absent(),
+            ),
           );
           return true;
         }

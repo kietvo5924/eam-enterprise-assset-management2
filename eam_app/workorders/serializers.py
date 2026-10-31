@@ -1,6 +1,6 @@
 from decimal import Decimal
 from rest_framework import serializers
-from workorders.models import WorkOrder, WorkOrderChecklistItem, WorkOrderAttachment, WorkOrderMaterial
+from workorders.models import WorkOrder, WorkOrderChecklistItem, WorkOrderAttachment, WorkOrderMaterial, WorkOrderCost
 from assets.serializers import AssetSerializer, SparePartSerializer
 from users.serializers import UserSerializer
 
@@ -46,6 +46,28 @@ class WorkOrderMaterialSerializer(serializers.ModelSerializer):
         model = WorkOrderMaterial
         fields = ['id', 'sparePartId', 'sparePart', 'quantity', 'actualCost']
 
+class WorkOrderCostSerializer(serializers.ModelSerializer):
+    costCenterSnapshot = serializers.CharField(source='cost_center_snapshot', read_only=True)
+    materialCost = serializers.DecimalField(source='material_cost', max_digits=19, decimal_places=2, read_only=True)
+    laborCost = serializers.DecimalField(source='labor_cost', max_digits=19, decimal_places=2, read_only=True)
+    vendorCost = serializers.DecimalField(source='vendor_cost', max_digits=19, decimal_places=2, read_only=True)
+    grossCost = serializers.DecimalField(source='gross_cost', max_digits=19, decimal_places=2, read_only=True)
+    warrantyCoveredAmount = serializers.DecimalField(source='warranty_covered_amount', max_digits=19, decimal_places=2, read_only=True)
+    insuranceCoveredAmount = serializers.DecimalField(source='insurance_covered_amount', max_digits=19, decimal_places=2, read_only=True)
+    netCost = serializers.DecimalField(source='net_cost', max_digits=19, decimal_places=2, read_only=True)
+    isCapitalOverhaul = serializers.BooleanField(source='is_capital_overhaul', read_only=True)
+    isCostFrozen = serializers.BooleanField(source='is_cost_frozen', read_only=True)
+    costFrozenAt = serializers.DateTimeField(source='cost_frozen_at', read_only=True)
+
+    class Meta:
+        model = WorkOrderCost
+        fields = [
+            'id', 'costCenterSnapshot', 'materialCost', 'laborCost',
+            'vendorCost', 'grossCost', 'warrantyCoveredAmount',
+            'insuranceCoveredAmount', 'netCost', 'isCapitalOverhaul',
+            'isCostFrozen', 'costFrozenAt'
+        ]
+
 class WorkOrderSerializer(serializers.ModelSerializer):
     code = serializers.CharField(read_only=True)
     assetId = serializers.UUIDField(source='asset.id', read_only=True)
@@ -79,6 +101,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     postRepairVibration = serializers.FloatField(source='post_repair_vibration', read_only=True)
     postRepairTemperature = serializers.FloatField(source='post_repair_temperature', read_only=True)
     postRepairLoadFactor = serializers.FloatField(source='post_repair_load_factor', read_only=True)
+    actualCost = serializers.DecimalField(source='actual_cost', max_digits=19, decimal_places=2, read_only=True)
+    isCapitalized = serializers.BooleanField(source='is_capitalized', read_only=True)
+    costBreakdown = WorkOrderCostSerializer(source='cost_breakdown', read_only=True)
 
     class Meta:
         model = WorkOrder
@@ -93,6 +118,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'maintenanceWindowStart', 'maintenanceWindowEnd',
             'maintenanceAction', 'completionProcessedAt',
             'postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor',
+            'actualCost', 'isCapitalized', 'costBreakdown',
             'created_at', 'updated_at',
             'asset', 'checklists', 'attachments', 'materials'
         ]

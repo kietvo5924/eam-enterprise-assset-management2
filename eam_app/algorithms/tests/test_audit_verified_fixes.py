@@ -40,6 +40,8 @@ from analytics.views import check_report_permission, is_admin_or_manager
 class DeepAuditVerifiedFixesTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Deep Audit Tenant", tenant_code="TENANT_AUDIT")
+        from core.tenant_context import set_current_tenant
+        set_current_tenant(self.tenant.id)
         self.location = Location.objects.create(
             name="Xưởng Cơ Khí A",
             code="LOC_CK_A",
@@ -79,6 +81,10 @@ class DeepAuditVerifiedFixesTests(TestCase):
         self.role_finance = Role.objects.create(name="FINANCE_MANAGER", tenant=self.tenant)
         self.tech_user.roles.add(self.role_tech)
         self.finance_user.roles.add(self.role_finance)
+
+    def tearDown(self):
+        from core.tenant_context import clear_current_tenant
+        clear_current_tenant()
 
     def test_01_material_issue_stock_transaction_and_cost_freeze(self):
         """A1: Xuất vật tư trong Work Order phải trừ kho, tạo StockTransaction và hạch toán đúng vào Cost Breakdown."""
@@ -531,4 +537,292 @@ class DeepAuditVerifiedFixesTests(TestCase):
             transaction_type='RETURN'
         ).exists()
         self.assertTrue(has_return)
+
+    def test_10_work_order_delete_restores_inventory_exactly_once(self):
+        """Fix 1: Xóa Work Order hoàn trả tồn kho chính xác 1 lần (không bị nhân đôi)."""
+        initial_stock = Decimal('20.00')
+        self.part.quantity_in_stock = initial_stock
+        self.part.save(update_fields=['quantity_in_stock'])
+
+        # Cấp quyền xóa cho tech_user
+        p_del, _ = Permission.objects.get_or_create(id='work_order:delete', defaults={'name': 'Del WO'})
+        p_read, _ = Permission.objects.get_or_create(id='work_order:read', defaults={'name': 'Read WO'})
+        self.role_tech.permissions.add(p_del, p_read)
+
+        wo = WorkOrder.objects.create(
+            title="Phiếu bảo trì cần xóa",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='CREATED',
+            assigned_to=self.tech_user
+        )
+        qty_used = Decimal('3.00')
+        self.part.quantity_in_stock -= qty_used
+        self.part.save(update_fields=['quantity_in_stock'])
+
+        StockTransaction.objects.create(
+            tenant=self.tenant,
+            spare_part=self.part,
+            work_order=wo,
+            transaction_type='ISSUE',
+            quantity=qty_used,
+            unit_price=self.part.unit_cost,
+            total_amount=qty_used * self.part.unit_cost,
+            issue_date=timezone.now()
+        )
+        WorkOrderMaterial.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.part,
+            quantity=qty_used,
+            actual_cost=qty_used * self.part.unit_cost
+        )
+
+        from workorders.views import WorkOrderDetailView
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        factory = APIRequestFactory()
+        req = factory.delete(f'/api/v1/work-orders/{wo.id}')
+        force_authenticate(req, user=self.tech_user)
+
+        view = WorkOrderDetailView.as_view()
+        response = view(req, wo_id=wo.id)
+        self.assertEqual(response.status_code, 200)
+
+        self.part.refresh_from_db()
+        # Tồn kho ban đầu là 20. Xuất 3 -> còn 17. Sau khi xóa hoàn lại 3 -> phải đúng bằng 20, KHÔNG ĐƯỢC THÀNH 23!
+        self.assertEqual(self.part.quantity_in_stock, initial_stock)
+
+        # Kiểm tra StockTransaction RETURN (work_order_id chuyển thành NULL theo on_delete=SET_NULL khi wo bị xóa)
+        returns = StockTransaction.objects.filter(
+            tenant=self.tenant,
+            spare_part=self.part,
+            transaction_type='RETURN'
+        )
+        self.assertEqual(returns.count(), 1)
+        self.assertEqual(returns.first().quantity, qty_used)
+        self.assertIsNone(returns.first().work_order)
+
+    def test_11_multiple_material_lines_same_part_all_create_stock_transactions(self):
+        """Fix 2: Work Order có nhiều dòng cùng sparePartId phải tạo đầy đủ ISSUE và tính đúng material_cost khi freeze."""
+        initial_stock = Decimal('50.00')
+        self.part.quantity_in_stock = initial_stock
+        self.part.save(update_fields=['quantity_in_stock'])
+
+        p_create, _ = Permission.objects.get_or_create(id='work_order:create', defaults={'name': 'Create WO'})
+        p_read, _ = Permission.objects.get_or_create(id='work_order:read', defaults={'name': 'Read WO'})
+        p_upd, _ = Permission.objects.get_or_create(id='work_order:update', defaults={'name': 'Update WO'})
+        self.role_tech.permissions.add(p_create, p_read, p_upd)
+
+        from workorders.views import WorkOrderListView
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        factory = APIRequestFactory()
+        # Tạo WO với 2 dòng cùng 1 loại vật tư: dòng 1 lấy 3 cái, dòng 2 lấy 2 cái
+        post_data = {
+            'assetId': str(self.asset.id),
+            'title': 'WO thay thế nhiều vị trí cùng vòng bi',
+            'priority': 'HIGH',
+            'materials': [
+                {'sparePartId': str(self.part.id), 'quantity': '3.00'},
+                {'sparePartId': str(self.part.id), 'quantity': '2.00'},
+            ]
+        }
+        req = factory.post('/api/v1/work-orders', data=post_data, format='json')
+        force_authenticate(req, user=self.tech_user)
+
+        view = WorkOrderListView.as_view()
+        response = view(req)
+        self.assertEqual(response.status_code, 200)
+        wo_id = response.data['data']['id']
+        wo = WorkOrder.objects.get(id=wo_id)
+
+        # 1. Tồn kho phải bị trừ tổng cộng 5.00
+        self.part.refresh_from_db()
+        self.assertEqual(self.part.quantity_in_stock, initial_stock - Decimal('5.00'))
+
+        # 2. Phải có đúng 2 giao dịch StockTransaction ISSUE
+        issue_txs = StockTransaction.objects.filter(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.part,
+            transaction_type='ISSUE'
+        )
+        self.assertEqual(issue_txs.count(), 2)
+        total_issued = sum(t.quantity for t in issue_txs)
+        self.assertEqual(total_issued, Decimal('5.00'))
+
+        # 3. Hoàn thành phiếu và đóng băng chi phí: vật tư phải được tính đủ cho cả 2 dòng (5 * 250,000 = 1,250,000)
+        wo.status = 'IN_PROGRESS'
+        wo.save()
+        from workorders.models import WorkOrderAttachment
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url='/media/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=1024
+        )
+
+        cost_obj = CostForecastingService.freeze_work_order_cost(wo)
+        expected_mat_cost = Decimal('5.00') * self.part.unit_cost
+        self.assertEqual(cost_obj.material_cost, expected_mat_cost)
+        self.assertEqual(cost_obj.gross_cost, expected_mat_cost)
+        self.assertEqual(cost_obj.net_cost, expected_mat_cost)
+
+    def test_12_cancel_and_edit_inventory_restore_quantity_based_and_idempotent(self):
+        """Fix 3: Hủy phiếu bảo trì chống hoàn trả trùng lặp (Idempotent) và tính theo số lượng giao dịch."""
+        initial_stock = Decimal('30.00')
+        self.part.quantity_in_stock = initial_stock
+        self.part.save(update_fields=['quantity_in_stock'])
+
+        p_upd, _ = Permission.objects.get_or_create(id='work_order:update', defaults={'name': 'Update WO'})
+        self.role_tech.permissions.add(p_upd)
+
+        wo = WorkOrder.objects.create(
+            title="Phiếu cần kiểm tra hủy lặp",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='ASSIGNED',
+            assigned_to=self.tech_user
+        )
+        qty = Decimal('4.00')
+        self.part.quantity_in_stock -= qty
+        self.part.save(update_fields=['quantity_in_stock'])
+        StockTransaction.objects.create(
+            tenant=self.tenant,
+            spare_part=self.part,
+            work_order=wo,
+            transaction_type='ISSUE',
+            quantity=qty,
+            unit_price=self.part.unit_cost,
+            total_amount=qty * self.part.unit_cost,
+            issue_date=timezone.now()
+        )
+        WorkOrderMaterial.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            spare_part=self.part,
+            quantity=qty,
+            actual_cost=qty * self.part.unit_cost
+        )
+
+        # Lần 1: Gọi restore_work_order_inventory
+        WorkOrderTransitionService.restore_work_order_inventory(wo)
+        self.part.refresh_from_db()
+        self.assertEqual(self.part.quantity_in_stock, initial_stock)
+        return_count = StockTransaction.objects.filter(work_order=wo, transaction_type='RETURN').count()
+        self.assertEqual(return_count, 1)
+
+        # Lần 2: Gọi lại restore_work_order_inventory -> Không được tạo thêm RETURN và không được cộng thêm tồn kho
+        WorkOrderTransitionService.restore_work_order_inventory(wo)
+        self.part.refresh_from_db()
+        self.assertEqual(self.part.quantity_in_stock, initial_stock)
+        return_count_after = StockTransaction.objects.filter(work_order=wo, transaction_type='RETURN').count()
+        self.assertEqual(return_count_after, 1)
+
+    def test_13_cost_calculation_preserves_explicit_zero_values(self):
+        """Fix 4: Nhập giá trị 0 cho vendor_cost, bảo hành, bảo hiểm phải được ghi nhận là 0, không bị lấy lại giá trị cũ."""
+        wo = WorkOrder.objects.create(
+            title="Phiếu kiểm tra chi phí 0",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='IN_PROGRESS',
+            assigned_to=self.tech_user
+        )
+        from workorders.models import WorkOrderAttachment
+        WorkOrderAttachment.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            file_url='/media/proof.jpg',
+            file_name='proof.jpg',
+            file_type='image/jpeg',
+            file_size=1024
+        )
+        # Giả sử trước đó đã có pre-configured cost breakdown với vendor_cost = 5,000,000
+        WorkOrderCost.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            material_cost=Decimal('500000.00'),
+            labor_cost=Decimal('200000.00'),
+            vendor_cost=Decimal('5000000.00'),
+            gross_cost=Decimal('5700000.00'),
+            net_cost=Decimal('5700000.00'),
+            is_cost_frozen=False
+        )
+
+        # Người dùng hoàn thành và nhập rõ ràng vendorCost = 0.00, warrantyCoveredAmount = 0.00, insuranceCoveredAmount = 0.00
+        wo_completed = WorkOrderTransitionService.complete_work_order(
+            work_order_id=wo.id,
+            user=self.tech_user,
+            vendor_cost=Decimal('0.00'),
+            warranty_covered_amount=Decimal('0.00'),
+            insurance_covered_amount=Decimal('0.00')
+        )
+        cost_obj = wo_completed.cost_breakdown
+        self.assertEqual(cost_obj.vendor_cost, Decimal('0.00'))
+        self.assertEqual(cost_obj.warranty_covered_amount, Decimal('0.00'))
+        self.assertEqual(cost_obj.insurance_covered_amount, Decimal('0.00'))
+        # Gross cost không bị cộng 5M cũ
+        self.assertEqual(cost_obj.gross_cost, cost_obj.material_cost + cost_obj.labor_cost)
+        self.assertEqual(cost_obj.net_cost, cost_obj.gross_cost)
+
+    def test_14_multi_layer_consistency_portal_delete_and_wo_serializer(self):
+        """Fix 5 & 6: Đồng bộ đa lớp giữa Portal DELETE, API Serializer và dữ liệu chi phí bất biến."""
+        # 1. Portal DELETE từ chối xóa phiếu COMPLETED
+        wo_comp = WorkOrder.objects.create(
+            title="Phiếu đã xong",
+            asset=self.asset,
+            tenant=self.tenant,
+            status='COMPLETED',
+            assigned_to=self.tech_user
+        )
+        from portal.views import portal_work_orders
+        from django.test import RequestFactory
+        import json
+
+        factory = RequestFactory()
+        req = factory.delete(
+            '/portal/work-orders/',
+            data=json.dumps({'id': str(wo_comp.id)}),
+            content_type='application/json'
+        )
+        req.user = self.tech_user
+        setattr(req, '_cached_tenant', self.tenant)
+        req.session = {}
+
+        p_del, _ = Permission.objects.get_or_create(id='work_order:delete', defaults={'name': 'Del WO'})
+        p_read, _ = Permission.objects.get_or_create(id='work_order:read', defaults={'name': 'Read WO'})
+        self.role_tech.permissions.add(p_del, p_read)
+
+        resp = portal_work_orders(req)
+        resp_data = json.loads(resp.content)
+        self.assertFalse(resp_data['success'])
+        self.assertIn('Only CREATED or ASSIGNED', resp_data['error'])
+
+        # 2. WorkOrderSerializer bao gồm costBreakdown, actualCost, isCapitalized
+        wo_comp.actual_cost = Decimal('1500000.00')
+        wo_comp.is_capitalized = True
+        wo_comp.save()
+        WorkOrderCost.objects.create(
+            tenant=self.tenant,
+            work_order=wo_comp,
+            material_cost=Decimal('1000000.00'),
+            labor_cost=Decimal('500000.00'),
+            vendor_cost=Decimal('0.00'),
+            gross_cost=Decimal('1500000.00'),
+            net_cost=Decimal('1500000.00'),
+            is_cost_frozen=True
+        )
+
+        from workorders.serializers import WorkOrderSerializer
+        ser = WorkOrderSerializer(wo_comp)
+        self.assertIn('actualCost', ser.data)
+        self.assertIn('isCapitalized', ser.data)
+        self.assertIn('costBreakdown', ser.data)
+        self.assertEqual(ser.data['actualCost'], '1500000.00')
+        self.assertTrue(ser.data['isCapitalized'])
+        self.assertEqual(ser.data['costBreakdown']['materialCost'], '1000000.00')
+
 

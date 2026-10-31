@@ -54,14 +54,28 @@ class WorkOrderTransitionService:
         # Resolve vendor_cost from existing pre-configured cost breakdown if not explicitly supplied
         from decimal import Decimal
         if vendor_cost is None:
-            if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.vendor_cost:
+            if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.vendor_cost is not None:
                 vendor_cost = wo.cost_breakdown.vendor_cost
             else:
                 vendor_cost = Decimal('0.00')
+        else:
+            vendor_cost = Decimal(str(vendor_cost))
+
         if warranty_covered_amount is None:
-            warranty_covered_amount = Decimal('0.00')
+            if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.warranty_covered_amount is not None:
+                warranty_covered_amount = wo.cost_breakdown.warranty_covered_amount
+            else:
+                warranty_covered_amount = Decimal('0.00')
+        else:
+            warranty_covered_amount = Decimal(str(warranty_covered_amount))
+
         if insurance_covered_amount is None:
-            insurance_covered_amount = Decimal('0.00')
+            if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.insurance_covered_amount is not None:
+                insurance_covered_amount = wo.cost_breakdown.insurance_covered_amount
+            else:
+                insurance_covered_amount = Decimal('0.00')
+        else:
+            insurance_covered_amount = Decimal(str(insurance_covered_amount))
 
         # 1. Idempotency Check: Nếu đã COMPLETED trước đó
         if wo.status == 'COMPLETED':
@@ -291,3 +305,92 @@ class WorkOrderTransitionService:
                 tp.save()
         except Exception as ex:
             logger.warning(f"Lỗi định vị kỹ thuật viên sau hoàn thành WO {wo.id}: {ex}")
+
+    @classmethod
+    @transaction.atomic
+    def restore_work_order_inventory(cls, wo):
+        """
+        Hoàn trả tồn kho an toàn, lũy kế theo số lượng giao dịch (quantity-based),
+        tạo StockTransaction RETURN và chống hoàn trả trùng lặp (Idempotent).
+        Hỗ trợ nhiều dòng vật tư cùng spare_part.
+        """
+        from decimal import Decimal
+        from django.db.models import Sum
+        from assets.models import SparePart, StockTransaction
+        cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+
+        part_ids = set(wo.materials.values_list('spare_part_id', flat=True))
+        issue_part_ids = set(StockTransaction.all_objects.filter(
+            tenant=wo.tenant,
+            work_order=wo,
+            transaction_type='ISSUE'
+        ).values_list('spare_part_id', flat=True))
+        all_part_ids = part_ids | issue_part_ids
+
+        for pid in all_part_ids:
+            part = SparePart.objects.select_for_update().filter(id=pid, tenant=wo.tenant).first()
+            if not part:
+                continue
+
+            issued_qty = StockTransaction.all_objects.filter(
+                tenant=wo.tenant,
+                work_order=wo,
+                spare_part=part,
+                transaction_type='ISSUE'
+            ).aggregate(s=Sum('quantity'))['s'] or Decimal('0')
+
+            returned_qty = StockTransaction.all_objects.filter(
+                tenant=wo.tenant,
+                work_order=wo,
+                spare_part=part,
+                transaction_type='RETURN'
+            ).aggregate(s=Sum('quantity'))['s'] or Decimal('0')
+
+            # Fallback nếu không có transaction ISSUE nhưng có WorkOrderMaterial
+            if issued_qty == Decimal('0'):
+                mat_qty = wo.materials.filter(spare_part=part).aggregate(s=Sum('quantity'))['s'] or Decimal('0')
+                issued_qty = mat_qty
+
+            remaining = max(Decimal('0'), issued_qty - returned_qty)
+            if remaining > Decimal('0'):
+                unit_c = part.unit_cost or Decimal('0.00')
+                ret_amt = (remaining * unit_c).quantize(Decimal('0.01'))
+                StockTransaction.all_objects.create(
+                    tenant=wo.tenant,
+                    spare_part=part,
+                    work_order=wo,
+                    transaction_type='RETURN',
+                    quantity=remaining,
+                    unit_price=unit_c,
+                    total_amount=ret_amt,
+                    cost_center_snapshot=cost_center_str,
+                    issue_date=timezone.now(),
+                    is_variance_adjustment=False
+                )
+                if part.quantity_in_stock is not None:
+                    part.quantity_in_stock += remaining
+                    part.save(update_fields=['quantity_in_stock'])
+
+    @classmethod
+    def cancel_work_order_reservations(cls, wo):
+        """
+        Hủy đặt dụng cụ và giải phóng tài nguyên dụng cụ về trạng thái AVAILABLE.
+        """
+        from assets.models import ToolReservation
+        try:
+            active_res = ToolReservation.objects.filter(
+                tenant=wo.tenant,
+                work_order=wo,
+                status__in=['RESERVED', 'IN_USE']
+            )
+            for r in active_res:
+                r.status = 'CANCELLED'
+                r.save(update_fields=['status'])
+                if r.tool:
+                    r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
+                    r.tool.save(update_fields=['available_quantity'])
+                if r.tool_instance:
+                    r.tool_instance.status = 'AVAILABLE'
+                    r.tool_instance.save(update_fields=['status'])
+        except Exception as ex:
+            logger.warning(f"Error cancelling tool reservations for WO {wo.id}: {ex}")

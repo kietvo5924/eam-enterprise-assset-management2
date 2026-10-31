@@ -86,6 +86,8 @@ class CostForecastingService:
                 elif wm.spare_part and wm.spare_part.unit_cost:
                     material_cost += Decimal(str(wm.quantity)) * wm.spare_part.unit_cost
 
+        material_cost = max(Decimal('0'), material_cost)
+
         # 2. Tính toán chi phí giờ công thợ từ LaborLog
         labor_logs = LaborLog.all_objects.filter(
             tenant=tenant,
@@ -106,7 +108,7 @@ class CostForecastingService:
         # 3. Chi phí thuê ngoài dịch vụ
         if vendor_cost is not None:
             v_cost = Decimal(str(vendor_cost))
-        elif existing and existing.vendor_cost:
+        elif existing and existing.vendor_cost is not None:
             v_cost = existing.vendor_cost
         else:
             v_cost = Decimal('0.00')
@@ -117,18 +119,18 @@ class CostForecastingService:
         # 5. Chi phí bảo hành & bảo hiểm
         if warranty_covered_amount is not None:
             w_cost = Decimal(str(warranty_covered_amount))
-        elif existing and existing.warranty_covered_amount:
+        elif existing and existing.warranty_covered_amount is not None:
             w_cost = existing.warranty_covered_amount
-        elif hasattr(work_order, 'warranty_covered_amount') and getattr(work_order, 'warranty_covered_amount', None):
+        elif hasattr(work_order, 'warranty_covered_amount') and getattr(work_order, 'warranty_covered_amount', None) is not None:
             w_cost = Decimal(str(work_order.warranty_covered_amount))
         else:
             w_cost = Decimal('0.00')
 
         if insurance_covered_amount is not None:
             i_cost = Decimal(str(insurance_covered_amount))
-        elif existing and existing.insurance_covered_amount:
+        elif existing and existing.insurance_covered_amount is not None:
             i_cost = existing.insurance_covered_amount
-        elif hasattr(work_order, 'insurance_covered_amount') and getattr(work_order, 'insurance_covered_amount', None):
+        elif hasattr(work_order, 'insurance_covered_amount') and getattr(work_order, 'insurance_covered_amount', None) is not None:
             i_cost = Decimal(str(work_order.insurance_covered_amount))
         else:
             i_cost = Decimal('0.00')

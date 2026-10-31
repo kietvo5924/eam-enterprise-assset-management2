@@ -1993,13 +1993,28 @@ def portal_work_orders(request):
                         if str(wo.assigned_to_id) != str(request.user.id) and not check_perm(request, 'work_order:update'):
                             raise Exception("Only the assignee can complete the Work Order")
 
-                        m_state = data.get('machine_state') or data.get('machineState') or data.get('postRepairMachineState') or 'RUNNING'
+                        def _extract_val(d, *keys, default=None):
+                            for k in keys:
+                                if k in d and d[k] is not None:
+                                    return d[k]
+                            return default
+
+                        def _extract_decimal(d, *keys):
+                            for k in keys:
+                                if k in d and d[k] is not None:
+                                    v = d[k]
+                                    if str(v).strip() != '':
+                                        from decimal import Decimal
+                                        return Decimal(str(v))
+                            return None
+
+                        m_state = _extract_val(data, 'machine_state', 'machineState', 'postRepairMachineState', default='RUNNING')
                         post_repair_payload = None
-                        if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor', 'post_repair_vibration', 'post_repair_temperature', 'machine_state', 'machineState')):
+                        if any(k in data for k in ('postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor', 'post_repair_vibration', 'post_repair_temperature', 'machine_state', 'machineState', 'postRepairMachineState')):
                             post_repair_payload = {
-                                'vibration': data.get('postRepairVibration') or data.get('post_repair_vibration'),
-                                'temperature': data.get('postRepairTemperature') or data.get('post_repair_temperature'),
-                                'load_factor': data.get('postRepairLoadFactor') or data.get('post_repair_load_factor') or 1.0,
+                                'vibration': _extract_val(data, 'postRepairVibration', 'post_repair_vibration'),
+                                'temperature': _extract_val(data, 'postRepairTemperature', 'post_repair_temperature'),
+                                'load_factor': _extract_val(data, 'postRepairLoadFactor', 'post_repair_load_factor', default=1.0),
                                 'machine_state': m_state,
                             }
 
@@ -2008,64 +2023,22 @@ def portal_work_orders(request):
                             work_order_id=wo.id,
                             user=request.user,
                             resolution_notes=data.get('resolution_notes', '') or data.get('resolutionNotes', ''),
-                            maintenance_action=data.get('maintenance_action') or data.get('maintenanceAction') or wo.maintenance_action or 'GENERAL',
-                            actual_duration_minutes=data.get('actual_duration_minutes') or data.get('actualDurationMinutes'),
+                            maintenance_action=_extract_val(data, 'maintenance_action', 'maintenanceAction', default=wo.maintenance_action or 'GENERAL'),
+                            actual_duration_minutes=_extract_val(data, 'actual_duration_minutes', 'actualDurationMinutes'),
                             post_repair_data=post_repair_payload,
                             tenant_id=tenant_id,
-                            warranty_covered_amount=data.get('warranty_covered_amount') or data.get('warrantyCoveredAmount'),
-                            insurance_covered_amount=data.get('insurance_covered_amount') or data.get('insuranceCoveredAmount'),
-                            vendor_cost=data.get('vendor_cost') or data.get('vendorCost') or data.get('vendorServiceCost')
+                            warranty_covered_amount=_extract_decimal(data, 'warranty_covered_amount', 'warrantyCoveredAmount'),
+                            insurance_covered_amount=_extract_decimal(data, 'insurance_covered_amount', 'insuranceCoveredAmount'),
+                            vendor_cost=_extract_decimal(data, 'vendor_cost', 'vendorCost', 'vendorServiceCost')
                         )
 
                     elif new_status in ['CANCELED', 'CANCELLED']:
                         if current_status == 'COMPLETED':
                             raise Exception("Cannot cancel a COMPLETED Work Order")
                         if current_status not in ['CANCELED', 'CANCELLED']:
-                            from decimal import Decimal
-                            from assets.models import StockTransaction
-                            cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
-                            # Restore inventory stock for reserved materials and record RETURN idempotently
-                            for wm in wo.materials.select_related('spare_part').all():
-                                if wm.spare_part and wm.spare_part.quantity_in_stock is not None:
-                                    ret_qty = Decimal(str(wm.quantity))
-                                    wm.spare_part.quantity_in_stock += ret_qty
-                                    wm.spare_part.save()
-                                    unit_c = wm.spare_part.unit_cost or Decimal('0.00')
-                                    ret_amt = (ret_qty * unit_c).quantize(Decimal('0.01'))
-                                    issues_cnt = StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=wm.spare_part, transaction_type='ISSUE').count()
-                                    returns_cnt = StockTransaction.all_objects.filter(tenant=wo.tenant, work_order=wo, spare_part=wm.spare_part, transaction_type='RETURN').count()
-                                    if issues_cnt > returns_cnt:
-                                        StockTransaction.all_objects.create(
-                                            tenant=wo.tenant,
-                                            spare_part=wm.spare_part,
-                                            work_order=wo,
-                                            transaction_type='RETURN',
-                                            quantity=ret_qty,
-                                            unit_price=unit_c,
-                                            total_amount=ret_amt,
-                                            cost_center_snapshot=cost_center_str,
-                                            issue_date=timezone.now(),
-                                            is_variance_adjustment=False
-                                        )
-                            # Cancel tool reservations and release tools
-                            try:
-                                from assets.models import ToolReservation
-                                active_res = ToolReservation.objects.filter(
-                                    tenant_id=tenant_id,
-                                    work_order=wo,
-                                    status__in=['RESERVED', 'IN_USE']
-                                )
-                                for r in active_res:
-                                    r.status = 'CANCELLED'
-                                    r.save()
-                                    if r.tool:
-                                        r.tool.available_quantity = r.tool.available_quantity + r.reserved_quantity
-                                        r.tool.save()
-                                    if r.tool_instance:
-                                        r.tool_instance.status = 'AVAILABLE'
-                                        r.tool_instance.save()
-                            except Exception:
-                                pass
+                            from workorders.services import WorkOrderTransitionService
+                            WorkOrderTransitionService.restore_work_order_inventory(wo)
+                            WorkOrderTransitionService.cancel_work_order_reservations(wo)
                             
                     wo.status = new_status
                     wo.save()
@@ -2245,6 +2218,11 @@ def portal_work_orders(request):
                 if not check_perm(request, 'work_order:delete'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:delete required'}, status=403)
                 wo = WorkOrder.objects.get(id=data.get('id'), tenant_id=tenant_id)
+                if wo.status not in ['CREATED', 'ASSIGNED']:
+                    return JsonResponse({'success': False, 'error': 'Only CREATED or ASSIGNED Work Orders can be deleted'}, status=400)
+                from workorders.services import WorkOrderTransitionService
+                WorkOrderTransitionService.restore_work_order_inventory(wo)
+                WorkOrderTransitionService.cancel_work_order_reservations(wo)
                 wo.delete()
             return JsonResponse({'success': True})
         except Exception as e:
@@ -2285,10 +2263,19 @@ def portal_work_orders(request):
             'follow_ups_count': len(follow_ups)
         })
 
+        cb = getattr(wo, 'cost_breakdown', None)
         wo_metadata[str(wo.id)] = {
             'checklists': checklists,
             'maintenance_action': getattr(wo, 'maintenance_action', 'GENERAL') or 'GENERAL',
-            'vendor_cost': float(wo.cost_breakdown.vendor_cost) if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.vendor_cost else 0.0,
+            'vendor_cost': float(cb.vendor_cost) if cb and cb.vendor_cost is not None else 0.0,
+            'material_cost': float(cb.material_cost) if cb and cb.material_cost is not None else 0.0,
+            'labor_cost': float(cb.labor_cost) if cb and cb.labor_cost is not None else 0.0,
+            'gross_cost': float(cb.gross_cost) if cb and cb.gross_cost is not None else 0.0,
+            'net_cost': float(cb.net_cost) if cb and cb.net_cost is not None else (float(wo.actual_cost) if wo.actual_cost else 0.0),
+            'warranty_covered_amount': float(cb.warranty_covered_amount) if cb and cb.warranty_covered_amount is not None else 0.0,
+            'insurance_covered_amount': float(cb.insurance_covered_amount) if cb and cb.insurance_covered_amount is not None else 0.0,
+            'is_cost_frozen': bool(cb and cb.is_cost_frozen),
+            'is_capital_overhaul': bool(cb and cb.is_capital_overhaul) or bool(wo.is_capitalized),
             'required_skill': wo.required_skill or '',
             'min_skill_level': wo.min_skill_level if wo.min_skill_level is not None else '',
             'required_certification': wo.required_certification or '',

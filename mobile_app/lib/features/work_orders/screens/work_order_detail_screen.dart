@@ -1181,6 +1181,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       final success = await _service.updateStatus(
                         widget.workOrderId,
                         'COMPLETED',
+                        resolutionNotes: _workOrder?.resolutionNotes,
                         machineState: _selectedMachineState,
                         loadFactor: _selectedLoadFactor,
                       );
