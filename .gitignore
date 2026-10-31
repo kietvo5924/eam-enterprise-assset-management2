@@ -32,10 +32,12 @@ google-services.json
 # Temporary & Disposable Test Scripts
 *live_chrome*.py
 *test_chrome*.py
-*_temp*.py
 *_scratch*.py
 scratch/
 eam_app/scratch/
 .settings/
 **/.settings/
+
+# Ensure migrations are never ignored
+!**/migrations/*.py
 
