@@ -1,7 +1,7 @@
-# Thiết Kế Hệ Thống & Đặc Tả Kỹ Thuật: Task 11.7 — Smart Field Biometric Attendance & Multi-Tier Proximity Geofencing (MobileFaceNet, ESP32 Universal BLE Beacon 50m & Haversine Fallback)
+# Thiết Kế Hệ Thống & Đặc Tả Kỹ Thuật: Task 11.7 — Smart Field Biometric Attendance & Micro-Geofencing (MobileFaceNet & ESP32 Universal BLE Beacon 50m)
 
 > **Căn cứ Đề cương Đồ án Tốt nghiệp**: Mục 3.1.3 (Thuật toán nghiên cứu cốt lõi) & Mã chức năng 106.
-> **Mục tiêu nghiên cứu**: Ứng dụng mô hình mạng nơ-ron học sâu **MobileFaceNet** nhận diện khuôn mặt hai giai đoạn (**Đăng ký hồ sơ trên Web $\rightarrow$ Điểm danh thời gian thực trên Mobile**) kết hợp cơ chế kiểm soát không gian vi định vị **ESP32 Universal BLE Beacon** trong bán kính **năm mươi mét ($50\text{m}$)** theo mô hình suy hao tín hiệu logarit (Log-Distance Path Loss Model) cho nhà xưởng trong nhà, kết hợp giải thuật trắc địa **Haversine** cho thiết bị ngoài trời và cơ chế **Cổng Kép Đầu - Cuối (Dual-Gate Interlock: Bắt đầu & Nghiệm thu hoàn thành)** vào ứng dụng di động Flutter để ngăn chặn triệt để tình trạng "lệnh làm việc ma" và "nghiệm thu khống từ xa".
+> **Mục tiêu nghiên cứu**: Ứng dụng mô hình mạng nơ-ron học sâu **MobileFaceNet** nhận diện khuôn mặt hai giai đoạn (**Đăng ký hồ sơ trên Web $\rightarrow$ Điểm danh thời gian thực trên Mobile**) kết hợp cơ chế kiểm soát không gian vi định vị **ESP32 Universal BLE Beacon** trong bán kính **năm mươi mét ($50\text{m}$)** theo mô hình suy hao tín hiệu logarit (Log-Distance Path Loss Model) cho nhà xưởng trong nhà, kết hợp cơ chế bật/tắt linh hoạt theo từng thiết bị (**Asset-Level BLE Toggle**) và cơ chế **Cổng Kép Đầu - Cuối (Dual-Gate Interlock: Bắt đầu & Nghiệm thu hoàn thành)** vào ứng dụng di động Flutter để ngăn chặn triệt để tình trạng "lệnh làm việc ma" và "nghiệm thu khống từ xa".
 
 ---
 
@@ -52,7 +52,7 @@ Hệ thống phân định rạch ròi 100% giữa hai nghiệp vụ:
   - **Mục đích duy nhất**: Dành cho kỹ thuật viên hoặc nhân viên mới khi đi tuần tra hoặc đến hiện trường máy móc, nếu **không biết hoặc muốn xem nhanh thông tin thiết bị** (thông số kỹ thuật, tình trạng vận hành, lịch sử các phiếu bảo trì trước đó), họ dùng camera quét mã QR trên thân máy $\rightarrow$ Ứng dụng điều hướng hiển thị hồ sơ lý lịch chi tiết của thiết bị (`GET /api/v1/assets/qr/{qrCode}`).
 - **Tại sao mã QR TUYỆT ĐỐI KHÔNG ĐƯỢC DÙNG để điểm danh hay nghiệm thu trong Task 11.7**:
   - *Lỗ hổng gian lận nghiêm trọng*: Mã QR là hình ảnh tĩnh in trên decal/kim loại. Kỹ thuật viên hoàn toàn có thể dùng điện thoại chụp lại ảnh tem QR của máy, lưu vào album hoặc gửi qua Zalo cho đồng nghiệp, sau đó ngồi ở quán cà phê hay ở nhà giơ ảnh QR trước màn hình để "quét lụi" nhận việc hoặc bấm nghiệm thu khống.
-  - *Nguyên tắc bảo vệ hiện trường chuẩn xác*: Quá trình điểm danh Bắt đầu (Cổng 1) và Nghiệm thu Hoàn thành (Cổng 2) **bắt buộc 100% phải dựa trên Sóng vô tuyến vật lý thực tế phát ra từ mạch ESP32 Universal BLE Beacon ($\le 50\text{m}$)** cho nhà xưởng trong nhà hoặc **GPS vệ tinh Haversine** cho máy ngoài trời, kết hợp với **khuôn mặt sống thời gian thực của MobileFaceNet**. Mã QR thân máy hoàn toàn không can thiệp vào quy trình điểm danh.
+  - *Nguyên tắc bảo vệ hiện trường chuẩn xác*: Quá trình điểm danh Bắt đầu (Cổng 1) và Nghiệm thu Hoàn thành (Cổng 2) **bắt buộc 100% phải dựa trên Sóng vô tuyến vật lý thực tế phát ra từ mạch ESP32 Universal BLE Beacon ($\le 50\text{m}$)** với máy có yêu cầu beacon, hoặc chỉ cần **khuôn mặt sống thời gian thực của MobileFaceNet** với tài sản thông thường (bàn, ghế) không gắn chip. Mã QR thân máy hoàn toàn không can thiệp vào quy trình điểm danh.
 
 ---
 
@@ -61,11 +61,11 @@ Hệ thống phân định rạch ròi 100% giữa hai nghiệp vụ:
 - **Tái Sử Dụng Mô Hình Multi-Tenancy**: Mọi dữ liệu hồ sơ sinh trắc học và lịch sử điểm danh kế thừa `BaseTenantModel`, bảo đảm phân lập hoàn toàn giữa các Tenant qua `TenantManager`.
 - **Tái Sử Dụng Thực Thể Nghiệp Vụ Sẵn Có**:
   - `WorkOrder`: Kiểm soát trạng thái chuyển dịch từ `ASSIGNED` sang `IN_PROGRESS` (Cổng 1) và từ `IN_PROGRESS` sang `COMPLETED` (Cổng 2).
-  - `Asset`: Bổ sung mã định danh Beacon `ble_beacon_uuid` và địa chỉ `ble_mac_address`. Mã QR thân máy (`qr_code`) chỉ dùng cho tính năng tra cứu lý lịch máy, độc lập hoàn toàn khỏi quy trình điểm danh.
+  - `Asset`: Bổ sung trường cờ `require_ble_beacon` (Boolean, bật/tắt yêu cầu quét sóng ESP32, hiển thị trực quan dạng switch On/Off trên Web Portal lúc tạo/sửa tài sản), mã định danh Beacon `ble_beacon_uuid` và địa chỉ `ble_mac_address`. Mã QR thân máy (`qr_code`) chỉ dùng cho tính năng tra cứu lý lịch máy, độc lập hoàn toàn khỏi quy trình điểm danh.
   - `User`: Hồ sơ nhân viên kỹ thuật thực hiện điểm danh.
 - **Tối Ưu Hóa Thiết Bị Di Động (Edge Inference)**: Mô hình MobileFaceNet được đóng gói dạng TFLite (`mobilefacenet.tflite` $\approx 4.1\text{ MB}$) chạy trực tiếp trên chip di động của kỹ thuật viên, không yêu cầu máy chủ phải gắn GPU.
 - **Kiến Trúc Đóng Gói Module Giải Thuật & Dữ Liệu Cách Ly (Dedicated Algorithms & Data Package)**:
-  - Tuân thủ quy ước kiến trúc chung của toàn bộ Phase 11, toàn bộ mã nguồn giải thuật (kiểm soát không gian BLE RSSI, trắc địa Haversine, cổng kiểm soát 15 phút), **cùng toàn bộ tệp mô hình học sâu và dữ liệu tải về liên quan đều được đặt tập trung hoàn toàn trong thư mục riêng biệt: `eam_app/algorithms/biometric/`**.
+  - Tuân thủ quy ước kiến trúc chung của toàn bộ Phase 11, toàn bộ mã nguồn giải thuật (kiểm soát không gian BLE RSSI, cấu hình require_ble_beacon, cổng kiểm soát 15 phút), **cùng toàn bộ tệp mô hình học sâu và dữ liệu tải về liên quan đều được đặt tập trung hoàn toàn trong thư mục riêng biệt: `eam_app/algorithms/biometric/`**.
   - Cấu trúc thư mục cách ly rõ ràng:
     - `eam_app/algorithms/biometric/models/`: Chứa tệp trọng số mô hình MobileFaceNet (`mobilefacenet.tflite` $\approx 4.1\text{ MB}$).
     - `eam_app/algorithms/biometric/data/`: Chứa các tệp dữ liệu kiểm thử, vector chuẩn đối soát, và tập dữ liệu mẫu benchmark tải về (LFW / Synthetic data).
@@ -196,18 +196,25 @@ Hệ thống sử dụng nền tảng **Kaggle Datasets** và các kho dữ li�
   - Trong môi trường kiểm thử và bảo vệ đồ án tốt nghiệp, ứng dụng di động Flutter trên tay thợ khi mở bất kỳ Work Order nào: chỉ cần phát hiện tín hiệu `EAM-UNIVERSAL-BEACON` với cường độ $\text{RSSI} \ge -92\text{ dBm}$ (khoảng cách $d \le 50\text{m}$) là tự động công nhận kỹ thuật viên đang có mặt tại hiện trường máy móc!
   - **Ưu điểm tuyệt đối**: Không cần nút gán động trên Web, không cần nạp lại code hay đổi cấu hình Serial. Bạn chỉ cần cắm sạc dự phòng cho ESP32 và cầm điện thoại đi lại trong phòng là demo thành công $100\%$.
 
-### Quy Tắc 5: Cơ Chế Dự Phòng Ngoại Trời Bằng GPS Haversine (Outdoor GPS Fallback)
-- **Tình Huống Thực Tế**: Thiết bị đặt ngoài trời (trạm biến áp, quạt thông gió mái xưởng, cột đèn, xe tải công trình) không có sẵn nguồn điện để cắm ESP32, nhưng bắt sóng GPS vệ tinh rất tốt.
-- **Quy Tắc**:
-  - Với tài sản có cấu hình tọa độ GPS (`latitude`, `longitude` khác NULL) và không có sóng ESP32, hệ thống kích hoạt chế độ **Định vị trắc địa Haversine**:
-    $$d = 2 \cdot R_{\text{earth}} \cdot \text{atan2}\left(\sqrt{a}, \sqrt{1-a}\right) \le 50.0\text{ mét}$$
-  - Kiểm tra cờ giả lập vị trí của hệ điều hành di động (`isMocked == false`). Phát hiện Fake GPS lập tức hủy phiên điểm danh.
+### Quy Tắc 5: Cơ Chế Bật/Tắt Yêu Cầu Sóng Beacon Theo Từng Tài Sản (Asset-Level `require_ble_beacon` Toggle)
+- **Tình Huống Thực Tế Của Doanh Nghiệp**:
+  Trong một nhà máy hoặc tòa xưởng, danh mục tài sản rất phong phú và đa dạng:
+  1. *Tài sản kỹ thuật, máy móc sản xuất quan trọng (Critical Machinery)*: Máy tiện CNC, máy dập thủy lực, máy chiller làm lạnh, trạm máy nén khí, trạm biến áp. Những thiết bị này được lắp mạch ESP32 và **bắt buộc kỹ thuật viên phải có mặt tại chỗ để bảo trì**.
+  2. *Tài sản phổ thông, nội thất, cơ sở vật chất tĩnh (General/Static Assets)*: Bàn làm việc, ghế xoay văn phòng, tủ hồ sơ, bảng thông báo, rèm cửa. Những tài sản này không bao giờ được gắn chip IoT hay vi điều khiển vì lãng phí chi phí.
+- **Quy Tắc Thực Thi Nghiệp Vụ**:
+  - Trên thực thể `Asset`, bổ sung trường thuộc tính: **`require_ble_beacon`** (Kiểu dữ liệu: `Boolean`, Mặc định: `True` cho máy móc).
+  - **Giao diện Web Portal (`asset_registry.html`)**: Tại modal tạo mới hoặc chỉnh sửa thông tin tài sản, bổ sung công tắc gạt trực quan (**Switch On/Off: `Yêu cầu xác thực Beacon ESP32`**).
+    - Quản đốc/Kỹ sư khi tạo tài sản là "Máy nén khí trục vít" $\rightarrow$ Bật `ON`.
+    - Khi tạo tài sản là "Bàn làm việc kỹ thuật viên" hoặc "Ghế văn phòng" $\rightarrow$ Gạt `OFF`.
+  - **Hành vi ứng dụng Mobile khi mở Work Order**:
+    - Nếu `asset.require_ble_beacon == True`: Ứng dụng kích hoạt Radar quét sóng BLE ESP32. Bắt buộc điện thoại nhận được sóng `EAM-UNIVERSAL-BEACON` ($\text{RSSI} \ge -92\text{ dBm}$, $d \le 50\text{m}$) **và** quét khuôn mặt MobileFaceNet mới cho phép bắt đầu/nghiệm thu.
+    - Nếu `asset.require_ble_beacon == False`: Ứng dụng tự động bỏ qua bước dò sóng Radar BLE (hiển thị trạng thái: *"Thiết bị không yêu cầu Beacon hiện trường"*), **NHƯNG VẪN BẮT BUỘC QUÉT KHUÔN MẶT MOBILEFACENET 100%**. Quy định này đảm bảo: Dù bảo dưỡng cái bàn hay sửa máy CNC, đúng người thợ được giao việc mới được bấm nhận việc và hoàn thành (chống hoàn toàn việc nhận việc hộ hoặc nghiệm thu khống).
 
-### Quy Tắc 6: Chính Sách Bật/Tắt Định Vị Cho Doanh Nghiệp Không Có Hạ Tầng (Tenant Policy Fallback)
-- **Tình Huống Thực Tế**: Doanh nghiệp hoặc trường học chưa trang bị mạch ESP32 và máy móc cũng không có tọa độ GPS (hoặc tài sản cơ động di chuyển liên tục).
+### Quy Tắc 6: Chính Sách Bật/Tắt Toàn Hệ Thống Cấp Doanh Nghiệp (Tenant Policy Fallback)
+- **Tình Huống Thực Tế**: Doanh nghiệp hoặc trường học mới triển khai giai đoạn đầu, chưa trang bị mạch ESP32 cho nhà xưởng.
 - **Quy Tắc**:
   - Hỗ trợ cấu hình cấp Tenant: `ENABLE_GEOFENCING = False`.
-  - Khi đó, hệ thống **bỏ qua kiểm tra sóng BLE ESP32 và tọa độ GPS**. Cổng không gian tự động đánh dấu hợp lệ (`BYPASSED_BY_TENANT_POLICY`).
+  - Khi đó, hệ thống tạm thời bỏ qua kiểm tra sóng BLE ESP32 cho toàn bộ tài sản (`verification_method = 'BYPASSED_BY_TENANT_POLICY'`).
   - Kỹ thuật viên chỉ cần thực hiện quét khuôn mặt sinh trắc học MobileFaceNet để xác thực danh tính đúng người được giao việc trước khi bắt đầu.
   - **Lưu ý nghiệp vụ**: Tuyệt đối không dùng mã QR để điểm danh thay thế cho định vị. Mã QR chỉ dùng để tra cứu thông tin thiết bị.
 
@@ -448,7 +455,7 @@ CREATE TABLE attendance_logs (
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   work_order_id UUID NOT NULL REFERENCES work_orders(id),
   technician_id UUID NOT NULL REFERENCES users(id),
-  verification_method VARCHAR(32) NOT NULL, -- 'ESP32_UNIVERSAL_BEACON', 'GPS_HAVERSINE', 'BYPASSED_BY_TENANT_POLICY'
+  verification_method VARCHAR(32) NOT NULL, -- 'ESP32_UNIVERSAL_BEACON', 'BLE_EXEMPT_BY_ASSET', 'BYPASSED_BY_TENANT_POLICY'
   ble_beacon_id VARCHAR(64) NULL,
   rssi_dbm INT NULL,
   distance_meters FLOAT NULL, -- Khoảng cách tính toán (mét)
@@ -462,6 +469,17 @@ CREATE TABLE attendance_logs (
 );
 CREATE INDEX idx_att_wo_tech_time ON attendance_logs(tenant_id, work_order_id, technician_id, created_at);
 ```
+
+### 6.3. Mở rộng thực thể `assets` (Thêm cờ cấu hình Beacon theo từng tài sản)
+```sql
+ALTER TABLE assets ADD COLUMN require_ble_beacon BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE assets ADD COLUMN ble_beacon_uuid VARCHAR(64) NULL;
+ALTER TABLE assets ADD COLUMN ble_mac_address VARCHAR(32) NULL;
+```
+- **Ý nghĩa nghiệp vụ**:
+  - `require_ble_beacon = TRUE`: Bắt buộc quét sóng ESP32 BLE $\le 50\text{m}$ (dành cho máy móc, thiết bị kỹ thuật quan trọng).
+  - `require_ble_beacon = FALSE`: Miễn quét sóng BLE, chỉ quét khuôn mặt MobileFaceNet (dành cho bàn, ghế, tủ, nội thất văn phòng).
+  - Tích hợp công tắc bật/tắt (Switch On/Off) trực tiếp tại form Thêm mới / Chỉnh sửa tài sản trên Web Portal (`asset_registry.html`).
 
 ---
 
@@ -551,8 +569,8 @@ CREATE INDEX idx_att_wo_tech_time ON attendance_logs(tenant_id, work_order_id, t
 | **TC-BIO-06** | Mỏ neo vạn năng nhận diện mọi Work Order | Cắm mạch ESP32 phát `EAM-UNIVERSAL-BEACON`, mở bất kỳ WO nào | Điện thoại tự động nhận diện mỏ neo không gian cho mọi phiếu việc | Chưa thực hiện |
 | **TC-BIO-07** | Điểm danh hộ / Không khớp khuôn mặt | Người khác cầm máy điểm danh thay, $\text{Sim} = 0.52 < 0.65$ | Cổng sinh trắc từ chối (`Rejected`), hiển thị thông báo khuôn mặt không khớp | Chưa thực hiện |
 | **TC-BIO-08** | Chặn dùng ảnh QR để điểm danh từ xa | Thợ chụp ảnh tem QR mang ra ngoài xưởng cách máy >50m bấm điểm danh | Không có sóng ESP32, từ chối ngay lập tức (`is_location_verified = False`), chứng minh QR chỉ dùng tra cứu | Chưa thực hiện |
-| **TC-BIO-09** | Dự phòng GPS Haversine ngoài trời | Thiết bị ngoài trời có tọa độ GPS, không có ESP32, thợ cách $15\text{m} \le 50\text{m}$ | Chấp thuận định vị GPS Haversine hợp lệ | Chưa thực hiện |
-| **TC-BIO-10** | Chặn phần mềm Fake GPS / Mock Location | Ứng dụng gửi `isMocked: true` trong chế độ ngoài trời | Hủy yêu cầu ngay lập tức, trả về `400 Bad Request`, ghi log vi phạm | Chưa thực hiện |
+| **TC-BIO-09** | Tài sản nội thất không yêu cầu Beacon (`require_ble_beacon = False`) | Tài sản bàn/ghế có cấu hình `require_ble_beacon = False`, thợ không mang ESP32 | Ứng dụng tự bỏ qua quét BLE sóng ESP32, chỉ quét khuôn mặt MobileFaceNet $\rightarrow$ Điểm danh thành công (`BLE_EXEMPT_BY_ASSET`) | Chưa thực hiện |
+| **TC-BIO-10** | Bật/Tắt cấu hình Beacon trên Web Portal (`require_ble_beacon` Switch) | Quản lý vào chi tiết tài sản trên Web Portal, gạt switch On/Off `Yêu cầu Beacon ESP32` | DB cập nhật đúng cờ boolean; Mobile phản hồi chuẩn xác theo cờ (bắt buộc sóng hoặc miễn sóng) | Chưa thực hiện |
 | **TC-BIO-11** | Khóa thư viện ảnh (Chặn dùng ảnh cũ) | Thợ cố tình chọn ảnh chân dung có sẵn từ album | Ứng dụng khóa hoàn toàn Gallery Picker, chỉ mở luồng camera phát trực tiếp | Chưa thực hiện |
 | **TC-BIO-12** | Cổng gác máy chủ Backend 15 phút | Gọi thẳng API cập nhật status sang `IN_PROGRESS` mà không có điểm danh | Server từ chối (`403 Forbidden`) kèm mã lỗi `COMPLIANCE_ATTENDANCE_REQUIRED` | Chưa thực hiện |
 | **TC-BIO-13** | Tuân thủ bảo mật Nghị định 13/2023/NĐ-CP | Kiểm tra trực tiếp cơ sở dữ liệu PostgreSQL | Tuyệt đối không lưu ảnh thô vào SQL, chỉ lưu vector toán học 1 chiều 128 số thực | Chưa thực hiện |
@@ -637,7 +655,6 @@ def verify_start_work_order_gate(work_order, user):
         work_order=work_order,
         technician=user,
         is_face_verified=True,
-        is_location_verified=True,
         gate_type='START_GATE',
         created_at__gte=cutoff
     ).first()
@@ -647,21 +664,34 @@ def verify_start_work_order_gate(work_order, user):
             "success": False,
             "error": {
                 "code": "COMPLIANCE_ATTENDANCE_REQUIRED",
-                "message": "Yêu cầu điểm danh sinh trắc học hợp lệ với ESP32 trong vòng 15 phút trước khi bắt đầu."
+                "message": "Yêu cầu điểm danh sinh trắc học hợp lệ trong vòng 15 phút trước khi bắt đầu."
             }
         }, status=status.HTTP_403_FORBIDDEN)
+
+    # Nếu tài sản yêu cầu Beacon mà không có sóng ESP32 -> Chặn lại
+    if getattr(work_order.asset, 'require_ble_beacon', True) and not valid_log.is_location_verified:
+        return Response({
+            "success": False,
+            "error": {
+                "code": "LOCATION_VERIFICATION_REQUIRED",
+                "message": "Tài sản này yêu cầu xác thực vị trí mỏ neo ESP32 (<= 50m). Vui lòng lại gần thiết bị để điểm danh!"
+            }
+        }, status=status.HTTP_403_FORBIDDEN)
+
     return None
 
 def verify_complete_work_order_gate(work_order, user, ble_verification_data=None):
     """Cổng 2: Kiểm tra sự hiện diện của thợ tại máy trước khi hoàn thành."""
-    if not ble_verification_data:
-        return Response({
-            "success": False,
-            "error": {
-                "code": "PRESENCE_VERIFICATION_REQUIRED",
-                "message": "Yêu cầu xác thực hiện diện tại máy móc (Bắt sóng ESP32 hoặc GPS) để nghiệm thu hoàn thành."
-            }
-        }, status=status.HTTP_403_FORBIDDEN)
+    # Nếu tài sản yêu cầu Beacon, bắt buộc phải có dữ liệu BLE hợp lệ
+    if getattr(work_order.asset, 'require_ble_beacon', True):
+        if not ble_verification_data or not ble_verification_data.get('is_location_verified'):
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "PRESENCE_VERIFICATION_REQUIRED",
+                    "message": "Thiết bị này yêu cầu xác thực hiện diện tại máy móc (Bắt sóng ESP32 <= 50m) để nghiệm thu hoàn thành."
+                }
+            }, status=status.HTTP_403_FORBIDDEN)
     return None
 ```
 
@@ -676,7 +706,7 @@ def verify_complete_work_order_gate(work_order, user, ble_verification_data=None
 - [ ] **Task 11.7.2 — Web Face Enrollment & Deep Learning MobileFaceNet Pipeline**
   - [ ] Xây dựng API đăng ký khuôn mặt trên Web `POST /api/v1/biometric/enroll/`.
   - [ ] Tích hợp mô hình MobileFaceNet trích xuất vector 128 số thực từ ảnh chân dung tải lên.
-  - [ ] Xây dựng module `eam_app/algorithms/biometric/proximity_engine.py` (Log-Distance Path Loss RSSI + Haversine).
+  - [ ] Xây dựng module `eam_app/algorithms/biometric/proximity_engine.py` (Log-Distance Path Loss RSSI 50m).
   - [ ] Xây dựng module `eam_app/algorithms/biometric/cosine_similarity.py` (MobileFaceNet 128-d cosine matcher).
   - [ ] Xây dựng module `eam_app/algorithms/biometric/gatekeeper.py` (Cổng 1 Khóa 15 phút & Cổng 2 Khóa nghiệm thu).
 - [ ] **Task 11.7.3 — Flutter Mobile Client BLE & Edge AI Integration**
