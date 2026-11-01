@@ -148,7 +148,7 @@ class AssetValuationEngine:
                 tenant=tenant,
                 asset=asset,
                 is_capitalized=False
-            ).exclude(status='CANCELLED')
+            ).exclude(status__in=['CANCELLED', 'CANCELED'])
 
             total_opex = Decimal('0')
             for wo in opex_orders:
@@ -261,7 +261,7 @@ class MaintenancePerformanceEngine:
         pm_orders = wo_qs.filter(type='PREVENTIVE')
         total_pm_due = pm_orders.count()
         skipped_overlap = pm_orders.filter(
-            Q(skipped_reason='SKIPPED_DUE_TO_OVERLAP') | Q(status='CANCELLED', resolution_notes__icontains='OVERLAP')
+            Q(skipped_reason='SKIPPED_DUE_TO_OVERLAP') | Q(status__in=['CANCELLED', 'CANCELED'], resolution_notes__icontains='OVERLAP')
         ).count()
 
         # Effective denominator excludes skipped due to overlap
@@ -272,7 +272,7 @@ class MaintenancePerformanceEngine:
 
         for pm in pm_orders:
             # Skip overlap orders from numerator evaluation
-            if pm.skipped_reason == 'SKIPPED_DUE_TO_OVERLAP' or (pm.status == 'CANCELLED' and pm.resolution_notes and 'OVERLAP' in pm.resolution_notes.upper()):
+            if pm.skipped_reason == 'SKIPPED_DUE_TO_OVERLAP' or (pm.status in ('CANCELLED', 'CANCELED') and pm.resolution_notes and 'OVERLAP' in pm.resolution_notes.upper()):
                 continue
 
             target_deadline = pm.due_date or pm.deadline

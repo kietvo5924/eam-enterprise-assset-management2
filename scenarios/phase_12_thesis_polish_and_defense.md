@@ -35,7 +35,7 @@ Phase 12 là tầng "đóng gói vũ khí tối thượng" đưa toàn bộ côn
   4. Task 11.4: Giám sát tình trạng & Phát hiện dị biệt (Z-score & Isolation Forest).
   5. Task 11.5: Dự đoán tuổi thọ còn lại RUL (PyTorch LSTM).
   6. Task 11.6: Dự báo ngân sách bảo trì (Random Forest Regressor).
-  7. Task 11.7: Điểm danh sinh trắc học hiện trường (MobileFaceNet & Haversine).
+  7. Task 11.7: Điểm danh sinh trắc học & Vi định vị hiện trường 50m (MobileFaceNet & ESP32 BLE Beacon).
   8. Task 11.9: Trợ lý AI RAG tra cứu kỹ thuật (Sentence-Transformers & PGVector).
 
 ---
@@ -91,7 +91,7 @@ Toàn bộ công tác đóng gói và chuẩn bị bảo vệ đồ án phải t
 - **Quy Tắc Bắt Buộc**:
   Toàn bộ dữ liệu demo được xâu chuỗi thành kịch bản khép kín:
   $$\text{Rung chấn FEMTO (11.4)} \xrightarrow{\text{Z-score} \ge 3.0} \text{Dự báo RUL 4.2 ngày (11.5)} \xrightarrow{} \text{Sinh Work Order (10.1)} \xrightarrow{} \text{Phân công GA/Hungary (11.1/11.2)}$$
-  $$\xrightarrow{} \text{Lộ trình TSP (11.3)} \xrightarrow{} \text{Điểm danh Face/GPS (11.7)} \xrightarrow{} \text{Trợ lý SOP RAG (11.9)} \xrightarrow{} \text{Đại tu HSM 8 bước (11.8)}$$
+  $$\xrightarrow{} \text{Lộ trình TSP (11.3)} \xrightarrow{} \text{Điểm danh Face/ESP32 (11.7)} \xrightarrow{} \text{Trợ lý SOP RAG (11.9)} \xrightarrow{} \text{Đại tu HSM 8 bước (11.8)}$$
 
 ### Quy Tắc 7: Tự Động Xuất Bảng Đánh Giá Đối Sánh Benchmark Chuẩn Học Thuật (Automated Markdown Evaluation Benchmark Table)
 - **Điểm Yếu Nghiệp Vụ**: Khi giảng viên phản biện hỏi *"Thuật toán GA tốt hơn Hungary ở điểm nào? Sai số RMSE của LSTM là bao nhiêu?"*, người trình bày lúng túng phải mở từng tệp mã nguồn để xem.

@@ -1,3 +1,4 @@
+import 'package:path/path.dart' as p;
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -194,7 +195,7 @@ class WorkOrderService {
         }
         final response = await _dio.get(
           '/api/v1/work-orders',
-          queryParameters: {'page': page, 'size': 100},
+          queryParameters: {'page': page, 'size': 100, 'assignedTo': 'me'},
         );
 
         if (response.statusCode == 200 && response.data['success'] == true) {
@@ -243,13 +244,7 @@ class WorkOrderService {
             for (var wo in safeToUpdateWos) {
               for (var att in wo.attachments) {
                 if (!att.isLocal) {
-                  final apiUri = Uri.parse(ApiConstants.baseUrl);
-                  String imageUrl = att.fileUrl.startsWith('http')
-                      ? att.fileUrl
-                      : 'http://${apiUri.host}:9000${att.fileUrl}';
-                  if (imageUrl.contains('localhost')) {
-                    imageUrl = imageUrl.replaceAll('localhost', apiUri.host);
-                  }
+                  String imageUrl = ApiConstants.resolveAttachmentUrl(att.fileUrl);
                   // Silent download without awaiting so it doesn't block sync
                   // ignore: invalid_return_type_for_catch_error
                   DefaultCacheManager()
@@ -291,12 +286,11 @@ class WorkOrderService {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final myUsername = prefs.getString('username') ?? '';
       final tenantId = prefs.getString('tenantId') ?? '';
 
       final response = await _dio.get(
         '/api/v1/work-orders',
-        queryParameters: {'page': page, 'size': size},
+        queryParameters: {'page': page, 'size': size, 'assignedTo': 'me'},
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
@@ -307,9 +301,7 @@ class WorkOrderService {
         final allWos = content
             .map((json) => WorkOrder.fromJson(json as Map<String, dynamic>))
             .toList();
-        final filteredWos = allWos
-            .where((wo) => wo.assigneeUsername == myUsername)
-            .toList();
+        final filteredWos = allWos;
 
         // Caching is handled by syncWorkOrdersInBackground for full sync
         // But we can also insert these just in case
@@ -354,12 +346,17 @@ class WorkOrderService {
   // Hàm dành riêng cho Mobile (Lọc theo user và bỏ qua CANCELED/COMPLETED)
   Future<List<WorkOrder>> getMobileHomeWorkOrders() async {
     try {
-      // Trigger background sync to chunk all pages into local DB
       syncWorkOrdersInBackground();
-
-      // Since UI uses Stream from Local DB, we just return empty list here
-      // or return the first page directly.
-      // The Stream in WorkOrderProvider will automatically yield the full updated list.
+      final prefs = await SharedPreferences.getInstance();
+      final myUsername = prefs.getString('username') ?? '';
+      final tenantId = prefs.getString('tenantId') ?? '';
+      if (myUsername.isNotEmpty && tenantId.isNotEmpty) {
+        final entities = await AppDatabase.instance.workOrderDao.getMyWorkOrders(myUsername, tenantId);
+        return entities
+            .map((e) => DatabaseMapper.fromWorkOrderEntity(e))
+            .where((wo) => wo.status != 'COMPLETED' && wo.status != 'CANCELLED' && wo.status != 'CANCELED')
+            .toList();
+      }
       return [];
     } catch (e) {
       return [];
@@ -447,6 +444,7 @@ class WorkOrderService {
     String? inputType,
     String? expectedValue,
     bool? isMandatory,
+    String? checklistId,
   ]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -456,6 +454,7 @@ class WorkOrderService {
       if (NetworkService().isOnline) {
         try {
           final payload = <String, dynamic>{
+            if (checklistId != null && checklistId.isNotEmpty) 'id': checklistId,
             'itemName': itemName,
             'isCompleted': isCompleted,
             if (actualValue != null) 'actualValue': actualValue,
@@ -482,6 +481,7 @@ class WorkOrderService {
       } else {
         final payload = jsonEncode({
           'woId': woId,
+          if (checklistId != null && checklistId.isNotEmpty) 'id': checklistId,
           'itemName': itemName,
           'isCompleted': isCompleted,
           if (actualValue != null) 'actualValue': actualValue,
@@ -489,50 +489,96 @@ class WorkOrderService {
           if (expectedValue != null) 'expectedValue': expectedValue,
           if (isMandatory != null) 'isMandatory': isMandatory,
         });
-        await AppDatabase.instance.syncQueueDao.addSyncTask(
-          SyncQueuesCompanion.insert(
-            actionType: 'UPDATE_CHECKLIST',
-            payload: payload,
-            tenantId: tenantId,
-            idempotencyKey: drift.Value(const Uuid().v4()),
-          ),
-        );
-        final wo = await AppDatabase.instance.workOrderDao.getWorkOrderById(
-          woId,
-        );
-        if (wo != null) {
-          List<dynamic> checklists = List.from(wo.checklists);
-          bool found = false;
-          for (var i = 0; i < checklists.length; i++) {
-            var item = checklists[i];
-            if (item['itemName'] == itemName) {
-              item = Map<String, dynamic>.from(item);
-              item['completed'] = isCompleted;
-              if (actualValue != null) item['actualValue'] = actualValue;
-              if (inputType != null) item['inputType'] = inputType;
-              if (expectedValue != null) item['expectedValue'] = expectedValue;
-              if (isMandatory != null) item['isMandatory'] = isMandatory;
-              checklists[i] = item;
-              found = true;
-              break;
-            }
+        await AppDatabase.instance.transaction(() async {
+          final existingTasks = await (AppDatabase.instance.select(AppDatabase.instance.syncQueues)
+            ..where((t) => t.actionType.equals('UPDATE_CHECKLIST') & t.tenantId.equals(tenantId))).get();
+          SyncQueueEntity? matchingTask;
+          for (final t in existingTasks) {
+            try {
+              // Chỉ gộp task ở trạng thái PENDING hoặc FAILED; không thay đổi payload của task IN_PROGRESS
+              if (t.status != 'PENDING' && t.status != 'FAILED') continue;
+
+              final p = jsonDecode(t.payload) as Map<String, dynamic>;
+              final sameWo = p['woId'] == woId;
+              if (!sameWo) continue;
+
+              final bool hasId = checklistId != null && checklistId.isNotEmpty;
+              final bool taskHasId = p['id'] != null && (p['id'] as String).isNotEmpty;
+              final bool isSameItem;
+              if (hasId) {
+                // Bắt buộc so khớp ID chính xác khi có checklistId, chống gộp nhầm 2 checklist trùng tên
+                isSameItem = taskHasId && p['id'] == checklistId;
+              } else {
+                isSameItem = !taskHasId && p['itemName'] == itemName;
+              }
+
+              if (isSameItem) {
+                matchingTask = t;
+                break;
+              }
+            } catch (_) {}
           }
-          if (!found) {
-            checklists.add({
-              'itemName': itemName,
-              'completed': isCompleted,
-              if (actualValue != null) 'actualValue': actualValue,
-              if (inputType != null) 'inputType': inputType,
-              if (expectedValue != null) 'expectedValue': expectedValue,
-              if (isMandatory != null) 'isMandatory': isMandatory,
-            });
+
+          if (matchingTask != null) {
+            final existingKey = matchingTask.idempotencyKey;
+            await AppDatabase.instance.syncQueueDao.updateSyncTask(
+              matchingTask.copyWith(
+                payload: payload,
+                status: 'PENDING',
+                retryCount: 0,
+                idempotencyKey: (existingKey != null && existingKey.isNotEmpty)
+                    ? drift.Value(existingKey)
+                    : drift.Value(const Uuid().v4()),
+              ),
+            );
+          } else {
+            await AppDatabase.instance.syncQueueDao.addSyncTask(
+              SyncQueuesCompanion.insert(
+                actionType: 'UPDATE_CHECKLIST',
+                payload: payload,
+                tenantId: tenantId,
+                idempotencyKey: drift.Value(const Uuid().v4()),
+              ),
+            );
           }
-          await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
-            wo.copyWith(checklists: checklists),
+          final wo = await AppDatabase.instance.workOrderDao.getWorkOrderById(
+            woId,
           );
-          return true;
-        }
-        return false;
+          if (wo != null) {
+            List<dynamic> checklists = List.from(wo.checklists);
+            bool found = false;
+            for (var i = 0; i < checklists.length; i++) {
+              var item = checklists[i];
+              final bool matchesId = checklistId != null && checklistId.isNotEmpty && item['id'] == checklistId;
+              final bool matchesName = (checklistId == null || checklistId.isEmpty) && item['itemName'] == itemName;
+              if (matchesId || matchesName) {
+                item = Map<String, dynamic>.from(item);
+                item['completed'] = isCompleted;
+                if (actualValue != null) item['actualValue'] = actualValue;
+                if (inputType != null) item['inputType'] = inputType;
+                if (expectedValue != null) item['expectedValue'] = expectedValue;
+                if (isMandatory != null) item['isMandatory'] = isMandatory;
+                checklists[i] = item;
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              checklists.add({
+                'itemName': itemName,
+                'completed': isCompleted,
+                if (actualValue != null) 'actualValue': actualValue,
+                if (inputType != null) 'inputType': inputType,
+                if (expectedValue != null) 'expectedValue': expectedValue,
+                if (isMandatory != null) 'isMandatory': isMandatory,
+              });
+            }
+            await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
+              wo.copyWith(checklists: checklists),
+            );
+          }
+        });
+        return true;
       }
     } catch (e) {
       return false;
@@ -560,14 +606,24 @@ class WorkOrderService {
             final woEntity = await AppDatabase.instance.workOrderDao.getWorkOrderById(woId);
             if (woEntity != null && attData != null) {
               List<dynamic> attachments = List.from(woEntity.attachments);
-              attachments.add({
-                'id': attData['id'],
-                'fileUrl': attData['fileUrl'] ?? attData['file_url'],
+              final attId = attData['id'];
+              final fileUrl = attData['fileUrl'] ?? attData['file_url'];
+              final existingIndex = attachments.indexWhere((a) =>
+                  (attId != null && a['id'] == attId) ||
+                  (fileUrl != null && a['fileUrl'] == fileUrl));
+              final itemMap = {
+                'id': attId,
+                'fileUrl': fileUrl,
                 'fileName': attData['fileName'] ?? attData['file_name'],
                 'fileType': attData['fileType'] ?? attData['file_type'],
                 'fileSize': attData['fileSize'] ?? attData['file_size'],
                 'isLocal': false,
-              });
+              };
+              if (existingIndex >= 0) {
+                attachments[existingIndex] = itemMap;
+              } else {
+                attachments.add(itemMap);
+              }
               await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
                 woEntity.copyWith(attachments: attachments),
               );
@@ -586,7 +642,7 @@ class WorkOrderService {
       } else {
         // Safe File Caching
         final appDir = await getApplicationDocumentsDirectory();
-        final fileName = '${const Uuid().v4()}_${filePath.split('/').last}';
+        final fileName = '${const Uuid().v4()}_${p.basename(filePath)}';
         final localFile = File(filePath);
         final savedImage = await localFile.copy('${appDir.path}/$fileName');
         final safePath = savedImage.path;
@@ -606,14 +662,18 @@ class WorkOrderService {
         );
         if (wo != null) {
           List<dynamic> attachments = List.from(wo.attachments);
-          attachments.add({
-            'fileUrl': safePath,
-            'fileName': fileName,
-            'isLocal': true,
-          });
-          await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
-            wo.copyWith(attachments: attachments),
-          );
+          final existingLocalIndex =
+              attachments.indexWhere((a) => a['fileUrl'] == safePath);
+          if (existingLocalIndex < 0) {
+            attachments.add({
+              'fileUrl': safePath,
+              'fileName': fileName,
+              'isLocal': true,
+            });
+            await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
+              wo.copyWith(attachments: attachments),
+            );
+          }
           return true;
         }
         return false;
@@ -795,24 +855,53 @@ class WorkOrderService {
         return true;
       } else {
         final payload = jsonEncode({'woId': woId, 'notes': notes});
-        await AppDatabase.instance.syncQueueDao.addSyncTask(
-          SyncQueuesCompanion.insert(
-            actionType: 'UPDATE_NOTES',
-            payload: payload,
-            tenantId: tenantId,
-            idempotencyKey: drift.Value(const Uuid().v4()),
-          ),
-        );
-        final wo = await AppDatabase.instance.workOrderDao.getWorkOrderById(
-          woId,
-        );
-        if (wo != null) {
-          await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
-            wo.copyWith(resolutionNotes: drift.Value(notes)),
+        await AppDatabase.instance.transaction(() async {
+          final existingNotesTasks = await (AppDatabase.instance.select(AppDatabase.instance.syncQueues)
+            ..where((t) => t.actionType.equals('UPDATE_NOTES') & t.tenantId.equals(tenantId))).get();
+          SyncQueueEntity? matchingNotesTask;
+          for (final t in existingNotesTasks) {
+            try {
+              if (t.status != 'PENDING' && t.status != 'FAILED') continue;
+              final p = jsonDecode(t.payload) as Map<String, dynamic>;
+              if (p['woId'] == woId) {
+                matchingNotesTask = t;
+                break;
+              }
+            } catch (_) {}
+          }
+
+          if (matchingNotesTask != null) {
+            final existingKey = matchingNotesTask.idempotencyKey;
+            await AppDatabase.instance.syncQueueDao.updateSyncTask(
+              matchingNotesTask.copyWith(
+                payload: payload,
+                status: 'PENDING',
+                retryCount: 0,
+                idempotencyKey: (existingKey != null && existingKey.isNotEmpty)
+                    ? drift.Value(existingKey)
+                    : drift.Value(const Uuid().v4()),
+              ),
+            );
+          } else {
+            await AppDatabase.instance.syncQueueDao.addSyncTask(
+              SyncQueuesCompanion.insert(
+                actionType: 'UPDATE_NOTES',
+                payload: payload,
+                tenantId: tenantId,
+                idempotencyKey: drift.Value(const Uuid().v4()),
+              ),
+            );
+          }
+          final wo = await AppDatabase.instance.workOrderDao.getWorkOrderById(
+            woId,
           );
-          return true;
-        }
-        return false;
+          if (wo != null) {
+            await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(
+              wo.copyWith(resolutionNotes: drift.Value(notes)),
+            );
+          }
+        });
+        return true;
       }
     } catch (e) {
       return false;

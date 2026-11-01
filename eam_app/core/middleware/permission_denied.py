@@ -52,6 +52,8 @@ class PermissionDeniedMiddleware(MiddlewareMixin):
             'reports:export': 'Xuất báo cáo doanh nghiệp (Export Enterprise Reports)',
             'system:admin': 'Quản trị viên toàn hệ thống (Super Admin)',
             'asset_category:read': 'Cấu hình phân loại tài sản (Asset Config)',
+            'workforce:read': 'Quản lý lực lượng & công cụ (Workforce & Specialized Tools)',
+            'cost_forecast:read': 'Dự báo chi phí & ngân sách (Cost Forecasting & Budgeting)',
         }
 
         context = {

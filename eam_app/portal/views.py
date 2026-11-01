@@ -31,13 +31,6 @@ def portal_login(request):
     if request.user.is_authenticated:
         return redirect('portal_dashboard')
 
-    if request.method == 'GET' and request.GET.get('auto_login') == 'vf':
-        from users.models import User
-        user = User.all_objects.filter(email__iexact='admin_vf@vinfast.vn').first()
-        if user:
-            login(request, user)
-            return redirect('portal_cost_forecasting')
-        
     if request.method == 'POST':
         u = request.POST.get('username')
         p = request.POST.get('password')
@@ -61,7 +54,7 @@ def portal_login(request):
             return resp
         else:
             messages.error(request, 'Invalid username or password')
-            
+
     return render(request, 'login.html')
 
 def portal_logout(request):
@@ -76,7 +69,7 @@ def portal_logout(request):
 def portal_dashboard(request):
     from analytics.services import DashboardCacheService
     import json
-    
+
     tenant = getattr(request.user, 'tenant', None)
     if tenant:
         summary_data = DashboardCacheService.get_summary(tenant)
@@ -134,8 +127,8 @@ def portal_tenants(request):
     from core.models import Tenant
     import json
     from django.http import JsonResponse, HttpResponseForbidden
-    
-    
+
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -148,7 +141,7 @@ def portal_tenants(request):
             return JsonResponse({'success': True, 'id': str(t.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         try:
             data = json.loads(request.body)
@@ -161,7 +154,7 @@ def portal_tenants(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         try:
             data = json.loads(request.body)
@@ -173,7 +166,7 @@ def portal_tenants(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     tenants = Tenant.objects.all().order_by('-created_at')
     return render(request, 'tenants.html', {'tenants': tenants})
 
@@ -185,13 +178,13 @@ def portal_tenant_admins(request):
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     from django.contrib.auth.hashers import make_password
-    
-        
+
+
     if request.method == 'GET':
         tenant_id = request.GET.get('tenant_id')
         if not tenant_id:
             return JsonResponse({'success': False, 'error': 'tenant_id is required'}, status=400)
-            
+
         admins = User.all_objects.filter(tenant_id=tenant_id, roles__name='TENANT_ADMIN').distinct()
         data = []
         for a in admins:
@@ -202,19 +195,19 @@ def portal_tenant_admins(request):
                 'created_at': a.created_at.isoformat() if a.created_at else None
             })
         return JsonResponse({'success': True, 'data': data})
-        
+
     elif request.method == 'POST':
         try:
             data = json.loads(request.body)
             tenant_id = data.get('tenant_id')
             username = data.get('username')
             password = data.get('password')
-            
+
             if User.all_objects.filter(tenant_id=tenant_id, username=username).exists():
                 return JsonResponse({'success': False, 'error': 'Username already exists in this tenant'}, status=400)
-                
+
             tenant = Tenant.objects.get(id=tenant_id)
-            
+
             admin_role, created = Role.all_objects.get_or_create(
                 tenant_id=tenant_id,
                 name='TENANT_ADMIN',
@@ -223,11 +216,11 @@ def portal_tenant_admins(request):
                     'is_system': True
                 }
             )
-            
+
             if created:
                 perms = Permission.objects.exclude(id='system:admin')
                 admin_role.permissions.set(perms)
-                
+
             u = User.all_objects.create(
                 tenant_id=tenant_id,
                 username=username,
@@ -236,33 +229,34 @@ def portal_tenant_admins(request):
                 status='ACTIVE'
             )
             u.roles.add(admin_role)
-            
+
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         try:
             data = json.loads(request.body)
             admin_id = data.get('id')
             u = User.all_objects.get(id=admin_id)
-            
+
             if data.get('status'):
                 if str(u.id) == '00000000-0000-0000-0000-000000000000':
                     return JsonResponse({'success': False, 'error': 'Cannot modify the Super Admin'}, status=400)
                 u.status = data.get('status')
-            
+
             if data.get('username'):
                 u.username = data.get('username')
                 u.email = data.get('username')
-                
+
             if data.get('password'):
                 u.password = make_password(data.get('password'))
-                
+
             u.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
 
 @login_required(login_url='portal_login')
 @permission_required('tenant:read')
@@ -271,25 +265,25 @@ def portal_settings(request):
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     from users.permissions import HasPermission
-    
+
     tenant = request.user.tenant
-    
+
     if request.method == 'POST':
         checker = HasPermission('tenant:update')()
         if not checker.has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied: tenant:update required'}, status=403)
-            
+
         try:
             data = json.loads(request.body)
             tenant.name = data.get('name', tenant.name)
             raw_logo = data.get('logoUrl', data.get('logo_url', tenant.logo_url))
             tenant.logo_url = str(raw_logo).strip() if raw_logo and str(raw_logo).strip() else None
             tenant.timezone = data.get('timezone', tenant.timezone)
-            
+
             # Theme color
             if 'themeColor' in data or 'theme_color' in data:
                 tenant.theme_color = data.get('themeColor', data.get('theme_color', tenant.theme_color))
-            
+
             # AI algorithm toggles
             if 'enableTspRouting' in data or 'enable_tsp_routing' in data:
                 tenant.enable_tsp_routing = bool(data.get('enableTspRouting', data.get('enable_tsp_routing', tenant.enable_tsp_routing)))
@@ -308,9 +302,9 @@ def portal_settings(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     # GET method
-        
+
     return render(request, 'settings.html', {'tenant': tenant})
 
 
@@ -319,20 +313,20 @@ def portal_change_password(request):
     import json
     from django.http import JsonResponse
     from django.contrib.auth import update_session_auth_hash
-    
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             old_password = data.get('oldPassword')
             new_password = data.get('newPassword')
-            
+
             if not request.user.check_password(old_password):
                 return JsonResponse({'success': False, 'error': 'Invalid current password'}, status=400)
-                
+
             request.user.set_password(new_password)
             request.user.save()
             update_session_auth_hash(request, request.user) # Keep user logged in
-            
+
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -342,44 +336,59 @@ def portal_forgot_password(request):
     import json
     import random
     import datetime
+    import logging
     from django.utils import timezone
     from django.http import JsonResponse
     from users.models import User
     from django.core.mail import send_mail
     from django.conf import settings
-    
+    logger = logging.getLogger(__name__)
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             email = (data.get('email') or '').strip()
+            if not email:
+                return JsonResponse({'success': False, 'error': 'Vui lòng nhập địa chỉ email hợp lệ.'}, status=400)
+
             user = User.all_objects.filter(email__iexact=email).first()
             if not user:
-                return JsonResponse({'success': False, 'error': f"User with email '{email}' not found."}, status=404)
-            
+                # Neutral response to prevent account enumeration
+                return JsonResponse({'success': True, 'message': 'Nếu email tồn tại trong hệ thống, mã xác nhận đã được gửi đi.'})
+
             # Generate random 6-digit code
             code = f"{random.randint(100000, 999999):06d}"
             user.reset_token = code
             user.reset_token_expiry = timezone.now() + datetime.timedelta(minutes=15)
             user.save(update_fields=['reset_token', 'reset_token_expiry'])
-            
+
             # Attempt to send real email via SMTP
-            send_mail(
-                subject="[EAM System] Password Reset Code",
-                message=(
-                    f"Hello {user.username},\n\n"
-                    f"You requested a password reset for your EAM account.\n"
-                    f"Your 6-digit verification code is: {code}\n\n"
-                    f"This code will expire in 15 minutes.\n"
-                    f"If you did not request this, please ignore this email.\n\n"
-                    f"Best regards,\nEAM Technical Team"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL or 'noreply@eam.local',
-                recipient_list=[email],
-                fail_silently=False,
-            )
+            try:
+                send_mail(
+                    subject="[EAM System] Password Reset Code",
+                    message=(
+                        f"Hello {user.username},\n\n"
+                        f"You requested a password reset for your EAM account.\n"
+                        f"Your 6-digit verification code is: {code}\n\n"
+                        f"This code will expire in 15 minutes.\n"
+                        f"If you did not request this, please ignore this email.\n\n"
+                        f"Best regards,\nEAM Technical Team"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL or 'noreply@eam.local',
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+            except Exception as mail_err:
+                logger.error(f"Failed to send password reset email: {mail_err}")
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Không thể gửi email xác nhận vào lúc này. Vui lòng thử lại sau hoặc liên hệ quản trị viên.'
+                }, status=500)
+
             return JsonResponse({'success': True})
         except Exception as e:
-            return JsonResponse({'success': False, 'error': f"SMTP Error: {str(e)}"}, status=500)
+            logger.error(f"Forgot password processing error: {e}")
+            return JsonResponse({'success': False, 'error': 'Yêu cầu không hợp lệ. Vui lòng thử lại.'}, status=400)
     return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
 
 def portal_reset_password(request):
@@ -387,34 +396,34 @@ def portal_reset_password(request):
     from django.utils import timezone
     from django.http import JsonResponse
     from users.models import User
-    
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             code = str(data.get('code') or '').strip()
             new_password = data.get('newPassword')
-            
+
             if not code or len(code) != 6:
                 return JsonResponse({'success': False, 'error': 'Please enter a valid 6-digit code.'}, status=400)
             if not new_password or len(new_password) < 6:
                 return JsonResponse({'success': False, 'error': 'New password must be at least 6 characters long.'}, status=400)
-                
-            email = (data.get('email') or '').strip().lower()
-            if email:
-                user = User.all_objects.filter(email=email, reset_token=code).first()
-            else:
-                user = User.all_objects.filter(reset_token=code).first()
+
+            email = (data.get('email') or '').strip()
+            if not email:
+                return JsonResponse({'success': False, 'error': 'Vui lòng cung cấp địa chỉ email.'}, status=400)
+
+            user = User.all_objects.filter(email__iexact=email, reset_token=code).first()
             if not user:
                 return JsonResponse({'success': False, 'error': 'Invalid or incorrect reset code.'}, status=400)
-                
+
             if user.reset_token_expiry and user.reset_token_expiry < timezone.now():
                 return JsonResponse({'success': False, 'error': 'Reset code has expired (15 minutes). Please request a new one.'}, status=400)
-                
+
             user.set_password(new_password)
             user.reset_token = None
             user.reset_token_expiry = None
             user.save(update_fields=['password', 'reset_token', 'reset_token_expiry'])
-            
+
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -438,20 +447,20 @@ def portal_users(request):
     from users.permissions import HasPermission
     import json
     from django.http import JsonResponse, HttpResponseForbidden
-    
+
     tenant_id = request.session.get('tenant_id') or getattr(request.user, 'tenant_id', None)
-    
+
     if request.method == 'POST':
         if not HasPermission('user:create')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-            
+
         action = request.GET.get('action')
         if action == 'import':
             file = request.FILES.get('file')
             if not file:
                 return JsonResponse({'success': False, 'error': 'No file uploaded'}, status=400)
             return JsonResponse({'success': True, 'data': {'successCount': 0, 'failureCount': 1, 'errors': ['Import functionality is not fully implemented in this demo']}})
-        
+
         try:
             data = json.loads(request.body)
             if action == 'invite':
@@ -484,7 +493,7 @@ def portal_users(request):
             email = data.get('email')
             if email and User.all_objects.filter(tenant_id=tenant_id, email=email).exists():
                 return JsonResponse({'success': False, 'error': 'Email already exists in this organization'}, status=400)
-                
+
             u = User.all_objects.create(
                 username=username,
                 email=email,
@@ -494,7 +503,7 @@ def portal_users(request):
             if data.get('password'):
                 u.set_password(data.get('password'))
                 u.save()
-                
+
             role_ids = data.get('roles', [])
             roles = []
             if role_ids:
@@ -516,7 +525,7 @@ def portal_users(request):
                 from assets.models import Location
                 from datetime import timedelta
                 from django.utils import timezone
-                
+
                 tech_data = tech_payload or {}
                 shift_code = tech_data.get('shift_code', 'SHIFT_1')
                 now = timezone.now()
@@ -560,15 +569,15 @@ def portal_users(request):
                         'availability_status': 'AVAILABLE'
                     }
                 )
-                
+
             return JsonResponse({'success': True, 'id': str(u.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not HasPermission('user:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
-            
+
         action = request.GET.get('action')
         try:
             if action in ['disable', 'enable']:
@@ -583,23 +592,23 @@ def portal_users(request):
                 u.status = 'INACTIVE' if action == 'disable' else 'ACTIVE'
                 u.save()
                 return JsonResponse({'success': True})
-                
+
             data = json.loads(request.body)
             u = User.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            
+
             new_username = data.get('username')
             if new_username != u.username and User.objects.filter(username=new_username).exists():
                 return JsonResponse({'success': False, 'error': 'Username already exists'}, status=400)
-                
+
             u.username = new_username
             u.email = data.get('email')
             if 'status' in data:
                 u.status = data.get('status')
-            
+
             if data.get('password'):
                 u.set_password(data.get('password'))
             u.save()
-            
+
             role_ids = data.get('roles', [])
             roles = []
             if role_ids:
@@ -621,7 +630,7 @@ def portal_users(request):
                 from assets.models import Location
                 from datetime import timedelta
                 from django.utils import timezone
-                
+
                 tech_data = tech_payload or {}
                 shift_code = tech_data.get('shift_code', 'SHIFT_1')
                 now = timezone.now()
@@ -665,11 +674,11 @@ def portal_users(request):
                         'availability_status': 'AVAILABLE'
                     }
                 )
-            
+
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not HasPermission('user:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -692,13 +701,13 @@ def portal_users(request):
         users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').select_related('tenant', 'technician_profile').prefetch_related('roles__permissions').order_by('-created_at')
     else:
         users = User.objects.filter(tenant_id=tenant_id).select_related('tenant', 'technician_profile').prefetch_related('roles__permissions').order_by('-created_at')
-    
+
     # Calculate metrics
     total_users = users.count()
     active_users = users.filter(status='ACTIVE').count()
     blocked_users = users.filter(status='INACTIVE').count()
     pending_users = users.filter(status='PENDING').count()
-    
+
     # Ensure standard TENANT_ADMIN role exists for tenant
     from users.models import Permission
     ta_role, created = Role.all_objects.get_or_create(
@@ -714,7 +723,7 @@ def portal_users(request):
     if not is_super:
         roles = roles.exclude(name='SUPER_ADMIN')
     roles = roles.order_by('-is_system', 'name')
-    
+
     # RBAC: Compute permission map and user profile data for frontend
     roles_can_execute_map = {}
     for r in roles:
@@ -779,10 +788,12 @@ def portal_users(request):
     shift_templates = list(ShiftTemplate.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'start_time', 'end_time', 'is_overnight'))
 
     return render(request, 'users.html', {
-        'users': users, 
+        'users': users,
         'roles': roles,
-        'roles_can_execute_json': json.dumps(roles_can_execute_map),
-        'user_profiles_json': json.dumps(user_profiles_dict),
+        'roles_can_execute_map': roles_can_execute_map,
+        'user_profiles_dict': user_profiles_dict,
+        'roles_can_execute_json': json.dumps(roles_can_execute_map).replace('<', '\\u003c').replace('>', '\\u003e'),
+        'user_profiles_json': json.dumps(user_profiles_dict).replace('<', '\\u003c').replace('>', '\\u003e'),
         'available_zones': available_zones,
         'locations_list': locations_list,
         'locations_json': json.dumps(locations_list, default=str),
@@ -804,63 +815,63 @@ def portal_roles(request):
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     from users.permissions import HasPermission
-    
+
     tenant_id = request.user.tenant_id
-    
+
     if request.method == 'POST':
         if not HasPermission('role:create')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             name = data.get('name')
-            
+
             if Role.objects.filter(name=name, tenant_id=tenant_id).exists():
                 return JsonResponse({'success': False, 'error': f'Role with name {name} already exists in this tenant'}, status=400)
-                
+
             r = Role.objects.create(
                 name=name,
                 description=data.get('description'),
                 is_system=False,
                 tenant_id=tenant_id
             )
-            
+
             perm_ids = data.get('permissions', [])
             if perm_ids:
                 perms = Permission.objects.filter(id__in=perm_ids)
                 r.permissions.set(perms)
-                
+
             return JsonResponse({'success': True, 'id': str(r.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not HasPermission('role:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             r = Role.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            
+
             if r.is_system:
                 return JsonResponse({'success': False, 'error': 'Cannot edit system roles'}, status=400)
-                
+
             new_name = data.get('name')
             if new_name != r.name and Role.objects.filter(name=new_name, tenant_id=tenant_id).exists():
                 return JsonResponse({'success': False, 'error': 'Role name already exists'}, status=400)
-                
+
             r.name = new_name
             r.description = data.get('description')
             r.save()
-            
+
             perm_ids = data.get('permissions', [])
             perms = Permission.objects.filter(id__in=perm_ids)
             r.permissions.set(perms)
-            
+
             return JsonResponse({'success': True})
         except Role.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Role not found in this tenant'}, status=400)
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not HasPermission('role:delete')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -870,14 +881,14 @@ def portal_roles(request):
             r = Role.objects.get(id=data.get('id'), tenant_id=tenant_id)
             if r.is_system:
                 return JsonResponse({'success': False, 'error': 'Cannot delete system roles'}, status=400)
-                
+
             fallback_role_id = data.get('fallbackRoleId')
             users_with_role = User.objects.filter(roles=r, tenant_id=tenant_id)
-            
+
             if users_with_role.exists():
                 if not fallback_role_id:
                     return JsonResponse({'success': False, 'error': 'ROLE_HAS_USERS'}, status=400)
-                
+
                 try:
                     fallback_role = Role.objects.get(id=fallback_role_id, tenant_id=tenant_id)
                     for user in users_with_role:
@@ -885,7 +896,7 @@ def portal_roles(request):
                         user.roles.add(fallback_role)
                 except Role.DoesNotExist:
                     return JsonResponse({'success': False, 'error': 'Fallback role not found in this tenant'}, status=400)
-                    
+
             r.delete()
             return JsonResponse({'success': True})
         except Role.DoesNotExist:
@@ -907,7 +918,7 @@ def portal_roles(request):
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
     if not is_super:
         roles = roles.exclude(name='SUPER_ADMIN')
-    
+
     roles = roles.order_by('-is_system', 'name')
     permissions = Permission.objects.exclude(id='system:admin').order_by('name')
     return render(request, 'roles.html', {'roles': roles, 'permissions': permissions})
@@ -919,19 +930,19 @@ def portal_asset_categories(request):
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     from users.permissions import HasPermission
-    
+
     tenant_id = request.user.tenant_id
-    
+
     if request.method == 'POST':
         if not HasPermission('asset_category:create')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             name = data.get('name')
-            
+
             if AssetCategory.objects.filter(tenant_id=tenant_id, name=name).exists():
                 return JsonResponse({'success': False, 'error': 'Category name already exists in this tenant'}, status=400)
-                
+
             c = AssetCategory.objects.create(
                 tenant_id=tenant_id,
                 name=name,
@@ -941,7 +952,7 @@ def portal_asset_categories(request):
             return JsonResponse({'success': True, 'id': str(c.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not HasPermission('asset_category:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -949,10 +960,10 @@ def portal_asset_categories(request):
             data = json.loads(request.body)
             c = AssetCategory.objects.get(id=data.get('id'), tenant_id=tenant_id)
             new_name = data.get('name')
-            
+
             if new_name != c.name and AssetCategory.objects.filter(tenant_id=tenant_id, name=new_name).exists():
                 return JsonResponse({'success': False, 'error': 'Category name already exists in this tenant'}, status=400)
-                
+
             c.name = new_name
             c.description = data.get('description')
             c.is_active = data.get('is_active', True)
@@ -960,7 +971,7 @@ def portal_asset_categories(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not HasPermission('asset_category:delete')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1027,13 +1038,13 @@ def portal_asset_categories(request):
     from workorders.models import WorkOrder
     from django.utils import timezone
     today = timezone.now().date()
-    
+
     today_scheds = TechnicianSchedule.objects.filter(
         tenant_id=tenant_id,
         work_date=today,
         status='ON_DUTY'
     ).select_related('user', 'shift_template')
-    
+
     techs_list = []
     for s in today_scheds:
         tp = getattr(s.user, 'technician_profile', None)
@@ -1144,9 +1155,9 @@ def portal_hierarchy_templates(request):
     import json
     from django.http import JsonResponse
     from users.permissions import HasPermission
-    
+
     tenant_id = request.user.tenant_id
-    
+
 
     if request.method == 'POST':
         if not HasPermission('asset_category:create')().has_permission(request, None):
@@ -1156,7 +1167,7 @@ def portal_hierarchy_templates(request):
             name = data.get('name')
             if HierarchyTemplate.objects.filter(tenant_id=tenant_id, name=name).exists():
                 return JsonResponse({'success': False, 'error': 'Hierarchy template name already exists in this tenant'}, status=400)
-            
+
             t = HierarchyTemplate.objects.create(
                 tenant_id=tenant_id,
                 name=name,
@@ -1167,7 +1178,7 @@ def portal_hierarchy_templates(request):
             return JsonResponse({'success': True, 'id': str(t.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not HasPermission('asset_category:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1177,7 +1188,7 @@ def portal_hierarchy_templates(request):
             name = data.get('name')
             if name != t.name and HierarchyTemplate.objects.filter(tenant_id=tenant_id, name=name).exists():
                 return JsonResponse({'success': False, 'error': 'Hierarchy template name already exists in this tenant'}, status=400)
-                
+
             t.name = name
             if 'description' in data:
                 t.description = data.get('description')
@@ -1189,7 +1200,7 @@ def portal_hierarchy_templates(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not HasPermission('asset_category:delete')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1216,9 +1227,9 @@ def portal_locations(request):
     import json
     from django.http import JsonResponse, HttpResponseForbidden
     from users.permissions import HasPermission
-    
+
     tenant_id = request.user.tenant_id
-    
+
 
     action = request.GET.get('action')
     if request.method == 'POST' and action == 'place_asset':
@@ -1229,12 +1240,12 @@ def portal_locations(request):
             cx = float(data.get('coords_x') or 0.0)
             cy = float(data.get('coords_y') or 0.0)
             fl = int(data.get('floor_level') or 1)
-            
+
             from assets.models import Asset
             asset_obj = Asset.objects.filter(id=asset_id, tenant_id=tenant_id).first()
             if not asset_obj:
                 return JsonResponse({'success': False, 'error': 'Asset not found'}, status=404)
-            
+
             if loc_id:
                 loc = Location.objects.filter(id=loc_id, tenant_id=tenant_id).first()
                 if loc:
@@ -1243,7 +1254,7 @@ def portal_locations(request):
             else:
                 asset_obj.location = None
                 asset_obj.zone_id = ''
-                
+
             asset_obj.coords_x = cx
             asset_obj.coords_y = cy
             asset_obj.floor_level = fl
@@ -1303,10 +1314,10 @@ def portal_locations(request):
                     return JsonResponse({'success': False, 'error': 'Mặt Bằng được chọn không tồn tại hoặc đã bị khóa.'}, status=400)
                 code = code or ('LOC-' + str(uuid.uuid4())[:6].upper())
                 description_to_save = data.get('description')
-            
+
             if Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exists():
                 return JsonResponse({'success': False, 'error': 'Tên này đã tồn tại trong cùng cấp phân nhóm.'}, status=400)
-            
+
             l = Location.objects.create(
                 tenant_id=tenant_id,
                 name=name,
@@ -1323,7 +1334,7 @@ def portal_locations(request):
             return JsonResponse({'success': True, 'id': str(l.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not HasPermission('asset_category:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1337,10 +1348,10 @@ def portal_locations(request):
             if zone_type != 'FLOORPLAN' and l.zone_type != 'FLOORPLAN':
                 if not parent_id:
                     return JsonResponse({'success': False, 'error': 'Khu vực bắt buộc phải trực thuộc một Mặt Bằng.'}, status=400)
-            
+
             if (name != l.name or parent_id != l.parent_id) and Location.objects.filter(tenant_id=tenant_id, name=name, parent_id=parent_id).exclude(id=l.id).exists():
                 return JsonResponse({'success': False, 'error': 'Tên này đã tồn tại trong cùng cấp phân nhóm.'}, status=400)
-                
+
             l.name = name
             if (zone_type == 'FLOORPLAN' or l.zone_type == 'FLOORPLAN') and any(k in data for k in ('width_m', 'height_m', 'building_shape', 'polygon_points', 'spatials')):
                 try:
@@ -1377,7 +1388,7 @@ def portal_locations(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not HasPermission('asset_category:delete')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1413,9 +1424,9 @@ def portal_asset_registry(request):
     import uuid
     from django.http import JsonResponse, HttpResponseForbidden
     from users.permissions import HasPermission
-    
+
     tenant_id = request.user.tenant_id
-    
+
     if request.method == 'POST':
         if not HasPermission('asset:create')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1456,14 +1467,14 @@ def portal_asset_registry(request):
             return JsonResponse({'success': True, 'id': str(a.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not HasPermission('asset:update')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
             data = json.loads(request.body)
             a = Asset.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            
+
             if 'name' in data: a.name = data.get('name')
             if 'model' in data: a.model = data.get('model')
             if 'serial_number' in data: a.serial_number = data.get('serial_number')
@@ -1471,11 +1482,11 @@ def portal_asset_registry(request):
             if 'status' in data: a.status = data.get('status')
             if 'asset_type' in data or 'assetType' in data:
                 a.asset_type = data.get('asset_type') or data.get('assetType') or 'MACHINERY'
-            
+
             if 'category_id' in data:
                 category_id = data.get('category_id')
                 a.category_id = category_id if category_id else None
-            
+
             if 'location_id' in data:
                 location_id = data.get('location_id')
                 a.location_id = location_id if location_id else None
@@ -1487,7 +1498,7 @@ def portal_asset_registry(request):
             if 'hierarchy_template_id' in data:
                 template_id = data.get('hierarchy_template_id')
                 a.hierarchy_template_id = template_id if template_id else None
-                
+
             if 'parent_id' in data:
                 a.parent_id = data.get('parent_id') or None
             if 'manufacturer' in data:
@@ -1512,12 +1523,12 @@ def portal_asset_registry(request):
                 a.floor_level = int(data.get('floor_level') or 1)
             if 'zone_id' in data and data.get('zone_id') is not None:
                 a.zone_id = str(data.get('zone_id') or '')
-                
+
             a.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not HasPermission('asset:delete')().has_permission(request, None):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -1534,7 +1545,7 @@ def portal_asset_registry(request):
     assets = Asset.objects.filter(tenant_id=tenant_id, is_active=True).select_related('category', 'location', 'hierarchy_template')
     categories = AssetCategory.objects.filter(tenant_id=tenant_id)
     locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True))
-    
+
     import unicodedata
     import re
     def format_to_ltree(input_str):
@@ -1549,7 +1560,7 @@ def portal_asset_registry(request):
 
     floorplans = [l for l in locations_list if l.zone_type == 'FLOORPLAN']
     zones = [l for l in locations_list if l.zone_type != 'FLOORPLAN' and not l.code.startswith('__')]
-    
+
     floorplans_data = [{'id': str(fp.id), 'name': fp.name, 'code': fp.code} for fp in floorplans]
     zones_data = [{'id': str(z.id), 'name': z.name, 'code': z.code, 'parent_id': str(z.parent_id or ''), 'floor_level': z.floor_level, 'center_x': z.center_x, 'center_y': z.center_y} for z in zones]
 
@@ -1573,7 +1584,7 @@ def portal_asset_registry(request):
 
                 # Only assets assigned to fp that DO NOT belong to any child zone
                 fp_assets = [
-                    a for a in assets 
+                    a for a in assets
                     if a.location and str(a.location.id) == str(fp.id) and not asset_belongs_to_child(a)
                 ]
                 nodes.append({
@@ -1589,7 +1600,7 @@ def portal_asset_registry(request):
             orphan_zones = [z for z in zones if not z.parent_id or not any(str(fp.id) == str(z.parent_id) for fp in floorplans)]
             for oz in orphan_zones:
                 oz_assets = [
-                    a for a in assets 
+                    a for a in assets
                     if str(a.location_id) == str(oz.id) or (
                         not a.location_id and a.zone_id and (a.zone_id == oz.code or a.zone_id == oz.name)
                     )
@@ -1608,9 +1619,9 @@ def portal_asset_registry(request):
             child_zones = [z for z in zones if str(z.parent_id) == str(parent_fp_id)]
             for z in child_zones:
                 z_assets = [
-                    a for a in assets 
+                    a for a in assets
                     if str(a.location_id) == str(z.id) or (
-                        (not a.location_id or str(a.location_id) == str(parent_fp_id)) and 
+                        (not a.location_id or str(a.location_id) == str(parent_fp_id)) and
                         a.zone_id and (a.zone_id == z.code or a.zone_id == z.name)
                     )
                 ]
@@ -1624,7 +1635,7 @@ def portal_asset_registry(request):
                     'children': []
                 })
         return nodes
-        
+
     tree_locations = build_location_tree(None)
     assigned_in_tree_ids = set()
     def collect_tree_asset_ids(tree_nodes):
@@ -1635,7 +1646,7 @@ def portal_asset_registry(request):
     collect_tree_asset_ids(tree_locations)
 
     unassigned_assets = [a for a in assets if str(a.id) not in assigned_in_tree_ids]
-    
+
     context = {
         'assets': assets,
         'categories': categories,
@@ -1659,9 +1670,9 @@ def portal_work_orders(request):
     from django.http import JsonResponse
     from django.utils.dateparse import parse_datetime
     from django.utils import timezone
-    
+
     tenant_id = request.user.tenant_id
-    
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -1753,7 +1764,7 @@ def portal_work_orders(request):
                         pass
 
                 return JsonResponse({'success': True})
-                
+
             elif action == 'add_checklist':
                 if not check_perm(request, 'work_order:update'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
@@ -1768,7 +1779,7 @@ def portal_work_orders(request):
                     is_mandatory=bool(data.get('is_mandatory', False))
                 )
                 return JsonResponse({'success': True, 'id': str(item.id)})
-                
+
             else:
                 if not check_perm(request, 'work_order:create'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:create required'}, status=403)
@@ -1776,7 +1787,7 @@ def portal_work_orders(request):
                 if not asset_id:
                     return JsonResponse({'success': False, 'error': 'Vui lòng chọn thiết bị / tài sản cho Work Order.'}, status=400)
                 assigned_to_id = data.get('assigned_to_id')
-                
+
                 # Auto-inherit location from asset if not manually supplied
                 asset_obj = Asset.objects.filter(id=asset_id, tenant_id=tenant_id).first() if asset_id else None
                 zone_id = data.get('zone_id') if data.get('zone_id') else (asset_obj.zone_id if asset_obj else '')
@@ -1793,7 +1804,7 @@ def portal_work_orders(request):
                         deadline_dt = timezone.make_aware(datetime.strptime(raw_deadline, '%Y-%m-%d').replace(hour=17, minute=0, second=0))
                     except Exception:
                         deadline_dt = None
-                
+
                 # SLA Deadline Auto-fallback Matrix
                 if not deadline_dt:
                     now_dt = timezone.now()
@@ -1932,14 +1943,14 @@ def portal_work_orders(request):
                 return JsonResponse({'success': True, 'id': str(wo.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         try:
             data = json.loads(request.body)
             wo_id = data.get('id') or request.GET.get('id')
             wo = WorkOrder.objects.get(id=wo_id, tenant_id=tenant_id)
             from django.utils import timezone
-            
+
             # 1. Update Status Action
             if 'status' in data and data.get('status') in ['ASSIGNED', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELED', 'CANCELLED']:
                 if not check_perm(request, ('work_order:execute', 'work_order:update')):
@@ -1948,7 +1959,24 @@ def portal_work_orders(request):
                 current_status = wo.status
                 if data.get('resolution_notes'):
                     wo.resolution_notes = data.get('resolution_notes')
-                
+
+                if current_status == new_status or (current_status in ['CANCELED', 'CANCELLED'] and new_status in ['CANCELED', 'CANCELLED']):
+                    if new_status == 'COMPLETED':
+                        incoming_notes = str(data.get('resolution_notes') or data.get('resolutionNotes') or '').strip()
+                        existing_notes = str(wo.resolution_notes or '').strip()
+                        incoming_vib = data.get('postRepairVibration') or data.get('post_repair_vibration')
+                        incoming_temp = data.get('postRepairTemperature') or data.get('post_repair_temperature')
+                        has_diff_notes = bool(incoming_notes and existing_notes and incoming_notes != existing_notes)
+                        has_diff_vib = bool(incoming_vib is not None and wo.post_repair_vibration is not None and abs(float(incoming_vib) - float(wo.post_repair_vibration)) > 0.001)
+                        has_diff_temp = bool(incoming_temp is not None and wo.post_repair_temperature is not None and abs(float(incoming_temp) - float(wo.post_repair_temperature)) > 0.001)
+                        if has_diff_notes or has_diff_vib or has_diff_temp:
+                            return JsonResponse({
+                                'success': False,
+                                'error': 'Xung đột dữ liệu nghiệm thu: Phiếu việc đã được nghiệm thu hoàn thành trước đó với dữ liệu khác. Vui lòng làm mới dữ liệu.',
+                                'code': 'WORK_ORDER_ALREADY_COMPLETED_CONFLICT'
+                            }, status=409)
+                    return JsonResponse({'success': True})
+
                 if current_status != new_status:
                     if new_status == 'ASSIGNED':
                         raise Exception("Cannot manually change status to ASSIGNED")
@@ -2005,7 +2033,10 @@ def portal_work_orders(request):
                                     v = d[k]
                                     if str(v).strip() != '':
                                         from decimal import Decimal
-                                        return Decimal(str(v))
+                                        dec_val = Decimal(str(v))
+                                        if dec_val < Decimal('0.00'):
+                                            raise Exception(f"Giá trị {k} không được là số âm ({dec_val}).")
+                                        return dec_val
                             return None
 
                         m_state = _extract_val(data, 'machine_state', 'machineState', 'postRepairMachineState', default='RUNNING')
@@ -2039,18 +2070,19 @@ def portal_work_orders(request):
                             from workorders.services import WorkOrderTransitionService
                             WorkOrderTransitionService.restore_work_order_inventory(wo)
                             WorkOrderTransitionService.cancel_work_order_reservations(wo)
-                            
+                        new_status = 'CANCELLED'
+
                     wo.status = new_status
                     wo.save()
                 return JsonResponse({'success': True})
-                
+
             # 2. Assign Action
             elif 'assigned_to_id' in data and 'title' not in data:
                 if not check_perm(request, ('work_order:reassign', 'work_order:update')):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:reassign required'}, status=403)
                 if wo.status in ['COMPLETED', 'CANCELED', 'CANCELLED']:
                     raise Exception("Cannot reassign a completed or canceled work order")
-                    
+
                 new_assignee_id = data.get('assigned_to_id')
                 if str(wo.assigned_to_id) != str(new_assignee_id):
                     wo.assigned_to_id = new_assignee_id if new_assignee_id else None
@@ -2063,7 +2095,7 @@ def portal_work_orders(request):
                             wo.status = 'ASSIGNED'
                     wo.save()
                 return JsonResponse({'success': True})
-                
+
             # 3. Full Update Action
             else:
                 if not check_perm(request, 'work_order:update'):
@@ -2072,19 +2104,19 @@ def portal_work_orders(request):
                 if not asset_id:
                     return JsonResponse({'success': False, 'error': 'Vui lòng chọn thiết bị / tài sản cho Work Order.'}, status=400)
                 assigned_to_id = data.get('assigned_to_id')
-                
+
                 wo.title = data.get('title')
                 wo.description = data.get('description')
                 wo.priority = data.get('priority')
                 wo.status = data.get('status')
                 wo.asset_id = asset_id
                 wo.assigned_to_id = assigned_to_id if assigned_to_id else None
-                
+
                 if data.get('deadline'):
                     wo.deadline = parse_datetime(data.get('deadline'))
                 else:
                     wo.deadline = None
-                    
+
                 # Hungarian & Optimization fields in PUT
                 if 'required_skill' in data:
                     wo.required_skill = data.get('required_skill') or ''
@@ -2141,17 +2173,19 @@ def portal_work_orders(request):
                 if 'vendor_cost' in data or 'vendorCost' in data:
                     raw_vcost = data.get('vendor_cost') if 'vendor_cost' in data else data.get('vendorCost')
                     if raw_vcost is not None and str(raw_vcost).strip() != '':
+                        from decimal import Decimal
                         try:
-                            from decimal import Decimal
                             v_dec = Decimal(str(raw_vcost))
-                            from workorders.models import WorkOrderCost
-                            WorkOrderCost.objects.update_or_create(
-                                work_order=wo,
-                                tenant=wo.tenant,
-                                defaults={'vendor_cost': v_dec}
-                            )
                         except Exception:
-                            pass
+                            return JsonResponse({'success': False, 'error': f'Định dạng chi phí thuê ngoài không hợp lệ: {raw_vcost}'}, status=400)
+                        if v_dec < Decimal('0.00'):
+                            return JsonResponse({'success': False, 'error': 'Chi phí thuê ngoài (vendor_cost) không được là số âm.'}, status=400)
+                        from workorders.models import WorkOrderCost
+                        WorkOrderCost.objects.update_or_create(
+                            work_order=wo,
+                            tenant=wo.tenant,
+                            defaults={'vendor_cost': v_dec}
+                        )
 
                 # Sync checklists if provided
                 if 'checklists' in data and isinstance(data['checklists'], list):
@@ -2204,7 +2238,7 @@ def portal_work_orders(request):
                 elif isinstance(detail, str):
                     err_msg = detail
             return JsonResponse({'success': False, 'error': err_msg}, status=400)
-            
+
     elif request.method == 'DELETE':
         try:
             data = json.loads(request.body)
@@ -2233,7 +2267,7 @@ def portal_work_orders(request):
     now = timezone.now()
 
     work_orders = WorkOrder.objects.filter(tenant_id=tenant_id).select_related('asset', 'assigned_to', 'parent_id', 'created_by', 'cost_breakdown').prefetch_related('checklists', 'follow_up_work_orders').order_by('-created_at')
-    
+
     # Permission-based scope filtering (strictly permission-based, no role checks):
     # Users with 'work_order:reassign' or 'system:admin' (dispatchers/managers) can view all work orders in the tenant.
     # Users without 'work_order:reassign' (technicians/executors) can only view work orders assigned to them or created by them.
@@ -2244,7 +2278,7 @@ def portal_work_orders(request):
 
     total_wos = work_orders.count()
     in_progress = sum(1 for wo in work_orders if wo.status == 'IN_PROGRESS')
-    overdue = sum(1 for wo in work_orders if wo.deadline and wo.deadline < now and wo.status not in ['COMPLETED', 'CANCELED'])
+    overdue = sum(1 for wo in work_orders if wo.deadline and wo.deadline < now and wo.status not in ['COMPLETED', 'CANCELED', 'CANCELLED'])
     completed = sum(1 for wo in work_orders if wo.status == 'COMPLETED')
 
     wo_data = []
@@ -2254,9 +2288,9 @@ def portal_work_orders(request):
         # Need to cast UUIDs to strings
         for c in checklists:
             c['id'] = str(c['id'])
-        
+
         follow_ups = list(wo.follow_up_work_orders.all().values('id'))
-        
+
         wo_data.append({
             'wo': wo,
             'checklists_json': json.dumps(checklists),
@@ -2394,7 +2428,7 @@ def portal_work_orders(request):
         'overdue': overdue,
         'completed': completed
     }
-    
+
     return render(request, 'work_orders.html', {
         'work_orders_data': wo_data,
         'assets': assets,
@@ -2424,44 +2458,67 @@ def portal_work_orders(request):
 @login_required(login_url='portal_login')
 @permission_required('inventory:read')
 def portal_inventory(request):
+    from decimal import Decimal
     from assets.models import SparePart
     import json
     from django.http import JsonResponse, HttpResponseForbidden
-    
+
     tenant_id = request.user.tenant_id
     is_admin = request.user.is_superuser or request.user.roles.filter(permissions__id='system:admin').exists()
-    
-            
+
+
     if request.method == 'POST':
         if not (is_admin or request.user.roles.filter(permissions__id='inventory:create').exists()):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
-            data = json.loads(request.body)
-            qty = data.get('quantity_in_stock')
-            cost = data.get('unit_cost')
+            from django.db import transaction
+            with transaction.atomic():
+                data = json.loads(request.body)
+                qty = data.get('quantity_in_stock')
+                cost = data.get('unit_cost')
 
-            if qty is not None and float(qty) < 0:
-                return JsonResponse({'success': False, 'error': 'Số lượng tồn kho phải lớn hơn hoặc bằng 0.'}, status=400)
-            if cost is not None and float(cost) < 0:
-                return JsonResponse({'success': False, 'error': 'Đơn giá phải lớn hơn hoặc bằng 0.'}, status=400)
-            
-            sp = SparePart.objects.create(
-                tenant_id=tenant_id,
-                name=data.get('name'),
-                part_number=data.get('part_number'),
-                description=data.get('description'),
-                location_id=data.get('location_id') or None,
-                quantity_in_stock=qty if qty is not None else 0,
-                unit_cost=data.get('unit_cost') or None
-            )
+                if qty is not None and float(qty) < 0:
+                    return JsonResponse({'success': False, 'error': 'Số lượng tồn kho phải lớn hơn hoặc bằng 0.'}, status=400)
+                if cost is not None and float(cost) < 0:
+                    return JsonResponse({'success': False, 'error': 'Đơn giá phải lớn hơn hoặc bằng 0.'}, status=400)
+
+                cost_raw = data.get('unit_cost')
+                unit_cost_val = Decimal(str(cost_raw)) if cost_raw is not None and str(cost_raw).strip() != '' else None
+
+                sp = SparePart.objects.create(
+                    tenant_id=tenant_id,
+                    name=data.get('name'),
+                    part_number=data.get('part_number'),
+                    description=data.get('description'),
+                    location_id=data.get('location_id') or None,
+                    quantity_in_stock=qty if qty is not None else 0,
+                    unit_cost=unit_cost_val
+                )
+                if qty is not None and Decimal(str(qty)) > Decimal('0'):
+                    from assets.models import StockTransaction
+                    from django.utils import timezone
+                    u_c = unit_cost_val if unit_cost_val is not None else Decimal('0.00')
+                    q_dec = Decimal(str(qty))
+                    StockTransaction.all_objects.create(
+                        tenant_id=tenant_id,
+                        spare_part=sp,
+                        transaction_type='RECEIPT',
+                        quantity=q_dec,
+                        unit_price=u_c,
+                        total_amount=(q_dec * u_c).quantize(Decimal('0.01')),
+                        cost_center_snapshot='INITIAL_STOCK',
+                        issue_date=timezone.now(),
+                        is_variance_adjustment=False
+                    )
             return JsonResponse({'success': True, 'id': str(sp.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not (is_admin or request.user.roles.filter(permissions__id='inventory:update').exists()):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
         try:
+            from django.db import transaction
             data = json.loads(request.body)
             qty = data.get('quantity_in_stock')
             cost = data.get('unit_cost')
@@ -2471,22 +2528,46 @@ def portal_inventory(request):
             if cost is not None and float(cost) < 0:
                 return JsonResponse({'success': False, 'error': 'Đơn giá phải lớn hơn hoặc bằng 0.'}, status=400)
 
-            sp = SparePart.objects.get(id=data.get('id'), tenant_id=tenant_id)
-            sp.name = data.get('name')
-            sp.part_number = data.get('part_number')
-            sp.description = data.get('description')
-            if 'location_id' in data:
-                sp.location_id = data.get('location_id') or None
-            
-            if data.get('quantity_in_stock') is not None:
-                sp.quantity_in_stock = data['quantity_in_stock']
-                
-            sp.unit_cost = data.get('unit_cost') or None
-            sp.save()
+            with transaction.atomic():
+                sp = SparePart.objects.select_for_update().get(id=data.get('id'), tenant_id=tenant_id)
+                if 'name' in data and data['name']:
+                    sp.name = data['name']
+                if 'part_number' in data:
+                    sp.part_number = data['part_number']
+                if 'description' in data:
+                    sp.description = data['description']
+                if 'location_id' in data:
+                    sp.location_id = data.get('location_id') or None
+
+                if data.get('quantity_in_stock') is not None:
+                    old_q = sp.quantity_in_stock or Decimal('0.00')
+                    new_q = Decimal(str(data['quantity_in_stock']))
+                    if new_q != old_q:
+                        delta_q = new_q - old_q
+                        sp.quantity_in_stock = new_q
+                        from assets.models import StockTransaction
+                        from django.utils import timezone
+                        u_c = Decimal(str(cost)) if cost is not None and str(cost).strip() != '' else (sp.unit_cost or Decimal('0.00'))
+                        StockTransaction.all_objects.create(
+                            tenant_id=tenant_id,
+                            spare_part=sp,
+                            transaction_type='ADJUSTMENT',
+                            quantity=abs(delta_q),
+                            unit_price=u_c,
+                            total_amount=abs(delta_q * u_c).quantize(Decimal('0.01')),
+                            cost_center_snapshot='ADJUSTMENT_INCREASE' if delta_q > 0 else 'ADJUSTMENT_DECREASE',
+                            issue_date=timezone.now(),
+                            is_variance_adjustment=True
+                        )
+
+                if 'unit_cost' in data:
+                    cost_raw = data.get('unit_cost')
+                    sp.unit_cost = Decimal(str(cost_raw)) if cost_raw is not None and str(cost_raw).strip() != '' else None
+                sp.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not (is_admin or request.user.roles.filter(permissions__id='inventory:delete').exists()):
             return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
@@ -2512,7 +2593,7 @@ def portal_inventory(request):
         for l in locations
     ]
     floorplans_list = [l for l in locations_data if l['zone_type'] == 'FLOORPLAN']
-    
+
     prof = getattr(request.user, 'technician_profile', None)
     user_fp_id = str(prof.floorplan_id) if (prof and prof.floorplan_id) else None
     user_is_restricted_floorplan = bool(user_fp_id) and not is_admin
@@ -2535,9 +2616,9 @@ def portal_pm_plans(request):
     import json
     from django.http import JsonResponse
     from django.db import transaction
-    
+
     tenant_id = request.user.tenant_id
-    
+
     if request.method == 'POST':
         if not check_perm(request, 'pm_plan:create'):
             return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:create required'}, status=403)
@@ -2560,10 +2641,10 @@ def portal_pm_plans(request):
                     required_tools=data.get('required_tools', []) or [],
                     assignee_id=None
                 )
-                
+
                 from maintenance.models import PmPlanChecklistItem, PmPlanMaterial, PmPlanAssignment
                 from assets.models import SparePart
-                
+
                 # Auto-assign selected assets directly with PM Plan
                 asset_ids = data.get('asset_ids', [])
                 for aid in asset_ids:
@@ -2584,7 +2665,7 @@ def portal_pm_plans(request):
                             expected_value=pc.get('expected_value') or None,
                             is_mandatory=pc.get('is_mandatory', False)
                         )
-                
+
                 if 'materials' in data:
                     for pm_mat in data['materials']:
                         sp = SparePart.objects.get(id=pm_mat.get('spare_part_id'), tenant_id=tenant_id)
@@ -2593,11 +2674,11 @@ def portal_pm_plans(request):
                             spare_part=sp,
                             quantity=pm_mat.get('quantity')
                         )
-                
+
             return JsonResponse({'success': True, 'id': str(pm.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PUT':
         if not check_perm(request, 'pm_plan:update'):
             return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:update required'}, status=403)
@@ -2621,10 +2702,10 @@ def portal_pm_plans(request):
                     pm.required_tools = data.get('required_tools', []) or []
                 pm.assignee_id = None
                 pm.save()
-                
+
                 from maintenance.models import PmPlanChecklistItem, PmPlanMaterial, PmPlanAssignment
                 from assets.models import SparePart
-                
+
                 # Sync asset assignments
                 if 'asset_ids' in data:
                     new_asset_ids = set(str(aid) for aid in data.get('asset_ids', []) if aid)
@@ -2647,7 +2728,7 @@ def portal_pm_plans(request):
                             expected_value=pc.get('expected_value') or None,
                             is_mandatory=pc.get('is_mandatory', False)
                         )
-                
+
                 if 'materials' in data:
                     pm.materials.all().delete()
                     for pm_mat in data['materials']:
@@ -2661,7 +2742,7 @@ def portal_pm_plans(request):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE':
         if not check_perm(request, 'pm_plan:delete'):
             return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:delete required'}, status=403)
@@ -2674,7 +2755,7 @@ def portal_pm_plans(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
     pm_plans = PmPlan.objects.filter(tenant_id=tenant_id)
-    
+
     # Calculate KPIs
     from workorders.models import WorkOrder
     from django.utils import timezone
@@ -2684,10 +2765,10 @@ def portal_pm_plans(request):
         source_reference__startswith="PM_",
         deadline__lt=timezone.now()
     ).exclude(status__in=['COMPLETED', 'CANCELLED']).count()
-    
+
     total_pm_wos = WorkOrder.objects.filter(tenant_id=tenant_id, source_reference__startswith="PM_").count()
     completed_pm_wos = WorkOrder.objects.filter(tenant_id=tenant_id, source_reference__startswith="PM_", status='COMPLETED').count()
-    
+
     compliance_rate = 100.0
     if total_pm_wos > 0:
         compliance_rate = (completed_pm_wos / total_pm_wos) * 100.0
@@ -2698,20 +2779,20 @@ def portal_pm_plans(request):
     from dateutil.relativedelta import relativedelta
     now = timezone.now()
     next_week = now + timedelta(days=7)
-    
+
     active_assignments = PmPlanAssignment.objects.filter(
         tenant_id=tenant_id,
         status='ACTIVE',
         pm_plan__trigger_type='TIME'
     ).select_related('pm_plan')
-    
+
     for assignment in active_assignments:
         plan = assignment.pm_plan
         interval = plan.interval_value
         unit = plan.interval_unit
         if not interval or interval <= 0 or not unit:
             continue
-            
+
         ref_date = assignment.last_triggered_at or assignment.created_at
         due_date = ref_date
         if unit == 'DAYS':
@@ -2722,7 +2803,7 @@ def portal_pm_plans(request):
             due_date += relativedelta(months=int(interval))
         elif unit == 'YEARS':
             due_date += relativedelta(years=int(interval))
-            
+
         if now <= due_date <= next_week:
             upcoming_pms_count += 1
 
@@ -2834,9 +2915,9 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
     from assets.models import Asset
     import json
     from django.http import JsonResponse
-    
+
     tenant_id = request.user.tenant_id
-    
+
     if request.method == 'GET' and plan_id:
         assignments = PmPlanAssignment.objects.filter(pm_plan_id=plan_id, tenant_id=tenant_id).select_related('asset')
         data = []
@@ -2848,7 +2929,7 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
                 'status': a.status
             })
         return JsonResponse({'success': True, 'data': data})
-        
+
     elif request.method == 'POST' and plan_id:
         if not check_perm(request, ('pm_plan:create', 'pm_plan:update')):
             return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:create required'}, status=403)
@@ -2867,7 +2948,7 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'PATCH' and assignment_id:
         if not check_perm(request, 'pm_plan:update'):
             return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:update required'}, status=403)
@@ -2880,7 +2961,7 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
+
     elif request.method == 'DELETE' and assignment_id:
         if not check_perm(request, 'pm_plan:delete'):
             return JsonResponse({'success': False, 'error': 'Permission denied: pm_plan:delete required'}, status=403)
@@ -2898,11 +2979,11 @@ def portal_pm_plan_assignments(request, plan_id=None, assignment_id=None):
 def portal_audit_logs(request):
     from core.models import AuditLog
     logs = AuditLog.objects.all().order_by('-timestamp')[:500]
-    
+
     creates = sum(1 for log in logs if log.action_type == 'CREATE')
     updates = sum(1 for log in logs if log.action_type == 'UPDATE')
     deletes = sum(1 for log in logs if log.action_type == 'DELETE')
-    
+
     return render(request, 'audit_logs.html', {
         'logs': logs,
         'creates': creates,
@@ -2918,10 +2999,10 @@ def portal_reports(request):
     tenant = getattr(request.user, 'tenant', None)
     categories = AssetCategory.objects.filter(tenant=tenant, is_active=True) if tenant else []
     locations = Location.objects.filter(tenant=tenant, is_active=True) if tenant else []
-    
+
     today = timezone.now().date()
     first_day_of_month = today.replace(day=1)
-    
+
     context = {
         'categories': categories,
         'locations': locations,
@@ -2944,11 +3025,11 @@ def portal_cost_forecasting(request):
     locations = Location.objects.filter(tenant=tenant, is_active=True) if tenant else []
     readiness = CostForecastingService.check_readiness(tenant=tenant) if tenant else {}
     can_write = has_cost_forecasting_write_permission(request.user)
-    
+
     today = timezone.now().date()
     quarter = (today.month - 1) // 3 + 1
     current_period = f"{today.year}-Q{quarter}"
-    
+
     context = {
         'locations': locations,
         'current_period': current_period,
@@ -2988,6 +3069,8 @@ def custom_403_view(request, exception=None):
         'reports:export': 'Xuất báo cáo doanh nghiệp (Export Enterprise Reports)',
         'system:admin': 'Quản trị viên toàn hệ thống (Super Admin)',
         'asset_category:read': 'Cấu hình phân loại tài sản (Asset Config)',
+        'workforce:read': 'Quản lý lực lượng & công cụ (Workforce & Specialized Tools)',
+        'cost_forecast:read': 'Dự báo chi phí & ngân sách (Cost Forecasting & Budgeting)',
     }
 
     context = {
@@ -3010,7 +3093,8 @@ def portal_workforce_tools(request):
     Accessible with 'workforce:read', 'work_order:read', or 'user:read'.
     """
     if not check_perm(request, ['workforce:read', 'work_order:read', 'user:read']):
-        return portal_permission_denied(request, 'workforce:read')
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Bạn không có quyền truy cập trang Quản lý Lực lượng & Công cụ chuyên dụng (workforce:read required).")
 
     from users.models import (
         WorkforceSkill, CertificationType, ShiftTemplate,
@@ -3495,7 +3579,7 @@ def portal_locations_api(request):
 
     if request.method == 'GET':
         locs = Location.objects.filter(tenant_id=tenant_id, is_active=True).exclude(code__startswith='__').order_by('name')
-        
+
         # Floorplans list
         fps = Location.objects.filter(tenant_id=tenant_id, zone_type='FLOORPLAN', is_active=True).order_by('name')
         fps_data = []
@@ -3569,19 +3653,19 @@ def portal_locations_api(request):
                 cx = float(data.get('coords_x')) if data.get('coords_x') is not None else None
                 cy = float(data.get('coords_y')) if data.get('coords_y') is not None else None
                 fl = int(data.get('floor_level') or 1)
-                
+
                 from assets.models import Asset
                 asset_obj = Asset.objects.filter(id=asset_id, tenant_id=tenant_id).first()
                 if not asset_obj:
                     return JsonResponse({'success': False, 'error': 'Thiết bị không tồn tại.'}, status=404)
-                
+
                 if target_loc_id:
                     target_loc = Location.objects.filter(id=target_loc_id, tenant_id=tenant_id).first()
                     if target_loc:
                         asset_obj.location = target_loc
                         asset_obj.zone_id = target_loc.code or target_loc.name
                 # Note: Assets must always belong to a specific location (Asset Register requirement), never set to None
-                    
+
                 asset_obj.coords_x = cx
                 asset_obj.coords_y = cy
                 asset_obj.floor_level = fl

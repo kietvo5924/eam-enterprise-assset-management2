@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SwipeableChecklistTile extends StatefulWidget {
+  final String? id;
   final String title;
   final String? subtitle;
   final bool initialCompleted;
@@ -18,6 +19,7 @@ class SwipeableChecklistTile extends StatefulWidget {
 
   const SwipeableChecklistTile({
     super.key,
+    this.id,
     required this.title,
     this.subtitle,
     this.initialCompleted = false,
@@ -81,7 +83,7 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
     return Column(
       children: [
         Slidable(
-          key: ValueKey(widget.title),
+          key: ValueKey(widget.id ?? widget.title),
           endActionPane: widget.onDelete == null ? null : ActionPane(
             motion: const ScrollMotion(),
             extentRatio: 0.25,
@@ -261,23 +263,33 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                             onChanged: (val) {
                               final trimmed = val.trim().replaceAll(',', '.');
                               final isValid = widget.inputType == 'NUMBER' ? double.tryParse(trimmed) != null : trimmed.isNotEmpty;
-                              if (isValid && !_isCompleted) {
-                                setState(() {
-                                  _isCompleted = true;
-                                });
-                                if (widget.onChanged != null) {
-                                  widget.onChanged!(true);
-                                }
-                              } else if (trimmed.isEmpty && _isCompleted) {
-                                setState(() {
-                                  _isCompleted = false;
-                                });
-                                if (widget.onChanged != null) {
-                                  widget.onChanged!(false);
-                                }
-                              }
                               if (widget.onValueChanged != null) {
                                 widget.onValueChanged!(val);
+                                if (isValid && !_isCompleted) {
+                                  setState(() {
+                                    _isCompleted = true;
+                                  });
+                                } else if (trimmed.isEmpty && _isCompleted) {
+                                  setState(() {
+                                    _isCompleted = false;
+                                  });
+                                }
+                              } else {
+                                if (isValid && !_isCompleted) {
+                                  setState(() {
+                                    _isCompleted = true;
+                                  });
+                                  if (widget.onChanged != null) {
+                                    widget.onChanged!(true);
+                                  }
+                                } else if (trimmed.isEmpty && _isCompleted) {
+                                  setState(() {
+                                    _isCompleted = false;
+                                  });
+                                  if (widget.onChanged != null) {
+                                    widget.onChanged!(false);
+                                  }
+                                }
                               }
                             },
                           ),

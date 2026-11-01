@@ -19,16 +19,24 @@ class AuthService {
         if (data['success'] == true) {
           final payload = data['data'];
           final token = payload['token'];
+          final refreshToken = payload['refreshToken'] ?? payload['refresh'];
           final roles = payload['roles'];
           final tenantId = payload['tenantId'];
 
           final prefs = await SharedPreferences.getInstance();
           
-          // Securely store token
+          // Securely store tokens
           await _secureStorage.write(key: 'token', value: token);
+          if (refreshToken != null) {
+            await _secureStorage.write(key: 'refreshToken', value: refreshToken);
+          }
           
           // Store other non-sensitive preferences
-          await prefs.setString('username', username);
+          final userObj = payload['user'];
+          final canonicalUsername = (userObj is Map && userObj['username'] != null)
+              ? userObj['username'].toString()
+              : username;
+          await prefs.setString('username', canonicalUsername);
           await prefs.setString('roles', roles ?? '');
           await prefs.setString('tenantId', tenantId ?? '');
           await prefs.setBool('isLoggedIn', true);
@@ -43,13 +51,7 @@ class AuthService {
       if (e.response != null) {
         return e.response?.data?['message'] ?? 'Sai tài khoản hoặc mật khẩu';
       }
-      // Khi server offline: tự động hỗ trợ đăng nhập ngoại tuyến / demo
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('username', username.isNotEmpty ? username : 'ktv.minhnv');
-      await prefs.setString('roles', 'TECHNICIAN,ADMIN');
-      await prefs.setString('tenantId', 'demo-tenant-id');
-      await prefs.setBool('isLoggedIn', true);
-      return null;
+      return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối mạng.';
     } catch (e) {
       return 'Lỗi không xác định: $e';
     }
@@ -82,7 +84,10 @@ class AuthService {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove('isLoggedIn');
+    await prefs.remove('username');
+    await prefs.remove('roles');
+    await prefs.remove('tenantId');
     await _secureStorage.deleteAll();
   }
 }

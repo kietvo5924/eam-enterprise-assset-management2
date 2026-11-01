@@ -78,6 +78,10 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
       item.itemName,
       isCompleted,
       finalVal,
+      item.inputType,
+      item.expectedValue,
+      item.isMandatory,
+      item.id,
     );
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -91,6 +95,28 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
       );
     } else {
       // Revert if failed?
+    }
+  }
+
+  Future<void> _handleDeleteChecklist(WorkOrderChecklist item) async {
+    final checklistIdentifier = item.id.isNotEmpty ? item.id : item.itemName;
+    final success = await _service.deleteChecklist(
+      widget.workOrderId,
+      checklistIdentifier,
+    );
+    if (success && mounted) {
+      setState(() {
+        _workOrder?.checklists.removeWhere((c) =>
+            (item.id.isNotEmpty && c.id == item.id) ||
+            c.itemName == item.itemName);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Đã xóa mục checklist \"${item.itemName}\""),
+          backgroundColor: AppTheme.successColor,
+          duration: const Duration(seconds: 1),
+        ),
+      );
     }
   }
 
@@ -1545,6 +1571,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
                   child: SwipeableChecklistTile(
+                    id: chk.id,
                     title: chk.itemName,
                     initialCompleted: chk.isCompleted,
                     inputType: chk.inputType,
@@ -1580,7 +1607,9 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                               },
                             );
                           },
-                    onDelete: null,
+                    onDelete: _workOrder!.status == 'COMPLETED'
+                        ? null
+                        : () => _handleDeleteChecklist(chk),
                   ),
                 );
               }),
@@ -1632,14 +1661,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 children: [
                   ..._workOrder!.attachments.map((att) {
                     final bool isLocalFile = att.isLocal;
-                    final apiUri = Uri.parse(ApiConstants.baseUrl);
-                    String imageUrl = att.fileUrl.startsWith('http')
-                        ? att.fileUrl
-                        : 'http://${apiUri.host}:9000${att.fileUrl}';
-
-                    if (imageUrl.contains('localhost')) {
-                      imageUrl = imageUrl.replaceAll('localhost', apiUri.host);
-                    }
+                    final String imageUrl = ApiConstants.resolveAttachmentUrl(att.fileUrl);
 
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(16),

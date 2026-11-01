@@ -8,7 +8,7 @@ from workorders.models import WorkOrder
 from notifications.services import notify_sensor_anomaly
 
 from .physical_bounds import validate_physical_bounds, is_static_asset, get_static_asset_checklist
-from .iso_standards import evaluate_iso_10816
+from .iso_standards import evaluate_iso_10816, get_iso_thresholds_for_asset
 from .z_score_detector import detect_z_score_anomaly, OEM_STATIC_LIMITS
 from .theil_sen_drift import evaluate_trend_drift
 from .isolation_forest_detector import MultivariateIsolationForestDetector

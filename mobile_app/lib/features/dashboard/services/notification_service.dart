@@ -1,7 +1,7 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../../core/network/dio_client.dart';
 import '../models/notification_model.dart';
@@ -163,6 +163,15 @@ class NotificationService {
     }
   }
 
+  String _resolveDeviceType() {
+    if (kIsWeb) return 'WEB';
+    try {
+      if (Platform.isIOS) return 'IOS';
+      if (Platform.isAndroid) return 'ANDROID';
+    } catch (_) {}
+    return 'ANDROID';
+  }
+
   /// Helper to send device token to backend
   Future<bool> _syncDeviceToken(String token) async {
     try {
@@ -171,7 +180,7 @@ class NotificationService {
 
       final response = await _dio.post('/api/v1/notifications/devices/', data: {
         'device_token': token,
-        'device_type': 'ANDROID',
+        'device_type': _resolveDeviceType(),
       });
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
@@ -191,16 +200,18 @@ class NotificationService {
         debugPrint('Retrieved native FCM Token: $deviceToken');
       }
     } catch (e) {
-      debugPrint('Could not retrieve FCM token (using cached or fallback): $e');
+      debugPrint('Could not retrieve FCM token: $e');
     }
 
-    // 2. Fall back to cached token or UUID
+    // 2. Fall back to cached token if previously obtained
     if (deviceToken == null || deviceToken.isEmpty) {
       final prefs = await SharedPreferences.getInstance();
       deviceToken = prefs.getString('push_device_token');
-      if (deviceToken == null || deviceToken.isEmpty) {
-        deviceToken = const Uuid().v4();
-      }
+    }
+
+    if (deviceToken == null || deviceToken.isEmpty) {
+      debugPrint('No valid FCM device token available; skipping registration');
+      return false;
     }
 
     return await _syncDeviceToken(deviceToken);

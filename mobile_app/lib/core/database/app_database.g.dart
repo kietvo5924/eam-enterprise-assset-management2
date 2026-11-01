@@ -721,6 +721,69 @@ class $WorkOrdersTable extends WorkOrders
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _maintenanceActionMeta = const VerificationMeta(
+    'maintenanceAction',
+  );
+  @override
+  late final GeneratedColumn<String> maintenanceAction =
+      GeneratedColumn<String>(
+        'maintenance_action',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _coordsXMeta = const VerificationMeta(
+    'coordsX',
+  );
+  @override
+  late final GeneratedColumn<double> coordsX = GeneratedColumn<double>(
+    'coords_x',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _coordsYMeta = const VerificationMeta(
+    'coordsY',
+  );
+  @override
+  late final GeneratedColumn<double> coordsY = GeneratedColumn<double>(
+    'coords_y',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _floorLevelMeta = const VerificationMeta(
+    'floorLevel',
+  );
+  @override
+  late final GeneratedColumn<int> floorLevel = GeneratedColumn<int>(
+    'floor_level',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _zoneIdMeta = const VerificationMeta('zoneId');
+  @override
+  late final GeneratedColumn<String> zoneId = GeneratedColumn<String>(
+    'zone_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -738,6 +801,12 @@ class $WorkOrdersTable extends WorkOrders
     checklists,
     attachments,
     tenantId,
+    code,
+    maintenanceAction,
+    coordsX,
+    coordsY,
+    floorLevel,
+    zoneId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -848,6 +917,45 @@ class $WorkOrdersTable extends WorkOrders
     } else if (isInserting) {
       context.missing(_tenantIdMeta);
     }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    }
+    if (data.containsKey('maintenance_action')) {
+      context.handle(
+        _maintenanceActionMeta,
+        maintenanceAction.isAcceptableOrUnknown(
+          data['maintenance_action']!,
+          _maintenanceActionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('coords_x')) {
+      context.handle(
+        _coordsXMeta,
+        coordsX.isAcceptableOrUnknown(data['coords_x']!, _coordsXMeta),
+      );
+    }
+    if (data.containsKey('coords_y')) {
+      context.handle(
+        _coordsYMeta,
+        coordsY.isAcceptableOrUnknown(data['coords_y']!, _coordsYMeta),
+      );
+    }
+    if (data.containsKey('floor_level')) {
+      context.handle(
+        _floorLevelMeta,
+        floorLevel.isAcceptableOrUnknown(data['floor_level']!, _floorLevelMeta),
+      );
+    }
+    if (data.containsKey('zone_id')) {
+      context.handle(
+        _zoneIdMeta,
+        zoneId.isAcceptableOrUnknown(data['zone_id']!, _zoneIdMeta),
+      );
+    }
     return context;
   }
 
@@ -921,6 +1029,30 @@ class $WorkOrdersTable extends WorkOrders
         DriftSqlType.string,
         data['${effectivePrefix}tenant_id'],
       )!,
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      ),
+      maintenanceAction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}maintenance_action'],
+      ),
+      coordsX: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}coords_x'],
+      ),
+      coordsY: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}coords_y'],
+      ),
+      floorLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}floor_level'],
+      ),
+      zoneId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}zone_id'],
+      ),
     );
   }
 
@@ -951,6 +1083,12 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
   final List<dynamic> checklists;
   final List<dynamic> attachments;
   final String tenantId;
+  final String? code;
+  final String? maintenanceAction;
+  final double? coordsX;
+  final double? coordsY;
+  final int? floorLevel;
+  final String? zoneId;
   const WorkOrderEntity({
     required this.id,
     required this.title,
@@ -967,6 +1105,12 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
     required this.checklists,
     required this.attachments,
     required this.tenantId,
+    this.code,
+    this.maintenanceAction,
+    this.coordsX,
+    this.coordsY,
+    this.floorLevel,
+    this.zoneId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1010,6 +1154,24 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
       );
     }
     map['tenant_id'] = Variable<String>(tenantId);
+    if (!nullToAbsent || code != null) {
+      map['code'] = Variable<String>(code);
+    }
+    if (!nullToAbsent || maintenanceAction != null) {
+      map['maintenance_action'] = Variable<String>(maintenanceAction);
+    }
+    if (!nullToAbsent || coordsX != null) {
+      map['coords_x'] = Variable<double>(coordsX);
+    }
+    if (!nullToAbsent || coordsY != null) {
+      map['coords_y'] = Variable<double>(coordsY);
+    }
+    if (!nullToAbsent || floorLevel != null) {
+      map['floor_level'] = Variable<int>(floorLevel);
+    }
+    if (!nullToAbsent || zoneId != null) {
+      map['zone_id'] = Variable<String>(zoneId);
+    }
     return map;
   }
 
@@ -1046,6 +1208,22 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
       checklists: Value(checklists),
       attachments: Value(attachments),
       tenantId: Value(tenantId),
+      code: code == null && nullToAbsent ? const Value.absent() : Value(code),
+      maintenanceAction: maintenanceAction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(maintenanceAction),
+      coordsX: coordsX == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coordsX),
+      coordsY: coordsY == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coordsY),
+      floorLevel: floorLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(floorLevel),
+      zoneId: zoneId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(zoneId),
     );
   }
 
@@ -1070,6 +1248,14 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
       checklists: serializer.fromJson<List<dynamic>>(json['checklists']),
       attachments: serializer.fromJson<List<dynamic>>(json['attachments']),
       tenantId: serializer.fromJson<String>(json['tenantId']),
+      code: serializer.fromJson<String?>(json['code']),
+      maintenanceAction: serializer.fromJson<String?>(
+        json['maintenanceAction'],
+      ),
+      coordsX: serializer.fromJson<double?>(json['coordsX']),
+      coordsY: serializer.fromJson<double?>(json['coordsY']),
+      floorLevel: serializer.fromJson<int?>(json['floorLevel']),
+      zoneId: serializer.fromJson<String?>(json['zoneId']),
     );
   }
   @override
@@ -1091,6 +1277,12 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
       'checklists': serializer.toJson<List<dynamic>>(checklists),
       'attachments': serializer.toJson<List<dynamic>>(attachments),
       'tenantId': serializer.toJson<String>(tenantId),
+      'code': serializer.toJson<String?>(code),
+      'maintenanceAction': serializer.toJson<String?>(maintenanceAction),
+      'coordsX': serializer.toJson<double?>(coordsX),
+      'coordsY': serializer.toJson<double?>(coordsY),
+      'floorLevel': serializer.toJson<int?>(floorLevel),
+      'zoneId': serializer.toJson<String?>(zoneId),
     };
   }
 
@@ -1110,6 +1302,12 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
     List<dynamic>? checklists,
     List<dynamic>? attachments,
     String? tenantId,
+    Value<String?> code = const Value.absent(),
+    Value<String?> maintenanceAction = const Value.absent(),
+    Value<double?> coordsX = const Value.absent(),
+    Value<double?> coordsY = const Value.absent(),
+    Value<int?> floorLevel = const Value.absent(),
+    Value<String?> zoneId = const Value.absent(),
   }) => WorkOrderEntity(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -1132,6 +1330,14 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
     checklists: checklists ?? this.checklists,
     attachments: attachments ?? this.attachments,
     tenantId: tenantId ?? this.tenantId,
+    code: code.present ? code.value : this.code,
+    maintenanceAction: maintenanceAction.present
+        ? maintenanceAction.value
+        : this.maintenanceAction,
+    coordsX: coordsX.present ? coordsX.value : this.coordsX,
+    coordsY: coordsY.present ? coordsY.value : this.coordsY,
+    floorLevel: floorLevel.present ? floorLevel.value : this.floorLevel,
+    zoneId: zoneId.present ? zoneId.value : this.zoneId,
   );
   WorkOrderEntity copyWithCompanion(WorkOrdersCompanion data) {
     return WorkOrderEntity(
@@ -1162,6 +1368,16 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
           ? data.attachments.value
           : this.attachments,
       tenantId: data.tenantId.present ? data.tenantId.value : this.tenantId,
+      code: data.code.present ? data.code.value : this.code,
+      maintenanceAction: data.maintenanceAction.present
+          ? data.maintenanceAction.value
+          : this.maintenanceAction,
+      coordsX: data.coordsX.present ? data.coordsX.value : this.coordsX,
+      coordsY: data.coordsY.present ? data.coordsY.value : this.coordsY,
+      floorLevel: data.floorLevel.present
+          ? data.floorLevel.value
+          : this.floorLevel,
+      zoneId: data.zoneId.present ? data.zoneId.value : this.zoneId,
     );
   }
 
@@ -1182,13 +1398,19 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
           ..write('resolutionNotes: $resolutionNotes, ')
           ..write('checklists: $checklists, ')
           ..write('attachments: $attachments, ')
-          ..write('tenantId: $tenantId')
+          ..write('tenantId: $tenantId, ')
+          ..write('code: $code, ')
+          ..write('maintenanceAction: $maintenanceAction, ')
+          ..write('coordsX: $coordsX, ')
+          ..write('coordsY: $coordsY, ')
+          ..write('floorLevel: $floorLevel, ')
+          ..write('zoneId: $zoneId')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     title,
     description,
@@ -1204,7 +1426,13 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
     checklists,
     attachments,
     tenantId,
-  );
+    code,
+    maintenanceAction,
+    coordsX,
+    coordsY,
+    floorLevel,
+    zoneId,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1223,7 +1451,13 @@ class WorkOrderEntity extends DataClass implements Insertable<WorkOrderEntity> {
           other.resolutionNotes == this.resolutionNotes &&
           other.checklists == this.checklists &&
           other.attachments == this.attachments &&
-          other.tenantId == this.tenantId);
+          other.tenantId == this.tenantId &&
+          other.code == this.code &&
+          other.maintenanceAction == this.maintenanceAction &&
+          other.coordsX == this.coordsX &&
+          other.coordsY == this.coordsY &&
+          other.floorLevel == this.floorLevel &&
+          other.zoneId == this.zoneId);
 }
 
 class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
@@ -1242,6 +1476,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
   final Value<List<dynamic>> checklists;
   final Value<List<dynamic>> attachments;
   final Value<String> tenantId;
+  final Value<String?> code;
+  final Value<String?> maintenanceAction;
+  final Value<double?> coordsX;
+  final Value<double?> coordsY;
+  final Value<int?> floorLevel;
+  final Value<String?> zoneId;
   final Value<int> rowid;
   const WorkOrdersCompanion({
     this.id = const Value.absent(),
@@ -1259,6 +1499,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
     this.checklists = const Value.absent(),
     this.attachments = const Value.absent(),
     this.tenantId = const Value.absent(),
+    this.code = const Value.absent(),
+    this.maintenanceAction = const Value.absent(),
+    this.coordsX = const Value.absent(),
+    this.coordsY = const Value.absent(),
+    this.floorLevel = const Value.absent(),
+    this.zoneId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WorkOrdersCompanion.insert({
@@ -1277,6 +1523,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
     this.checklists = const Value.absent(),
     this.attachments = const Value.absent(),
     required String tenantId,
+    this.code = const Value.absent(),
+    this.maintenanceAction = const Value.absent(),
+    this.coordsX = const Value.absent(),
+    this.coordsY = const Value.absent(),
+    this.floorLevel = const Value.absent(),
+    this.zoneId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -1299,6 +1551,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
     Expression<String>? checklists,
     Expression<String>? attachments,
     Expression<String>? tenantId,
+    Expression<String>? code,
+    Expression<String>? maintenanceAction,
+    Expression<double>? coordsX,
+    Expression<double>? coordsY,
+    Expression<int>? floorLevel,
+    Expression<String>? zoneId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1317,6 +1575,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
       if (checklists != null) 'checklists': checklists,
       if (attachments != null) 'attachments': attachments,
       if (tenantId != null) 'tenant_id': tenantId,
+      if (code != null) 'code': code,
+      if (maintenanceAction != null) 'maintenance_action': maintenanceAction,
+      if (coordsX != null) 'coords_x': coordsX,
+      if (coordsY != null) 'coords_y': coordsY,
+      if (floorLevel != null) 'floor_level': floorLevel,
+      if (zoneId != null) 'zone_id': zoneId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1337,6 +1601,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
     Value<List<dynamic>>? checklists,
     Value<List<dynamic>>? attachments,
     Value<String>? tenantId,
+    Value<String?>? code,
+    Value<String?>? maintenanceAction,
+    Value<double?>? coordsX,
+    Value<double?>? coordsY,
+    Value<int?>? floorLevel,
+    Value<String?>? zoneId,
     Value<int>? rowid,
   }) {
     return WorkOrdersCompanion(
@@ -1355,6 +1625,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
       checklists: checklists ?? this.checklists,
       attachments: attachments ?? this.attachments,
       tenantId: tenantId ?? this.tenantId,
+      code: code ?? this.code,
+      maintenanceAction: maintenanceAction ?? this.maintenanceAction,
+      coordsX: coordsX ?? this.coordsX,
+      coordsY: coordsY ?? this.coordsY,
+      floorLevel: floorLevel ?? this.floorLevel,
+      zoneId: zoneId ?? this.zoneId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1411,6 +1687,24 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
     if (tenantId.present) {
       map['tenant_id'] = Variable<String>(tenantId.value);
     }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (maintenanceAction.present) {
+      map['maintenance_action'] = Variable<String>(maintenanceAction.value);
+    }
+    if (coordsX.present) {
+      map['coords_x'] = Variable<double>(coordsX.value);
+    }
+    if (coordsY.present) {
+      map['coords_y'] = Variable<double>(coordsY.value);
+    }
+    if (floorLevel.present) {
+      map['floor_level'] = Variable<int>(floorLevel.value);
+    }
+    if (zoneId.present) {
+      map['zone_id'] = Variable<String>(zoneId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1435,6 +1729,12 @@ class WorkOrdersCompanion extends UpdateCompanion<WorkOrderEntity> {
           ..write('checklists: $checklists, ')
           ..write('attachments: $attachments, ')
           ..write('tenantId: $tenantId, ')
+          ..write('code: $code, ')
+          ..write('maintenanceAction: $maintenanceAction, ')
+          ..write('coordsX: $coordsX, ')
+          ..write('coordsY: $coordsY, ')
+          ..write('floorLevel: $floorLevel, ')
+          ..write('zoneId: $zoneId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2242,6 +2542,12 @@ typedef $$WorkOrdersTableCreateCompanionBuilder =
       Value<List<dynamic>> checklists,
       Value<List<dynamic>> attachments,
       required String tenantId,
+      Value<String?> code,
+      Value<String?> maintenanceAction,
+      Value<double?> coordsX,
+      Value<double?> coordsY,
+      Value<int?> floorLevel,
+      Value<String?> zoneId,
       Value<int> rowid,
     });
 typedef $$WorkOrdersTableUpdateCompanionBuilder =
@@ -2261,6 +2567,12 @@ typedef $$WorkOrdersTableUpdateCompanionBuilder =
       Value<List<dynamic>> checklists,
       Value<List<dynamic>> attachments,
       Value<String> tenantId,
+      Value<String?> code,
+      Value<String?> maintenanceAction,
+      Value<double?> coordsX,
+      Value<double?> coordsY,
+      Value<int?> floorLevel,
+      Value<String?> zoneId,
       Value<int> rowid,
     });
 
@@ -2349,6 +2661,36 @@ class $$WorkOrdersTableFilterComposer
     column: $table.tenantId,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get maintenanceAction => $composableBuilder(
+    column: $table.maintenanceAction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get coordsX => $composableBuilder(
+    column: $table.coordsX,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get coordsY => $composableBuilder(
+    column: $table.coordsY,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get floorLevel => $composableBuilder(
+    column: $table.floorLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$WorkOrdersTableOrderingComposer
@@ -2434,6 +2776,36 @@ class $$WorkOrdersTableOrderingComposer
     column: $table.tenantId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get maintenanceAction => $composableBuilder(
+    column: $table.maintenanceAction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get coordsX => $composableBuilder(
+    column: $table.coordsX,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get coordsY => $composableBuilder(
+    column: $table.coordsY,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get floorLevel => $composableBuilder(
+    column: $table.floorLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$WorkOrdersTableAnnotationComposer
@@ -2503,6 +2875,28 @@ class $$WorkOrdersTableAnnotationComposer
 
   GeneratedColumn<String> get tenantId =>
       $composableBuilder(column: $table.tenantId, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get maintenanceAction => $composableBuilder(
+    column: $table.maintenanceAction,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get coordsX =>
+      $composableBuilder(column: $table.coordsX, builder: (column) => column);
+
+  GeneratedColumn<double> get coordsY =>
+      $composableBuilder(column: $table.coordsY, builder: (column) => column);
+
+  GeneratedColumn<int> get floorLevel => $composableBuilder(
+    column: $table.floorLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get zoneId =>
+      $composableBuilder(column: $table.zoneId, builder: (column) => column);
 }
 
 class $$WorkOrdersTableTableManager
@@ -2551,6 +2945,12 @@ class $$WorkOrdersTableTableManager
                 Value<List<dynamic>> checklists = const Value.absent(),
                 Value<List<dynamic>> attachments = const Value.absent(),
                 Value<String> tenantId = const Value.absent(),
+                Value<String?> code = const Value.absent(),
+                Value<String?> maintenanceAction = const Value.absent(),
+                Value<double?> coordsX = const Value.absent(),
+                Value<double?> coordsY = const Value.absent(),
+                Value<int?> floorLevel = const Value.absent(),
+                Value<String?> zoneId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkOrdersCompanion(
                 id: id,
@@ -2568,6 +2968,12 @@ class $$WorkOrdersTableTableManager
                 checklists: checklists,
                 attachments: attachments,
                 tenantId: tenantId,
+                code: code,
+                maintenanceAction: maintenanceAction,
+                coordsX: coordsX,
+                coordsY: coordsY,
+                floorLevel: floorLevel,
+                zoneId: zoneId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2587,6 +2993,12 @@ class $$WorkOrdersTableTableManager
                 Value<List<dynamic>> checklists = const Value.absent(),
                 Value<List<dynamic>> attachments = const Value.absent(),
                 required String tenantId,
+                Value<String?> code = const Value.absent(),
+                Value<String?> maintenanceAction = const Value.absent(),
+                Value<double?> coordsX = const Value.absent(),
+                Value<double?> coordsY = const Value.absent(),
+                Value<int?> floorLevel = const Value.absent(),
+                Value<String?> zoneId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkOrdersCompanion.insert(
                 id: id,
@@ -2604,6 +3016,12 @@ class $$WorkOrdersTableTableManager
                 checklists: checklists,
                 attachments: attachments,
                 tenantId: tenantId,
+                code: code,
+                maintenanceAction: maintenanceAction,
+                coordsX: coordsX,
+                coordsY: coordsY,
+                floorLevel: floorLevel,
+                zoneId: zoneId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

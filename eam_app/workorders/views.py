@@ -43,6 +43,13 @@ class WorkOrderListView(APIView):
         can_view_all = request.user.is_superuser or HasPermission('work_order:reassign')().has_permission(request, self) or HasPermission('system:admin')().has_permission(request, self)
         if not can_view_all:
             wos = wos.filter(models.Q(assigned_to=request.user) | models.Q(created_by=request.user))
+
+        assigned_to_param = request.query_params.get('assignedTo') or request.query_params.get('assignee') or request.query_params.get('assigned_to')
+        if assigned_to_param:
+            if assigned_to_param in ('me', 'my', '@me'):
+                wos = wos.filter(assigned_to=request.user)
+            else:
+                wos = wos.filter(models.Q(assigned_to__username=assigned_to_param) | models.Q(assigned_to__id=assigned_to_param))
         
         try:
             page = int(request.query_params.get('page', 0))
@@ -415,8 +422,26 @@ class WorkOrderStatusView(APIView):
             raise ValidationError(serializer.errors)
         data = serializer.validated_data
         new_status = data['status']
-        
-        if wo.status == new_status:
+        if new_status == 'CANCELED':
+            new_status = 'CANCELLED'
+
+        if wo.status == new_status or (wo.status in ('CANCELLED', 'CANCELED') and new_status == 'CANCELLED'):
+            if new_status == 'COMPLETED':
+                incoming_notes = str(data.get('resolutionNotes') or '').strip()
+                existing_notes = str(wo.resolution_notes or '').strip()
+                incoming_vib = data.get('postRepairVibration')
+                incoming_temp = data.get('postRepairTemperature')
+                has_diff_notes = bool(incoming_notes and existing_notes and incoming_notes != existing_notes)
+                has_diff_vib = bool(incoming_vib is not None and wo.post_repair_vibration is not None and abs(float(incoming_vib) - float(wo.post_repair_vibration)) > 0.001)
+                has_diff_temp = bool(incoming_temp is not None and wo.post_repair_temperature is not None and abs(float(incoming_temp) - float(wo.post_repair_temperature)) > 0.001)
+                if has_diff_notes or has_diff_vib or has_diff_temp:
+                    return Response({
+                        "success": False,
+                        "error": {
+                            "code": "WORK_ORDER_ALREADY_COMPLETED_CONFLICT",
+                            "message": "Xung đột dữ liệu nghiệm thu: Phiếu việc đã được nghiệm thu hoàn thành trước đó với dữ liệu khác. Vui lòng làm mới dữ liệu."
+                        }
+                    }, status=status.HTTP_409_CONFLICT)
             return success_response(WorkOrderSerializer(wo).data)
             
         if new_status == 'ASSIGNED':
@@ -512,6 +537,7 @@ class WorkOrderStatusView(APIView):
             from workorders.services import WorkOrderTransitionService
             WorkOrderTransitionService.restore_work_order_inventory(wo)
             WorkOrderTransitionService.cancel_work_order_reservations(wo)
+            new_status = 'CANCELLED'
                 
         wo.status = new_status
         wo.save()
@@ -624,17 +650,20 @@ class WorkOrderChecklistView(APIView):
         data = serializer.validated_data
         
         from workorders.models import WorkOrderChecklistItem
-        item_id = data.get('id')
+        item_id = data.get('id') or data.get('itemId')
+        item_name = data.get('itemName') or data.get('item_name')
         item = None
         if item_id:
             item = wo.checklists.filter(id=item_id).first()
-        if not item:
-            item = wo.checklists.filter(item_name=data['itemName']).first()
+        if not item and item_name:
+            item = wo.checklists.filter(item_name=item_name).first()
 
         if not item:
+            if not item_name:
+                raise ValidationError({'itemName': 'Tên mục kiểm tra không được để trống.'})
             item = WorkOrderChecklistItem(
                 work_order=wo,
-                item_name=data['itemName'],
+                item_name=item_name,
                 is_mandatory=data.get('isMandatory', False),
                 input_type=data.get('inputType', 'PASS_FAIL'),
                 expected_value=data.get('expectedValue')
@@ -828,19 +857,35 @@ class WorkOrderAttachmentView(APIView):
         content_type = file_obj.content_type
         if not content_type or not content_type.startswith('image/'):
             raise ValidationError("Only image files are allowed")
-            
+
+        # Chống tạo trùng lặp ảnh bằng SHA-256 Content Hash & Concurrency Lock
         import os
-        import uuid
+        import hashlib
         from django.conf import settings
-        from minio import Minio
+        from workorders.models import WorkOrderAttachment
+        from workorders.serializers import WorkOrderAttachmentSerializer
+
+        file_obj.seek(0)
+        file_bytes = file_obj.read()
+        file_obj.seek(0)
+        content_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        # Kiểm tra nhanh trước khi upload MinIO (Fast path)
+        existing_att = WorkOrderAttachment.objects.filter(
+            work_order=wo,
+            file_url__contains=content_hash
+        ).first()
+        if existing_att:
+            return success_response(WorkOrderAttachmentSerializer(existing_att).data)
 
         file_url = None
         bucket_name = getattr(settings, 'MINIO_BUCKET_NAME', 'tenant-assets')
         extension = os.path.splitext(file_obj.name)[1]
-        object_name = f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{uuid.uuid4()}{extension}"
+        object_name = f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{content_hash}{extension}"
 
-        # Upload directly to MinIO
+        # Upload to MinIO (Deterministic object name prevents duplicate orphaned objects)
         try:
+            from minio import Minio
             client = Minio(
                 settings.MINIO_ENDPOINT,
                 access_key=settings.MINIO_ACCESS_KEY,
@@ -877,22 +922,36 @@ class WorkOrderAttachmentView(APIView):
             logging.getLogger(__name__).warning(f"MinIO upload failed, falling back to default_storage: {e}")
             from django.core.files.storage import default_storage
             file_obj.seek(0)
-            file_path = default_storage.save(f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{file_obj.name}", file_obj)
+            storage_path = f"tenant-{wo.tenant_id}/work-orders/{wo.id}/{content_hash}_{file_obj.name}"
+            if not default_storage.exists(storage_path):
+                file_path = default_storage.save(storage_path, file_obj)
+            else:
+                file_path = storage_path
             file_url = default_storage.url(file_path)
             if not file_url.startswith('/') and not file_url.startswith('http'):
                 file_url = f"/{file_url}"
-        
-        from workorders.models import WorkOrderAttachment
-        from workorders.serializers import WorkOrderAttachmentSerializer
-        
-        attachment = WorkOrderAttachment.objects.create(
-            work_order=wo,
-            file_url=file_url,
-            file_name=file_obj.name,
-            file_type=content_type,
-            file_size=file_obj.size
-        )
-        
+
+        # Tạo bản ghi đính kèm an toàn đa luồng (select_for_update phòng chống race condition)
+        with transaction.atomic():
+            WorkOrder.objects.select_for_update().get(id=wo.id)
+            existing_att = WorkOrderAttachment.objects.filter(
+                work_order=wo,
+                file_url__contains=content_hash
+            ).first()
+            if existing_att:
+                return success_response(WorkOrderAttachmentSerializer(existing_att).data)
+
+            attachment = WorkOrderAttachment.objects.create(
+                work_order=wo,
+                tenant=wo.tenant,
+                file_url=file_url,
+                file_name=file_obj.name,
+                file_type=content_type,
+                file_size=file_obj.size,
+                created_by=request.user,
+                updated_by=request.user
+            )
+
         return success_response(WorkOrderAttachmentSerializer(attachment).data)
 
 class WorkOrderAttachmentDeleteView(APIView):

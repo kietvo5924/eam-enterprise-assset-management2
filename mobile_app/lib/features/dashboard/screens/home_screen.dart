@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _unreadCount = 0;
   final NotificationService _notificationService = NotificationService();
+  String? _lastOpenedMessageId;
 
   @override
   void initState() {
@@ -34,10 +35,23 @@ class _HomeScreenState extends State<HomeScreen> {
             context.read<WorkOrderProvider>().fetchHomeWorkOrders();
           }
         },
-        onNotificationOpened: (_) {
+        onNotificationOpened: (message) {
           _fetchUnreadCount();
           if (mounted) {
             context.read<WorkOrderProvider>().fetchHomeWorkOrders();
+            final msgId = message.messageId;
+            if (msgId != null && msgId.isNotEmpty && msgId == _lastOpenedMessageId) {
+              return;
+            }
+            _lastOpenedMessageId = msgId;
+
+            final data = message.data;
+            final woId = data['work_order_id'] ?? data['workOrderId'] ?? data['wo_id'] ?? data['woId'];
+            if (woId != null && woId.toString().isNotEmpty) {
+              context.push('/work-order-detail/$woId');
+            } else {
+              context.push('/notifications');
+            }
           }
         },
       );
@@ -238,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '${workOrders.length}',
+                            '${woProvider.homeTotalCount > 0 ? woProvider.homeTotalCount : workOrders.length}',
                             style: const TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w900,
@@ -258,14 +272,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   child: FractionallySizedBox(
                                     alignment: Alignment.centerLeft,
-                                    widthFactor: workOrders.isNotEmpty
-                                        ? workOrders
-                                                  .where(
-                                                    (w) =>
-                                                        w.status == 'COMPLETED',
-                                                  )
-                                                  .length /
-                                              workOrders.length
+                                    widthFactor: woProvider.homeTotalCount > 0
+                                        ? (woProvider.homeCompletedCount / woProvider.homeTotalCount).clamp(0.0, 1.0)
                                         : 0.0,
                                     child: Container(
                                       decoration: BoxDecoration(
@@ -278,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${workOrders.where((w) => w.status == 'COMPLETED').length}/${workOrders.length}',
+                                '${woProvider.homeCompletedCount}/${woProvider.homeTotalCount}',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -339,11 +347,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                workOrders
-                                        .where((w) => w.status == 'IN_PROGRESS')
-                                        .isNotEmpty
-                                    ? 'WO-${workOrders.firstWhere((w) => w.status == 'IN_PROGRESS').id.substring(0, 4)}'
-                                    : 'Chưa có',
+                                (() {
+                                  final inProg = workOrders.where((w) => w.status == 'IN_PROGRESS');
+                                  if (inProg.isEmpty) return 'Chưa có';
+                                  final first = inProg.first;
+                                  final c = first.code;
+                                  if (c != null && c.isNotEmpty) return c;
+                                  final id = first.id;
+                                  return id.length >= 4 ? 'WO-${id.substring(0, 4)}' : 'WO-$id';
+                                })(),
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w900,
@@ -566,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       statusBgColor: statusUI['bgColor'],
                       statusTextColor: statusUI['textColor'],
                       id: wo.id,
-                      code: 'WO-${wo.id.substring(0, 4)}',
+                      code: (wo.code != null && wo.code!.isNotEmpty) ? wo.code! : (wo.id.length >= 4 ? 'WO-${wo.id.substring(0, 4)}' : 'WO-${wo.id}'),
                       title: wo.title,
                       location: wo.assetName ?? 'Chưa gắn thiết bị',
                       timeOrInfo: wo.getFormattedTime(),

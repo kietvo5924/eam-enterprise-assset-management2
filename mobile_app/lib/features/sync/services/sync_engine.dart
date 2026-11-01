@@ -48,18 +48,32 @@ class SyncEngine {
         return;
       }
 
-      final pendingTasks = await AppDatabase.instance.syncQueueDao.getPendingSyncs();
+      final pendingTasks = await AppDatabase.instance.syncQueueDao.getPendingSyncs(tenantId);
       
+      final failedWoIds = <String>{};
       for (final task in pendingTasks) {
         if (task.tenantId != tenantId) {
-          await AppDatabase.instance.syncQueueDao.deleteSyncTask(task.id);
+          // Tenant isolation: preserve offline tasks for other tenant, do NOT delete!
           continue;
         }
         if (task.status == 'CONFLICT') continue; // Skip conflicted records
 
-        // Ensure we are not retrying too fast.
-        // Actually, we process them sequentially.
-        await _processTask(task);
+        // Dependency management within same Work Order
+        String? woId;
+        try {
+          final payload = jsonDecode(task.payload) as Map<String, dynamic>;
+          woId = payload['woId'] as String?;
+        } catch (_) {}
+
+        if (woId != null && failedWoIds.contains(woId) && task.actionType == 'UPDATE_STATUS') {
+          // Defer status completion until prior tasks for this WO succeed
+          continue;
+        }
+
+        final bool ok = await _processTask(task);
+        if (!ok && woId != null) {
+          failedWoIds.add(woId);
+        }
       }
     } catch (e) {
       debugPrint('SyncEngine error: $e');
@@ -68,11 +82,18 @@ class SyncEngine {
     }
   }
 
-  Future<void> _processTask(SyncQueueEntity task) async {
+  Future<void> retryFailedTasks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final tenantId = prefs.getString('tenantId') ?? '';
+    await AppDatabase.instance.syncQueueDao.retryFailedTasks(tenantId.isNotEmpty ? tenantId : null);
+    await triggerSync();
+  }
+
+  Future<bool> _processTask(SyncQueueEntity task) async {
     try {
       if (task.retryCount >= 3) {
         await _updateTaskStatus(task, 'FAILED');
-        return;
+        return false;
       }
 
       // Exponential backoff if it's a retry
@@ -96,6 +117,9 @@ class SyncEngine {
         case 'UPDATE_CHECKLIST':
           success = await _syncChecklist(payload, options);
           break;
+        case 'DELETE_CHECKLIST':
+          success = await _syncDeleteChecklist(payload, options);
+          break;
         case 'UPLOAD_PHOTO':
           success = await _syncPhoto(payload, options);
           break;
@@ -106,12 +130,19 @@ class SyncEngine {
           success = await _syncNotes(payload, options);
           break;
         default:
-          success = true; // Unknown task, mark as success to clear it
+          debugPrint('Unknown actionType: ${task.actionType}, marking task as FAILED');
+          await _updateTaskStatus(task, 'FAILED');
+          return false;
       }
 
       if (success) {
         // Success: Remove from queue
         await AppDatabase.instance.syncQueueDao.deleteSyncTask(task.id);
+        return true;
+      } else {
+        // If operation returned false, increment retry and update status
+        await _handleFailure(task);
+        return false;
       }
     } on DioException catch (e) {
       if (e.response?.statusCode == 409) {
@@ -119,17 +150,31 @@ class SyncEngine {
         await _updateTaskStatus(task, 'CONFLICT');
       } else if (e.response?.statusCode == 400 || e.response?.statusCode == 403 || e.response?.statusCode == 404) {
         // Deterministic error (e.g. invalid status transition, missing notes)
-        // No point in retrying
+        // No point in retrying automatically
         debugPrint('Sync task failed deterministically: ${e.response?.data}');
-        await _updateTaskStatus(task, 'FAILED');
+        await AppDatabase.instance.syncQueueDao.updateSyncTask(
+          task.copyWith(status: 'FAILED', retryCount: 3),
+        );
       } else {
         // Network or other server error
         await _handleFailure(task);
       }
+      return false;
     } catch (e) {
       debugPrint('Sync task failed: $e');
       await _handleFailure(task);
+      return false;
     }
+  }
+
+  Future<bool> _syncDeleteChecklist(Map<String, dynamic> payload, Options options) async {
+    final String woId = payload['woId'];
+    final String checklistId = payload['checklistId'];
+    final response = await _dio.delete(
+      '/api/v1/work-orders/$woId/checklists/$checklistId',
+      options: options,
+    );
+    return response.statusCode == 200 && response.data['success'] == true;
   }
 
   Future<void> _handleFailure(SyncQueueEntity task) async {
@@ -172,7 +217,8 @@ class SyncEngine {
     
     final file = File(filePath);
     if (!await file.exists()) {
-      return true; // File not found, skip
+      debugPrint('Photo sync file not found: $filePath');
+      return false; // Do NOT claim success if proof photo is missing!
     }
 
     final formData = FormData.fromMap({

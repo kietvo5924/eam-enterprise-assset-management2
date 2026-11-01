@@ -16,6 +16,12 @@ class DatabaseMapper {
       deadline: entity.deadline,
       assigneeUsername: entity.assigneeUsername,
       resolutionNotes: entity.resolutionNotes,
+      code: entity.code,
+      maintenanceAction: entity.maintenanceAction,
+      coordsX: entity.coordsX,
+      coordsY: entity.coordsY,
+      floorLevel: entity.floorLevel,
+      zoneId: entity.zoneId,
       checklists: (entity.checklists as List<dynamic>?)?.map((c) => WorkOrderChecklist.fromJson(c as Map<String, dynamic>)).toList() ?? [],
       attachments: (entity.attachments as List<dynamic>?)?.map((a) => WorkOrderAttachment.fromJson(a as Map<String, dynamic>)).toList() ?? [],
     );
@@ -38,6 +44,12 @@ class DatabaseMapper {
       checklists: wo.checklists.map((c) => c.toJson()).toList(),
       attachments: wo.attachments.map((a) => a.toJson()).toList(),
       tenantId: tenantId,
+      code: wo.code,
+      maintenanceAction: wo.maintenanceAction,
+      coordsX: wo.coordsX,
+      coordsY: wo.coordsY,
+      floorLevel: wo.floorLevel,
+      zoneId: wo.zoneId,
     );
   }
 

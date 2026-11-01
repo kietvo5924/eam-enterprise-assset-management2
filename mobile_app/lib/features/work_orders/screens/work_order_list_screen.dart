@@ -23,7 +23,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
     {'value': 'ASSIGNED', 'label': 'Được giao'},
     {'value': 'IN_PROGRESS', 'label': 'Đang làm'},
     {'value': 'COMPLETED', 'label': 'Hoàn thành'},
-    {'value': 'CANCELED', 'label': 'Đã hủy'},
+    {'value': 'CANCELLED', 'label': 'Đã hủy'},
   ];
 
   final ScrollController _scrollController = ScrollController();
@@ -57,7 +57,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
       final matchesSearch = wo.title.toLowerCase().contains(_searchQuery.toLowerCase()) || 
                             (wo.assetName?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false) ||
                             wo.id.toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchesStatus = _selectedStatus == 'ALL' || wo.status == _selectedStatus;
+      final matchesStatus = _selectedStatus == 'ALL' || (_selectedStatus == 'CANCELLED' ? (wo.status == 'CANCELLED' || wo.status == 'CANCELED') : wo.status == _selectedStatus);
       return matchesSearch && matchesStatus;
     }).toList();
   }
@@ -196,7 +196,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
                             statusBgColor: statusUI['bgColor'],
                             statusTextColor: statusUI['textColor'],
                             id: wo.id,
-                            code: 'WO-${wo.id.substring(0,4)}',
+                            code: (wo.code != null && wo.code!.isNotEmpty) ? wo.code! : (wo.id.length >= 4 ? 'WO-${wo.id.substring(0, 4)}' : 'WO-${wo.id}'),
                             title: wo.title,
                             location: wo.assetName ?? 'Chưa gắn thiết bị',
                             timeOrInfo: wo.getFormattedTime(),

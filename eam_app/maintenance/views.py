@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from maintenance.models import PmPlan, PmPlanChecklistItem, PmPlanMaterial, PmPlanAssignment
 from maintenance.serializers import (
@@ -164,7 +165,7 @@ class PmPlanKpiView(APIView):
         missed_pms = WorkOrder.objects.filter(
             tenant=tenant,
             source_reference__startswith="PM_",
-            deadline__lt=django.utils.timezone.now()
+            deadline__lt=timezone.now()
         ).exclude(status__in=['COMPLETED', 'CANCELLED']).count()
         
         total_pm_wos = WorkOrder.objects.filter(tenant=tenant, source_reference__startswith="PM_").count()

@@ -71,7 +71,7 @@ class SparePartCreateUpdateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     partNumber = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     description = serializers.CharField(max_length=1000, required=False, allow_blank=True, allow_null=True)
-    quantityInStock = serializers.DecimalField(max_digits=19, decimal_places=2, required=False, default=0.00)
+    quantityInStock = serializers.DecimalField(max_digits=19, decimal_places=2, required=False)
     unitCost = serializers.DecimalField(max_digits=19, decimal_places=2, required=False, allow_null=True)
 
 class AssetSerializer(serializers.ModelSerializer):

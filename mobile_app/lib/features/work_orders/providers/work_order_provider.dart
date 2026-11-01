@@ -11,6 +11,12 @@ class WorkOrderProvider extends ChangeNotifier {
   List<WorkOrder> _homeWorkOrders = [];
   List<WorkOrder> get homeWorkOrders => _homeWorkOrders;
 
+  int _homeCompletedCount = 0;
+  int get homeCompletedCount => _homeCompletedCount;
+
+  int _homeTotalCount = 0;
+  int get homeTotalCount => _homeTotalCount;
+
   List<WorkOrder> _myWorkOrders = [];
   List<WorkOrder> get myWorkOrders => _myWorkOrders;
 
@@ -41,6 +47,9 @@ class WorkOrderProvider extends ChangeNotifier {
       if (tenantId.isNotEmpty && myUsername.isNotEmpty) {
         _homeSub?.cancel();
         _homeSub = AppDatabase.instance.workOrderDao.watchMyWorkOrders(myUsername, tenantId).listen((entities) {
+          final validEntities = entities.where((e) => e.status != 'CANCELLED' && e.status != 'CANCELED').toList();
+          _homeCompletedCount = validEntities.where((e) => e.status == 'COMPLETED').length;
+          _homeTotalCount = validEntities.length;
           final mapped = entities.map((e) => DatabaseMapper.fromWorkOrderEntity(e)).toList();
           _homeWorkOrders = mapped.where((wo) => wo.status != 'COMPLETED' && wo.status != 'CANCELED' && wo.status != 'CANCELLED').toList();
           notifyListeners();

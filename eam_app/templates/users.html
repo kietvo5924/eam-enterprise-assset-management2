@@ -1023,9 +1023,19 @@
     font-weight: 600;
   }
 </style>
+{{ roles_can_execute_map|json_script:"roles-can-execute-data" }}
+{{ user_profiles_dict|json_script:"user-profiles-data" }}
 <script>
-  window.ROLES_CAN_EXECUTE = {{ roles_can_execute_json|safe }};
-  window.USER_PROFILES = {{ user_profiles_json|safe }};
+  try {
+    window.ROLES_CAN_EXECUTE = JSON.parse(document.getElementById('roles-can-execute-data').textContent || '{}');
+  } catch (e) {
+    window.ROLES_CAN_EXECUTE = {};
+  }
+  try {
+    window.USER_PROFILES = JSON.parse(document.getElementById('user-profiles-data').textContent || '{}');
+  } catch (e) {
+    window.USER_PROFILES = {};
+  }
 
   function checkTechnicianRoles() {
       if (!window.userRolesSelect) return false;

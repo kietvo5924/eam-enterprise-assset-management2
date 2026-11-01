@@ -27,7 +27,7 @@ class NetworkService extends ChangeNotifier {
   }
 
   void _updateStatus(List<ConnectivityResult> results) {
-    bool online = !results.contains(ConnectivityResult.none) && results.isNotEmpty;
+    bool online = results.any((r) => r != ConnectivityResult.none);
     if (_isOnline != online) {
       _isOnline = online;
       notifyListeners();

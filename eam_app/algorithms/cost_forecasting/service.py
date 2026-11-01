@@ -48,21 +48,24 @@ class CostForecastingService:
         Quy tắc 6: Bóc tách Gross vs Net Cost (trừ bảo hành & bảo hiểm).
         Đảm bảo tính Idempotent: nếu đã khóa (is_cost_frozen=True), không bao giờ ghi đè.
         """
-        tenant = work_order.tenant
+        # 0. Global Lock Order: WorkOrder -> WorkOrderCost -> Asset (Deadlock Prevention)
+        target_wo = WorkOrder.objects.select_for_update().get(id=work_order.id)
+        tenant = target_wo.tenant
 
-        # 0. Idempotency Check: Nếu đã có snapshot và đã chốt khóa, trả về ngay lập tức
+        # 0.1 Idempotency Check: Nếu đã có snapshot và đã chốt khóa, trả về ngay lập tức
         existing = WorkOrderCost.all_objects.select_for_update().filter(
             tenant=tenant,
-            work_order=work_order
+            work_order=target_wo
         ).first()
         if existing and existing.is_cost_frozen:
+            work_order.actual_cost = existing.net_cost
             return existing
 
         # 1. Tính toán chi phí vật tư từ các giao dịch StockTransaction liên kết
         # Chỉ lấy ISSUE (+), ADJUSTMENT (+), trừ RETURN (-)
         mat_txs = StockTransaction.all_objects.filter(
             tenant=tenant,
-            work_order=work_order,
+            work_order=target_wo,
             transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN']
         )
         material_cost = Decimal('0')
@@ -135,6 +138,13 @@ class CostForecastingService:
         else:
             i_cost = Decimal('0.00')
 
+        if v_cost < Decimal('0.00'):
+            raise ValidationError("Chi phí thuê ngoài (vendor_cost) không được là số âm.")
+        if w_cost < Decimal('0.00'):
+            raise ValidationError("Chi phí bảo hành (warranty_covered_amount) không được là số âm.")
+        if i_cost < Decimal('0.00'):
+            raise ValidationError("Chi phí bảo hiểm (insurance_covered_amount) không được là số âm.")
+
         # 6. Chi phí ròng Net Cost (có thể = 0 nếu bảo hành/bảo hiểm 100%)
         net_cost = max(Decimal('0'), gross_cost - (w_cost + i_cost))
 
@@ -163,19 +173,24 @@ class CostForecastingService:
         )
 
         # Đồng bộ ngược vào WorkOrder.actual_cost và is_capitalized (loại trừ OPEX)
-        work_order.actual_cost = cost_obj.net_cost
+        target_wo.actual_cost = cost_obj.net_cost
         update_fields = ['actual_cost']
-        if is_cap and not work_order.is_capitalized:
-            work_order.is_capitalized = True
+        if is_cap and not target_wo.is_capitalized:
+            target_wo.is_capitalized = True
             update_fields.append('is_capitalized')
-        work_order.save(update_fields=update_fields)
+        target_wo.save(update_fields=update_fields)
 
-        # Rule 2: Kế thừa cờ CapEx và cập nhật giá trị vốn hóa vào Asset.capitalized_cost
+        work_order.actual_cost = target_wo.actual_cost
+        work_order.is_capitalized = target_wo.is_capitalized
+
+        # Rule 2: Kế thừa cờ CapEx và cập nhật giá trị vốn hóa vào Asset.capitalized_cost (Atomic & Concurrency-safe)
         if is_cap and work_order.asset_id:
-            asset = work_order.asset
-            current_cap = asset.capitalized_cost or Decimal('0.00')
-            asset.capitalized_cost = current_cap + cost_obj.net_cost
-            asset.save(update_fields=['capitalized_cost'])
+            from assets.models import Asset
+            asset = Asset.objects.select_for_update().filter(id=work_order.asset_id).first()
+            if asset:
+                current_cap = asset.capitalized_cost or Decimal('0.00')
+                asset.capitalized_cost = current_cap + cost_obj.net_cost
+                asset.save(update_fields=['capitalized_cost'])
 
         return cost_obj
 

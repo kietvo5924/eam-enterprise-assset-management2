@@ -371,6 +371,7 @@ class MaintenanceCostForecastingTests(TestCase):
             tenant=self.tenant,
             pm_plan=plan,
             asset=self.asset,
+            last_triggered_at=timezone.make_aware(datetime.datetime(2026, 10, 15, 0, 0, 0)),
             status='ACTIVE'
         )
 

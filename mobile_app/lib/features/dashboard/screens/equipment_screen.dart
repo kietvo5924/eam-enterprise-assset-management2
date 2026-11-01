@@ -50,7 +50,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
         actions: [
           IconButton(
             icon: Icon(PhosphorIcons.qrCode(), color: AppTheme.neutral700),
-            onPressed: () {},
+            onPressed: () => context.push('/qr-scanner'),
           ),
         ],
       ),

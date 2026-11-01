@@ -19,7 +19,9 @@ class UserProvider extends ChangeNotifier {
 
   bool get canCreateWorkOrder {
     final r = _roles.toLowerCase();
-    return r.contains('admin') || r.contains('manager') || r.contains('supervisor');
+    return r.contains('admin') ||
+        r.contains('manager') ||
+        r.contains('supervisor');
   }
 
   Future<void> loadUser() async {
@@ -32,8 +34,12 @@ class UserProvider extends ChangeNotifier {
     // Trigger local DB cleanup in background
     if (_tenantId.isNotEmpty) {
       try {
-        AppDatabase.instance.workOrderDao.deleteOldCompletedWorkOrders();
-        AppDatabase.instance.assetDao.deleteOrphanedAssets();
+        AppDatabase.instance.workOrderDao
+            .deleteOldCompletedWorkOrders(_tenantId)
+            .catchError((_) => 0);
+        AppDatabase.instance.assetDao
+            .deleteOrphanedAssets(_tenantId)
+            .catchError((_) => 0);
       } catch (e) {
         // Ignore DB init/cleanup errors
       }

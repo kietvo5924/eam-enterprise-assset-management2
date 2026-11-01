@@ -1,3 +1,4 @@
+import '../../features/dashboard/screens/notifications_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -55,7 +56,7 @@ class AppRouter {
             path: 'work-order-detail/:id',
             builder: (context, state) {
               final id = state.pathParameters['id']!;
-              final code = state.extra as String? ?? 'WO-${id.substring(0, 4)}';
+              final code = state.extra as String? ?? (id.length >= 4 ? 'WO-${id.substring(0, 4)}' : 'WO-$id');
               return WorkOrderDetailScreen(workOrderId: id, workOrderCode: code);
             },
           ),
@@ -81,15 +82,19 @@ class AppRouter {
           GoRoute(
             path: 'equipment-detail',
             builder: (context, state) {
-              final equipment = state.extra as Map<String, dynamic>;
+              final equipment = (state.extra as Map<String, dynamic>?) ?? <String, dynamic>{};
               return EquipmentDetailScreen(equipment: equipment);
             },
+          ),
+          GoRoute(
+            path: 'notifications',
+            builder: (context, state) => const NotificationsScreen(),
           ),
           GoRoute(
             path: 'technician-route',
             builder: (context, state) {
               final extra = state.extra as Map<String, dynamic>?;
-              final workOrderIds = extra?['workOrderIds'] as List<String>?;
+              final workOrderIds = (extra?['workOrderIds'] as List?)?.map((e) => e.toString()).toList();
               return TechnicianRouteScreen(initialWorkOrderIds: workOrderIds);
             },
           ),

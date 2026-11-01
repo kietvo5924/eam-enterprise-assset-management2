@@ -20,13 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _usernameController.text = 'vf_admin@vinfast.local';
-    _passwordController.text = 'admin';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _handleLogin();
-      }
-    });
   }
 
   Future<void> _handleLogin() async {

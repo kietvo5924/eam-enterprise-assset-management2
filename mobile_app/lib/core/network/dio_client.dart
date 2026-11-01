@@ -27,16 +27,18 @@ class DioClient {
       },
     ));
 
-    // Thêm LogInterceptor để in log request/response
-    dio.interceptors.add(LogInterceptor(
-      request: true,
-      requestHeader: true,
-      requestBody: true,
-      responseHeader: true,
-      responseBody: true,
-      error: true,
-      logPrint: (obj) => debugPrint(obj.toString()),
-    ));
+    // Chỉ log an toàn trong kDebugMode, không in Authorization token hay mật khẩu
+    if (kDebugMode) {
+      dio.interceptors.add(LogInterceptor(
+        request: true,
+        requestHeader: false, // Redact Authorization headers
+        requestBody: false,   // Redact sensitive credentials in request bodies
+        responseHeader: false,
+        responseBody: false,
+        error: true,
+        logPrint: (obj) => debugPrint(obj.toString()),
+      ));
+    }
 
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -53,7 +55,10 @@ class DioClient {
       },
       onError: (DioException e, handler) async {
         if (e.response?.statusCode == 401) {
-          // Handle 401 Unauthorized - Token Expired
+          // Guard against refresh recursion: if this request was already a retry attempt or is the refresh call itself, do not retry
+          if (e.requestOptions.extra['isRetry'] == true || e.requestOptions.path.contains('/auth/refresh')) {
+            return handler.next(e);
+          }
           debugPrint('Caught 401: Token might be expired.');
           
           // Add the failed request to the queue to retry after refreshing
@@ -64,10 +69,11 @@ class DioClient {
 
           if (!_isRefreshing) {
             _isRefreshing = true;
+            String? newToken;
             try {
               final refreshToken = await _secureStorage.read(key: 'refreshToken');
               
-              if (refreshToken == null) {
+              if (refreshToken == null || refreshToken.isEmpty) {
                 throw Exception('No refresh token available');
               }
 
@@ -79,47 +85,57 @@ class DioClient {
               );
               
               if (response.statusCode == 200 && response.data['token'] != null) {
-                final newToken = response.data['token'];
+                newToken = response.data['token'];
                 await _secureStorage.write(key: 'token', value: newToken);
                 
-                // If there's a new refresh token, save it too
+                // If there's a new refresh token (rotation), save it too
                 if (response.data['refreshToken'] != null) {
-                   await _secureStorage.write(key: 'refreshToken', value: response.data['refreshToken']);
+                  await _secureStorage.write(key: 'refreshToken', value: response.data['refreshToken']);
                 }
-
-                // Retry all requests in the queue
-                for (var req in _failedRequestsQueue) {
-                  final options = req['options'] as RequestOptions;
-                  final reqHandler = req['handler'] as ErrorInterceptorHandler;
-                  
-                  // Attach the new token
-                  options.headers['Authorization'] = 'Bearer $newToken';
-                  
-                  // Re-fetch the original API call
-                  final retryResponse = await dio.fetch(options);
-                  reqHandler.resolve(retryResponse);
-                }
-                _failedRequestsQueue.clear();
-                return; // Return so we don't call handler.next(e)
               } else {
                 throw Exception('Failed to refresh token');
               }
             } catch (refreshError) {
               debugPrint('Refresh token failed: $refreshError');
-              // If refresh fails -> Force logout
+              // If refresh genuinely fails -> Invalidate auth session but preserve app settings
               await _secureStorage.deleteAll();
               final prefs = await SharedPreferences.getInstance();
-              await prefs.clear();
-              // In a real app, dispatch an event or use a global router key to navigate to Login
+              await prefs.remove('token');
+              await prefs.remove('refreshToken');
+              await prefs.remove('isLoggedIn');
             } finally {
               _isRefreshing = false;
-              // If there are still items in the queue (meaning refresh failed), reject them
-              for (var req in _failedRequestsQueue) {
+            }
+
+            final pendingRequests = List<Map<String, dynamic>>.from(_failedRequestsQueue);
+            _failedRequestsQueue.clear();
+
+            if (newToken != null) {
+              // Refresh succeeded: retry queued requests individually
+              for (var req in pendingRequests) {
+                final options = req['options'] as RequestOptions;
+                final reqHandler = req['handler'] as ErrorInterceptorHandler;
+                options.headers['Authorization'] = 'Bearer $newToken';
+                options.extra['isRetry'] = true;
+                try {
+                  final retryResponse = await dio.fetch(options);
+                  reqHandler.resolve(retryResponse);
+                } catch (retryErr) {
+                  if (retryErr is DioException) {
+                    reqHandler.next(retryErr);
+                  } else {
+                    reqHandler.next(DioException(requestOptions: options, error: retryErr));
+                  }
+                }
+              }
+            } else {
+              // Refresh failed: reject all queued requests
+              for (var req in pendingRequests) {
                 final reqHandler = req['handler'] as ErrorInterceptorHandler;
                 reqHandler.next(e);
               }
-              _failedRequestsQueue.clear();
             }
+            return;
           }
           return; // Hold the connection in pending state until refresh is resolved
         }

@@ -1,5 +1,6 @@
 import unicodedata
 import re
+from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -529,13 +530,31 @@ class SparePartListView(APIView):
             
         data = serializer.validated_data
         
+        loc_id = request.data.get('locationId') or request.data.get('location_id')
+        init_qty = Decimal(str(data.get('quantityInStock', 0.0) or 0.0))
         part = SparePart.objects.create(
             name=data['name'],
             part_number=data.get('partNumber'),
             description=data.get('description'),
-            quantity_in_stock=data.get('quantityInStock', 0.0),
+            location_id=loc_id or None,
+            quantity_in_stock=init_qty,
             unit_cost=data.get('unitCost')
         )
+        if init_qty > Decimal('0'):
+            from assets.models import StockTransaction
+            from django.utils import timezone
+            u_cost = part.unit_cost or Decimal('0.00')
+            StockTransaction.all_objects.create(
+                tenant=part.tenant,
+                spare_part=part,
+                transaction_type='RECEIPT',
+                quantity=init_qty,
+                unit_price=u_cost,
+                total_amount=(init_qty * u_cost).quantize(Decimal('0.01')),
+                cost_center_snapshot='INITIAL_STOCK',
+                issue_date=timezone.now(),
+                is_variance_adjustment=False
+            )
         
         return success_response(SparePartSerializer(part).data, message="Created")
 
@@ -558,15 +577,37 @@ class SparePartDetailView(APIView):
             
         data = serializer.validated_data
         
-        part.name = data['name']
-        if 'partNumber' in data:
-            part.part_number = data['partNumber']
-        if 'description' in data:
-            part.description = data['description']
-        if 'quantityInStock' in data:
-            part.quantity_in_stock = data['quantityInStock']
-        if 'unitCost' in data:
-            part.unit_cost = data['unitCost']
+        if 'name' in request.data and data.get('name'):
+            part.name = data['name']
+        if 'partNumber' in request.data:
+            part.part_number = data.get('partNumber')
+        if 'description' in request.data:
+            part.description = data.get('description')
+        if 'locationId' in request.data or 'location_id' in request.data:
+            loc_id = request.data.get('locationId') or request.data.get('location_id')
+            part.location_id = loc_id or None
+        if 'quantityInStock' in request.data and data.get('quantityInStock') is not None:
+            old_qty = part.quantity_in_stock or Decimal('0.00')
+            new_qty = Decimal(str(data['quantityInStock']))
+            if new_qty != old_qty:
+                delta_qty = new_qty - old_qty
+                part.quantity_in_stock = new_qty
+                from assets.models import StockTransaction
+                from django.utils import timezone
+                u_cost = data.get('unitCost') if ('unitCost' in request.data and data.get('unitCost') is not None) else (part.unit_cost or Decimal('0.00'))
+                StockTransaction.all_objects.create(
+                    tenant=part.tenant,
+                    spare_part=part,
+                    transaction_type='ADJUSTMENT',
+                    quantity=abs(delta_qty),
+                    unit_price=u_cost,
+                    total_amount=abs(delta_qty * u_cost).quantize(Decimal('0.01')),
+                    cost_center_snapshot='ADJUSTMENT_INCREASE' if delta_qty > 0 else 'ADJUSTMENT_DECREASE',
+                    issue_date=timezone.now(),
+                    is_variance_adjustment=True
+                )
+        if 'unitCost' in request.data:
+            part.unit_cost = data.get('unitCost')
             
         part.save()
 

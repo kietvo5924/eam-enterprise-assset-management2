@@ -1102,5 +1102,77 @@ class DeepAuditVerifiedFixesTests(TestCase):
         self.assertEqual(vib_reading.load_factor, 1.2)
         self.assertEqual(vib_reading.machine_state, 'RUNNING')
 
+    def test_22_portal_inventory_atomic_put_adjustment(self):
+        """B22: Kiểm tra cập nhật tồn kho vật tư qua portal_inventory PUT (Nguyên tử & Tạo StockTransaction ADJUSTMENT)."""
+        from portal.views import portal_inventory
+        from django.test import RequestFactory
+        import json
 
+        factory = RequestFactory()
+        part = SparePart.objects.create(
+            name="Dây curoa B-52",
+            part_number="BELT-B52",
+            tenant=self.tenant,
+            quantity_in_stock=Decimal('10.00'),
+            unit_cost=Decimal('150000.00')
+        )
 
+        p_inv_read, _ = Permission.objects.get_or_create(id='inventory:read', defaults={'name': 'Read Inventory'})
+        p_inv_upd, _ = Permission.objects.get_or_create(id='inventory:update', defaults={'name': 'Update Inventory'})
+        self.role_tech.permissions.add(p_inv_read, p_inv_upd)
+
+        # 1. Điều chỉnh tăng từ 10 lên 15
+        payload = {
+            'id': str(part.id),
+            'name': 'Dây curoa B-52 Cải tiến',
+            'part_number': 'BELT-B52',
+            'quantity_in_stock': '15.00',
+            'unit_cost': '160000.00'
+        }
+        req = factory.put('/portal/inventory/', data=json.dumps(payload), content_type='application/json')
+        req.user = self.tech_user
+
+        resp = portal_inventory(req)
+        self.assertEqual(resp.status_code, 200)
+
+        part.refresh_from_db()
+        self.assertEqual(part.quantity_in_stock, Decimal('15.00'))
+        self.assertEqual(part.unit_cost, Decimal('160000.00'))
+
+        txs = StockTransaction.all_objects.filter(spare_part=part, transaction_type='ADJUSTMENT')
+        self.assertEqual(txs.count(), 1)
+        self.assertEqual(txs.first().quantity, Decimal('5.00'))
+        self.assertEqual(txs.first().unit_price, Decimal('160000.00'))
+        self.assertEqual(txs.first().total_amount, Decimal('800000.00'))
+
+        # 2. Điều chỉnh giảm từ 15 về 8
+        payload2 = {
+            'id': str(part.id),
+            'name': 'Dây curoa B-52 Cải tiến',
+            'part_number': 'BELT-B52',
+            'quantity_in_stock': '8.00',
+            'unit_cost': '160000.00'
+        }
+        req2 = factory.put('/portal/inventory/', data=json.dumps(payload2), content_type='application/json')
+        req2.user = self.tech_user
+
+        resp2 = portal_inventory(req2)
+        self.assertEqual(resp2.status_code, 200)
+
+        part.refresh_from_db()
+        self.assertEqual(part.quantity_in_stock, Decimal('8.00'))
+
+        txs2 = StockTransaction.all_objects.filter(spare_part=part, transaction_type='ADJUSTMENT')
+        self.assertEqual(txs2.count(), 2)
+        latest_tx = txs2.order_by('-issue_date').first()
+        self.assertEqual(latest_tx.quantity, Decimal('7.00'))
+
+        # 3. Thử điều chỉnh số âm phải bị từ chối với status 400
+        neg_payload = {
+            'id': str(part.id),
+            'quantity_in_stock': '-5.00'
+        }
+        req_neg = factory.put('/portal/inventory/', data=json.dumps(neg_payload), content_type='application/json')
+        req_neg.user = self.tech_user
+        resp_neg = portal_inventory(req_neg)
+        self.assertEqual(resp_neg.status_code, 400)

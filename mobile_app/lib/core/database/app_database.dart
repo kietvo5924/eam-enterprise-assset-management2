@@ -20,6 +20,7 @@ class ChecklistConverter extends TypeConverter<List<dynamic>, String> {
       return [];
     }
   }
+
   @override
   String toSql(List<dynamic> value) {
     try {
@@ -38,9 +39,10 @@ class Assets extends Table {
   TextColumn get locationName => text().nullable()();
   TextColumn get tenantId => text()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-  DateTimeColumn get lastUpdated => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get lastUpdated =>
+      dateTime().withDefault(currentDateAndTime)();
   TextColumn get rawJson => text().nullable()();
-  
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -59,9 +61,19 @@ class WorkOrders extends Table {
   DateTimeColumn get updatedAt => dateTime().nullable()();
   TextColumn get assigneeUsername => text().nullable()();
   TextColumn get resolutionNotes => text().nullable()();
-  TextColumn get checklists => text().map(const ChecklistConverter()).withDefault(const Constant('[]'))();
-  TextColumn get attachments => text().map(const ChecklistConverter()).withDefault(const Constant('[]'))();
+  TextColumn get checklists => text()
+      .map(const ChecklistConverter())
+      .withDefault(const Constant('[]'))();
+  TextColumn get attachments => text()
+      .map(const ChecklistConverter())
+      .withDefault(const Constant('[]'))();
   TextColumn get tenantId => text()();
+  TextColumn get code => text().nullable()();
+  TextColumn get maintenanceAction => text().nullable()();
+  RealColumn get coordsX => real().nullable()();
+  RealColumn get coordsY => real().nullable()();
+  IntColumn get floorLevel => integer().nullable()();
+  TextColumn get zoneId => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -70,9 +82,12 @@ class WorkOrders extends Table {
 @DataClassName('SyncQueueEntity')
 class SyncQueues extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get actionType => text()(); // e.g., 'UPDATE_WORK_ORDER', 'UPLOAD_PHOTO'
+  TextColumn get actionType =>
+      text()(); // e.g., 'UPDATE_WORK_ORDER', 'UPLOAD_PHOTO'
   TextColumn get payload => text()(); // JSON string
-  TextColumn get status => text().withDefault(const Constant('PENDING'))(); // PENDING, IN_PROGRESS, FAILED, CONFLICT
+  TextColumn get status => text().withDefault(
+    const Constant('PENDING'),
+  )(); // PENDING, IN_PROGRESS, FAILED, CONFLICT
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   IntColumn get retryCount => integer().withDefault(const Constant(0))();
   TextColumn get tenantId => text()(); // Tenant isolation
@@ -90,12 +105,23 @@ class AssetDao extends DatabaseAccessor<AppDatabase> with _$AssetDaoMixin {
   Stream<List<AssetEntity>> watchAllAssets(String tenantId) =>
       (select(assets)..where((t) => t.tenantId.equals(tenantId))).watch();
 
-  Future<AssetEntity?> getAssetById(String id) =>
-      (select(assets)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<AssetEntity?> getAssetById(String id, [String? tenantId]) =>
+      (select(assets)..where((t) {
+            final cond = t.id.equals(id);
+            if (tenantId != null && tenantId.isNotEmpty) {
+              return cond & t.tenantId.equals(tenantId);
+            }
+            return cond;
+          }))
+          .getSingleOrNull();
 
   Future<AssetEntity?> getAssetByQrCode(String qrCode, String tenantId) =>
-      (select(assets)
-            ..where((t) => t.qrCode.equals(qrCode) & t.tenantId.equals(tenantId) & t.isActive.equals(true)))
+      (select(assets)..where(
+            (t) =>
+                t.qrCode.equals(qrCode) &
+                t.tenantId.equals(tenantId) &
+                t.isActive.equals(true),
+          ))
           .getSingleOrNull();
 
   Future<void> insertOrUpdateAsset(AssetEntity asset) =>
@@ -107,42 +133,64 @@ class AssetDao extends DatabaseAccessor<AppDatabase> with _$AssetDaoMixin {
     });
   }
 
-  Future<int> deleteOrphanedAssets() async {
+  Future<int> deleteOrphanedAssets([String? tenantId]) async {
     final cutoff = DateTime.now().subtract(const Duration(days: 30));
     final referencedAssetIds = db.selectOnly(db.workOrders)
       ..addColumns([db.workOrders.assetId])
       ..where(db.workOrders.assetId.isNotNull());
-    
+
     final query = delete(assets)
-      ..where((a) => a.id.isNotInQuery(referencedAssetIds) & a.lastUpdated.isSmallerThanValue(cutoff));
-      
+      ..where((a) {
+        final cond =
+            a.id.isNotInQuery(referencedAssetIds) &
+            a.lastUpdated.isSmallerThanValue(cutoff);
+        if (tenantId != null && tenantId.isNotEmpty) {
+          return cond & a.tenantId.equals(tenantId);
+        }
+        return cond;
+      });
+
     return await query.go();
   }
 }
 
 // DAO for WorkOrders
 @DriftAccessor(tables: [WorkOrders])
-class WorkOrderDao extends DatabaseAccessor<AppDatabase> with _$WorkOrderDaoMixin {
+class WorkOrderDao extends DatabaseAccessor<AppDatabase>
+    with _$WorkOrderDaoMixin {
   WorkOrderDao(AppDatabase db) : super(db);
 
-  Stream<List<WorkOrderEntity>> watchMyWorkOrders(String username, String tenantId) {
-    return (select(workOrders)
-          ..where((t) => 
-            t.assigneeUsername.equals(username) & 
-            t.tenantId.equals(tenantId)))
+  Stream<List<WorkOrderEntity>> watchMyWorkOrders(
+    String username,
+    String tenantId,
+  ) {
+    return (select(workOrders)..where(
+          (t) =>
+              t.assigneeUsername.equals(username) & t.tenantId.equals(tenantId),
+        ))
         .watch();
   }
 
-  Future<List<WorkOrderEntity>> getMyWorkOrders(String username, String tenantId) {
-    return (select(workOrders)
-          ..where((t) => 
-            t.assigneeUsername.equals(username) & 
-            t.tenantId.equals(tenantId)))
+  Future<List<WorkOrderEntity>> getMyWorkOrders(
+    String username,
+    String tenantId,
+  ) {
+    return (select(workOrders)..where(
+          (t) =>
+              t.assigneeUsername.equals(username) & t.tenantId.equals(tenantId),
+        ))
         .get();
   }
 
-  Future<WorkOrderEntity?> getWorkOrderById(String id) =>
-      (select(workOrders)..where((t) => t.id.equals(id))).getSingleOrNull();
+  Future<WorkOrderEntity?> getWorkOrderById(String id, [String? tenantId]) =>
+      (select(workOrders)..where((t) {
+            final cond = t.id.equals(id);
+            if (tenantId != null && tenantId.isNotEmpty) {
+              return cond & t.tenantId.equals(tenantId);
+            }
+            return cond;
+          }))
+          .getSingleOrNull();
 
   Future<void> insertOrUpdateWorkOrder(WorkOrderEntity wo) =>
       into(workOrders).insertOnConflictUpdate(wo);
@@ -153,47 +201,95 @@ class WorkOrderDao extends DatabaseAccessor<AppDatabase> with _$WorkOrderDaoMixi
     });
   }
 
-  Future<int> deleteStaleWorkOrders(List<String> validIds, String myUsername, String tenantId) {
+  Future<int> deleteStaleWorkOrders(
+    List<String> validIds,
+    String myUsername,
+    String tenantId,
+  ) {
     if (validIds.isEmpty) {
-      return (delete(workOrders)..where((t) => t.assigneeUsername.equals(myUsername) & t.tenantId.equals(tenantId))).go();
+      return (delete(workOrders)..where(
+            (t) =>
+                t.assigneeUsername.equals(myUsername) &
+                t.tenantId.equals(tenantId),
+          ))
+          .go();
     }
-    return (delete(workOrders)..where((t) => t.id.isNotIn(validIds) & t.assigneeUsername.equals(myUsername) & t.tenantId.equals(tenantId))).go();
+    return (delete(workOrders)..where(
+          (t) =>
+              t.id.isNotIn(validIds) &
+              t.assigneeUsername.equals(myUsername) &
+              t.tenantId.equals(tenantId),
+        ))
+        .go();
   }
 
-  Future<int> deleteOldCompletedWorkOrders() async {
+  Future<int> deleteOldCompletedWorkOrders([String? tenantId]) async {
     final cutoff = DateTime.now().subtract(const Duration(days: 7));
     final query = delete(workOrders)
-      ..where((wo) => wo.status.equals('COMPLETED') & 
-                     wo.updatedAt.isSmallerThanValue(cutoff));
-      
+      ..where((wo) {
+        final cond =
+            wo.status.equals('COMPLETED') &
+            wo.updatedAt.isSmallerThanValue(cutoff);
+        if (tenantId != null && tenantId.isNotEmpty) {
+          return cond & wo.tenantId.equals(tenantId);
+        }
+        return cond;
+      });
+
     return await query.go();
   }
 }
 
 // DAO for SyncQueue
 @DriftAccessor(tables: [SyncQueues])
-class SyncQueueDao extends DatabaseAccessor<AppDatabase> with _$SyncQueueDaoMixin {
+class SyncQueueDao extends DatabaseAccessor<AppDatabase>
+    with _$SyncQueueDaoMixin {
   SyncQueueDao(AppDatabase db) : super(db);
 
-  Stream<List<SyncQueueEntity>> watchPendingSyncs() {
-    return (select(syncQueues)
-          ..where((t) =>
+  Stream<List<SyncQueueEntity>> watchPendingSyncs([String? tenantId]) {
+    return (select(syncQueues)..where((t) {
+          final statusCond =
               t.status.equals('PENDING') |
               t.status.equals('FAILED') |
-              t.status.equals('IN_PROGRESS')))
+              t.status.equals('IN_PROGRESS') |
+              t.status.equals('CONFLICT');
+          if (tenantId != null && tenantId.isNotEmpty) {
+            return statusCond & t.tenantId.equals(tenantId);
+          }
+          return statusCond;
+        }))
         .watch();
   }
 
-  Future<List<SyncQueueEntity>> getPendingSyncs() {
+  Future<List<SyncQueueEntity>> getPendingSyncs([String? tenantId]) {
     return (select(syncQueues)
-      ..where((t) => 
-        (t.status.equals('PENDING') | 
-         t.status.equals('FAILED') | 
-         t.status.equals('IN_PROGRESS')) &
-        t.retryCount.isSmallerThanValue(3)
-      )
-      ..orderBy([(t) => OrderingTerm(expression: t.createdAt)])
-    ).get();
+          ..where((t) {
+            final cond =
+                (t.status.equals('PENDING') | t.status.equals('IN_PROGRESS')) &
+                t.retryCount.isSmallerThanValue(3);
+            if (tenantId != null && tenantId.isNotEmpty) {
+              return cond & t.tenantId.equals(tenantId);
+            }
+            return cond;
+          })
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt)]))
+        .get();
+  }
+
+  Future<int> retryFailedTasks([String? tenantId]) {
+    return (update(syncQueues)..where((t) {
+          final cond = t.status.equals('FAILED');
+          if (tenantId != null && tenantId.isNotEmpty) {
+            return cond & t.tenantId.equals(tenantId);
+          }
+          return cond;
+        }))
+        .write(
+          const SyncQueuesCompanion(
+            status: Value('PENDING'),
+            retryCount: Value(0),
+          ),
+        );
   }
 
   Future<int> addSyncTask(SyncQueuesCompanion entry) {
@@ -209,14 +305,18 @@ class SyncQueueDao extends DatabaseAccessor<AppDatabase> with _$SyncQueueDaoMixi
   }
 }
 
-@DriftDatabase(tables: [Assets, WorkOrders, SyncQueues], daos: [AssetDao, WorkOrderDao, SyncQueueDao])
+@DriftDatabase(
+  tables: [Assets, WorkOrders, SyncQueues],
+  daos: [AssetDao, WorkOrderDao, SyncQueueDao],
+)
 class AppDatabase extends _$AppDatabase {
   static final AppDatabase instance = AppDatabase._internal();
 
   AppDatabase._internal() : super(_openConnection());
+  AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5; // Incremented from 4 to 5 for idempotencyKey
+  int get schemaVersion => 6; // Incremented to 6 for code, maintenanceAction, coords, floor, zone
 
   @override
   MigrationStrategy get migration {
@@ -229,6 +329,14 @@ class AppDatabase extends _$AppDatabase {
           // Add idempotencyKey to SyncQueues
           await m.addColumn(syncQueues, syncQueues.idempotencyKey);
         }
+        if (from < 6) {
+          await m.addColumn(workOrders, workOrders.code);
+          await m.addColumn(workOrders, workOrders.maintenanceAction);
+          await m.addColumn(workOrders, workOrders.coordsX);
+          await m.addColumn(workOrders, workOrders.coordsY);
+          await m.addColumn(workOrders, workOrders.floorLevel);
+          await m.addColumn(workOrders, workOrders.zoneId);
+        }
       },
     );
   }
@@ -238,7 +346,7 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'eam_db.sqlite'));
-    
+
     applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
 
     return NativeDatabase.createInBackground(file);

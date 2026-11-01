@@ -53,6 +53,7 @@ class WorkOrderTransitionService:
 
         # Resolve vendor_cost from existing pre-configured cost breakdown if not explicitly supplied
         from decimal import Decimal
+        from algorithms.cost_forecasting import CostForecastingService
         if vendor_cost is None:
             if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.vendor_cost is not None:
                 vendor_cost = wo.cost_breakdown.vendor_cost
@@ -60,6 +61,9 @@ class WorkOrderTransitionService:
                 vendor_cost = Decimal('0.00')
         else:
             vendor_cost = Decimal(str(vendor_cost))
+
+        if vendor_cost < Decimal('0.00'):
+            raise ValidationError("Chi phí thuê ngoài (vendor_cost) không được là số âm.")
 
         if warranty_covered_amount is None:
             if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.warranty_covered_amount is not None:
@@ -69,6 +73,9 @@ class WorkOrderTransitionService:
         else:
             warranty_covered_amount = Decimal(str(warranty_covered_amount))
 
+        if warranty_covered_amount < Decimal('0.00'):
+            raise ValidationError("Chi phí bảo hành (warranty_covered_amount) không được là số âm.")
+
         if insurance_covered_amount is None:
             if hasattr(wo, 'cost_breakdown') and wo.cost_breakdown and wo.cost_breakdown.insurance_covered_amount is not None:
                 insurance_covered_amount = wo.cost_breakdown.insurance_covered_amount
@@ -77,16 +84,22 @@ class WorkOrderTransitionService:
         else:
             insurance_covered_amount = Decimal(str(insurance_covered_amount))
 
+        if insurance_covered_amount < Decimal('0.00'):
+            raise ValidationError("Chi phí bảo hiểm (insurance_covered_amount) không được là số âm.")
+
         # 1. Idempotency Check: Nếu đã COMPLETED trước đó
         if wo.status == 'COMPLETED':
             # Cơ chế tự phục hồi (self-healing): nếu snapshot chi phí bị thiếu do lỗi trước đó, đóng băng ngay
-            from algorithms.cost_forecasting import CostForecastingService
-            CostForecastingService.freeze_work_order_cost(
+            cost_obj = CostForecastingService.freeze_work_order_cost(
                 wo,
                 warranty_covered_amount=warranty_covered_amount,
                 insurance_covered_amount=insurance_covered_amount,
                 vendor_cost=vendor_cost
             )
+            wo.actual_cost = cost_obj.net_cost
+            if cost_obj.is_capital_overhaul:
+                wo.is_capitalized = True
+            wo.cost_breakdown = cost_obj
             return wo
 
         # 2. State Validation: Chỉ có thể hoàn thành từ IN_PROGRESS
@@ -192,6 +205,9 @@ class WorkOrderTransitionService:
             insurance_covered_amount=insurance_covered_amount,
             vendor_cost=vendor_cost
         )
+        wo.actual_cost = cost_obj.net_cost
+        if cost_obj.is_capital_overhaul:
+            wo.is_capitalized = True
         wo.cost_breakdown = cost_obj
 
         logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}, action={wo.maintenance_action}")
@@ -346,15 +362,37 @@ class WorkOrderTransitionService:
                 transaction_type='RETURN'
             ).aggregate(s=Sum('quantity'))['s'] or Decimal('0')
 
-            # Fallback nếu không có transaction ISSUE nhưng có WorkOrderMaterial
-            if issued_qty == Decimal('0'):
+            # Fallback cho WO kế thừa / chưa có StockTransaction ISSUE riêng:
+            # Nếu hoàn toàn không có ISSUE nhưng có WorkOrderMaterial, lấy mat_qty làm mức xuất ban đầu
+            if issued_qty <= Decimal('0'):
                 mat_qty = wo.materials.filter(spare_part=part).aggregate(s=Sum('quantity'))['s'] or Decimal('0')
-                issued_qty = mat_qty
+                if mat_qty > Decimal('0'):
+                    issued_qty = mat_qty
+                    issued_amt = mat_qty * (part.unit_cost or Decimal('0.00'))
+                else:
+                    continue
+            else:
+                issued_amt = StockTransaction.all_objects.filter(
+                    tenant=wo.tenant,
+                    work_order=wo,
+                    spare_part=part,
+                    transaction_type='ISSUE'
+                ).aggregate(s=Sum('total_amount'))['s'] or Decimal('0')
 
             remaining = max(Decimal('0'), issued_qty - returned_qty)
             if remaining > Decimal('0'):
-                unit_c = part.unit_cost or Decimal('0.00')
-                ret_amt = (remaining * unit_c).quantize(Decimal('0.01'))
+                # Định giá RETURN dựa trên giao dịch ISSUE gốc hoặc unit_cost lịch sử
+                returned_amt = StockTransaction.all_objects.filter(
+                    tenant=wo.tenant,
+                    work_order=wo,
+                    spare_part=part,
+                    transaction_type='RETURN'
+                ).aggregate(s=Sum('total_amount'))['s'] or Decimal('0')
+
+                remaining_amt = max(Decimal('0'), issued_amt - returned_amt)
+                unit_c = (remaining_amt / remaining).quantize(Decimal('0.01')) if remaining > Decimal('0') else Decimal('0.00')
+                ret_amt = remaining_amt
+
                 StockTransaction.all_objects.create(
                     tenant=wo.tenant,
                     spare_part=part,
