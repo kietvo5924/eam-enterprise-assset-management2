@@ -292,7 +292,7 @@
     - `[ ]` Task 11.6.6 — Web Portal UI: Multi-quantile budget overrun gauge, Lemon Asset bad actor callout card, deferred maintenance debt bar, and 12 test cases (`TC-COST-01` to `TC-COST-12`).
   - [ ] **11.7 — Smart Field Biometric Attendance & Multi-Tier Proximity Geofencing (MobileFaceNet, ESP32 BLE Beacon 50m & Haversine Fallback)** *(Đề Cương Mục 3.1.3 & 106)*
     - [ ] Task 11.7.1 — ESP32 Firmware & Biometric Schema: Deploy esp32_asset_beacon.ino on ESP32 DevKit, add le_beacon_uuid/le_mac_address to Asset, and build BiometricProfile (128-d float array) & AttendanceLog with AES-256 encrypted MinIO storage.
-    - [ ] Task 11.7.2 — Dual-Gate Spatial Engine: Implement BLE RSSI Log-Distance Path Loss model (50m radius,  \ge -92\text{ dBm}$), Dynamic 1-touch Beacon Binding, Universal Test Beacon mode, and Haversine/QR fallbacks.
+    - [ ] Task 11.7.2 — Dual-Gate Spatial Engine: Implement BLE RSSI Log-Distance Path Loss model (50m radius,  \ge -92\text{ dBm}$), Dynamic 1-touch Beacon Binding, Universal Test Beacon mode, and Haversine outdoor fallback.
     - [ ] Task 11.7.3 — Mobile Edge AI & MobileFaceNet Integration: Deploy mobilefacenet.tflite on Flutter, ML Kit face detection ( \times 112$), BLE radar scanner (lutter_blue_plus), and live camera stream enforcement.
     - [ ] Task 11.7.4 — Backend Dual-Gate Compliance Gatekeeper: Enforce 15-minute start gate (START_GATE) and presence completion gate (COMPLETE_GATE) on Work Order status transitions.
     - [ ] Task 11.7.5 — Mobile UI & 14 Test Cases Matrix: Build field attendance scanner screen with BLE radar, real-time RSSI signal bars, and 14 test cases (TC-BIO-01 to TC-BIO-14).

@@ -45,6 +45,15 @@ Hệ thống thiết lập cơ chế kiểm soát hiện trường nghiêm ngặ
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+### 1.4. Phân Định Rạch Ròi: Mã QR Thân Máy Chỉ Dùng Tra Cứu Thông Tin (Asset Information Lookup), Tuyệt Đối KHÔNG Dùng Điểm Danh
+Hệ thống phân định rạch ròi 100% giữa hai nghiệp vụ:
+- **Mã QR Dán Trên Thân Máy (`asset.qr_code`)**:
+  - Thuộc phạm vi nghiệp vụ của **Task 3.4 & Phase 9** (Màn hình `qr_scanner_screen.dart`).
+  - **Mục đích duy nhất**: Dành cho kỹ thuật viên hoặc nhân viên mới khi đi tuần tra hoặc đến hiện trường máy móc, nếu **không biết hoặc muốn xem nhanh thông tin thiết bị** (thông số kỹ thuật, tình trạng vận hành, lịch sử các phiếu bảo trì trước đó), họ dùng camera quét mã QR trên thân máy $\rightarrow$ Ứng dụng điều hướng hiển thị hồ sơ lý lịch chi tiết của thiết bị (`GET /api/v1/assets/qr/{qrCode}`).
+- **Tại sao mã QR TUYỆT ĐỐI KHÔNG ĐƯỢC DÙNG để điểm danh hay nghiệm thu trong Task 11.7**:
+  - *Lỗ hổng gian lận nghiêm trọng*: Mã QR là hình ảnh tĩnh in trên decal/kim loại. Kỹ thuật viên hoàn toàn có thể dùng điện thoại chụp lại ảnh tem QR của máy, lưu vào album hoặc gửi qua Zalo cho đồng nghiệp, sau đó ngồi ở quán cà phê hay ở nhà giơ ảnh QR trước màn hình để "quét lụi" nhận việc hoặc bấm nghiệm thu khống.
+  - *Nguyên tắc bảo vệ hiện trường chuẩn xác*: Quá trình điểm danh Bắt đầu (Cổng 1) và Nghiệm thu Hoàn thành (Cổng 2) **bắt buộc 100% phải dựa trên Sóng vô tuyến vật lý thực tế phát ra từ mạch ESP32 Universal BLE Beacon ($\le 50\text{m}$)** cho nhà xưởng trong nhà hoặc **GPS vệ tinh Haversine** cho máy ngoài trời, kết hợp với **khuôn mặt sống thời gian thực của MobileFaceNet**. Mã QR thân máy hoàn toàn không can thiệp vào quy trình điểm danh.
+
 ---
 
 ## 2. Ràng Buộc Kế Thừa Hệ Thống (Existing System Constraints & Codebase Reuse)
@@ -52,7 +61,7 @@ Hệ thống thiết lập cơ chế kiểm soát hiện trường nghiêm ngặ
 - **Tái Sử Dụng Mô Hình Multi-Tenancy**: Mọi dữ liệu hồ sơ sinh trắc học và lịch sử điểm danh kế thừa `BaseTenantModel`, bảo đảm phân lập hoàn toàn giữa các Tenant qua `TenantManager`.
 - **Tái Sử Dụng Thực Thể Nghiệp Vụ Sẵn Có**:
   - `WorkOrder`: Kiểm soát trạng thái chuyển dịch từ `ASSIGNED` sang `IN_PROGRESS` (Cổng 1) và từ `IN_PROGRESS` sang `COMPLETED` (Cổng 2).
-  - `Asset`: Bổ sung mã định danh Beacon `ble_beacon_uuid` và địa chỉ `ble_mac_address`. Đồng thời kế thừa tọa độ mặt bằng (`coords_x`, `coords_y`, `floor_level`) và mã QR thân máy (`qr_code`).
+  - `Asset`: Bổ sung mã định danh Beacon `ble_beacon_uuid` và địa chỉ `ble_mac_address`. Mã QR thân máy (`qr_code`) chỉ dùng cho tính năng tra cứu lý lịch máy, độc lập hoàn toàn khỏi quy trình điểm danh.
   - `User`: Hồ sơ nhân viên kỹ thuật thực hiện điểm danh.
 - **Tối Ưu Hóa Thiết Bị Di Động (Edge Inference)**: Mô hình MobileFaceNet được đóng gói dạng TFLite (`mobilefacenet.tflite` $\approx 4.1\text{ MB}$) chạy trực tiếp trên chip di động của kỹ thuật viên, không yêu cầu máy chủ phải gắn GPU.
 - **Kiến Trúc Đóng Gói Module Giải Thuật & Dữ Liệu Cách Ly (Dedicated Algorithms & Data Package)**:
@@ -194,11 +203,13 @@ Hệ thống sử dụng nền tảng **Kaggle Datasets** và các kho dữ li�
     $$d = 2 \cdot R_{\text{earth}} \cdot \text{atan2}\left(\sqrt{a}, \sqrt{1-a}\right) \le 50.0\text{ mét}$$
   - Kiểm tra cờ giả lập vị trí của hệ điều hành di động (`isMocked == false`). Phát hiện Fake GPS lập tức hủy phiên điểm danh.
 
-### Quy Tắc 6: Cơ Chế Dự Phòng Quét Mã QR Thân Máy Khi ESP32 Mất Điện (Zero-Hardware Fallback)
-- **Tình Huống Thực Tế**: Mạch ESP32 bị tuột dây sạc Type-C, mất nguồn điện hoặc bị hỏng đột xuất tại hiện trường.
+### Quy Tắc 6: Chính Sách Bật/Tắt Định Vị Cho Doanh Nghiệp Không Có Hạ Tầng (Tenant Policy Fallback)
+- **Tình Huống Thực Tế**: Doanh nghiệp hoặc trường học chưa trang bị mạch ESP32 và máy móc cũng không có tọa độ GPS (hoặc tài sản cơ động di chuyển liên tục).
 - **Quy Tắc**:
-  - Nếu sau 5 giây không bắt được sóng ESP32, ứng dụng hiển thị nút: *"Không thấy sóng ESP32? Quét mã QR thân máy"*.
-  - Kỹ thuật viên dùng camera quét trực tiếp mã QR dán cố định trên vỏ máy móc (`asset.qr_code`) kết hợp bước quét khuôn mặt. Bản ghi được lưu nhận diện thành công với phương thức `QR_FALLBACK_WITH_BIOMETRIC`.
+  - Hỗ trợ cấu hình cấp Tenant: `ENABLE_GEOFENCING = False`.
+  - Khi đó, hệ thống **bỏ qua kiểm tra sóng BLE ESP32 và tọa độ GPS**. Cổng không gian tự động đánh dấu hợp lệ (`BYPASSED_BY_TENANT_POLICY`).
+  - Kỹ thuật viên chỉ cần thực hiện quét khuôn mặt sinh trắc học MobileFaceNet để xác thực danh tính đúng người được giao việc trước khi bắt đầu.
+  - **Lưu ý nghiệp vụ**: Tuyệt đối không dùng mã QR để điểm danh thay thế cho định vị. Mã QR chỉ dùng để tra cứu thông tin thiết bị.
 
 ### Quy Tắc 7: Chống Gian Lận Thực Dụng & Khóa Luồng Camera Trực Tiếp
 - **Quy Tắc Bắt Buộc**:
@@ -374,7 +385,7 @@ Kỹ thuật viên đứng cạnh máy ──► Mở Work Order trên Flutter �
        │       │       ├── d <= 50.0m (RSSI >= -92 dBm): VÙNG SÓNG HỢP LỆ (Báo Xanh)
        │       │       └── d > 50.0m (RSSI < -92 dBm): Báo ngoài vùng, yêu cầu lại gần máy
        │       └── KHÔNG THẤY:
-       │               └── Sau 5 giây, hiển thị nút: "Quét mã QR dán trên thân máy" (Quy Tắc 6)
+       │               └── Báo ngoài phạm vi: "Không tìm thấy sóng ESP32 của máy móc. Vui lòng di chuyển vào bán kính <= 50m!"
        │
        ▼ (Khi Bước 1 Hợp Lệ)
 [Bước 2: Quét Khuôn Mặt Sinh Trắc Học MobileFaceNet]
@@ -409,8 +420,7 @@ Kỹ thuật viên sửa chữa xong ──► Vuốt "Hoàn thành công việc
        │       └── KHÔNG BẮT ĐƯỢC SÓNG (Thợ đã bỏ về / ngồi từ xa):
        │               └── CHẶN HOÀN THÀNH NGAY LẬP TỨC!
        │                   Hiển thị cảnh báo: "Bạn không có mặt tại thiết bị. Vui lòng lại gần máy để nghiệm thu!"
-       │                   (Hỗ trợ quét mã QR thân máy nếu ESP32 mất nguồn đột xuất)
-```
+`
 
 ---
 
@@ -438,7 +448,7 @@ CREATE TABLE attendance_logs (
   tenant_id UUID NOT NULL REFERENCES tenants(id),
   work_order_id UUID NOT NULL REFERENCES work_orders(id),
   technician_id UUID NOT NULL REFERENCES users(id),
-  verification_method VARCHAR(32) NOT NULL, -- 'ESP32_UNIVERSAL_BEACON', 'GPS_HAVERSINE', 'QR_FALLBACK_WITH_BIOMETRIC'
+  verification_method VARCHAR(32) NOT NULL, -- 'ESP32_UNIVERSAL_BEACON', 'GPS_HAVERSINE', 'BYPASSED_BY_TENANT_POLICY'
   ble_beacon_id VARCHAR(64) NULL,
   rssi_dbm INT NULL,
   distance_meters FLOAT NULL, -- Khoảng cách tính toán (mét)
@@ -462,7 +472,7 @@ CREATE INDEX idx_att_wo_tech_time ON attendance_logs(tenant_id, work_order_id, t
 | Phương Thức | Đường Dẫn | Chức Năng |
 | :--- | :--- | :--- |
 | `POST` | `/api/v1/biometric/enroll/` | Đăng ký khuôn mặt User trên Web: Trích xuất vector 128-d qua MobileFaceNet |
-| `POST` | `/api/v1/attendance/check-in/` | Gửi dữ liệu điểm danh Cổng 1 (ESP32 BLE / Face / QR) để bắt đầu Work Order |
+| `POST` | `/api/v1/attendance/check-in/` | Gửi dữ liệu điểm danh Cổng 1 (ESP32 BLE / Face) để bắt đầu Work Order |
 | `POST` | `/api/v1/attendance/verify-presence/` | Xác thực hiện diện nhanh Cổng 2 trước khi cho phép nghiệm thu |
 | `PUT` | `/api/v1/work-orders/{id}/status` | Chuyển trạng thái WO (`IN_PROGRESS` hoặc `COMPLETED` có cổng gác) |
 
@@ -496,7 +506,6 @@ CREATE INDEX idx_att_wo_tech_time ON attendance_logs(tenant_id, work_order_id, t
   "rssi": -68,
   "estimatedDistance": 8.5,
   "liveEmbedding": [0.034, -0.082, 0.051, 0.112, "... (128 số) ..."],
-  "scannedQrCode": null,
   "clientTimestamp": "2026-11-01T10:35:00Z"
 }
 ```
@@ -541,7 +550,7 @@ CREATE INDEX idx_att_wo_tech_time ON attendance_logs(tenant_id, work_order_id, t
 | **TC-BIO-05** | Đăng ký khuôn mặt User trên Web qua Deep Learning | Upload ảnh chân dung nhân viên trên Web Portal | MobileFaceNet trích xuất vector 128 số thực, lưu vào `biometric_profiles` | Chưa thực hiện |
 | **TC-BIO-06** | Mỏ neo vạn năng nhận diện mọi Work Order | Cắm mạch ESP32 phát `EAM-UNIVERSAL-BEACON`, mở bất kỳ WO nào | Điện thoại tự động nhận diện mỏ neo không gian cho mọi phiếu việc | Chưa thực hiện |
 | **TC-BIO-07** | Điểm danh hộ / Không khớp khuôn mặt | Người khác cầm máy điểm danh thay, $\text{Sim} = 0.52 < 0.65$ | Cổng sinh trắc từ chối (`Rejected`), hiển thị thông báo khuôn mặt không khớp | Chưa thực hiện |
-| **TC-BIO-08** | Dự phòng quét mã QR khi ESP32 mất nguồn | Rút nguồn cổng Type-C của ESP32, ứng dụng mở nút quét mã QR thân máy | Chấp thuận điểm danh phương thức `QR_FALLBACK_WITH_BIOMETRIC`, mở khóa WO | Chưa thực hiện |
+| **TC-BIO-08** | Chặn dùng ảnh QR để điểm danh từ xa | Thợ chụp ảnh tem QR mang ra ngoài xưởng cách máy >50m bấm điểm danh | Không có sóng ESP32, từ chối ngay lập tức (`is_location_verified = False`), chứng minh QR chỉ dùng tra cứu | Chưa thực hiện |
 | **TC-BIO-09** | Dự phòng GPS Haversine ngoài trời | Thiết bị ngoài trời có tọa độ GPS, không có ESP32, thợ cách $15\text{m} \le 50\text{m}$ | Chấp thuận định vị GPS Haversine hợp lệ | Chưa thực hiện |
 | **TC-BIO-10** | Chặn phần mềm Fake GPS / Mock Location | Ứng dụng gửi `isMocked: true` trong chế độ ngoài trời | Hủy yêu cầu ngay lập tức, trả về `400 Bad Request`, ghi log vi phạm | Chưa thực hiện |
 | **TC-BIO-11** | Khóa thư viện ảnh (Chặn dùng ảnh cũ) | Thợ cố tình chọn ảnh chân dung có sẵn từ album | Ứng dụng khóa hoàn toàn Gallery Picker, chỉ mở luồng camera phát trực tiếp | Chưa thực hiện |
@@ -650,7 +659,7 @@ def verify_complete_work_order_gate(work_order, user, ble_verification_data=None
             "success": False,
             "error": {
                 "code": "PRESENCE_VERIFICATION_REQUIRED",
-                "message": "Yêu cầu xác thực hiện diện tại máy móc (Bắt sóng ESP32 hoặc quét mã QR) để nghiệm thu hoàn thành."
+                "message": "Yêu cầu xác thực hiện diện tại máy móc (Bắt sóng ESP32 hoặc GPS) để nghiệm thu hoàn thành."
             }
         }, status=status.HTTP_403_FORBIDDEN)
     return None
