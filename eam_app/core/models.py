@@ -17,6 +17,7 @@ class Tenant(models.Model):
     enable_ai_rul = models.BooleanField(default=True, help_text='Bật/tắt dự đoán tuổi thọ còn lại RUL')
     enable_ai_anomaly_detection = models.BooleanField(default=True, help_text='Bật/tắt phát hiện dị thường cảm biến và ISO 10816')
     enable_ai_cost_forecasting = models.BooleanField(default=True, help_text='Bật/tắt dự báo chi phí bảo trì tương lai')
+    enable_geofencing = models.BooleanField(default=True, help_text='Bật/tắt kiểm soát không gian vi định vị BLE ESP32')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

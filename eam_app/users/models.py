@@ -292,3 +292,22 @@ class TechnicianSchedule(BaseTenantModel):
         shift_name = self.shift_template.name if self.shift_template else self.status
         return f"{self.user.username} - {self.work_date}: {shift_name}"
 
+
+class BiometricProfile(BaseTenantModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField('users.User', on_delete=models.CASCADE, related_name='biometric_profile')
+    face_embedding = models.JSONField(help_text='Mảng 128 số thực chuẩn hóa L2 từ MobileFaceNet')
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    enrolled_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='enrolled_by', db_constraint=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'biometric_profiles'
+        indexes = [
+            models.Index(fields=['tenant', 'user', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"BiometricProfile of {self.user.username}"
+

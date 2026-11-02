@@ -7,11 +7,13 @@ from assets.views import (
     AssetListView, AssetDetailView, MeterReadingListView,
     AssetTreeView, AssetQRCodeView, AssetImportView, AssetExportView,
     AssetImportTemplateView, AssetAnomalyHistoryView, ConditionMonitoringAlertFeedbackView,
-    AssetRulPredictionDetailView, AssetRulPredictionRunView, AssetRulOverridePhantomView, CriticalAssetsRulListView
+    AssetRulPredictionDetailView, AssetRulPredictionRunView, AssetRulOverridePhantomView, CriticalAssetsRulListView,
+    IoTSensorAlertView
 )
 
 urlpatterns = [
     re_path(r'^locations/?$', LocationListView.as_view(), name='location_list'),
+    re_path(r'^locations/floorplan/?$', LocationFloorplanDetailView.as_view(), name='location_floorplan_default'),
     re_path(r'^locations/(?P<location_id>[0-9a-zA-Z_ -]+)/floorplan/?$', LocationFloorplanDetailView.as_view(), name='location_floorplan_detail'),
     re_path(r'^locations/(?P<location_id>[0-9a-fA-F-]+)/?$', LocationDetailView.as_view(), name='location_detail'),
     
@@ -41,4 +43,6 @@ urlpatterns = [
     re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/rul-prediction/run/?$', AssetRulPredictionRunView.as_view(), name='asset_rul_prediction_run'),
     re_path(r'^assets/(?P<asset_id>[0-9a-fA-F-]+)/rul-prediction/override-phantom/?$', AssetRulOverridePhantomView.as_view(), name='asset_rul_override_phantom'),
     re_path(r'^predictive-maintenance/critical-assets/?$', CriticalAssetsRulListView.as_view(), name='critical_assets_rul_list'),
+    re_path(r'^iot/sensor-alert/?$', IoTSensorAlertView.as_view(), name='iot_sensor_alert'),
+    re_path(r'^assets/iot/sensor-alert/?$', IoTSensorAlertView.as_view(), name='assets_iot_sensor_alert'),
 ]

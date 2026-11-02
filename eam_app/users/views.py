@@ -607,11 +607,46 @@ class UserMeProfileView(APIView):
                 "floorLevel": 1
             }
 
+        # Lấy ảnh chân dung đại diện thực tế từ hồ sơ sinh trắc học AES-256
+        avatar_b64 = None
+        try:
+            import os
+            from django.conf import settings
+            audit_dir = os.path.join(settings.MEDIA_ROOT, 'biometric_audits')
+            from pathlib import Path
+            from algorithms.biometric.enrollment import decrypt_image_snapshot
+            import base64
+            enroll_files = sorted(
+                list(Path(audit_dir).rglob(f"face_enrollment*{user.id}*.enc")),
+                key=os.path.getmtime,
+                reverse=True
+            )
+            if enroll_files:
+                decrypted = decrypt_image_snapshot(str(enroll_files[0]))
+                import cv2, numpy as np
+                nparr = np.frombuffer(decrypted, np.uint8)
+                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                if img is not None:
+                    h, w = img.shape[:2]
+                    min_dim = min(h, w)
+                    sy = (h - min_dim) // 2
+                    sx = (w - min_dim) // 2
+                    square = img[sy:sy+min_dim, sx:sx+min_dim]
+                    thumb = cv2.resize(square, (180, 180), interpolation=cv2.INTER_AREA)
+                    _, buf = cv2.imencode('.jpg', thumb, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+                    avatar_b64 = base64.b64encode(buf.tobytes()).decode('utf-8')
+                else:
+                    avatar_b64 = base64.b64encode(decrypted).decode('utf-8')
+        except Exception as ex:
+            print('AVATAR ERROR:', repr(ex))
+            avatar_b64 = None
+
         res_data = {
             "id": str(user.id),
             "username": user.username,
             "fullName": getattr(user, 'full_name', None) or user.username,
             "email": user.email,
+            "avatarBase64": avatar_b64,
             "tenantId": str(user.tenant_id) if user.tenant_id else None,
             "themeColor": getattr(user, 'theme_color', None) or (tenant.theme_color if tenant and hasattr(tenant, 'theme_color') else 'cyan') or 'cyan',
             "preferredLanguage": getattr(user, 'preferred_language', None) or 'vi',

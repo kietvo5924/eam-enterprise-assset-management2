@@ -7,6 +7,7 @@ class TenantMiddleware:
         self.get_response = get_response
         self.exempt_urls = [
             re.compile(r'^/api/v1/system.*'),
+            re.compile(r'^/api/v1/iot.*'),
             re.compile(r'^/api/v1/auth/login.*'),
             re.compile(r'^/api/v1/auth/refresh.*'),
             re.compile(r'^/api/v1/auth/forgot-password.*'),

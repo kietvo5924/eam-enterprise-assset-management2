@@ -691,6 +691,9 @@ class WorkOrderService {
     double? loadFactor,
     double? postRepairVibration,
     double? postRepairTemperature,
+    Map<String, dynamic>? bleVerificationData,
+    bool? isLocationVerified,
+    int? rssi,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -747,6 +750,15 @@ class WorkOrderService {
           }
           if (postRepairTemperature != null) {
             putData['postRepairTemperature'] = postRepairTemperature;
+          }
+          if (bleVerificationData != null) {
+            putData['bleVerificationData'] = bleVerificationData;
+          }
+          if (isLocationVerified != null) {
+            putData['isLocationVerified'] = isLocationVerified;
+          }
+          if (rssi != null) {
+            putData['rssi'] = rssi;
           }
 
           final response = await _dio.put(
@@ -1004,6 +1016,62 @@ class WorkOrderService {
     } catch (e) {
       debugPrint('reportIncident API error: $e');
       return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> checkIn({
+    required String workOrderId,
+    String? faceImageBase64,
+    List<double>? liveEmbedding,
+    int? rssi,
+    String? bleBeaconId,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/attendance/check-in/',
+        data: {
+          'workOrderId': workOrderId,
+          if (faceImageBase64 != null) 'faceImageBase64': faceImageBase64,
+          if (liveEmbedding != null) 'liveEmbedding': liveEmbedding,
+          if (rssi != null) 'rssi': rssi,
+          if (bleBeaconId != null) 'bleBeaconId': bleBeaconId,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        await _updateLocalWorkOrder(workOrderId);
+        return response.data['data'] as Map<String, dynamic>?;
+      }
+      return null;
+    } on DioException catch (dioErr) {
+      final serverMsg = dioErr.response?.data?['error'] ?? dioErr.response?.data?['message'];
+      debugPrint('checkIn DioException: ');
+      throw Exception(serverMsg ?? 'Lỗi xác thực ()');
+    } catch (e) {
+      debugPrint('checkIn API error: ');
+      rethrow;
+    }
+  }
+  Future<Map<String, dynamic>?> verifyPresence({
+    required String workOrderId,
+    int? rssi,
+    String? bleBeaconId,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/attendance/verify-presence/',
+        data: {
+          'workOrderId': workOrderId,
+          if (rssi != null) 'rssi': rssi,
+          if (bleBeaconId != null) 'bleBeaconId': bleBeaconId,
+        },
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return response.data['data'] as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('verifyPresence API error: $e');
+      return null;
     }
   }
 }

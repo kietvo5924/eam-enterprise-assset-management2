@@ -11,6 +11,7 @@ urlpatterns = [
     path('tenants/', views.portal_tenants, name='portal_tenants'),
     path('tenants/admins/', views.portal_tenant_admins, name='portal_tenant_admins'),
     path('users/', views.portal_users, name='portal_users'),
+    path('users/<uuid:user_id>/face-photo/', views.portal_user_face_photo, name='portal_user_face_photo'),
     path('roles/', views.portal_roles, name='portal_roles'),
     path('settings/', views.portal_settings, name='portal_settings'),
     path('asset-categories/', views.portal_asset_categories, name='portal_asset_categories'),

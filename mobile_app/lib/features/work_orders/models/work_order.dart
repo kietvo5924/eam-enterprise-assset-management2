@@ -19,6 +19,12 @@ class WorkOrder {
   final double? coordsY;
   final int? floorLevel;
   final String? zoneId;
+  final String? locationId;
+  final String? assetType;
+
+  final bool requireBleBeacon;
+  final String? bleBeaconUuid;
+  final String? bleMacAddress;
 
   final List<WorkOrderChecklist> checklists;
   final List<WorkOrderAttachment> attachments;
@@ -41,9 +47,20 @@ class WorkOrder {
     this.coordsY,
     this.floorLevel,
     this.zoneId,
+    this.locationId,
+    this.assetType,
+    this.requireBleBeacon = true,
+    this.bleBeaconUuid,
+    this.bleMacAddress,
     this.checklists = const [],
     this.attachments = const [],
   });
+
+  bool get isMachinery {
+    // Chỉ dựa hoàn toàn vào đúng phân loại bản chất tài sản (asset_type)
+    if (assetType == null || assetType!.trim().isEmpty) return true;
+    return assetType!.toUpperCase() != 'STATIC';
+  }
 
   Map<String, dynamic> getStatusUI() {
     switch (status) {
@@ -136,10 +153,35 @@ class WorkOrder {
       assetId: json['asset']?['id'] ?? json['assetId'],
       assetName: json['asset']?['name'] ?? 'Chưa gán thiết bị',
       assetLocation: json['asset']?['locationName'] ?? 'Không rõ vị trí',
-      coordsX: (json['coordsX'] as num?)?.toDouble() ?? (json['asset']?['coordsX'] as num?)?.toDouble(),
-      coordsY: (json['coordsY'] as num?)?.toDouble() ?? (json['asset']?['coordsY'] as num?)?.toDouble(),
+      coordsX: ((json['coordsX'] as num?)?.toDouble() ?? 0.0) > 0
+          ? (json['coordsX'] as num).toDouble()
+          : (json['asset']?['coordsX'] as num?)?.toDouble(),
+      coordsY: ((json['coordsY'] as num?)?.toDouble() ?? 0.0) > 0
+          ? (json['coordsY'] as num).toDouble()
+          : (json['asset']?['coordsY'] as num?)?.toDouble(),
       floorLevel: json['floorLevel'] as int? ?? json['asset']?['floorLevel'] as int?,
       zoneId: json['zoneId'] as String? ?? json['asset']?['zoneId'] as String?,
+      locationId: json['locationId'] as String? ??
+          json['incidentLocationId'] as String? ??
+          json['asset']?['locationId'] as String? ??
+          json['asset']?['location']?['id'] as String?,
+      assetType: json['asset']?['assetType'] as String? ??
+          json['asset']?['asset_type'] as String? ??
+          json['assetType'] as String?,
+
+      requireBleBeacon: json['asset']?['requireBleBeacon'] ??
+          json['asset']?['require_ble_beacon'] ??
+          json['requireBleBeacon'] ??
+          json['require_ble_beacon'] ??
+          true,
+      bleBeaconUuid: json['asset']?['bleBeaconUuid'] ??
+          json['asset']?['ble_beacon_uuid'] ??
+          json['bleBeaconUuid'] ??
+          json['ble_beacon_uuid'],
+      bleMacAddress: json['asset']?['bleMacAddress'] ??
+          json['asset']?['ble_mac_address'] ??
+          json['bleMacAddress'] ??
+          json['ble_mac_address'],
       deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline']) : null,
       assigneeUsername: json['assignee']?['username'] ?? json['assigneeName'],
       resolutionNotes: json['resolutionNotes'],

@@ -165,6 +165,10 @@ class WorkOrder(BaseTenantModel):
         return self.title
 
     def save(self, *args, **kwargs):
+        if not self.deadline:
+            from django.utils import timezone
+            from datetime import timedelta
+            self.deadline = timezone.now() + timedelta(days=2)
         super().save(*args, **kwargs)
         if self.tenant_id:
             try:
@@ -308,4 +312,49 @@ class WorkOrderCost(BaseTenantModel):
 
     def __str__(self):
         return f"Cost of {self.work_order.title} (Gross: {self.gross_cost}, Net: {self.net_cost})"
+
+
+class AttendanceLog(BaseTenantModel):
+    """
+    Task 11.7: Smart Field Biometric Attendance & Micro-Geofencing Log
+    Lưu trữ lịch sử điểm danh hiện trường bất biến (Cổng Kép: Bắt đầu & Nghiệm thu).
+    """
+    VERIFICATION_METHOD_CHOICES = (
+        ('ESP32_UNIVERSAL_BEACON', 'ESP32 Universal Beacon'),
+        ('BLE_EXEMPT_BY_ASSET', 'BLE Exempt by Asset'),
+        ('BYPASSED_BY_TENANT_POLICY', 'Bypassed by Tenant Policy'),
+    )
+    GATE_TYPE_CHOICES = (
+        ('START_GATE', 'Start Work Gate (Cổng 1)'),
+        ('COMPLETE_GATE', 'Complete Work Gate (Cổng 2)'),
+    )
+    COMPLIANCE_CHOICES = (
+        ('PASSED', 'Passed'),
+        ('FAILED', 'Failed'),
+        ('BYPASSED_BY_TENANT_POLICY', 'Bypassed by Tenant Policy'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='attendance_logs')
+    technician = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='attendance_logs')
+    verification_method = models.CharField(max_length=32, choices=VERIFICATION_METHOD_CHOICES)
+    ble_beacon_id = models.CharField(max_length=64, null=True, blank=True)
+    rssi_dbm = models.IntegerField(null=True, blank=True)
+    distance_meters = models.FloatField(null=True, blank=True)
+    similarity_score = models.FloatField(default=0.0)
+    is_location_verified = models.BooleanField(default=False)
+    is_face_verified = models.BooleanField(default=False)
+    overall_compliance = models.CharField(max_length=32, choices=COMPLIANCE_CHOICES)
+    gate_type = models.CharField(max_length=20, choices=GATE_TYPE_CHOICES, default='START_GATE')
+    snapshot_minio_path = models.CharField(max_length=512, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'attendance_logs'
+        indexes = [
+            models.Index(fields=['tenant', 'work_order', 'technician', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"Attendance {self.gate_type} for WO {self.work_order_id} by {self.technician.username} [{self.overall_compliance}]"
 

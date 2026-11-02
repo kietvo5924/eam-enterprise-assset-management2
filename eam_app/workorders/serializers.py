@@ -90,6 +90,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     incidentLocationId = serializers.UUIDField(source='incident_location.id', read_only=True, default=None)
     maintenanceWindowStart = serializers.TimeField(source='maintenance_window_start', read_only=True, default=None)
     maintenanceWindowEnd = serializers.TimeField(source='maintenance_window_end', read_only=True, default=None)
+    assetType = serializers.CharField(source='asset.asset_type', read_only=True, default='MACHINERY')
 
     asset = AssetSerializer(read_only=True)
     checklists = WorkOrderChecklistItemSerializer(many=True, read_only=True)
@@ -120,7 +121,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor',
             'actualCost', 'isCapitalized', 'costBreakdown',
             'created_at', 'updated_at',
-            'asset', 'checklists', 'attachments', 'materials'
+            'assetType', 'asset', 'checklists', 'attachments', 'materials'
         ]
 
 class WorkOrderCreateSerializer(serializers.Serializer):
@@ -177,6 +178,9 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     vendorCost = serializers.DecimalField(
         required=False, allow_null=True, max_digits=19, decimal_places=2, min_value=Decimal('0.00')
     )
+    bleVerificationData = serializers.DictField(required=False, allow_null=True)
+    isLocationVerified = serializers.BooleanField(required=False, allow_null=True)
+    rssi = serializers.IntegerField(required=False, allow_null=True)
 
 
 class WorkOrderRequestReassignmentSerializer(serializers.Serializer):

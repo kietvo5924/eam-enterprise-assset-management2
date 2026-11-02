@@ -77,19 +77,35 @@ class _FloorplanViewerScreenState extends State<FloorplanViewerScreen>
 
   /// Ánh xạ tọa độ mét (0-220m, 0-130m) sang tọa độ pixel 1100x750 đồng bộ với RouteMapPainter
   static Offset mapMetersToCanvas(double rawX, double rawY) {
-    if (rawX <= 250 && rawY <= 150) {
-      final double px = 90.0 + (rawX / 220.0) * 920.0;
-      final double py = 105.0 + (rawY / 130.0) * 520.0;
-      return Offset(px.clamp(80.0, 1020.0), py.clamp(90.0, 650.0));
+    double safeX = rawX;
+    double safeY = rawY;
+    if (safeX <= 1.0 && safeY <= 1.0) {
+      safeX = 95.0;
+      safeY = 22.0;
     }
-    return Offset(rawX.clamp(80.0, 1020.0), rawY.clamp(90.0, 650.0));
+    if (safeX <= 250 && safeY <= 150) {
+      final double px = 90.0 + (safeX / 220.0) * 920.0;
+      final double py = 105.0 + (safeY / 130.0) * 520.0;
+      return Offset(px.clamp(120.0, 980.0), py.clamp(115.0, 620.0));
+    }
+    return Offset(safeX.clamp(120.0, 980.0), safeY.clamp(115.0, 620.0));
   }
 
   Future<void> _fetchFloorplanData() async {
     final cacheKey = 'floorplan_cache_${widget.locationId}';
     try {
       final dio = DioClient().dio;
-      final response = await dio.get('/api/v1/locations/${widget.locationId}/floorplan/');
+      final bool hasLocId = widget.locationId.isNotEmpty && widget.locationId != 'null';
+      final path = hasLocId
+          ? '/api/v1/locations/${widget.locationId}/floorplan/'
+          : '/api/v1/locations/floorplan/';
+      final response = await dio.get(
+        path,
+        queryParameters: {
+          if (widget.focusAssetId != null && widget.focusAssetId!.isNotEmpty)
+            'focusAssetId': widget.focusAssetId,
+        },
+      );
       if (response.statusCode == 200 && response.data['success'] == true) {
         final data = response.data['data'] as Map<String, dynamic>;
         // Lưu bộ đệm ngoại tuyến
@@ -387,8 +403,20 @@ class _FloorplanViewerScreenState extends State<FloorplanViewerScreen>
     }
 
     // Tọa độ máy mục tiêu (ưu tiên widget -> sau đó equipment trong list)
-    double? tx = widget.targetCoordsX ?? (targetEquipment?['coordsX'] as num?)?.toDouble();
-    double? ty = widget.targetCoordsY ?? (targetEquipment?['coordsY'] as num?)?.toDouble();
+    final double? eqX = (targetEquipment?['coordsX'] as num?)?.toDouble();
+    final double? eqY = (targetEquipment?['coordsY'] as num?)?.toDouble();
+    double tx = widget.targetCoordsX ?? eqX ?? 95.0;
+    double ty = widget.targetCoordsY ?? eqY ?? 22.0;
+
+    if (tx <= 1.0 && ty <= 1.0) {
+      if (eqX != null && eqX > 1.0 && eqY != null && eqY > 1.0) {
+        tx = eqX;
+        ty = eqY;
+      } else {
+        tx = 95.0;
+        ty = 22.0;
+      }
+    }
 
     // Tọa độ trạm xuất phát (Chốt trực KTV hoặc mặc định Tổng Kho CKD)
     double sx = widget.dutyZoneCoordsX ?? 126.6;
@@ -411,7 +439,7 @@ class _FloorplanViewerScreenState extends State<FloorplanViewerScreen>
     double routeDistanceMeters = 0.0;
     double walkTimeMinutes = 0.0;
 
-    if (tx != null && ty != null && tx > 0 && ty > 0) {
+    if (tx > 0 && ty > 0) {
       startOffset = mapMetersToCanvas(sx, sy);
       targetOffset = mapMetersToCanvas(tx, ty);
       final double dx = (tx - sx).abs();

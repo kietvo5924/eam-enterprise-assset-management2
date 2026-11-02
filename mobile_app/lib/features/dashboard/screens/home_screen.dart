@@ -67,6 +67,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _handleRefresh() async {
+    await Future.wait([
+      context.read<WorkOrderProvider>().fetchHomeWorkOrders(),
+      _fetchUnreadCount(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
@@ -215,9 +222,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        color: AppTheme.primaryColor,
+        backgroundColor: Colors.white,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -594,7 +606,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildWOCard({

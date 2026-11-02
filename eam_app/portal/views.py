@@ -151,6 +151,23 @@ def portal_tenants(request):
             t.service_plan = data.get('service_plan', 'FREE')
             t.status = data.get('status', 'ACTIVE')
             t.save()
+            # Cập nhật hồ sơ sinh trắc học khuôn mặt nếu có ảnh đính kèm
+            face_img = data.get('faceImage') or data.get('faceImageBase64')
+            if face_img:
+                import base64
+                from algorithms.biometric.enrollment import enroll_user_face
+                try:
+                    b64_str = str(face_img)
+                    if ',' in b64_str:
+                        b64_str = b64_str.split(',', 1)[1]
+                    raw_bytes = base64.b64decode(b64_str)
+                    enroll_user_face(u, raw_bytes, enrolled_by=request.user)
+                except ValueError as ve:
+                    return JsonResponse({'success': False, 'error': f"Lỗi sinh trắc học: {str(ve)}"}, status=400)
+                except Exception as ex:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Lỗi đăng ký khuôn mặt: {ex}")
+
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -504,12 +521,15 @@ def portal_users(request):
                 u.set_password(data.get('password'))
                 u.save()
 
+            is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
             role_ids = data.get('roles', [])
             roles = []
             if role_ids:
-                roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
+                if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
+                    roles = list(Role.all_objects.filter(id__in=role_ids).prefetch_related('permissions'))
+                else:
+                    roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
                 for r in roles:
-                    is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
                     if r.name == 'SUPER_ADMIN' and not is_super:
                         return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
                 u.roles.set(roles)
@@ -570,6 +590,23 @@ def portal_users(request):
                     }
                 )
 
+            # Đăng ký hồ sơ sinh trắc học khuôn mặt nếu có ảnh đính kèm
+            face_img = data.get('faceImage') or data.get('faceImageBase64')
+            if face_img:
+                import base64
+                from algorithms.biometric.enrollment import enroll_user_face
+                try:
+                    b64_str = str(face_img)
+                    if ',' in b64_str:
+                        b64_str = b64_str.split(',', 1)[1]
+                    raw_bytes = base64.b64decode(b64_str)
+                    enroll_user_face(u, raw_bytes, enrolled_by=request.user)
+                except ValueError as ve:
+                    return JsonResponse({'success': False, 'error': f"Lỗi sinh trắc học: {str(ve)}"}, status=400)
+                except Exception as ex:
+                    import logging
+                    logging.getLogger(__name__).warning(f"Lỗi đăng ký khuôn mặt: {ex}")
+
             return JsonResponse({'success': True, 'id': str(u.id)})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
@@ -609,12 +646,15 @@ def portal_users(request):
                 u.set_password(data.get('password'))
             u.save()
 
+            is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
             role_ids = data.get('roles', [])
             roles = []
             if role_ids:
-                roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
+                if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
+                    roles = list(Role.all_objects.filter(id__in=role_ids).prefetch_related('permissions'))
+                else:
+                    roles = list(Role.objects.filter(id__in=role_ids, tenant_id=u.tenant_id).prefetch_related('permissions'))
                 for r in roles:
-                    is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
                     if r.name == 'SUPER_ADMIN' and not is_super:
                         return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
                 u.roles.set(roles)
@@ -697,10 +737,12 @@ def portal_users(request):
 
     from assets.models import Asset
 
+    from django.db.models import Prefetch
+    roles_prefetch = Prefetch('roles', queryset=Role.all_objects.all().prefetch_related('permissions'))
     if str(tenant_id) == '00000000-0000-0000-0000-000000000000' or request.user.is_superuser:
-        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').select_related('tenant', 'technician_profile').prefetch_related('roles__permissions').order_by('-created_at')
+        users = User.all_objects.exclude(id='00000000-0000-0000-0000-000000000000').select_related('tenant', 'technician_profile').prefetch_related(roles_prefetch).order_by('-created_at')
     else:
-        users = User.objects.filter(tenant_id=tenant_id).select_related('tenant', 'technician_profile').prefetch_related('roles__permissions').order_by('-created_at')
+        users = User.objects.filter(tenant_id=tenant_id).select_related('tenant', 'technician_profile').prefetch_related(roles_prefetch).order_by('-created_at')
 
     # Calculate metrics
     total_users = users.count()
@@ -719,7 +761,10 @@ def portal_users(request):
         ta_role.permissions.set(Permission.objects.exclude(id='system:admin'))
 
     is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
-    roles = Role.objects.filter(tenant_id=tenant_id).prefetch_related('permissions')
+    if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
+        roles = Role.all_objects.all().select_related('tenant').prefetch_related('permissions')
+    else:
+        roles = Role.objects.filter(tenant_id=tenant_id).select_related('tenant').prefetch_related('permissions')
     if not is_super:
         roles = roles.exclude(name='SUPER_ADMIN')
     roles = roles.order_by('-is_system', 'name')
@@ -735,31 +780,36 @@ def portal_users(request):
     from assets.models import Location
     locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
 
+    from users.models import BiometricProfile
+    enrolled_uids = set(str(uid) for uid in BiometricProfile.all_objects.filter(is_active=True).values_list('user_id', flat=True))
+
     user_profiles_dict = {}
     for u in users:
+        u.has_biometric = str(u.id) in enrolled_uids
         tp = getattr(u, 'technician_profile', None)
         u.can_execute_wo = any(roles_can_execute_map.get(str(r.id), False) for r in u.roles.all()) or (tp is not None)
-        if tp:
-            fp_id_str = str(tp.floorplan_id) if tp.floorplan_id else ''
-            fp_name_str = tp.floorplan.name if tp.floorplan else ''
-            if not fp_id_str and tp.zone_id:
-                matched_loc = next((l for l in locations_list if l['code'] == tp.zone_id or str(l['id']) == str(tp.zone_id)), None)
-                if matched_loc and matched_loc.get('parent_id'):
-                    fp_id_str = str(matched_loc['parent_id'])
-                    parent_fp = next((l for l in locations_list if str(l['id']) == fp_id_str), None)
-                    if parent_fp:
-                        fp_name_str = parent_fp['name']
-            user_profiles_dict[str(u.id)] = {
-                'skill_level': tp.skill_level,
-                'skills': tp.skills or [],
-                'certifications': tp.certifications or [],
-                'floorplan_id': fp_id_str,
-                'floorplan_name': fp_name_str,
-                'zone_id': tp.zone_id or '',
-                'floor_level': tp.floor_level or 1,
-                'coords_x': tp.coords_x or 0.0,
-                'coords_y': tp.coords_y or 0.0,
-            }
+        fp_id_str = str(tp.floorplan_id) if (tp and tp.floorplan_id) else ''
+        fp_name_str = tp.floorplan.name if (tp and tp.floorplan) else ''
+        if tp and not fp_id_str and tp.zone_id:
+            matched_loc = next((l for l in locations_list if l['code'] == tp.zone_id or str(l['id']) == str(tp.zone_id)), None)
+            if matched_loc and matched_loc.get('parent_id'):
+                fp_id_str = str(matched_loc['parent_id'])
+                parent_fp = next((l for l in locations_list if str(l['id']) == fp_id_str), None)
+                if parent_fp:
+                    fp_name_str = parent_fp['name']
+        user_profiles_dict[str(u.id)] = {
+            'skill_level': tp.skill_level if tp else 1,
+            'skills': (tp.skills or []) if tp else [],
+            'certifications': (tp.certifications or []) if tp else [],
+            'floorplan_id': fp_id_str,
+            'floorplan_name': fp_name_str,
+            'zone_id': (tp.zone_id or '') if tp else '',
+            'floor_level': (tp.floor_level or 1) if tp else 1,
+            'coords_x': (tp.coords_x or 0.0) if tp else 0.0,
+            'coords_y': (tp.coords_y or 0.0) if tp else 0.0,
+            'has_biometric': str(u.id) in enrolled_uids,
+            'photo_url': f'/portal/users/{u.id}/face-photo/' if (str(u.id) in enrolled_uids) else '',
+        }
 
     # Available Zones & Locations Master Data
     loc_codes = [l['code'] for l in locations_list if l['code']]
@@ -807,6 +857,41 @@ def portal_users(request):
         'blocked_users': blocked_users,
         'pending_users': pending_users
     })
+
+@login_required(login_url='portal_login')
+def portal_user_face_photo(request, user_id):
+    """
+    Trả về ảnh chân dung khuôn mặt đã giải mã từ lưu trữ sinh trắc học AES-256 an toàn.
+    """
+    from users.models import User
+    from algorithms.biometric.enrollment import decrypt_image_snapshot
+    from pathlib import Path
+    import os
+    from django.conf import settings
+    from django.http import HttpResponse, Http404
+
+    try:
+        target_user = User.all_objects.get(id=user_id)
+    except User.DoesNotExist:
+        raise Http404("User not found")
+
+    audit_dir = os.path.join(settings.MEDIA_ROOT, 'biometric_audits')
+    files = sorted(
+        list(Path(audit_dir).rglob(f"*{target_user.id}*.enc")),
+        key=os.path.getmtime,
+        reverse=True
+    )
+    if not files:
+        raise Http404("Face photo not found")
+
+    try:
+        decrypted_bytes = decrypt_image_snapshot(str(files[0]))
+        response = HttpResponse(decrypted_bytes, content_type='image/jpeg')
+        response['Cache-Control'] = 'private, max-age=300'
+        return response
+    except Exception as e:
+        return HttpResponse(status=500)
+
 
 @login_required(login_url='portal_login')
 @permission_required('role:read')
@@ -1462,7 +1547,10 @@ def portal_asset_registry(request):
                 value=data.get('value') or None,
                 duty_cycle_ratio=float(data.get('duty_cycle_ratio') or 1.0),
                 asset_type=asset_type_val,
-                is_active=data.get('is_active', True)
+                is_active=data.get('is_active', True),
+                require_ble_beacon=bool(data.get('require_ble_beacon', True) if data.get('require_ble_beacon') is not None else True),
+                ble_beacon_uuid=data.get('ble_beacon_uuid') or 'e2c56db5-dffb-48d2-b060-d0f5a71096e0',
+                ble_mac_address=data.get('ble_mac_address') or None,
             )
             return JsonResponse({'success': True, 'id': str(a.id)})
         except Exception as e:
@@ -1507,6 +1595,12 @@ def portal_asset_registry(request):
                 a.purchase_date = data.get('purchase_date') or None
             if 'is_active' in data:
                 a.is_active = data.get('is_active', True)
+            if 'require_ble_beacon' in data:
+                a.require_ble_beacon = bool(data.get('require_ble_beacon'))
+            if 'ble_beacon_uuid' in data:
+                a.ble_beacon_uuid = data.get('ble_beacon_uuid')
+            if 'ble_mac_address' in data:
+                a.ble_mac_address = data.get('ble_mac_address')
             if 'duty_cycle_ratio' in data and data.get('duty_cycle_ratio') is not None:
                 try:
                     dc_val = float(data.get('duty_cycle_ratio'))

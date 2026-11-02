@@ -8,6 +8,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/work_order.dart';
 import '../services/work_order_service.dart';
+import '../services/ble_beacon_service.dart';
+import 'field_attendance_screen.dart';
 import '../widgets/swipeable_checklist_tile.dart';
 import '../../../core/constants/api_constants.dart';
 
@@ -1114,37 +1116,27 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   onCompleted: () async {
                     if (_workOrder!.status != 'IN_PROGRESS' &&
                         _workOrder!.status != 'COMPLETED') {
-                      final success = await _service.updateStatus(
-                        widget.workOrderId,
-                        'IN_PROGRESS',
+                      final attendanceSuccess = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (ctx) => FieldAttendanceScreen(workOrder: _workOrder!),
+                        ),
                       );
-                      if (mounted) {
-                        if (success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                _workOrder!.status == 'ON_HOLD'
-                                    ? 'Đã tiếp tục thực hiện phiếu bảo trì.'
-                                    : 'Đã bắt đầu thực hiện phiếu bảo trì.',
-                              ),
-                              backgroundColor: AppTheme.successColor,
+
+                      if (mounted && attendanceSuccess == true) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              _workOrder!.status == 'ON_HOLD'
+                                  ? 'Đã tiếp tục thực hiện phiếu bảo trì.'
+                                  : 'Đã điểm danh hiện trường và bắt đầu thực hiện phiếu.',
                             ),
-                          );
-                          _fetchWorkOrderDetails();
-                          return true;
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Lỗi khi bắt đầu hoặc tiếp tục công việc. Vui lòng thử lại.',
-                              ),
-                              backgroundColor: AppTheme.dangerColor,
-                            ),
-                          );
-                          return false;
-                        }
+                            backgroundColor: AppTheme.successColor,
+                          ),
+                        );
+                        await _fetchWorkOrderDetails();
+                        return true;
                       }
-                      return success;
+                      return false;
                     } else {
                       final missingMandatory =
                           _workOrder?.checklists.any((c) {
@@ -1192,9 +1184,10 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                         return false;
                       }
 
-                      // Validate Machine State is selected!
-                      if (_selectedMachineState == null ||
-                          _selectedMachineState!.trim().isEmpty) {
+                      // Validate Machine State is selected (only for machinery)!
+                      if (_workOrder!.isMachinery &&
+                          (_selectedMachineState == null ||
+                           _selectedMachineState!.trim().isEmpty)) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -1208,6 +1201,65 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                         return false;
                       }
 
+                      // CỔNG 2: PROOF-OF-PRESENCE INTERLOCK (Phase 11.7)
+                      int? presenceRssi;
+                      String? presenceBeaconId;
+                      if (_workOrder!.requireBleBeacon) {
+                        final scanResult = await BleBeaconService().scanForBeacon(
+                          targetUuid: _workOrder!.bleBeaconUuid,
+                          timeout: const Duration(seconds: 3),
+                        );
+                        if (!scanResult.isWithinRange) {
+                          if (mounted) {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                title: const Row(
+                                  children: [
+                                    Icon(PhosphorIconsRegular.warningCircle, color: AppTheme.dangerColor, size: 28),
+                                    SizedBox(width: 8),
+                                    Text('Cảnh Báo Hiện Diện'),
+                                  ],
+                                ),
+                                content: const Text(
+                                  'Bạn không có mặt tại thiết bị (không tìm thấy tín hiệu ESP32 hoặc khoảng cách > 50m).\n'
+                                  'Vui lòng lại gần máy móc để nghiệm thu!',
+                                  style: TextStyle(fontSize: 14, height: 1.4),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx).pop(),
+                                    child: const Text('Đóng'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return false;
+                        }
+                        presenceRssi = scanResult.rssi;
+                        presenceBeaconId = scanResult.beaconId;
+
+                        // Call verifyPresence API to record immutable Cổng 2 presence log
+                        final presenceRes = await _service.verifyPresence(
+                          workOrderId: widget.workOrderId,
+                          rssi: presenceRssi,
+                          bleBeaconId: presenceBeaconId,
+                        );
+                        if (presenceRes == null || presenceRes['isPresenceVerified'] != true) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Xác thực hiện diện Cổng 2 không thành công trên máy chủ.'),
+                                backgroundColor: AppTheme.dangerColor,
+                              ),
+                            );
+                          }
+                          return false;
+                        }
+                      }
+
                       final vibText = _vibrationController.text.trim().replaceAll(',', '.');
                       final tempText = _temperatureController.text.trim().replaceAll(',', '.');
                       final success = await _service.updateStatus(
@@ -1218,6 +1270,12 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                         loadFactor: _selectedLoadFactor,
                         postRepairVibration: vibText.isNotEmpty ? double.tryParse(vibText) : null,
                         postRepairTemperature: tempText.isNotEmpty ? double.tryParse(tempText) : null,
+                        isLocationVerified: _workOrder!.requireBleBeacon ? true : true,
+                        rssi: presenceRssi,
+                        bleVerificationData: presenceRssi != null ? {
+                          'beaconId': presenceBeaconId ?? BleBeaconService.universalBeaconName,
+                          'rssi': presenceRssi,
+                        } : null,
                       );
                       if (mounted) {
                         if (success) {
@@ -1472,7 +1530,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                                   context.push(
                                     '/floorplan-viewer',
                                     extra: {
-                                      'locationId': _workOrder!.zoneId ?? '',
+                                      'locationId': _workOrder!.locationId ?? _workOrder!.zoneId ?? '',
                                       'locationName':
                                           _workOrder!.assetLocation ??
                                           _workOrder!.zoneId ??
@@ -1742,12 +1800,12 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 ],
               ),
 
-              const SizedBox(height: 32),
-
-              // Machine Operating State Section (Bắt buộc)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
+              // Machine Operating State Section (Bắt buộc cho máy móc, ẩn cho đồ dùng bàn ghế)
+              if (_workOrder!.isMachinery) ...[
+                const SizedBox(height: 32),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -1980,6 +2038,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   ],
                 ),
               ),
+              ],
 
               const SizedBox(height: 32),
 

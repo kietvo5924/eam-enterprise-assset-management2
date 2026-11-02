@@ -172,7 +172,7 @@ class LocationFloorplanDetailView(APIView):
     """
     API Mobile & Web: Xem Sơ đồ Mặt bằng Chi tiết của Phân xưởng/Doanh nghiệp kèm danh sách máy móc đã lắp đặt
     """
-    def get(self, request, location_id):
+    def get(self, request, location_id=None):
         has_loc = HasPermission('location:read')().has_permission(request, self)
         has_asset = HasPermission('asset:read')().has_permission(request, self)
         has_wo = HasPermission('work_order:read')().has_permission(request, self)
@@ -181,19 +181,42 @@ class LocationFloorplanDetailView(APIView):
 
         import uuid
         location = None
-        try:
-            loc_uuid = uuid.UUID(str(location_id))
-            location = Location.objects.filter(id=loc_uuid).first()
-        except (ValueError, TypeError):
-            location = None
+        target_loc_id = location_id or request.query_params.get('location_id') or request.query_params.get('locationId')
+
+        if target_loc_id and str(target_loc_id).strip():
+            try:
+                loc_uuid = uuid.UUID(str(target_loc_id).strip())
+                location = Location.objects.filter(id=loc_uuid).first()
+            except (ValueError, TypeError):
+                location = None
+
+            if not location:
+                # Fallback search by location code within tenant
+                tenant = getattr(request.user, 'tenant', None)
+                location = Location.objects.filter(code=str(target_loc_id).strip(), is_active=True)
+                if tenant:
+                    location = location.filter(tenant=tenant)
+                location = location.first()
 
         if not location:
-            # Fallback search by location code within tenant
+            # Fallback search by asset's location
+            asset_id = request.query_params.get('focusAssetId') or request.query_params.get('asset_id') or request.query_params.get('assetId')
+            if asset_id and str(asset_id).strip():
+                try:
+                    asset = Asset.all_objects.filter(id=str(asset_id).strip()).first()
+                    if asset and asset.location:
+                        location = asset.location
+                except Exception:
+                    pass
+
+        if not location:
+            # Fallback to tenant primary active location
             tenant = getattr(request.user, 'tenant', None)
-            location = Location.objects.filter(code=str(location_id), is_active=True)
             if tenant:
-                location = location.filter(tenant=tenant)
-            location = location.first()
+                location = Location.objects.filter(tenant=tenant, is_active=True).first() or Location.all_objects.filter(tenant=tenant).first()
+
+        if not location:
+            location = Location.objects.filter(is_active=True).first()
 
         if not location:
             raise ValidationError("Location not found")
@@ -701,7 +724,10 @@ class AssetListView(APIView):
             location_id=data.get('locationId'),
             hierarchy_template_id=data.get('hierarchyTemplateId'),
             qr_code=qr_code,
-            is_active=data.get('isActive', True)
+            is_active=data.get('isActive', True),
+            require_ble_beacon=data.get('requireBleBeacon', True),
+            ble_beacon_uuid=data.get('bleBeaconUuid') or 'e2c56db5-dffb-48d2-b060-d0f5a71096e0',
+            ble_mac_address=data.get('bleMacAddress')
         )
         
         return success_response(AssetSerializer(asset).data, message="Created")
@@ -783,6 +809,13 @@ class AssetDetailView(APIView):
 
         if 'dutyCycleRatio' in data:
             asset.duty_cycle_ratio = data['dutyCycleRatio']
+
+        if 'requireBleBeacon' in data:
+            asset.require_ble_beacon = data['requireBleBeacon']
+        if 'bleBeaconUuid' in data:
+            asset.ble_beacon_uuid = data['bleBeaconUuid']
+        if 'bleMacAddress' in data:
+            asset.ble_mac_address = data['bleMacAddress']
             
         asset.save()
         return success_response(AssetSerializer(asset).data)
@@ -1473,3 +1506,265 @@ class CriticalAssetsRulListView(APIView):
         data = AssetSerializer(critical_assets, many=True).data
         return success_response(data)
 
+
+
+class IoTSensorAlertView(APIView):
+    """
+    Endpoint tiếp nhận dữ liệu đo đạc và cảnh báo từ thiết bị IoT (ESP32).
+    - Hoàn toàn động (Dynamic): Không gán cứng tenant, asset, hay ngưỡng cảnh báo.
+    - Gửi thông báo 1 lần duy nhất khi phát hiện thông số vượt ngưỡng.
+    - Không gửi thông báo nhắc nhở rác, không tự động gửi thông báo khôi phục khi chưa có kiểm tra hiện trường.
+    """
+    permission_classes = []
+
+    def post(self, request):
+        data = request.data or {}
+        asset_code = str(data.get('asset_code', '')).strip()
+        tenant_code = str(data.get('tenant_code', '')).strip()
+
+        if not tenant_code:
+            return error_response(
+                message="Thiếu thông tin 'tenant_code' từ thiết bị IoT.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        if not asset_code:
+            return error_response(
+                message="Thiếu thông tin 'asset_code' từ thiết bị IoT.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Định danh Tenant hoàn toàn động (hỗ trợ tenant_code chính xác, UUID, hoặc tên/tiền tố viết tắt)
+        from core.models import Tenant
+        target_tenant = (
+            Tenant.objects.filter(tenant_code__iexact=tenant_code).first() or
+            (Tenant.objects.filter(id=tenant_code).first() if len(tenant_code) == 36 else None) or
+            Tenant.objects.filter(tenant_code__icontains=tenant_code).first() or
+            Tenant.objects.filter(name__icontains=tenant_code).first()
+        )
+
+        # 2. Định danh tài sản Asset hoàn toàn động (theo qr_code, serial_number, name)
+        asset = None
+        if target_tenant:
+            asset = Asset.all_objects.filter(tenant=target_tenant).filter(
+                models.Q(qr_code__iexact=asset_code) |
+                models.Q(serial_number__iexact=asset_code) |
+                models.Q(name__iexact=asset_code) |
+                models.Q(qr_code__icontains=asset_code) |
+                models.Q(name__icontains=asset_code)
+            ).first()
+
+        if not asset:
+            # Tìm kiếm toàn cục nếu mã thiết bị có tiền tố hoặc khác biệt
+            asset = Asset.all_objects.filter(
+                models.Q(qr_code__iexact=asset_code) |
+                models.Q(serial_number__iexact=asset_code) |
+                models.Q(name__iexact=asset_code) |
+                models.Q(qr_code__icontains=asset_code) |
+                models.Q(name__icontains=asset_code)
+            ).first()
+            if asset:
+                target_tenant = asset.tenant
+
+        if not target_tenant:
+            return error_response(
+                message=f"Không tìm thấy Tenant tương ứng với mã '{tenant_code}'.",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        if not asset:
+            return error_response(
+                message=f"Không tìm thấy thiết bị '{asset_code}' thuộc hệ thống.",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        from core.tenant_context import set_current_tenant
+        set_current_tenant(target_tenant.id)
+
+        try:
+            temperature = float(data.get('temperature', 0.0))
+        except (ValueError, TypeError):
+            temperature = 0.0
+
+        try:
+            vibration = float(data.get('vibration', 0.0))
+        except (ValueError, TypeError):
+            vibration = 0.0
+
+        device_id = str(data.get('device_id', '')).strip() or f"IOT-{asset_code}"
+
+        # 3. Ngưỡng cảnh báo động (Được cấu hình từ thiết bị IoT gửi lên)
+        try:
+            temp_min_warn = float(data.get('temp_min_warn', 15.0))
+            temp_max_warn = float(data.get('temp_max_warn', 70.0))
+            temp_min_crit = float(data.get('temp_min_crit', 5.0))
+            temp_max_crit = float(data.get('temp_max_crit', 85.0))
+        except (ValueError, TypeError):
+            temp_min_warn, temp_max_warn = 15.0, 70.0
+            temp_min_crit, temp_max_crit = 5.0, 85.0
+
+        try:
+            vib_min_warn = float(data.get('vib_min_warn', 0.02))
+            vib_max_warn = float(data.get('vib_max_warn', 0.85))
+            vib_max_crit = float(data.get('vib_max_crit', 1.50))
+        except (ValueError, TypeError):
+            vib_min_warn, vib_max_warn = 0.02, 0.85
+            vib_max_crit = 1.50
+
+        # Kiểm tra ngưỡng thực tế
+        is_temp_high = temperature > temp_max_warn
+        is_temp_low  = (0.0 < temperature < temp_min_warn)
+        is_vib_high  = vibration > vib_max_warn
+        is_vib_low   = (0.0 <= vibration < vib_min_warn)
+
+        has_anomaly = is_temp_high or is_temp_low or is_vib_high or is_vib_low
+
+        # Ghi nhật ký đo lường thực tế (MeterReading)
+        from django.utils import timezone
+        now = timezone.now()
+
+        if temperature > 0:
+            MeterReading.objects.create(
+                tenant=asset.tenant,
+                asset=asset,
+                metric_code='TEMPERATURE',
+                reading_value=Decimal(str(round(temperature, 2))),
+                reading_date=now,
+                unit='°C',
+                machine_state='RUNNING'
+            )
+
+        if vibration >= 0:
+            MeterReading.objects.create(
+                tenant=asset.tenant,
+                asset=asset,
+                metric_code='VIBRATION',
+                reading_value=Decimal(str(round(vibration, 3))),
+                reading_date=now,
+                unit='g',
+                machine_state='RUNNING'
+            )
+
+        loc_name = asset.location.name if asset.location else 'Khu vực phân xưởng'
+        tenant_display = f'[{target_tenant.name}] '
+
+        # Nếu thông số an toàn trong ngưỡng: Chỉ ghi nhận dữ liệu, không phát cảnh báo
+        if not has_anomaly:
+            return success_response({
+                'tenantCode': target_tenant.tenant_code,
+                'tenantName': target_tenant.name,
+                'assetId': str(asset.id),
+                'assetName': asset.name,
+                'assetCode': getattr(asset, 'code', '') or getattr(asset, 'qr_code', ''),
+                'temperature': temperature,
+                'vibration': vibration,
+                'status': 'NORMAL',
+                'message': f'Thông số đo được (Nhiệt độ: {temperature:.1f}°C, Rung: {vibration:.3f}g) đều nằm trong giới hạn MIN-MAX.'
+            }, message='Dữ liệu cảm biến được ghi nhận an toàn.')
+
+        # 4. Khi thông số ngoài giới hạn: Gửi cảnh báo 1 lần duy nhất
+        is_critical = (
+            (temperature >= temp_max_crit) or
+            (0.0 < temperature <= temp_min_crit) or
+            (vibration >= vib_max_crit)
+        )
+        severity = 'CRITICAL' if is_critical else 'WARNING'
+
+        anomalies = []
+        if is_temp_high:
+            anomalies.append(f'Nhiệt độ {temperature:.1f}°C (Vượt ngưỡng MAX: {temp_max_warn:.1f}°C)')
+        elif is_temp_low:
+            anomalies.append(f'Nhiệt độ {temperature:.1f}°C (Dưới ngưỡng MIN: {temp_min_warn:.1f}°C)')
+
+        if is_vib_high:
+            anomalies.append(f'Độ rung {vibration:.3f}g RMS (Vượt ngưỡng MAX: {vib_max_warn:.2f}g)')
+        elif is_vib_low:
+            anomalies.append(f'Độ rung {vibration:.3f}g RMS (Dưới ngưỡng MIN: {vib_min_warn:.3f}g)')
+
+        anomaly_str = ' & '.join(anomalies)
+
+        if severity == 'CRITICAL':
+            title = f'🚨 KHẨN CẤP: Thiết bị {asset.name} - Thông số vượt ngưỡng nguy hiểm!'
+            message = (
+                f'{tenant_display}Hệ thống cảm biến IoT ghi nhận thông số thực tế tại {asset.name} '
+                f'[{loc_name}]: {anomaly_str}. '
+                f'Yêu cầu nhân sự có thẩm quyền kiểm tra hiện trường thiết bị và lập Phiếu Bảo Trì (Work Order).'
+            )
+        else:
+            title = f'⚠️ CẢNH BÁO: Thiết bị {asset.name} - Thông số ngoài ngưỡng an toàn'
+            message = (
+                f'{tenant_display}Hệ thống cảm biến IoT ghi nhận thông số thực tế tại {asset.name} '
+                f'[{loc_name}]: {anomaly_str}. '
+                f'Vui lòng kiểm tra hiện trường thiết bị và tạo Phiếu Bảo Trì (Work Order) nếu cần thiết.'
+            )
+
+        # 5. Tìm người nhận thông báo CÓ QUYỀN TẠO WORK ORDER trong đúng Tenant
+        from users.models import User
+        recipients = list(User.all_objects.filter(
+            tenant_id=asset.tenant_id,
+            status='ACTIVE'
+        ).filter(
+            models.Q(roles__permissions__id__in=['work_order:create', 'work_order:approve', 'maintenance:update']) |
+            models.Q(roles__name__icontains='manager') |
+            models.Q(roles__name__icontains='supervisor') |
+            models.Q(roles__name__icontains='admin') |
+            models.Q(is_superuser=True)
+        ).distinct())
+
+        if not recipients:
+            recipients = list(User.all_objects.filter(
+                tenant_id=asset.tenant_id,
+                status='ACTIVE'
+            )[:5])
+
+        # 6. Bắn thông báo Real-time (Đảm bảo Deduplication 1 lần theo sự cố của tài sản)
+        from notifications.services import dispatch_event_notification
+        link = f'/portal/work-orders/?create_wo=1&asset_id={asset.id}'
+
+        dispatched_notifs = dispatch_event_notification(
+            event_type='SENSOR_ANOMALY_DETECTED',
+            tenant=asset.tenant,
+            entity_type='Asset',
+            entity_id=f'{asset.id}:IOT_{severity}',
+            recipients=recipients,
+            title=title,
+            message=message,
+            link=link,
+            category='EQUIPMENT',
+            severity=severity,
+            is_actionable=True,
+            sla_minutes=15 if severity == 'CRITICAL' else 120,
+            metadata={
+                'tenant_code': target_tenant.tenant_code,
+                'tenant_name': target_tenant.name,
+                'asset_id': str(asset.id),
+                'asset_name': asset.name,
+                'asset_code': getattr(asset, 'code', '') or getattr(asset, 'qr_code', ''),
+                'location': loc_name,
+                'temperature': temperature,
+                'vibration': vibration,
+                'temp_min_warn': temp_min_warn,
+                'temp_max_warn': temp_max_warn,
+                'vib_min_warn': vib_min_warn,
+                'vib_max_warn': vib_max_warn,
+                'device_id': device_id,
+                'anomalies': anomalies,
+                'severity': severity,
+                'action': 'CREATE_WORK_ORDER'
+            }
+        )
+
+        return success_response({
+            'tenant': target_tenant.name,
+            'tenantCode': target_tenant.tenant_code,
+            'assetId': str(asset.id),
+            'assetName': asset.name,
+            'assetCode': getattr(asset, 'code', '') or getattr(asset, 'qr_code', ''),
+            'location': loc_name,
+            'temperature': temperature,
+            'vibration': vibration,
+            'status': severity,
+            'anomalies': anomalies,
+            'notifiedUsersCount': len(recipients),
+            'notifiedUsers': [u.username for u in recipients],
+            'dispatchedCount': len(dispatched_notifs)
+        }, message='Đã tiếp nhận cảnh báo IoT và phát thông báo tới nhân sự có quyền tạo Work Order.')

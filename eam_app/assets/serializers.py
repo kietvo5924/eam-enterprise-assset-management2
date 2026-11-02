@@ -104,6 +104,9 @@ class AssetSerializer(serializers.ModelSerializer):
     rapidDegradationAlert = serializers.BooleanField(source='rapid_degradation_alert', read_only=True)
     lastCoreOverhaulAt = serializers.DateTimeField(source='last_core_overhaul_at', read_only=True)
     lastRulPredictedAt = serializers.DateTimeField(source='last_rul_predicted_at', read_only=True)
+    requireBleBeacon = serializers.BooleanField(source='require_ble_beacon', default=True)
+    bleBeaconUuid = serializers.CharField(source='ble_beacon_uuid', required=False, allow_null=True)
+    bleMacAddress = serializers.CharField(source='ble_mac_address', required=False, allow_null=True)
 
     class Meta:
         model = Asset
@@ -113,6 +116,7 @@ class AssetSerializer(serializers.ModelSerializer):
                   'primarySparePartId', 'currentRulDays', 'currentRulCalendarDays', 'dutyCycleRatio',
                   'rulConfidenceLower', 'rulConfidenceUpper', 'rulRiskLevel', 'isPhantomRecovery',
                   'rapidDegradationAlert', 'lastCoreOverhaulAt', 'lastRulPredictedAt',
+                  'requireBleBeacon', 'bleBeaconUuid', 'bleMacAddress',
                   'createdAt', 'updatedAt']
 
 class AssetCreateUpdateSerializer(serializers.Serializer):
@@ -131,6 +135,9 @@ class AssetCreateUpdateSerializer(serializers.Serializer):
     qrCode = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     isActive = serializers.BooleanField(required=False, default=True)
     dutyCycleRatio = serializers.FloatField(required=False, default=1.0)
+    requireBleBeacon = serializers.BooleanField(required=False, default=True)
+    bleBeaconUuid = serializers.CharField(max_length=64, required=False, allow_blank=True, allow_null=True)
+    bleMacAddress = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
 
 class AssetRulPredictionSerializer(serializers.ModelSerializer):
     assetId = serializers.UUIDField(source='asset.id', read_only=True)

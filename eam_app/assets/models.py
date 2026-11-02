@@ -175,6 +175,11 @@ class Asset(BaseTenantModel):
     floor_level = models.SmallIntegerField(default=1)
     zone_id = models.CharField(max_length=64, blank=True, default='')
 
+    # Phase 11.7: Smart Biometric Attendance & ESP32 BLE Micro-Geofencing Fields
+    require_ble_beacon = models.BooleanField(default=True, help_text='Bắt buộc quét sóng ESP32 BLE Beacon 50m khi điểm danh')
+    ble_beacon_uuid = models.CharField(max_length=64, null=True, blank=True, default='e2c56db5-dffb-48d2-b060-d0f5a71096e0')
+    ble_mac_address = models.CharField(max_length=32, null=True, blank=True)
+
     # Phase 11.5: Deep Learning LSTM RUL Fields
     RUL_RISK_CHOICES = (
         ('CALIBRATING', 'Calibrating'),

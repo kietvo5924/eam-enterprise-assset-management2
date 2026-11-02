@@ -452,6 +452,13 @@ class WorkOrderStatusView(APIView):
                 raise ValidationError('Work Order can only be started from ASSIGNED or ON_HOLD state')
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can start the Work Order')
+
+            # Phase 11.7: Cổng 1 - Khóa 15 phút điểm danh sinh trắc học & định vị hiện trường
+            from algorithms.biometric.gatekeeper import verify_start_work_order_gate
+            gate_resp = verify_start_work_order_gate(wo, request.user)
+            if gate_resp is not None:
+                return gate_resp
+
             if not wo.actual_start_time:
                 wo.actual_start_time = timezone.now()
 
@@ -489,6 +496,21 @@ class WorkOrderStatusView(APIView):
         if new_status == 'COMPLETED':
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can complete the Work Order')
+
+            # Phase 11.7: Cổng 2 - Khóa kiểm tra hiện diện tại máy móc trước khi nghiệm thu
+            from algorithms.biometric.gatekeeper import verify_complete_work_order_gate
+            ble_check_data = data.get('bleVerificationData')
+            if not ble_check_data:
+                rssi_in = data.get('rssi')
+                if rssi_in is not None:
+                    ble_check_data = {
+                        'rssi': rssi_in,
+                        'beaconId': data.get('bleBeaconId') or data.get('beaconId') or 'EAM-UNIVERSAL-BEACON'
+                    }
+
+            comp_gate_resp = verify_complete_work_order_gate(wo, request.user, ble_check_data)
+            if comp_gate_resp is not None:
+                return comp_gate_resp
 
             def _extract_val(d, *keys, default=None):
                 for k in keys:

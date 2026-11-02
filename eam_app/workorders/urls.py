@@ -12,7 +12,14 @@ from workorders.views import (
     WorkOrderReportIncidentView, WorkOrderRequestReassignmentView
 )
 
+from workorders.attendance_views import (
+    BiometricEnrollView, AttendanceCheckInView, AttendanceVerifyPresenceView
+)
+
 urlpatterns = [
+    re_path(r'^biometric/enroll/?$', BiometricEnrollView.as_view(), name='biometric_enroll'),
+    re_path(r'^attendance/check-in/?$', AttendanceCheckInView.as_view(), name='attendance_check_in'),
+    re_path(r'^attendance/verify-presence/?$', AttendanceVerifyPresenceView.as_view(), name='attendance_verify_presence'),
     re_path(r'^work-orders/?$', WorkOrderListView.as_view(), name='work_order_list'),
     re_path(r'^work-orders/kpis/?$', WorkOrderKpiView.as_view(), name='work_order_kpis'),
     re_path(r'^work-orders/calendar/?$', MaintenanceCalendarView.as_view(), name='work_order_calendar'),

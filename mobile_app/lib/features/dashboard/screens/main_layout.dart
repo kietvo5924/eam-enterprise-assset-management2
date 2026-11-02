@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -171,10 +172,14 @@ class _ProfileScreenState extends State<_ProfileScreen> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final cachedAvatar = prefs.getString('userAvatarBase64');
     setState(() {
       _username = prefs.getString('username') ?? 'Người dùng';
       _roles = prefs.getString('roles') ?? 'Technician';
       _tenantId = prefs.getString('tenantId') ?? 'N/A';
+      if (cachedAvatar != null && cachedAvatar.isNotEmpty) {
+        _profileData = {'avatarBase64': cachedAvatar};
+      }
     });
     _fetchProfileDetails();
   }
@@ -190,6 +195,11 @@ class _ProfileScreenState extends State<_ProfileScreen> {
             _profileData = response.data['data'];
             _isLoadingProfile = false;
           });
+          final b64 = _profileData?['avatarBase64'];
+          if (b64 != null && b64.toString().isNotEmpty) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('userAvatarBase64', b64.toString());
+          }
         }
       } else {
         if (mounted) setState(() => _isLoadingProfile = false);
@@ -518,17 +528,36 @@ class _ProfileScreenState extends State<_ProfileScreen> {
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryColor,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
+                      ],
                     ),
+                    child: (_profileData != null &&
+                            _profileData!['avatarBase64'] != null &&
+                            _profileData!['avatarBase64'].toString().isNotEmpty)
+                        ? ClipOval(
+                            child: Image.memory(
+                              base64Decode(_profileData!['avatarBase64']),
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
                   ),
                   const SizedBox(width: 20),
                   Expanded(

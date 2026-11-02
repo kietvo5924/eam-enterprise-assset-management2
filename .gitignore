@@ -37,7 +37,14 @@ scratch/
 eam_app/scratch/
 .settings/
 **/.settings/
+*.enc
+media/
+eam_app/media/
 
 # Ensure migrations are never ignored
 !**/migrations/*.py
+
+
+# IoT Firmware with local WiFi credentials
+scripts/firmware/esp32_asset_beacon/
 

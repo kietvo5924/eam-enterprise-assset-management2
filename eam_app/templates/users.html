@@ -149,7 +149,18 @@
         <tbody class="divide-y divide-neutral-100" id="userTableBody">
           {% for u in users %}
           <tr class="hover:bg-neutral-50/50 transition-colors user-row" data-status="{{ u.status }}" data-roles="{% for role in u.roles.all %}{{ role.id }},{% endfor %}">
-            <td class="px-4 py-3 font-semibold text-gray-800 user-username">{{ u.username }}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800 user-username">
+              <div class="flex items-center gap-2.5">
+                {% if u.has_biometric %}
+                <img src="{% url 'portal_user_face_photo' u.id %}" alt="{{ u.username }}" class="w-7 h-7 rounded-full object-cover border border-emerald-300 shadow-xs" title="Đã có ảnh chân dung">
+                {% else %}
+                <div class="w-7 h-7 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-500 font-bold text-[11px]" title="Chưa có ảnh">
+                  {{ u.username|slice:":1"|upper }}
+                </div>
+                {% endif %}
+                <span>{{ u.username }}</span>
+              </div>
+            </td>
             <td class="px-4 py-3 text-neutral-600 user-email">{{ u.email|default:"" }}</td>
             {% if is_system_admin or user.tenant.tenant_code == 'SYSTEM' %}
             <td class="px-4 py-3 text-neutral-700 font-medium user-tenant">
@@ -275,9 +286,42 @@
             <label class="block text-xs font-bold text-neutral-700 mb-1">Gán vai trò (Roles)</label>
             <select id="user-roles" multiple placeholder="Select roles..." autocomplete="off">
                 {% for r in roles %}
-                <option value="{{ r.id }}">{{ r.name }}</option>
+                <option value="{{ r.id }}">{{ r.name }}{% if r.tenant and r.tenant.name != 'EAM System (Host Tenant)' %} ({{ r.tenant.name }}){% endif %}</option>
                 {% endfor %}
             </select>
+          </div>
+
+          <!-- Face Biometric Photo Section -->
+          <div class="border border-neutral-200/90 bg-neutral-50/70 rounded-xl p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-bold text-neutral-700">
+                Ảnh chân dung <span class="text-danger" id="face-req-star">*</span>
+              </label>
+              <span id="biometric-badge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600">
+                Chưa có ảnh
+              </span>
+            </div>
+            
+            <div class="flex items-center gap-3.5">
+              <div class="relative w-14 h-14 rounded-full border-2 border-dashed border-neutral-300 flex items-center justify-center overflow-hidden bg-white shrink-0 shadow-xs" id="face-preview-container">
+                <img id="face-preview-img" src="" class="hidden w-full h-full object-cover" alt="Face preview" />
+                <i class="ph-bold ph-user text-neutral-400 text-xl" id="face-placeholder-icon"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <input type="file" id="user-face-file" accept="image/*" class="hidden" />
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="document.getElementById('user-face-file').click()" class="h-8 px-3 text-xs font-semibold rounded-lg bg-white border border-neutral-300 hover:border-primary hover:text-primary transition shadow-xs flex items-center gap-1.5 text-neutral-700">
+                    <i class="ph-bold ph-camera"></i> Chọn ảnh chân dung
+                  </button>
+                  <button type="button" id="btn-remove-face" onclick="clearFacePhotoSelection()" class="hidden h-8 px-2 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition" title="Xóa ảnh đã chọn">
+                    <i class="ph-bold ph-x"></i>
+                  </button>
+                </div>
+                <p class="text-[11px] text-neutral-500 mt-1 truncate">
+                  Ảnh chụp thẳng, rõ mặt để trích xuất 128D vector MobileFaceNet.
+                </p>
+              </div>
+            </div>
           </div>
 
           <!-- Dynamic Technician Competency Section (Permission-Driven: work_order:execute, update, reassign, workforce:read) -->
@@ -704,6 +748,48 @@
             zone_id: ''
         };
 
+        // Biometric Face Status & Live Photo Display
+        const profBio = (id && window.USER_PROFILES && window.USER_PROFILES[id]) ? window.USER_PROFILES[id] : null;
+        window.CURRENT_USER_HAS_BIOMETRIC = !!(profBio && profBio.has_biometric);
+
+        const previewImg = document.getElementById('face-preview-img');
+        const phIcon = document.getElementById('face-placeholder-icon');
+        const badge = document.getElementById('biometric-badge');
+        const rmBtn = document.getElementById('btn-remove-face');
+        const faceInput = document.getElementById('user-face-file');
+        if (faceInput) faceInput.value = '';
+
+        if (id && window.CURRENT_USER_HAS_BIOMETRIC) {
+            if (previewImg) {
+                previewImg.src = `/portal/users/${id}/face-photo/?t=${Date.now()}`;
+                previewImg.classList.remove('hidden');
+            }
+            if (phIcon) phIcon.classList.add('hidden');
+            if (badge) {
+                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700';
+                badge.textContent = 'Đã có ảnh';
+            }
+            if (rmBtn) rmBtn.classList.remove('hidden');
+        } else {
+            if (previewImg) {
+                previewImg.src = '';
+                previewImg.classList.add('hidden');
+            }
+            if (phIcon) phIcon.classList.remove('hidden');
+            if (badge) {
+                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600';
+                badge.textContent = 'Chưa có ảnh';
+            }
+            if (rmBtn) rmBtn.classList.add('hidden');
+        }
+
+        const faceStar = document.getElementById('face-req-star');
+        if (id && window.CURRENT_USER_HAS_BIOMETRIC) {
+            if (faceStar) faceStar.classList.add('hidden');
+        } else {
+            if (faceStar) faceStar.classList.remove('hidden');
+        }
+
         if (document.getElementById('tech-skill-level')) {
             document.getElementById('tech-skill-level').value = prof.skill_level || 3;
             
@@ -746,6 +832,7 @@
         if (window.userRolesSelect) {
             window.userRolesSelect.clear();
         }
+        clearFacePhotoSelection();
     }
 
     document.getElementById('user-form').addEventListener('submit', function(e) {
@@ -794,30 +881,114 @@
         const method = id ? 'PUT' : 'POST';
         const btn = document.getElementById('btn-save-user');
         const msg = document.getElementById('user-msg');
+
+        // VALIDATION: Bắt buộc ảnh chân dung sinh trắc học
+        const faceInput = document.getElementById('user-face-file');
+        const hasFaceFile = faceInput && faceInput.files && faceInput.files.length > 0;
+        const hasExistingFace = window.CURRENT_USER_HAS_BIOMETRIC;
+
+        if (!id && !hasFaceFile) {
+            msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+            msg.innerText = 'Vui lòng tải lên ảnh chân dung khuôn mặt để đăng ký hồ sơ sinh trắc học bắt buộc!';
+            msg.classList.remove('hidden');
+            return;
+        }
+
         btn.disabled = true;
-        
-        fetch('{% url "portal_users" %}', {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify(data)
-        })
-        .then(res => res.json())
-        .then(resData => {
-            if(resData.success) {
-                window.location.reload();
-            } else {
+
+        function submitUserForm(payload) {
+            fetch('{% url "portal_users" %}', {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(resData => {
+                if(resData.success) {
+                    window.location.reload();
+                } else {
+                    msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
+                    msg.innerText = resData.error || 'An error occurred';
+                    msg.classList.remove('hidden');
+                }
+            })
+            .catch(err => {
                 msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
-                msg.innerText = resData.error || 'An error occurred';
+                msg.innerText = 'Lỗi hệ thống: ' + err.message;
                 msg.classList.remove('hidden');
-            }
-        })
-        .finally(() => {
-            btn.disabled = false;
-        });
+            })
+            .finally(() => {
+                btn.disabled = false;
+            });
+        }
+
+        if (hasFaceFile) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                data.faceImage = evt.target.result;
+                submitUserForm(data);
+            };
+            reader.readAsDataURL(faceInput.files[0]);
+        } else {
+            submitUserForm(data);
+        }
     });
+
+    // Face Photo Upload Handlers
+    document.getElementById('user-face-file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const img = document.getElementById('face-preview-img');
+                img.src = evt.target.result;
+                img.classList.remove('hidden');
+                document.getElementById('face-placeholder-icon').classList.add('hidden');
+                document.getElementById('btn-remove-face').classList.remove('hidden');
+                const badge = document.getElementById('biometric-badge');
+                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700';
+                badge.textContent = 'Đã chọn ảnh mới';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    function clearFacePhotoSelection() {
+        const faceInput = document.getElementById('user-face-file');
+        if (faceInput) faceInput.value = '';
+        const previewImg = document.getElementById('face-preview-img');
+        const phIcon = document.getElementById('face-placeholder-icon');
+        const badge = document.getElementById('biometric-badge');
+        const rmBtn = document.getElementById('btn-remove-face');
+        const userId = document.getElementById('user-id').value;
+
+        if (window.CURRENT_USER_HAS_BIOMETRIC && userId) {
+            if (previewImg) {
+                previewImg.src = `/portal/users/${userId}/face-photo/?t=${Date.now()}`;
+                previewImg.classList.remove('hidden');
+            }
+            if (phIcon) phIcon.classList.add('hidden');
+            if (badge) {
+                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700';
+                badge.textContent = 'Đã có ảnh';
+            }
+            if (rmBtn) rmBtn.classList.remove('hidden');
+        } else {
+            if (previewImg) {
+                previewImg.src = '';
+                previewImg.classList.add('hidden');
+            }
+            if (phIcon) phIcon.classList.remove('hidden');
+            if (badge) {
+                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600';
+                badge.textContent = 'Chưa có ảnh';
+            }
+            if (rmBtn) rmBtn.classList.add('hidden');
+        }
+    }
 
     function disableUser(id) {
         if(confirm('Are you sure you want to block this user? This user will no longer be able to log in.')) {
