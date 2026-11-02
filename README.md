@@ -39,18 +39,36 @@ Each organization/tenant has full granular control to enable or temporarily disa
 - **2D CAD Floorplan & TSP Routing**: Traveling Salesperson Problem (ATTSP) navigating technicians via stairs and corridors between factory floors. *When disabled: Falls back to pure business priority sequencing.*
 - **Maintenance Cost Forecasting**: Time-series predictive models for labor and material cost projections. *When disabled: Displays historical actual invoiced expenses.*
 
-### 4. Enterprise Personalization & Multilingual Experience
+### 4. Biometric Attendance & BLE Micro-Geofencing (Điểm Danh Thực Địa & Vi Định Vị BLE)
+- **ESP32 BLE Proximity Micro-Geofencing**:
+  - Utilizes Bluetooth Low Energy (BLE) spatial beacons conforming to the Apple iBeacon specification (UUID, Major, Minor, TxPower).
+  - High-precision indoor proximity verification (1 - 5 meter radius) via RSSI filtering (`rssi >= -85 dBm`), overcoming GPS signal attenuation inside metal and reinforced concrete factory buildings.
+  - **Granular Asset-Level & Tenant-Level Controls**: Assets feature a `require_ble_beacon` toggle to distinguish on-site physical machinery from remote or virtual inspection tasks, backed by a master `enable_geofencing` tenant policy.
+  - **Industrial Low-Power Beacon Firmware**: Included in `scripts/firmware/esp32_asset_beacon.ino` (80MHz CPU downclock, 100ms advertising interval, WiFi radio disabled for 24/7 cool operation).
+- **Deep Learning Biometric Pipeline (YuNet + SFace)**:
+  - **YuNet Face Detector** (`face_detection_yunet_2023mar.onnx`): High-speed on-device/edge face detection and 5-point facial landmark alignment.
+  - **SFace 128D Deep Feature Extractor** (`face_recognition_sface_2021dec.onnx`): Deep CNN feature extractor mapping faces into high-discriminability 128-dimensional unit hyperspheres.
+  - **Pure Mathematical Cosine Similarity**: Evaluated from scratch via vector dot product and L2-norm normalization.
+  - **Calibrated Similarity Threshold (0.55)**: Rigorously calibrated threshold balancing False Acceptance Rate (FAR) and False Rejection Rate (FRR) for real-world front-camera smartphone captures compared against studio ID enrollment photos.
+- **Strict Compliance with Decree 13/2023/ND-CP (Bảo Vệ Dữ Liệu Cá Nhân)**:
+  - **Ephemeral In-Memory Processing**: Smartphone camera frames are processed temporarily in RAM and immediately freed after vector extraction—no raw unencrypted photos are ever stored on disk or in database tables.
+  - **Military-Grade AES-256 Encrypted Audit Trail**: Mandatory dispute/audit snapshots stored in `media/biometric_audits/` are encrypted using AES-256 (`.enc`), completely impenetrable to unauthorized file inspection.
+
+### 5. Enterprise Personalization & Multilingual Experience
 - **Personalized Multi-Palette Themes**: 5 curated enterprise themes (**EAM Cyan**, **Emerald**, **Navy Blue**, **Indigo**, **Amber**) customizable directly from the header dropdown, persistently synchronized with each user profile (`User.theme_color`) and runtime Tailwind CSS variables.
 - **Client-Side Multilingual Engine**: Seamless in-place UI translation powered by Google Translate client engine (Vietnamese, English, Japanese, Korean, Chinese, German, etc.) without requiring hardcoded per-string translations.
 
-### 5. Fault-Tolerant Storage & Auto-Sync Engine
+### 6. Fault-Tolerant Storage & Auto-Sync Engine
 - **Resilient Media Storage**: S3-compatible MinIO object storage with automatic graceful fallback to Django `default_storage` upon network timeouts or storage unavailability.
 - **Background Auto-Sync & Local Purge**: Scheduled Celery background task (`core.tasks.sync_and_purge_local_fallback_files`) that automatically reconciles fallback files to MinIO and safely cleans local disk storage once remote storage connectivity is restored.
 
-### 6. Offline-First Mobile Application (Flutter)
+### 7. Offline-First Mobile Application (Flutter)
 - Built for on-the-ground technicians in network-challenged industrial facilities.
 - **Local Embedded Database**: Drift (SQLite) storing work orders, checklists, and asset telemetry locally.
 - **Robust Background Sync Engine**: Automatic queue processing, conflict handling, deterministic error management, and tenant data isolation.
+- **Two-Step Field Attendance**: Step 1 scans and matches ESP32 BLE Beacons (`flutter_blue_plus`); Step 2 activates front camera face detection (`camera`) for on-site identity verification.
+- **Pull-To-Refresh Dashboard**: Native `RefreshIndicator` gesture on the home screen providing instant synchronization of assigned Work Orders and status changes.
+- **User Profile & Synchronized Avatar**: Live personal profile with dynamically decoded avatar from server-side encrypted biometric profile.
 
 ---
 
@@ -59,9 +77,10 @@ Each organization/tenant has full granular control to enable or temporarily disa
 | Layer | Technologies |
 | :--- | :--- |
 | **Backend & Core** | Python 3.11+, Django 5.2 LTS, Django REST Framework, SimpleJWT, Celery |
-| **Algorithms & AI** | NumPy, SciPy, Scikit-learn (Isolation Forest, Theil-Sen, Hungarian algorithm) |
+| **Algorithms & AI** | NumPy, SciPy, Scikit-learn (Isolation Forest, Theil-Sen, Hungarian algorithm), OpenCV SFace & YuNet Deep Biometrics |
+| **IoT & Spatial Firmware** | ESP32 C/C++ DevKit V1 (Apple iBeacon Protocol, RSSI Proximity Calibrated) |
 | **Web Frontend** | Django Templates, TailwindCSS, Phosphor Icons, Modern Vanilla JavaScript |
-| **Mobile Client** | Flutter 3.x, Dart, Dio, Provider, GoRouter, Drift (SQLite), ImagePicker |
+| **Mobile Client** | Flutter 3.x, Dart, Dio, Provider, GoRouter, Drift (SQLite), flutter_blue_plus (BLE), camera |
 | **Data Storage & Cache** | PostgreSQL 15, Redis 7 (Cache & Task Broker), MinIO (S3-compatible Object Storage) |
 | **Database Tooling** | pgAdmin 4 |
 | **Testing Framework** | Pytest, Microsoft Playwright (E2E), Django Test Runner, Flutter Test |
@@ -78,23 +97,26 @@ eam-enterprise-assset-management/
 ├── .env.example                # Template for environment variables
 ├── TEST_CREDENTIALS.md         # Comprehensive test credentials and tenant directory
 ├── docs/                       # Architectural specs, migration guides, and idea documentation
+├── scenarios/                  # Phase design specs (Algorithms, Mobile, Biometrics, Geofencing)
+├── scripts/                    # Industrial firmware and utility tools
+│   └── firmware/               # ESP32 Universal Proximity Beacon source (.ino)
 ├── eam_app/                    # Core Django Backend Monolith
 │   ├── manage.py               # Django management CLI
 │   ├── config/                 # Settings, ASGI/WSGI, routing configurations
 │   ├── core/                   # Multi-tenant middleware, audit logging, base models
-│   ├── users/                  # Custom User model, technician profiles, RBAC
-│   ├── assets/                 # Asset hierarchy, sensors, tool reservations, spare parts
-│   ├── workorders/             # Work order lifecycle, checklists, attachments, dispatch
+│   ├── users/                  # Custom User model, biometric profiles, technician RBAC
+│   ├── assets/                 # Asset hierarchy, BLE beacon configurations, spare parts
+│   ├── workorders/             # Work order lifecycle, field attendance API, checklists
 │   ├── maintenance/            # Preventive maintenance schedules, PM triggers
-│   ├── algorithms/             # Anomaly detection, Hungarian dispatch, TSP routing
+│   ├── algorithms/             # Anomaly detection, Hungarian dispatch, TSP, Biometrics (YuNet/SFace)
 │   ├── portal/                 # Web views, dashboards, CAD floorplan maps
 │   ├── templates/              # Server-rendered HTML templates with TailwindCSS
 │   └── static/                 # Static assets, JavaScript utilities, stylesheets
 ├── mobile_app/                 # Offline-First Flutter Mobile App
 │   ├── lib/
 │   │   ├── core/               # Theme, database (Drift), network (Dio), security
-│   │   ├── features/           # Work orders, sync engine, CAD routing, auth, dashboard
-│   └── test/                   # Flutter unit and widget tests
+│   │   ├── features/           # Field attendance (BLE+Face), work orders, sync, routing
+│   └── test/                   # Flutter unit, widget, and biometric geofencing tests
 └── e2e_tests/                  # End-to-End Playwright test suite
 ```
 
@@ -249,6 +271,9 @@ The mobile application is located in `mobile_app/` and supports Android and iOS.
 ```bash
 cd eam_app
 
+# Run Biometric Face Verification & BLE Micro-Geofencing tests
+python manage.py test algorithms.tests.test_biometric_geofencing
+
 # Run all work orders tests
 python manage.py test workorders.tests
 
@@ -271,9 +296,11 @@ pytest -v e2e_tests
 playwright install chromium
 ```
 
-### 3. Flutter Mobile Unit Tests
+### 3. Flutter Mobile Unit & Biometric Tests
 ```bash
 cd mobile_app
+
+# Run all mobile tests including BLE Geofencing & Biometric pipeline
 flutter test
 ```
 

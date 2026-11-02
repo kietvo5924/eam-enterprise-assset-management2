@@ -35,6 +35,7 @@ google-services.json
 *_scratch*.py
 scratch/
 eam_app/scratch/
+e2e_tests/reports/
 .settings/
 **/.settings/
 *.enc

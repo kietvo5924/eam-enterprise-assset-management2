@@ -589,6 +589,7 @@ class BiometricGeofencingTestSuite(TestCase):
             user=self.technician,
             image_bytes=test_raw_bytes,
             enrolled_by=self.manager,
+            precomputed_embedding=self.baseline_embedding,
         )
 
         # File trên đĩa phải bị xáo trộn (mã hóa AES-256-GCM)

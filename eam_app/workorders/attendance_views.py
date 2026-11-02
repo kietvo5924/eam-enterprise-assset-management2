@@ -201,7 +201,7 @@ class AttendanceCheckInView(APIView):
                     "success": False,
                     "error": str(ex)
                 }, status=status.HTTP_400_BAD_REQUEST)
-        else:
+        elif not live_embedding:
             return Response({
                 "success": False,
                 "error": "Bắt buộc chụp ảnh trực tiếp từ camera trước để nhận diện sinh trắc học khuôn mặt!"
