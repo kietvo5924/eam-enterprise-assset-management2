@@ -284,11 +284,11 @@ class BleBeaconService {
           if (isMatchingBeacon(r, cleanTargetUuid)) {
             final dist = calculateDistance(r.rssi);
             if (!completer.isCompleted) {
-              final String bName = r.device.advName.isNotEmpty
-                  ? r.device.advName
-                  : (targetUuid ?? 'EAM-BEACON-P102');
+              final String canonicalBeaconId = (targetUuid != null && targetUuid.isNotEmpty)
+                  ? targetUuid
+                  : (r.device.advName.isNotEmpty ? r.device.advName : universalBeaconName);
               completer.complete(BleScanResult.found(
-                beaconId: bName,
+                beaconId: canonicalBeaconId,
                 rssi: r.rssi,
                 distanceMeters: dist,
                 isWithinRange: dist <= defaultMaxRadiusMeters,

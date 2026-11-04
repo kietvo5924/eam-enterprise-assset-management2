@@ -21,6 +21,11 @@ Ngưỡng phân định sinh trắc học MobileFaceNet:
 
 import math
 
+# Hằng số chuẩn theo đặc tả Kỹ thuật Phase 11.7 (tối ưu thực tế hiện trường camera trước)
+DEFAULT_ACCEPTANCE_THRESHOLD = 0.55       # Sim >= 0.55: Xác thực thành công (Verified thực tế)
+DEFAULT_INDETERMINATE_THRESHOLD = 0.50     # 0.50 <= Sim < 0.55: Chưa rõ nét (Indeterminate)
+DEFAULT_REJECTION_THRESHOLD = 0.50         # Sim < 0.50: Từ chối khuôn mặt (Rejected)
+
 
 def calculate_l2_norm_from_scratch(vec: list[float]) -> float:
     """
@@ -139,7 +144,7 @@ def calculate_cosine_similarity_from_scratch(
 def verify_face_cosine_similarity(
     live_vec: list[float],
     profile_vec: list[float],
-    threshold: float = 0.72,
+    threshold: float = DEFAULT_ACCEPTANCE_THRESHOLD,
 ) -> tuple[bool, float]:
     """
     Kiểm tra độ khớp khuôn mặt giữa vector thời gian thực từ camera

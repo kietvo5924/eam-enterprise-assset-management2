@@ -125,3 +125,52 @@ def rssi_for_distance(
 
     rssi_calc = f_tx - (10.0 * f_n * math.log10(f_dist))
     return int(round(rssi_calc))
+
+
+def is_beacon_identifier_matched(client_beacon_id: str, asset=None) -> bool:
+    """
+    Xác thực định danh Beacon nhận được từ ứng dụng di động:
+    1. Khớp tên hoặc UUID của Mỏ neo không gian vạn năng (EAM-UNIVERSAL-BEACON).
+    2. Khớp UUID mỏ neo riêng của tài sản (asset.ble_beacon_uuid) không phân biệt dấu gạch ngang hoặc hoa thường.
+    3. Khớp địa chỉ MAC vật lý của mạch ESP32 (asset.ble_mac_address).
+    4. Khớp tên quảng bá ESP32 chuẩn (chứa 'EAM-' hoặc 'BEACON').
+    """
+    if not client_beacon_id:
+        return False
+
+    raw_id = str(client_beacon_id).strip()
+    if not raw_id:
+        return False
+
+    clean_id = raw_id.upper().replace('-', '').replace(':', '')
+    clean_universal_name = BLE_UNIVERSAL_BEACON_NAME.upper().replace('-', '')
+    clean_universal_uuid = BLE_UNIVERSAL_BEACON_UUID.upper().replace('-', '')
+
+    # 1. Khớp Universal Beacon (tên hoặc UUID)
+    if raw_id.upper() == BLE_UNIVERSAL_BEACON_NAME or clean_id == clean_universal_name or clean_id == clean_universal_uuid:
+        return True
+
+    # 2. Khớp UUID cấu hình trên Asset
+    if asset and getattr(asset, 'ble_beacon_uuid', None):
+        clean_asset_uuid = str(asset.ble_beacon_uuid).strip().upper().replace('-', '')
+        if clean_id == clean_asset_uuid:
+            return True
+
+    # 3. Khớp MAC address cấu hình trên Asset
+    if asset and getattr(asset, 'ble_mac_address', None):
+        clean_asset_mac = str(asset.ble_mac_address).strip().upper().replace(':', '').replace('-', '')
+        if clean_id == clean_asset_mac:
+            return True
+
+    # 4. Hỗ trợ tên quảng bá ESP32 chuẩn theo tài sản
+    upper_raw = raw_id.upper()
+    if upper_raw.startswith('EAM-') or 'BEACON' in upper_raw:
+        if not asset or not getattr(asset, 'ble_beacon_uuid', None):
+            return True
+        if getattr(asset, 'code', None) and str(asset.code).upper() in upper_raw:
+            return True
+        if getattr(asset, 'name', None) and str(asset.name).upper() in upper_raw:
+            return True
+
+    return False
+

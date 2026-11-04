@@ -114,18 +114,19 @@ def verify_complete_work_order_gate(work_order, user, ble_verification_data: dic
             ble_verification_data.get('beaconId')
             or ble_verification_data.get('bleBeaconId')
             or ble_verification_data.get('ble_beacon_id')
-            or 'EAM-UNIVERSAL-BEACON'
+            or ''
         )
-        if rssi_val is not None:
-            from algorithms.biometric.proximity_engine import verify_ble_proximity
+        if rssi_val is not None and beacon_id:
+            from algorithms.biometric.proximity_engine import (
+                verify_ble_proximity,
+                is_beacon_identifier_matched,
+            )
             try:
                 rssi_int = int(rssi_val)
             except (ValueError, TypeError):
                 rssi_int = -999
 
-            beacon_matched = (beacon_id == 'EAM-UNIVERSAL-BEACON') or (
-                work_order.asset and work_order.asset.ble_beacon_uuid and beacon_id == work_order.asset.ble_beacon_uuid
-            )
+            beacon_matched = is_beacon_identifier_matched(beacon_id, asset=work_order.asset)
             is_valid, dist_meters = verify_ble_proximity(rssi_int, max_radius_meters=50.0)
             if is_valid and beacon_matched:
                 # Ghi nhận bản ghi kiểm soát hiện diện Cổng 2
