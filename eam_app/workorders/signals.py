@@ -31,8 +31,11 @@ def on_work_order_completed(sender, instance, **kwargs):
         from django.db.models import Q
         AssetAnomalyAlert.objects.filter(
             asset_id=instance.asset_id,
-            status__in=['OPEN', 'ACKNOWLEDGED'],
+            status__in=['OPEN', 'ACKNOWLEDGED', 'ACTIVE'],
             created_at__lte=completed_time
         ).filter(
             Q(draft_work_order=instance) | Q(draft_work_order__isnull=True)
-        ).update(status='RESOLVED')
+        ).update(
+            status='RESOLVED',
+            message='Đã tự động giải quyết sau khi hoàn thành đại tu bổ máy'
+        )

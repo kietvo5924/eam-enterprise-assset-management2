@@ -128,22 +128,31 @@ class WorkOrderListView(APIView):
             maintenance_window_start=data.get('maintenanceWindowStart'),
             maintenance_window_end=data.get('maintenanceWindowEnd'),
             maintenance_action=data.get('maintenanceAction', 'GENERAL'),
+            severity_level=data.get('severityLevel'),
+            marginal_boundary_warning=data.get('marginalBoundaryWarning', False),
+            decision_path_explanation=data.get('decisionPathExplanation'),
+            override_reason=data.get('overrideReason'),
         )
         
         # Save Checklists
         from workorders.models import WorkOrderChecklistItem, WorkOrderMaterial
         from assets.models import SparePart
+        from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
         
         checklists = data.get('checklists', [])
-        for pc in checklists:
-            WorkOrderChecklistItem.objects.create(
-                work_order=wo,
-                item_name=pc.get('itemName'),
-                input_type=pc.get('inputType', 'PASS_FAIL'),
-                expected_value=pc.get('expectedValue'),
-                is_mandatory=pc.get('isMandatory', False),
-                is_completed=False
-            )
+        if checklists:
+            for pc in checklists:
+                WorkOrderChecklistItem.objects.create(
+                    work_order=wo,
+                    item_name=pc.get('itemName'),
+                    input_type=pc.get('inputType', 'PASS_FAIL'),
+                    expected_value=pc.get('expectedValue'),
+                    is_mandatory=pc.get('isMandatory', False),
+                    stage=pc.get('stage'),
+                    is_completed=False
+                )
+        elif wo.maintenance_action == 'CORE_REPLACEMENT' or wo.severity_level == 'CRITICAL_OVERHAUL':
+            DecisionTreeChecklistEngine.apply_overhaul_checklist(wo)
             
         # Save Materials and Deduct Inventory with select_for_update to avoid race conditions
         materials = data.get('materials', [])
@@ -453,14 +462,19 @@ class WorkOrderStatusView(APIView):
             if wo.assigned_to_id != request.user.id and not has_upd:
                 raise ValidationError('Only the assignee can start the Work Order')
 
-            # Phase 11.7: Cổng 1 - Khóa 15 phút điểm danh sinh trắc học & định vị hiện trường
-            from algorithms.biometric.gatekeeper import verify_start_work_order_gate
-            gate_resp = verify_start_work_order_gate(wo, request.user)
-            if gate_resp is not None:
-                return gate_resp
+            if wo.status == 'ON_HOLD' or wo.is_on_hold:
+                from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+                r_notes = data.get('notes') or request.data.get('notes') or ''
+                DecisionTreeChecklistEngine.resume_work_order(wo, request.user, r_notes)
+            else:
+                # Phase 11.7: Cổng 1 - Khóa 15 phút điểm danh sinh trắc học & định vị hiện trường khi BẮT ĐẦU
+                from algorithms.biometric.gatekeeper import verify_start_work_order_gate
+                gate_resp = verify_start_work_order_gate(wo, request.user)
+                if gate_resp is not None:
+                    return gate_resp
 
-            if not wo.actual_start_time:
-                wo.actual_start_time = timezone.now()
+                if not wo.actual_start_time:
+                    wo.actual_start_time = timezone.now()
 
             # Event-based technician positioning: snap tech coords & zone to machine
             assigned_user = wo.assigned_to or request.user
@@ -492,6 +506,15 @@ class WorkOrderStatusView(APIView):
                 tp = assigned_user.technician_profile
                 tp.availability_status = 'AVAILABLE'
                 tp.save()
+            from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+            h_reason = data.get('holdReason') or data.get('hold_reason') or request.data.get('holdReason') or request.data.get('hold_reason') or 'WAITING_PARTS'
+            h_notes = data.get('notes') or request.data.get('notes') or ''
+            DecisionTreeChecklistEngine.hold_work_order(
+                wo,
+                request.user,
+                hold_reason=h_reason,
+                notes=h_notes
+            )
             
         if new_status == 'COMPLETED':
             if wo.assigned_to_id != request.user.id and not has_upd:
@@ -1540,5 +1563,203 @@ class WorkOrderAlgorithmReadinessView(APIView):
                 "blockedWorkOrders": blocked_wos_count
             }
         })
+
+
+class WorkOrderEvaluateAlertView(APIView):
+    """
+    Task 11.8: Cây quyết định phân tích dữ liệu cảnh báo và sinh gợi ý Checklist
+    POST /api/v1/work-orders/evaluate-alert/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not (HasPermission('work_order:create')().has_permission(request, self) or
+                HasPermission('work_order:update')().has_permission(request, self) or
+                request.user.is_superuser or
+                HasPermission('system:admin')().has_permission(request, self)):
+            self.permission_denied(request)
+
+        data = request.data or {}
+        asset_id = data.get('assetId') or data.get('asset_id')
+        alert_id = data.get('alertId') or data.get('alert_id')
+        z_score_raw = data.get('anomalyZscore') or data.get('anomaly_zscore') or data.get('z_score')
+        rul_raw = data.get('currentRulDays') or data.get('current_rul_days') or data.get('rul_days')
+        cost_raw = data.get('estimatedCost') or data.get('estimated_cost')
+        recurrence_raw = data.get('recurrenceCount') or data.get('recurrence_count')
+
+        tenant = getattr(request.user, 'tenant', None)
+        from assets.models import Asset, AssetAnomalyAlert
+        from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+
+        asset = None
+        if asset_id:
+            asset_qs = Asset.objects.all()
+            if tenant:
+                asset_qs = asset_qs.filter(tenant=tenant)
+            asset = asset_qs.filter(id=asset_id).first()
+
+        alert = None
+        if alert_id:
+            alert_qs = AssetAnomalyAlert.objects.all()
+            if tenant:
+                alert_qs = alert_qs.filter(tenant=tenant)
+            alert = alert_qs.filter(id=alert_id).first()
+            if alert and not asset:
+                asset = alert.asset
+
+        def _safe_float(val):
+            if val is not None and str(val).strip() != '':
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        def _safe_int(val):
+            if val is not None and str(val).strip() != '':
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        evaluation = DecisionTreeChecklistEngine.evaluate(
+            asset=asset,
+            alert=alert,
+            z_score=_safe_float(z_score_raw),
+            rul_days=_safe_float(rul_raw),
+            estimated_cost=_safe_float(cost_raw),
+            recurrence_count=_safe_int(recurrence_raw),
+            tenant=tenant
+        )
+
+        return success_response(evaluation, message="Đánh giá Cây quyết định thành công")
+
+
+class WorkOrderHsmRollbackView(APIView):
+    """
+    Task 11.8: Quản đốc yêu cầu làm lại (Rollback checklist chạy thử về sửa chữa)
+    POST /api/v1/work-orders/{wo_id}/hsm-rollback/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, wo_id):
+        if not (HasPermission('work_order:reassign')().has_permission(request, self) or
+                HasPermission('work_order:update')().has_permission(request, self) or
+                request.user.is_superuser or
+                HasPermission('system:admin')().has_permission(request, self)):
+            self.permission_denied(request)
+
+        tenant = getattr(request.user, 'tenant', None)
+        query = WorkOrder.objects.all()
+        if tenant:
+            query = query.filter(tenant=tenant)
+        wo = query.filter(id=wo_id).first()
+        if not wo:
+            return Response({"success": False, "message": "Work Order không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data or {}
+        reason = data.get('reason')
+        if not reason:
+            return Response({"success": False, "message": "Lý do lùi bước kỹ thuật là bắt buộc."}, status=status.HTTP_400_BAD_REQUEST)
+
+        vib_raw = (
+            data.get('recheckVibration') or data.get('recheck_vibration') or
+            data.get('vibrationReading') or data.get('vibration_reading')
+        )
+        temp_raw = (
+            data.get('recheckTemperature') or data.get('recheck_temperature') or
+            data.get('temperatureReading') or data.get('temperature_reading')
+        )
+
+        def _parse_flt(val):
+            if val is not None and str(val).strip() != '':
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+        from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+        try:
+            transition, reverted_count = DecisionTreeChecklistEngine.rollback_work_order(
+                work_order=wo,
+                user=request.user,
+                reason=reason,
+                vibration_reading=_parse_flt(vib_raw),
+                temperature_reading=_parse_flt(temp_raw)
+            )
+        except ValidationError as val_err:
+            return Response({"success": False, "message": str(val_err.message if hasattr(val_err, 'message') else val_err)}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_checklists = list(wo.checklists.all().values(
+            'id', 'item_name', 'is_completed', 'input_type', 'expected_value', 'actual_value', 'is_mandatory', 'stage'
+        ))
+        for c in updated_checklists:
+            c['id'] = str(c['id'])
+
+        return success_response({
+            "workOrderId": str(wo.id),
+            "status": wo.status,
+            "revertedChecklistsCount": reverted_count,
+            "transitionId": str(transition.id),
+            "checklists": updated_checklists
+        }, message="Đã thực hiện lùi bước quy trình (Rollback) thành công.")
+
+
+class WorkOrderHsmHoldView(APIView):
+    """
+    Task 11.8: Kích hoạt tạm hoãn ON_HOLD hoặc tiếp tục RESUME
+    POST /api/v1/work-orders/{wo_id}/hsm-hold/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, wo_id):
+        if not (HasPermission('work_order:update')().has_permission(request, self) or
+                HasPermission('work_order:reassign')().has_permission(request, self) or
+                request.user.is_superuser or
+                HasPermission('system:admin')().has_permission(request, self)):
+            self.permission_denied(request)
+
+        tenant = getattr(request.user, 'tenant', None)
+        query = WorkOrder.objects.all()
+        if tenant:
+            query = query.filter(tenant=tenant)
+        wo = query.filter(id=wo_id).first()
+        if not wo:
+            return Response({"success": False, "message": "Work Order không tồn tại"}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data or {}
+        action = data.get('action')
+        if not action:
+            action = 'RESUME' if wo.is_on_hold else 'HOLD'
+        action = str(action).upper().strip()
+
+        from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+        notes = data.get('notes', '')
+
+        if action == 'HOLD':
+            if wo.status != 'IN_PROGRESS':
+                return Response({"success": False, "message": "Chỉ có thể tạm hoãn phiếu đang thực hiện (IN_PROGRESS)"}, status=status.HTTP_400_BAD_REQUEST)
+            hold_reason = data.get('holdReason') or data.get('hold_reason') or 'WAITING_PARTS'
+            transition = DecisionTreeChecklistEngine.hold_work_order(wo, request.user, hold_reason=hold_reason, notes=notes)
+            msg = "Đã tạm hoãn Work Order và đóng băng thời gian tính SLA."
+        elif action == 'RESUME':
+            if not wo.is_on_hold and wo.status != 'ON_HOLD':
+                return Response({"success": False, "message": "Phiếu hiện không ở trạng thái tạm hoãn"}, status=status.HTTP_400_BAD_REQUEST)
+            transition = DecisionTreeChecklistEngine.resume_work_order(wo, request.user, notes=notes)
+            msg = "Đã tiếp tục thực hiện Work Order."
+        else:
+            return Response({"success": False, "message": f"Action '{action}' không hợp lệ. Phải là HOLD hoặc RESUME."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return success_response({
+            "workOrderId": str(wo.id),
+            "isOnHold": wo.is_on_hold,
+            "status": wo.status,
+            "holdReason": wo.hold_reason,
+            "holdAccumulatedSeconds": wo.hold_accumulated_seconds,
+            "transitionId": str(transition.id)
+        }, message=msg)
+
 
 

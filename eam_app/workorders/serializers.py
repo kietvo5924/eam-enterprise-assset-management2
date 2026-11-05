@@ -22,10 +22,11 @@ class WorkOrderChecklistItemSerializer(serializers.ModelSerializer):
     expectedValue = serializers.CharField(source='expected_value', required=False, allow_null=True)
     actualValue = serializers.CharField(source='actual_value', required=False, allow_null=True)
     isMandatory = serializers.BooleanField(source='is_mandatory')
+    stage = serializers.CharField(required=False, allow_null=True)
     
     class Meta:
         model = WorkOrderChecklistItem
-        fields = ['id', 'itemName', 'isCompleted', 'completed', 'inputType', 'expectedValue', 'actualValue', 'isMandatory']
+        fields = ['id', 'itemName', 'isCompleted', 'completed', 'inputType', 'expectedValue', 'actualValue', 'isMandatory', 'stage']
 
 class WorkOrderAttachmentSerializer(serializers.ModelSerializer):
     fileUrl = serializers.CharField(source='file_url')
@@ -106,6 +107,18 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     isCapitalized = serializers.BooleanField(source='is_capitalized', read_only=True)
     costBreakdown = WorkOrderCostSerializer(source='cost_breakdown', read_only=True)
 
+    # Phase 11.8 Fields
+    severityLevel = serializers.CharField(source='severity_level', read_only=True)
+    marginalBoundaryWarning = serializers.BooleanField(source='marginal_boundary_warning', read_only=True)
+    decisionPathExplanation = serializers.CharField(source='decision_path_explanation', read_only=True)
+    overrideReason = serializers.CharField(source='override_reason', read_only=True)
+    isOnHold = serializers.BooleanField(source='is_on_hold', read_only=True)
+    holdReason = serializers.CharField(source='hold_reason', read_only=True)
+    holdStartedAt = serializers.DateTimeField(source='hold_started_at', read_only=True)
+    holdAccumulatedSeconds = serializers.IntegerField(source='hold_accumulated_seconds', read_only=True)
+    componentId = serializers.UUIDField(source='component.id', read_only=True, default=None)
+    componentName = serializers.CharField(source='component.name', read_only=True, default=None)
+
     class Meta:
         model = WorkOrder
         fields = [
@@ -120,6 +133,9 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'maintenanceAction', 'completionProcessedAt',
             'postRepairVibration', 'postRepairTemperature', 'postRepairLoadFactor',
             'actualCost', 'isCapitalized', 'costBreakdown',
+            'severityLevel', 'marginalBoundaryWarning', 'decisionPathExplanation',
+            'overrideReason', 'isOnHold', 'holdReason', 'holdStartedAt',
+            'holdAccumulatedSeconds', 'componentId', 'componentName',
             'created_at', 'updated_at',
             'assetType', 'asset', 'checklists', 'attachments', 'materials'
         ]
@@ -151,6 +167,11 @@ class WorkOrderCreateSerializer(serializers.Serializer):
     )
     maintenanceAction = serializers.CharField(required=False, default='GENERAL')
     vendorCost = serializers.DecimalField(max_digits=19, decimal_places=2, required=False, allow_null=True, min_value=Decimal('0.00'))
+    severityLevel = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    marginalBoundaryWarning = serializers.BooleanField(required=False, default=False)
+    decisionPathExplanation = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    overrideReason = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    componentId = NullableUUIDField(required=False, allow_null=True)
 
 class WorkOrderAssignSerializer(serializers.Serializer):
     assignedTo = serializers.UUIDField()
@@ -181,6 +202,9 @@ class WorkOrderStatusUpdateSerializer(serializers.Serializer):
     bleVerificationData = serializers.DictField(required=False, allow_null=True)
     isLocationVerified = serializers.BooleanField(required=False, allow_null=True)
     rssi = serializers.IntegerField(required=False, allow_null=True)
+    holdReason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    hold_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class WorkOrderRequestReassignmentSerializer(serializers.Serializer):

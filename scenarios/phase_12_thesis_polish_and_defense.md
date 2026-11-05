@@ -27,7 +27,7 @@ Phase 12 là tầng "đóng gói vũ khí tối thượng" đưa toàn bộ côn
 
 - **Tái Sử Dụng Mô Hình Multi-Tenancy**: Toàn bộ dữ liệu demo của 3 khách hàng mẫu và 1 phân xưởng Sandbox kế thừa `BaseTenantModel`, chứng minh khả năng cách ly phân quyền tuyệt đối trước hội đồng.
 - **Tái Sử Dụng Thực Thể Nghiệp Vụ Toàn Hệ Thống**:
-  - `Asset`, `FacilityComponent`, `MeterReading`, `WorkOrder`, `SparePart`, `PmPlan`, `AttendanceLog`, `TechnicalDocument`.
+  - `Asset`, `MeterReading`, `WorkOrder`, `SparePart`, `PmPlan`, `AttendanceLog`, `TechnicalDocument`.
 - **Tích Hợp Đồng Bộ 8 Thuật Toán Cốt Lõi**:
   1. Task 11.1: Phân công Hungary (Kuhn-Munkres).
   2. Task 11.2: Phân công đa mục tiêu Di truyền (Genetic Algorithm).

@@ -1870,7 +1870,8 @@ def portal_work_orders(request):
                     item_name=data.get('item_name'),
                     input_type=data.get('input_type', 'PASS_FAIL'),
                     expected_value=data.get('expected_value') or None,
-                    is_mandatory=bool(data.get('is_mandatory', False))
+                    is_mandatory=bool(data.get('is_mandatory', False)),
+                    stage=str(data.get('stage') or '').strip()
                 )
                 return JsonResponse({'success': True, 'id': str(item.id)})
 
@@ -1958,7 +1959,7 @@ def portal_work_orders(request):
                     title=data.get('title'),
                     description=data.get('description'),
                     priority=priority_val,
-                    status=data.get('status', 'CREATED'),
+                    status='ASSIGNED' if (assigned_to_id and data.get('status') in ('CREATED', None, '')) else data.get('status', 'CREATED'),
                     type=data.get('type', 'CORRECTIVE'),
                     maintenance_action=data.get('maintenance_action') or data.get('maintenanceAction') or 'GENERAL',
                     parent_id_id=data.get('parent_id') if data.get('parent_id') else None,
@@ -1982,6 +1983,11 @@ def portal_work_orders(request):
                     tool_pickup_location_id=data.get('tool_pickup_location_id') or None,
                     maintenance_window_start=parse_time_val(data.get('maintenance_window_start')),
                     maintenance_window_end=parse_time_val(data.get('maintenance_window_end')),
+                    # Phase 11.8 Decision Tree & HSM fields
+                    severity_level='NORMAL_MAINTENANCE' if (data.get('severity_level') in ('NORMAL', None, '')) else data.get('severity_level'),
+                    marginal_boundary_warning=bool(data.get('marginal_boundary_warning', False)),
+                    decision_path_explanation=data.get('decision_path_explanation', '') or '',
+                    override_reason=data.get('override_reason', '') or '',
                 )
 
                 # Initialize vendor_cost if specified during Work Order creation by supervisor
@@ -2012,6 +2018,7 @@ def portal_work_orders(request):
                             c_type = 'PASS_FAIL'
                         c_exp = str(pc.get('expected_value') or pc.get('expectedValue') or '').strip() or None
                         c_mand = bool(pc.get('is_mandatory') if 'is_mandatory' in pc else pc.get('isMandatory', False))
+                        c_stage = str(pc.get('stage') or '').strip()
                         WorkOrderChecklistItem.objects.create(
                             tenant_id=tenant_id,
                             work_order=wo,
@@ -2019,6 +2026,7 @@ def portal_work_orders(request):
                             input_type=c_type,
                             expected_value=c_exp,
                             is_mandatory=c_mand,
+                            stage=c_stage,
                             is_completed=False
                         )
 
@@ -2079,7 +2087,11 @@ def portal_work_orders(request):
                             raise Exception("Work Order can only be started from ASSIGNED or ON_HOLD state")
                         if str(wo.assigned_to_id) != str(request.user.id) and not check_perm(request, 'work_order:update'):
                             raise Exception("Only the assignee can start the Work Order")
-                        wo.actual_start_time = timezone.now()
+                        if current_status == 'ON_HOLD' or getattr(wo, 'is_on_hold', False):
+                            from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+                            DecisionTreeChecklistEngine.resume_work_order(wo, request.user, data.get('notes', ''))
+                        else:
+                            wo.actual_start_time = timezone.now()
 
                         # Event-based technician positioning: snap tech coords & zone to machine
                         if hasattr(request.user, 'technician_profile'):
@@ -2110,6 +2122,11 @@ def portal_work_orders(request):
                             tp = assigned_user.technician_profile
                             tp.availability_status = 'AVAILABLE'
                             tp.save()
+                        from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+                        hold_reason = data.get('holdReason') or data.get('hold_reason') or 'WAITING_PARTS'
+                        DecisionTreeChecklistEngine.hold_work_order(
+                            wo, request.user, hold_reason=hold_reason, notes=data.get('notes', '')
+                        )
 
                     elif new_status == 'COMPLETED':
                         if str(wo.assigned_to_id) != str(request.user.id) and not check_perm(request, 'work_order:update'):
@@ -2260,6 +2277,15 @@ def portal_work_orders(request):
                         wo.maintenance_window_end = None
                 if 'maintenance_action' in data or 'maintenanceAction' in data:
                     wo.maintenance_action = data.get('maintenance_action') or data.get('maintenanceAction') or wo.maintenance_action
+                if 'severity_level' in data:
+                    s_raw = data.get('severity_level')
+                    wo.severity_level = 'NORMAL_MAINTENANCE' if (s_raw in ('NORMAL', None, '')) else s_raw
+                if 'marginal_boundary_warning' in data:
+                    wo.marginal_boundary_warning = bool(data.get('marginal_boundary_warning', False))
+                if 'decision_path_explanation' in data:
+                    wo.decision_path_explanation = data.get('decision_path_explanation') or ''
+                if 'override_reason' in data:
+                    wo.override_reason = data.get('override_reason') or ''
 
                 wo.save()
 
@@ -2295,6 +2321,7 @@ def portal_work_orders(request):
                             c_type = 'PASS_FAIL'
                         c_exp = str(pc.get('expected_value') or pc.get('expectedValue') or '').strip() or None
                         c_mand = bool(pc.get('is_mandatory') if 'is_mandatory' in pc else pc.get('isMandatory', False))
+                        c_stage = str(pc.get('stage') or '').strip()
 
                         if cid:
                             existing_item = WorkOrderChecklistItem.objects.filter(id=cid, work_order=wo, tenant_id=tenant_id).first()
@@ -2303,6 +2330,7 @@ def portal_work_orders(request):
                                 existing_item.input_type = c_type
                                 existing_item.expected_value = c_exp
                                 existing_item.is_mandatory = c_mand
+                                existing_item.stage = c_stage
                                 existing_item.save()
                                 kept_ids.add(str(existing_item.id))
                                 continue
@@ -2314,6 +2342,7 @@ def portal_work_orders(request):
                             input_type=c_type,
                             expected_value=c_exp,
                             is_mandatory=c_mand,
+                            stage=c_stage,
                             is_completed=False
                         )
                         kept_ids.add(str(new_item.id))
@@ -2378,7 +2407,7 @@ def portal_work_orders(request):
     wo_data = []
     wo_metadata = {}
     for wo in work_orders:
-        checklists = list(wo.checklists.all().values('id', 'item_name', 'is_completed', 'input_type', 'expected_value', 'actual_value', 'is_mandatory'))
+        checklists = list(wo.checklists.all().values('id', 'item_name', 'is_completed', 'input_type', 'expected_value', 'actual_value', 'is_mandatory', 'stage'))
         # Need to cast UUIDs to strings
         for c in checklists:
             c['id'] = str(c['id'])
@@ -2417,6 +2446,14 @@ def portal_work_orders(request):
             'coords_y': wo.coords_y if wo.coords_y is not None else 0.0,
             'tool_pickup_location_id': str(wo.tool_pickup_location_id) if wo.tool_pickup_location_id else '',
             'tool_pickup_location_name': wo.tool_pickup_location.name if wo.tool_pickup_location else '',
+            # Phase 11.8 fields
+            'severity_level': wo.severity_level or 'NORMAL_MAINTENANCE',
+            'marginal_boundary_warning': bool(wo.marginal_boundary_warning),
+            'decision_path_explanation': wo.decision_path_explanation or '',
+            'override_reason': wo.override_reason or '',
+            'is_on_hold': bool(wo.is_on_hold),
+            'hold_reason': wo.hold_reason or '',
+            'hold_accumulated_seconds': wo.hold_accumulated_seconds or 0,
         }
 
     prof = getattr(request.user, 'technician_profile', None)

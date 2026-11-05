@@ -116,9 +116,23 @@ class WorkOrderTransitionService:
                     if not val_str:
                         raise ValidationError(f"Không thể hoàn thành: Mục bắt buộc '{item.item_name}' chưa có số liệu đo kiểm.")
                     try:
-                        float(val_str)
+                        num_val = float(val_str)
                     except ValueError:
                         raise ValidationError(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
+
+                    if item.expected_value:
+                        exp_clean = item.expected_value.strip()
+                        if exp_clean.startswith('<') or exp_clean.startswith('<='):
+                            try:
+                                threshold = float(exp_clean.lstrip('<=').strip())
+                                if num_val > threshold:
+                                    raise ValidationError(
+                                        f"Không thể hoàn thành: Giá trị đo '{item.item_name}' ({num_val}) "
+                                        f"vượt ngưỡng an toàn cho phép ({item.expected_value}). "
+                                        f"Vui lòng thực hiện Lùi bước (Rollback) để căn chỉnh lại."
+                                    )
+                            except (ValueError, TypeError):
+                                pass
 
         # 4. Check attachment requirement
         if not wo.attachments.exists():
@@ -132,17 +146,31 @@ class WorkOrderTransitionService:
             wo.resolution_notes = resolution_notes.strip()
         if actual_duration_minutes is not None:
             wo.actual_duration_minutes = actual_duration_minutes
+        elif wo.actual_start_time:
+            net_sec = max(0, int((now - wo.actual_start_time).total_seconds()) - (wo.hold_accumulated_seconds or 0))
+            wo.actual_duration_minutes = int(round(net_sec / 60.0))
         
         # Validate & set maintenance action: preserve existing wo.maintenance_action if not provided
         if maintenance_action in ('GENERAL', 'MICRO_MAINTENANCE', 'CORE_REPLACEMENT'):
             wo.maintenance_action = maintenance_action
         elif not wo.maintenance_action:
-            wo.maintenance_action = 'GENERAL'
+            if wo.severity_level == 'CRITICAL_OVERHAUL':
+                wo.maintenance_action = 'CORE_REPLACEMENT'
+            else:
+                wo.maintenance_action = 'GENERAL'
+        elif wo.severity_level == 'CRITICAL_OVERHAUL':
+            wo.maintenance_action = 'CORE_REPLACEMENT'
 
         # Set post repair telemetry if supplied
         if post_repair_data and isinstance(post_repair_data, dict):
             if 'vibration' in post_repair_data and post_repair_data['vibration'] is not None:
-                wo.post_repair_vibration = float(post_repair_data['vibration'])
+                vib_f = float(post_repair_data['vibration'])
+                if vib_f > 4.5 and wo.maintenance_action == 'CORE_REPLACEMENT':
+                    raise ValidationError(
+                        f"Không thể hoàn thành: Độ rung nghiệm thu sau sửa chữa ({vib_f} mm/s) vượt ngưỡng an toàn cho phép (<= 4.5 mm/s theo ISO 10816). "
+                        f"Vui lòng thực hiện Lùi bước (Rollback) để căn chỉnh lại."
+                    )
+                wo.post_repair_vibration = vib_f
             if 'temperature' in post_repair_data and post_repair_data['temperature'] is not None:
                 wo.post_repair_temperature = float(post_repair_data['temperature'])
             if 'load_factor' in post_repair_data and post_repair_data['load_factor'] is not None:
@@ -171,6 +199,14 @@ class WorkOrderTransitionService:
                 is_phantom_recovery=False,
                 rul_risk_level='CALIBRATING'
             )
+            from assets.models import AssetRulPrediction
+            AssetRulPrediction.objects.filter(
+                asset_id=wo.asset_id
+            ).update(
+                risk_level='CALIBRATING',
+                action_taken='CALIBRATING',
+                is_phantom_recovery=False
+            )
 
         # 7. Tự động hoàn trả dụng cụ (Auto-return ToolReservations)
         cls._release_tool_reservations(wo, now)
@@ -191,11 +227,14 @@ class WorkOrderTransitionService:
         if wo.asset_id:
             AssetAnomalyAlert.objects.filter(
                 asset_id=wo.asset_id,
-                status__in=['OPEN', 'ACKNOWLEDGED'],
+                status__in=['OPEN', 'ACKNOWLEDGED', 'ACTIVE'],
                 created_at__lte=now
             ).filter(
                 Q(draft_work_order=wo) | Q(draft_work_order__isnull=True)
-            ).update(status='RESOLVED')
+            ).update(
+                status='RESOLVED',
+                message='Đã tự động giải quyết sau khi hoàn thành đại tu bổ máy'
+            )
 
         # 11. Task 11.6: Đóng băng bất biến snapshot chi phí và phân tách Gross vs Net Cost (Atomic)
         from algorithms.cost_forecasting import CostForecastingService
@@ -212,6 +251,17 @@ class WorkOrderTransitionService:
 
         logger.info(f"[KAFKA MOCK] work_orders_topic - work_order.completed: wo_id={wo.id}, action={wo.maintenance_action}")
         return wo
+
+    @classmethod
+    def transition(cls, work_order, new_status, user, **kwargs):
+        """
+        Generic state transition helper.
+        """
+        if new_status == 'COMPLETED':
+            return cls.complete_work_order(work_order=work_order, user=user, **kwargs)
+        work_order.status = new_status
+        work_order.save(update_fields=['status', 'updated_at'])
+        return work_order
 
     @classmethod
     def _record_post_repair_acceptance(cls, wo, post_repair_data, user, recorded_at):

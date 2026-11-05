@@ -113,6 +113,25 @@ class WorkOrder(BaseTenantModel):
         help_text='Khung giờ kết thúc cho phép dừng máy để bảo trì'
     )
 
+    # Phase 11.8: Complex Maintenance Workflow & Facility Management (Decision Tree & HSM)
+    SEVERITY_CHOICES = (
+        ('NORMAL_MAINTENANCE', 'Normal Maintenance / Bảo dưỡng thông thường'),
+        ('CRITICAL_OVERHAUL', 'Critical Overhaul / Đại tu thay thế cốt lõi'),
+    )
+    HOLD_REASON_CHOICES = (
+        ('WAITING_PARTS', 'Chờ phụ tùng'),
+        ('WAITING_VENDOR', 'Chờ nhà thầu / chuyên gia'),
+        ('BUDGET_APPROVAL', 'Chờ duyệt ngân sách'),
+    )
+    severity_level = models.CharField(max_length=32, choices=SEVERITY_CHOICES, null=True, blank=True, db_index=True)
+    marginal_boundary_warning = models.BooleanField(default=False, help_text='Cảnh báo chỉ số mấp mé ngưỡng quyết định (±5%)')
+    decision_path_explanation = models.TextField(null=True, blank=True, help_text='Giải thích IF-THEN minh bạch từ Cây quyết định')
+    override_reason = models.TextField(null=True, blank=True, help_text='Lý do người dùng can thiệp đè phán quyết AI')
+    is_on_hold = models.BooleanField(default=False, help_text='Trạng thái tạm hoãn công việc do nguyên nhân khách quan')
+    hold_reason = models.CharField(max_length=64, choices=HOLD_REASON_CHOICES, null=True, blank=True)
+    hold_started_at = models.DateTimeField(null=True, blank=True)
+    hold_accumulated_seconds = models.IntegerField(default=0, help_text='Tổng thời gian tạm hoãn (giây) được đóng băng khỏi SLA')
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
@@ -148,8 +167,8 @@ class WorkOrder(BaseTenantModel):
         if self.actual_duration_minutes is not None:
             return round(float(self.actual_duration_minutes) / 60.0, 2)
         if self.actual_start_time and self.completed_at:
-            delta = (self.completed_at - self.actual_start_time).total_seconds() / 3600.0
-            return round(delta, 2)
+            net_sec = max(0.0, (self.completed_at - self.actual_start_time).total_seconds() - float(self.hold_accumulated_seconds or 0))
+            return round(net_sec / 3600.0, 2)
         return None
 
     class Meta:
@@ -186,6 +205,13 @@ class WorkOrderChecklistItem(BaseTenantModel):
     expected_value = models.CharField(max_length=255, null=True, blank=True)
     actual_value = models.CharField(max_length=255, null=True, blank=True)
     is_mandatory = models.BooleanField(default=False)
+    STAGE_CHOICES = (
+        ('DIAGNOSIS', 'Giai đoạn 1: Khảo sát hiện trạng'),
+        ('STAGING_PARTS', 'Giai đoạn 2: Vật tư sẵn sàng'),
+        ('OVERHAUL_EXECUTION', 'Giai đoạn 3: Thực hiện đại tu'),
+        ('TRIAL_ACCEPTANCE', 'Giai đoạn 4: Nghiệm thu chạy thử'),
+    )
+    stage = models.CharField(max_length=32, choices=STAGE_CHOICES, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='+', db_column='created_by', db_constraint=False)
@@ -357,4 +383,58 @@ class AttendanceLog(BaseTenantModel):
 
     def __str__(self):
         return f"Attendance {self.gate_type} for WO {self.work_order_id} by {self.technician.username} [{self.overall_compliance}]"
+
+
+class HsmStageTransition(BaseTenantModel):
+    """
+    Task 11.8: Lịch sử đánh giá AI, lùi bước kỹ thuật (Rollback) & tạm hoãn (Hold)
+    """
+    ACTION_CHOICES = (
+        ('AI_EVALUATE', 'AI Evaluate'),
+        ('OVERRIDE', 'Override'),
+        ('ROLLBACK', 'Rollback'),
+        ('HOLD', 'Hold'),
+        ('RESUME', 'Resume'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='hsm_transitions')
+    action_type = models.CharField(max_length=32, choices=ACTION_CHOICES)
+    severity_assigned = models.CharField(max_length=32, null=True, blank=True)
+    reason = models.TextField(null=True, blank=True)
+    performed_by = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='+')
+    vibration_reading = models.FloatField(null=True, blank=True)
+    temperature_reading = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def action(self):
+        return self.action_type
+
+    @property
+    def from_stage(self):
+        return 'TRIAL_ACCEPTANCE'
+
+    @property
+    def to_stage(self):
+        return 'OVERHAUL_EXECUTION'
+
+    @property
+    def recheck_vibration(self):
+        return self.vibration_reading
+
+    @property
+    def recheck_temperature(self):
+        return self.temperature_reading
+
+    class Meta:
+        db_table = 'hsm_stage_transitions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'work_order', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"HSM {self.action_type} for WO-{str(self.work_order_id)[:8]} by {self.performed_by_id} [{self.created_at}]"
+
 

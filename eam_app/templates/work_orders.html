@@ -164,6 +164,7 @@
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CREATED" checked onchange="filterTable()"> Mới tạo (Created)</label>
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ASSIGNED" checked onchange="filterTable()"> Đã giao (Assigned)</label>
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="IN_PROGRESS" checked onchange="filterTable()"> Đang xử lý</label>
+                    <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ON_HOLD" checked onchange="filterTable()"> Tạm dừng (On Hold)</label>
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="COMPLETED" checked onchange="filterTable()"> Hoàn tất</label>
                     <label class="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CANCELED" checked onchange="filterTable()"> Đã hủy</label>
                 </div>
@@ -220,6 +221,8 @@
                     <span class="px-3 py-0.5 bg-cyan-50 text-cyan-600 border border-cyan-200 rounded-full text-xs font-bold">ASSIGNED</span>
                 {% elif wo.status == 'IN_PROGRESS' %}
                     <span class="px-3 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-200 rounded-full text-xs font-bold">IN_PROGRESS</span>
+                {% elif wo.status == 'ON_HOLD' %}
+                    <span class="px-3 py-0.5 bg-amber-50 text-amber-700 border border-amber-300 rounded-full text-xs font-bold">ON_HOLD</span>
                 {% elif wo.status == 'COMPLETED' %}
                     <span class="px-3 py-0.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-xs font-bold">COMPLETED</span>
                 {% else %}
@@ -342,6 +345,10 @@
         <input type="hidden" id="wo-parent-id" value="" />
         <input type="hidden" id="wo-type" value="CORRECTIVE" />
         <input type="hidden" id="wo-alert-id" value="" />
+        <input type="hidden" id="wo-severity-level" value="" />
+        <input type="hidden" id="wo-marginal-warning" value="0" />
+        <input type="hidden" id="wo-decision-explanation" value="" />
+        <input type="hidden" id="wo-override-reason" value="" />
         <div id="wo-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
 
         <!-- Follow-up Work Order Indicator -->
@@ -351,6 +358,28 @@
             <span>Phiếu sửa chữa khắc phục tiếp theo (Follow-up) của <b id="wo-parent-indicator-code" class="font-mono"></b></span>
           </div>
           <span class="px-2 py-0.5 rounded bg-amber-200/60 font-bold text-[10px] text-amber-900 uppercase">Corrective</span>
+        </div>
+
+        <!-- AI Decision Tree & HSM Workflow Assistant Card (Phase 11.8) -->
+        <div id="wo-hsm-ai-card" class="hidden p-4 rounded-2xl bg-indigo-50/90 border border-indigo-200 shadow-xs space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="ph-fill ph-tree-structure text-indigo-600 text-base"></i> Trợ lý AI Đề xuất Quy trình
+            </span>
+            <span id="wo-hsm-severity-badge" class="px-2.5 py-1 rounded-full font-black text-[10px] uppercase tracking-wide bg-rose-100 text-rose-700 border border-rose-300">
+              ĐẠI TU BỔ MÁY
+            </span>
+          </div>
+          <div id="wo-hsm-marginal-banner" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center gap-2">
+            <i class="ph-bold ph-warning text-amber-600 text-base shrink-0"></i>
+            <span>Chỉ số tiệm cận ngưỡng giáp ranh (±5%). Yêu cầu Quản đốc thẩm định kỹ phương án trước khi triển khai.</span>
+          </div>
+          <div id="wo-hsm-explanation-box" class="text-xs text-indigo-950 font-mono bg-white p-3 rounded-xl border border-indigo-200/80 leading-relaxed shadow-2xs">
+            <p id="wo-hsm-explanation-text" class="m-0"></p>
+          </div>
+          <button type="button" id="btn-apply-hsm-checklists" onclick="applyHsmSuggestedChecklists(true)" class="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm shadow-indigo-300 cursor-pointer">
+            <i class="ph-bold ph-check-circle text-sm"></i> Áp Dụng Quy Trình Checklist Chuẩn Bắt Buộc
+          </button>
         </div>
 
         <!-- AI Anomaly Alert Recommendation Indicator -->
@@ -422,6 +451,8 @@
                 {% endfor %}
               </select>
             </div>
+
+
           </div>
 
           <!-- Tầng & Tọa độ X - Y định vị (Tự động điền) & Huy hiệu định vị -->
@@ -856,14 +887,15 @@
 <div id="wo-detail-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeWoDetailModal()"></div>
   <div class="absolute right-0 top-0 bottom-0 w-[880px] max-w-full bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white gap-3">
-      <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
-        <h3 class="font-black text-lg sm:text-xl text-neutral-800 flex items-center gap-2 truncate whitespace-nowrap" id="detail-title">
+    <div class="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-white gap-3 shrink-0">
+      <div class="flex items-center gap-2.5 min-w-0 shrink-0">
+        <h3 class="font-black text-base sm:text-lg text-neutral-800 flex items-center gap-2 truncate whitespace-nowrap" id="detail-title">
           <i class="ph-fill ph-clipboard-text text-primary flex-shrink-0"></i> Work Order Details
         </h3>
         <span id="detail-status" class="px-2.5 py-1 bg-neutral-100 text-neutral-600 rounded-full text-xs font-bold border border-neutral-200 whitespace-nowrap flex-shrink-0">Status</span>
       </div>
-      <div class="flex gap-2 items-center flex-shrink-0">
+      <div class="flex items-center gap-2 min-w-0 flex-1 justify-end overflow-hidden">
+        <div id="drawer-action-buttons-bar" class="flex gap-2 items-center overflow-x-auto py-1 px-1 max-w-full scrollbar-hide cursor-grab active:cursor-grabbing select-none" style="scrollbar-width: none; -ms-overflow-style: none;">
         <button id="detail-btn-start" onclick="updateStatus(currentWo.id, 'IN_PROGRESS')" class="hidden px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1.5 shadow-sm whitespace-nowrap flex-shrink-0 cursor-pointer">
           <i class="ph-fill ph-play-circle text-base"></i> Bắt đầu
         </button>
@@ -880,6 +912,12 @@
           <i class="ph-bold ph-warning-octagon text-base"></i> Báo cáo phát sinh
         </button>
 
+        {% if 'work_order:reassign' in user_permissions or 'work_order:update' in user_permissions or is_system_admin or 'system:admin' in user_permissions %}
+        <button id="detail-btn-rollback" onclick="openHsmRollbackModal()" class="hidden px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs whitespace-nowrap flex-shrink-0 cursor-pointer" title="Yêu cầu làm lại: Chuyển bước thao tác và nghiệm thu về chưa đạt để thợ căn chỉnh lại">
+          <i class="ph-bold ph-arrow-u-up-left text-base"></i> Yêu cầu làm lại
+        </button>
+        {% endif %}
+
         {% if 'work_order:create' in user_permissions or is_system_admin or 'system:admin' in user_permissions %}
         <button id="detail-btn-create-followup" onclick="createFollowUpFromCurrentWo()" class="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-800 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow-sm cursor-pointer whitespace-nowrap flex-shrink-0" title="Tạo phiếu bảo trì/sửa chữa tiếp theo liên kết với phiếu này">
           <i class="ph-bold ph-arrow-bend-down-right text-base text-sky-600"></i> Tạo Follow-up WO
@@ -891,7 +929,8 @@
           <i class="ph-bold ph-pencil-simple"></i> Sửa
         </button>
         {% endif %}
-        <button onclick="closeWoDetailModal()" class="w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50 flex-shrink-0 cursor-pointer">
+        </div>
+        <button onclick="closeWoDetailModal()" class="w-9 h-9 flex items-center justify-center text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors bg-neutral-50 flex-shrink-0 cursor-pointer ml-1" title="Đóng">
           <i class="ph-bold ph-x text-lg"></i>
         </button>
       </div>
@@ -1167,6 +1206,12 @@
         <textarea id="wo-complete-notes" rows="3" placeholder="Mô tả công việc đã thực hiện, nguyên nhân sự cố hoặc kết quả kiểm tra..." class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary font-medium"></textarea>
       </div>
 
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Ảnh minh chứng nghiệm thu / hiện trường <span class="text-danger">*</span></label>
+        <input type="file" id="wo-complete-attachment" accept="image/*" class="w-full text-xs text-neutral-700 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-neutral-200 rounded-xl p-1 bg-neutral-50">
+        <p class="text-[11px] text-neutral-400 mt-1">Đính kèm ảnh minh chứng hiện trường / thông số nghiệm thu trước khi đóng phiếu.</p>
+      </div>
+
       <div id="wo-complete-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
     <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
@@ -1197,8 +1242,17 @@
     </div>
     <div class="p-5 space-y-4">
       <div>
-        <label class="block text-xs font-bold text-neutral-700 mb-1">Lý do tạm dừng công việc <span class="text-danger">*</span></label>
-        <textarea id="wo-hold-notes" rows="3" placeholder="Nhập lý do tạm dừng (chờ phụ tùng, chờ cấp phép, gián đoạn ca trực...)" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary font-medium"></textarea>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Phân loại lý do tạm dừng <span class="text-danger">*</span></label>
+        <select id="wo-hold-reason-select" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 focus:outline-none focus:border-primary mb-2">
+          <option value="WAITING_PARTS">WAITING_PARTS (Chờ phụ tùng thay thế)</option>
+          <option value="WAITING_VENDOR">WAITING_VENDOR (Chờ chuyên gia hãng / đối tác)</option>
+          <option value="BUDGET_APPROVAL">BUDGET_APPROVAL (Chờ phê duyệt ngân sách phát sinh)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Chi tiết lý do tạm dừng công việc <span class="text-danger">*</span></label>
+        <textarea id="wo-hold-notes" rows="3" placeholder="Nhập lý do chi tiết tạm dừng (mã phụ tùng chờ giao, số ngày dự kiến...)" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary font-medium"></textarea>
       </div>
 
       <div id="wo-hold-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
@@ -1207,6 +1261,58 @@
       <button type="button" onclick="closeHoldWoModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-confirm-hold-wo" onclick="confirmHoldWo()" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-pause"></i> Xác nhận tạm dừng
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Yêu Cầu Làm Lại (HSM Rollback - Phase 11.8) -->
+<div id="hsm-rollback-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[125] flex items-center justify-center p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-5 bg-gradient-to-r from-rose-600 to-red-700 text-white flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-rose-200">
+          <i class="ph-bold ph-arrow-u-up-left"></i>
+        </div>
+        <div>
+          <h3 class="font-black text-base m-0">Yêu Cầu Làm Lại</h3>
+          <p class="text-xs text-rose-100 m-0" id="hsm-rollback-code-text">WO</p>
+        </div>
+      </div>
+      <button onclick="closeHsmRollbackModal()" class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer">
+        <i class="ph-bold ph-x text-base"></i>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-800 leading-relaxed font-medium">
+        <i class="ph-bold ph-info text-rose-600 mr-1"></i> Hệ thống sẽ tự động chuyển trạng thái Checklist Giai đoạn 3 (Thao tác đại tu) và Giai đoạn 4 (Nghiệm thu chạy thử) về chưa đạt.
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">
+          Lý do kỹ thuật bắt buộc <span class="text-danger">* (tối thiểu 20 ký tự)</span>
+        </label>
+        <textarea id="hsm-rollback-reason" rows="3" placeholder="Mô tả chi tiết nguyên nhân rung chấn, tiếng ồn hoặc đo kiểm chưa đạt yêu cầu kỹ thuật..." class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary font-medium" oninput="updateRollbackCharCount()"></textarea>
+        <div class="flex justify-between items-center mt-1 text-[11px] text-neutral-400">
+          <span id="hsm-rollback-char-count">0 / 20 ký tự</span>
+          <span class="text-amber-600 font-semibold">Tối thiểu 20 ký tự</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-bold text-neutral-600 mb-1">Độ rung đo lại (mm/s RMS)</label>
+          <input type="number" step="0.1" id="hsm-rollback-vib" placeholder="VD: 5.2" class="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold focus:border-primary">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-neutral-600 mb-1">Nhiệt độ đo lại (°C)</label>
+          <input type="number" step="0.1" id="hsm-rollback-temp" placeholder="VD: 78.5" class="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold focus:border-primary">
+        </div>
+      </div>
+      <div id="hsm-rollback-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
+    </div>
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+      <button type="button" onclick="closeHsmRollbackModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
+      <button type="button" id="btn-confirm-hsm-rollback" onclick="confirmHsmRollback()" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+        <i class="ph-bold ph-arrow-u-up-left"></i> Xác nhận lùi bước
       </button>
     </div>
   </div>
@@ -2320,6 +2426,7 @@
   const ASSETS_MAP = {{ assets_json|default:'{}'|safe }};
   window.ASSETS_MAP = ASSETS_MAP;
   const WO_METADATA = {{ wo_metadata_json|default:'{}'|safe }};
+  window.WO_METADATA = WO_METADATA;
   const ALL_TECHNICIANS = {{ technicians_json|default:'[]'|safe }};
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -2329,6 +2436,41 @@
       document.getElementById('wo-asset')?.addEventListener('change', function() {
           this.classList.remove('border-rose-500', 'ring-2', 'ring-rose-200');
       });
+
+      // Enable horizontal mouse drag-to-scroll for action buttons
+      const btnBar = document.getElementById('drawer-action-buttons-bar');
+      if (btnBar) {
+          let isDown = false;
+          let startX, scrollLeft;
+          let isDragging = false;
+          btnBar.addEventListener('mousedown', (e) => {
+              isDown = true;
+              isDragging = false;
+              startX = e.pageX - btnBar.offsetLeft;
+              scrollLeft = btnBar.scrollLeft;
+          });
+          btnBar.addEventListener('mouseleave', () => { isDown = false; });
+          btnBar.addEventListener('mouseup', () => {
+              isDown = false;
+              setTimeout(() => { isDragging = false; }, 50);
+          });
+          btnBar.addEventListener('mousemove', (e) => {
+              if (!isDown) return;
+              const x = e.pageX - btnBar.offsetLeft;
+              const walk = (x - startX) * 1.5;
+              if (Math.abs(walk) > 3) {
+                  isDragging = true;
+                  e.preventDefault();
+                  btnBar.scrollLeft = scrollLeft - walk;
+              }
+          });
+          btnBar.addEventListener('click', (e) => {
+              if (isDragging) {
+                  e.preventDefault();
+                  e.stopPropagation();
+              }
+          }, true);
+      }
 
       // Handle follow-up creation deep-link from incident notification
       const urlParams = new URLSearchParams(window.location.search);
@@ -2829,6 +2971,16 @@
       
       filterTable();
 
+      // Re-open work order detail if previously open before checklist update / action
+      const autoOpenWoId = sessionStorage.getItem('open_wo_id');
+      if (autoOpenWoId && !urlParams.has('create_pm')) {
+          sessionStorage.removeItem('open_wo_id');
+          setTimeout(() => {
+              const el = document.querySelector(`strong[onclick*="${autoOpenWoId}"]`) || document.querySelector(`tr[data-id="${autoOpenWoId}"] strong`) || document.querySelector(`button[onclick*="${autoOpenWoId}"]`);
+              if (el) el.click();
+          }, 150);
+      }
+
       // Handle create_pm parameter from Condition Monitoring Anomaly Notification
       if (urlParams.has('create_pm')) {
           const assetId = urlParams.get('asset_id') || '';
@@ -2907,22 +3059,49 @@
               }
               const levelSelect = document.getElementById('wo-min-skill-level');
               if (levelSelect) levelSelect.value = '1';
+              const techAccBody = document.getElementById('tech-accordion-body');
+              if (techAccBody) techAccBody.classList.remove('hidden');
 
-              // Populate standard checklists for this PM inspection
-              const modalChkContainer = document.getElementById('wo-modal-checklists-container');
-              const modalChkEmpty = document.getElementById('wo-modal-checklists-empty');
-              if (modalChkContainer) {
-                  modalChkContainer.innerHTML = '';
-                  if (modalChkEmpty) modalChkEmpty.classList.add('hidden');
-                  
-                  const defaultChecklists = [
-                      { itemName: `Đo lại rung động / chỉ số ${metric} sau khi hiệu chỉnh`, inputType: 'NUMBER', expectedValue: val ? `< ${val}` : '', isMandatory: true },
-                      { itemName: 'Kiểm tra bôi trơn dầu/mỡ ổ bi và nhiệt độ gối đỡ', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: true },
-                      { itemName: 'Kiểm tra độ siết bu-lông chân máy và khớp nối', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: false },
-                      { itemName: 'Vệ sinh cánh quạt tản nhiệt và lưới chắn bụi', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: false }
-                  ];
-                  defaultChecklists.forEach(c => renderWoModalChecklistRow(c));
-              }
+              // Phase 11.8: AI Decision Tree & HSM Checklist Evaluation
+              fetch('/api/v1/work-orders/evaluate-alert/', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '')
+                  },
+                  body: JSON.stringify({
+                      assetId: assetId,
+                      alertId: alertId,
+                      anomalyZscore: val ? parseFloat(val) : null,
+                      currentRulDays: daysRem ? parseFloat(daysRem) : null
+                  })
+              })
+              .then(res => res.json())
+              .then(resData => {
+                  if (resData.success && resData.data) {
+                      const d = resData.data;
+                      window._lastHsmEvaluation = d;
+                      displayHsmAiCard(d);
+                      applyHsmSuggestedChecklists();
+                  } else {
+                      const modalChkContainer = document.getElementById('wo-modal-checklists-container');
+                      const modalChkEmpty = document.getElementById('wo-modal-checklists-empty');
+                      if (modalChkContainer) {
+                          modalChkContainer.innerHTML = '';
+                          if (modalChkEmpty) modalChkEmpty.classList.add('hidden');
+                          const defaultChecklists = [
+                              { itemName: `Đo lại rung động / chỉ số ${metric} sau khi hiệu chỉnh`, inputType: 'NUMBER', expectedValue: val ? `< ${val}` : '', isMandatory: true, stage: 'TRIAL_ACCEPTANCE' },
+                              { itemName: 'Kiểm tra bôi trơn dầu/mỡ ổ bi và nhiệt độ gối đỡ', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: true, stage: 'DIAGNOSIS' },
+                              { itemName: 'Kiểm tra độ siết bu-lông chân máy và khớp nối', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: false, stage: 'OVERHAUL_EXECUTION' },
+                              { itemName: 'Vệ sinh cánh quạt tản nhiệt và lưới chắn bụi', inputType: 'PASS_FAIL', expectedValue: 'PASS', isMandatory: false, stage: 'OVERHAUL_EXECUTION' }
+                          ];
+                          defaultChecklists.forEach(c => renderWoModalChecklistRow(c));
+                      }
+                  }
+              })
+              .catch(err => {
+                  console.error("Error evaluating alert via AI Decision Tree:", err);
+              });
 
               // Update URL to clean state without page reload
               const cleanUrl = new URL(window.location);
@@ -3198,6 +3377,14 @@
       return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  const STAGE_LABELS = {
+      'DIAGNOSIS': 'GĐ 1: Chẩn đoán & Khảo sát',
+      'STAGING_PARTS': 'GĐ 2: Chuẩn bị vật tư & Phụ tùng',
+      'PARTS_PREP': 'GĐ 2: Chuẩn bị vật tư & Phụ tùng',
+      'OVERHAUL_EXECUTION': 'GĐ 3: Thao tác đại tu cơ khí',
+      'TRIAL_ACCEPTANCE': 'GĐ 4: Nghiệm thu chạy thử'
+  };
+
   function renderWoModalChecklistRow(item = {}) {
       woModalChkCounter++;
       const rowId = 'wo-chk-row-' + woModalChkCounter;
@@ -3206,6 +3393,8 @@
       const type = (item.input_type || item.inputType || 'PASS_FAIL').toUpperCase();
       const expected = item.expected_value || item.expectedValue || '';
       const isMandatory = (item.is_mandatory !== undefined) ? item.is_mandatory : (item.isMandatory !== undefined ? item.isMandatory : (type === 'NUMBER'));
+      const stage = item.stage || '';
+      const stageBadgeHtml = stage ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">${STAGE_LABELS[stage] || stage}</span>` : '';
 
       const container = document.getElementById('wo-modal-checklists-container');
       const emptyEl = document.getElementById('wo-modal-checklists-empty');
@@ -3217,6 +3406,7 @@
       const html = `
         <div id="${rowId}" class="wo-modal-chk-item bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs relative group">
           <input type="hidden" class="wo-chk-id" value="${escapeModalAttr(itemId)}">
+          <input type="hidden" class="wo-chk-stage" value="${escapeModalAttr(stage)}">
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
             <div class="sm:col-span-6">
               <input type="text" class="wo-chk-name w-full px-3 py-1.5 border border-neutral-200 rounded-lg text-xs font-semibold focus:border-primary focus:outline-none" placeholder="Tên bước kiểm tra / chỉ số đo (VD: Độ rung bệ bơm)..." value="${escapeModalAttr(name)}">
@@ -3242,9 +3432,12 @@
               <input type="checkbox" class="wo-chk-mandatory rounded text-primary focus:ring-primary w-3.5 h-3.5 cursor-pointer" ${isMandatory ? 'checked' : ''}>
               <span class="text-[11px] font-bold text-neutral-700">Bắt buộc thực hiện trước khi đóng phiếu</span>
             </label>
-            <span class="wo-chk-badge text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${badgeColor}">
-              ${badgeText}
-            </span>
+            <div class="flex items-center gap-1.5">
+              ${stageBadgeHtml}
+              <span class="wo-chk-badge text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${badgeColor}">
+                ${badgeText}
+              </span>
+            </div>
           </div>
         </div>
       `;
@@ -3343,7 +3536,8 @@
                   item_name: name,
                   input_type: el.querySelector('.wo-chk-type')?.value || 'PASS_FAIL',
                   expected_value: el.querySelector('.wo-chk-expected')?.value?.trim() || '',
-                  is_mandatory: el.querySelector('.wo-chk-mandatory')?.checked || false
+                  is_mandatory: el.querySelector('.wo-chk-mandatory')?.checked || false,
+                  stage: el.querySelector('.wo-chk-stage')?.value || ''
               });
           }
       });
@@ -3367,6 +3561,11 @@
       if (badge) badge.classList.add('hidden');
       if (document.getElementById('wo-anomaly-indicator')) document.getElementById('wo-anomaly-indicator').classList.add('hidden');
       if (document.getElementById('wo-alert-id')) document.getElementById('wo-alert-id').value = '';
+      if (document.getElementById('wo-hsm-ai-card')) document.getElementById('wo-hsm-ai-card').classList.add('hidden');
+      if (document.getElementById('wo-severity-level')) document.getElementById('wo-severity-level').value = 'NORMAL_MAINTENANCE';
+      if (document.getElementById('wo-marginal-warning')) document.getElementById('wo-marginal-warning').value = '0';
+      if (document.getElementById('wo-decision-explanation')) document.getElementById('wo-decision-explanation').value = '';
+      if (document.getElementById('wo-override-reason')) document.getElementById('wo-override-reason').value = '';
   }
 
   function saveWo() {
@@ -3406,7 +3605,7 @@
           title: title.trim(),
           description: document.getElementById('wo-desc').value,
           priority: document.getElementById('wo-priority').value,
-          status: document.getElementById('wo-status').value,
+          status: document.getElementById('wo-assignee')?.value && document.getElementById('wo-status')?.value === 'CREATED' ? 'ASSIGNED' : document.getElementById('wo-status').value,
           parent_id: document.getElementById('wo-parent-id')?.value || '',
           type: document.getElementById('wo-type')?.value || 'CORRECTIVE',
           maintenance_action: document.getElementById('wo-maintenance-action')?.value || 'GENERAL',
@@ -3428,6 +3627,11 @@
           checklists: getModalChecklistsData(),
           alert_id: document.getElementById('wo-alert-id')?.value || '',
           vendor_cost: parseFloat(document.getElementById('wo-vendor-cost')?.value) || 0,
+          // Phase 11.8 fields
+          severity_level: document.getElementById('wo-severity-level')?.value || 'NORMAL_MAINTENANCE',
+          marginal_boundary_warning: document.getElementById('wo-marginal-warning')?.value === '1',
+          decision_path_explanation: document.getElementById('wo-decision-explanation')?.value || '',
+          override_reason: document.getElementById('wo-override-reason')?.value || '',
       };
       
       const method = id ? 'PUT' : 'POST';
@@ -3445,7 +3649,14 @@
       .then(res => res.json())
       .then(resData => {
           if(resData.success) {
-              window.location.reload();
+              if (resData.id) {
+                  sessionStorage.setItem('open_wo_id', resData.id);
+              }
+              if (window.location.search) {
+                  window.location.href = window.location.pathname;
+              } else {
+                  window.location.reload();
+              }
           } else {
               msg.className = 'mb-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200 font-medium';
               msg.innerText = resData.error || 'An error occurred';
@@ -3482,6 +3693,67 @@
       }
   }
 
+  function syncWoStatusUI(newStatus) {
+      if (!currentWo) return;
+      currentWo.status = newStatus;
+      
+      const sColor = newStatus === 'COMPLETED' ? 'bg-green-50 text-green-600 border-green-200' :
+                     newStatus === 'IN_PROGRESS' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
+                     newStatus === 'ON_HOLD' ? 'bg-amber-50 text-amber-700 border-amber-300' :
+                     newStatus === 'ASSIGNED' ? 'bg-cyan-50 text-cyan-600 border-cyan-200' :
+                     'bg-blue-50 text-blue-600 border-blue-200';
+      const statusEl = document.getElementById('detail-status');
+      if (statusEl) {
+          statusEl.innerText = newStatus;
+          statusEl.className = `px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap flex-shrink-0 ${sColor}`;
+      }
+
+      const canExecute = {% if 'work_order:execute' in user_permissions or 'work_order:update' in user_permissions or is_system_admin %}true{% else %}false{% endif %};
+      const isSystemAdmin = {% if is_system_admin or 'system:admin' in user_permissions %}true{% else %}false{% endif %};
+      const canUpdateWO = {% if 'work_order:update' in user_permissions or is_system_admin %}true{% else %}false{% endif %};
+      const isAssignee = currentWo.assignee_id && String(currentWo.assignee_id).toLowerCase() === String(currentUserId).toLowerCase();
+
+      const btnStart = document.getElementById('detail-btn-start');
+      if (btnStart) {
+          if ((newStatus === 'ASSIGNED' || newStatus === 'ON_HOLD') && (isAssignee || isSystemAdmin || canUpdateWO) && canExecute) {
+              btnStart.classList.remove('hidden');
+              btnStart.innerHTML = newStatus === 'ON_HOLD' ? '<i class="ph-fill ph-play-circle text-base"></i> Tiếp tục' : '<i class="ph-fill ph-play-circle text-base"></i> Bắt đầu';
+          } else {
+              btnStart.classList.add('hidden');
+          }
+      }
+
+      const btnHold = document.getElementById('detail-btn-hold');
+      if (btnHold) {
+          if (newStatus === 'IN_PROGRESS' && (isAssignee || isSystemAdmin || canUpdateWO) && canExecute) btnHold.classList.remove('hidden');
+          else btnHold.classList.add('hidden');
+      }
+
+      const btnComplete = document.getElementById('detail-btn-complete');
+      if (btnComplete) {
+          if (newStatus === 'IN_PROGRESS' && (isAssignee || isSystemAdmin || canUpdateWO) && canExecute) btnComplete.classList.remove('hidden');
+          else btnComplete.classList.add('hidden');
+      }
+
+      const btnRollback = document.getElementById('detail-btn-rollback');
+      if (btnRollback) {
+          if ((newStatus === 'IN_PROGRESS' || newStatus === 'ON_HOLD') && (isAssignee || isSystemAdmin || canExecute)) {
+              btnRollback.classList.remove('hidden');
+          } else {
+              btnRollback.classList.add('hidden');
+          }
+      }
+
+      const rowEl = document.querySelector(`tr[data-id="${currentWo.id}"]`);
+      if (rowEl) {
+          rowEl.setAttribute('data-status', newStatus);
+          const statusTd = rowEl.querySelector('td:nth-child(5)');
+          if (statusTd) {
+              statusTd.innerHTML = `<span class="px-3 py-0.5 rounded-full text-xs font-bold border ${sColor}">${newStatus}</span>`;
+          }
+      }
+  }
+
   function updateStatus(id, status) {
     fetch('{% url "portal_work_orders" %}', {
         method: 'PUT',
@@ -3494,7 +3766,7 @@
     .then(res => res.json())
     .then(data => {
         if(data.success) {
-            window.location.reload();
+            syncWoStatusUI(status);
         } else {
             alert(data.error || 'Có lỗi xảy ra khi cập nhật trạng thái');
         }
@@ -3921,6 +4193,12 @@
       document.getElementById('detail-title-large').innerText = title;
       document.getElementById('detail-desc').innerText = desc !== 'None' && desc !== '' ? desc : 'Không có mô tả.';
       document.getElementById('detail-status').innerText = status;
+      const sColor = status === 'COMPLETED' ? 'bg-green-50 text-green-600 border-green-200' :
+                     status === 'IN_PROGRESS' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
+                     status === 'ON_HOLD' ? 'bg-amber-50 text-amber-700 border-amber-300' :
+                     status === 'ASSIGNED' ? 'bg-cyan-50 text-cyan-600 border-cyan-200' :
+                     'bg-blue-50 text-blue-600 border-blue-200';
+      document.getElementById('detail-status').className = `px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap flex-shrink-0 ${sColor}`;
       
       const pColor = priority === 'CRITICAL' ? 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200' :
                      priority === 'HIGH' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -3961,11 +4239,12 @@
       
       const canExecute = {% if 'work_order:execute' in user_permissions or 'work_order:update' in user_permissions or is_system_admin %}true{% else %}false{% endif %};
       const isSystemAdmin = {% if is_system_admin or 'system:admin' in user_permissions %}true{% else %}false{% endif %};
+      const canUpdateWO = {% if 'work_order:update' in user_permissions or is_system_admin %}true{% else %}false{% endif %};
       const isAssignee = assignee_id && String(assignee_id).toLowerCase() === String(currentUserId).toLowerCase();
       
       const btnStart = document.getElementById('detail-btn-start');
       if (btnStart) {
-          if ((status === 'ASSIGNED' || status === 'ON_HOLD') && (isAssignee || isSystemAdmin) && canExecute) {
+          if ((status === 'ASSIGNED' || status === 'ON_HOLD') && (isAssignee || isSystemAdmin || canUpdateWO) && canExecute) {
               btnStart.classList.remove('hidden');
               btnStart.innerHTML = status === 'ON_HOLD' ? '<i class="ph-fill ph-play-circle text-base"></i> Tiếp tục' : '<i class="ph-fill ph-play-circle text-base"></i> Bắt đầu';
           } else {
@@ -3975,14 +4254,23 @@
 
       const btnHold = document.getElementById('detail-btn-hold');
       if (btnHold) {
-          if (status === 'IN_PROGRESS' && (isAssignee || isSystemAdmin) && canExecute) btnHold.classList.remove('hidden');
+          if (status === 'IN_PROGRESS' && (isAssignee || isSystemAdmin || canUpdateWO) && canExecute) btnHold.classList.remove('hidden');
           else btnHold.classList.add('hidden');
       }
 
       const btnComplete = document.getElementById('detail-btn-complete');
       if (btnComplete) {
-          if (status === 'IN_PROGRESS' && (isAssignee || isSystemAdmin) && canExecute) btnComplete.classList.remove('hidden');
+          if (status === 'IN_PROGRESS' && (isAssignee || isSystemAdmin || canUpdateWO) && canExecute) btnComplete.classList.remove('hidden');
           else btnComplete.classList.add('hidden');
+      }
+
+      const btnRollback = document.getElementById('detail-btn-rollback');
+      if (btnRollback) {
+          if ((status === 'IN_PROGRESS' || status === 'ON_HOLD') && (isAssignee || isSystemAdmin || canExecute)) {
+              btnRollback.classList.remove('hidden');
+          } else {
+              btnRollback.classList.add('hidden');
+          }
       }
 
       const btnReassign = document.getElementById('detail-btn-reassign');
@@ -4268,6 +4556,8 @@
       if (!currentWo) return;
       document.getElementById('wo-complete-code-text').innerText = `Mã phiếu: #${currentWo.id.substring(0,8).toUpperCase()} - ${currentWo.title}`;
       document.getElementById('wo-complete-notes').value = '';
+      const attEl = document.getElementById('wo-complete-attachment');
+      if (attEl) attEl.value = '';
       const mStateEl = document.getElementById('wo-complete-machine-state');
       if (mStateEl) mStateEl.value = '';
       const mActionEl = document.getElementById('wo-complete-maintenance-action');
@@ -4306,45 +4596,81 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Đang xử lý...';
 
-      fetch('{% url "portal_work_orders" %}', {
-          method: 'PUT',
-          headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-          },
-          body: JSON.stringify({
-              id: currentWo.id,
-              status: 'COMPLETED',
-              resolution_notes: notes,
-              machine_state: machineState,
-              machineState: machineState,
-              postRepairMachineState: machineState,
-              maintenance_action: mAction,
-              maintenanceAction: mAction
+      const proceedComplete = () => {
+          fetch('{% url "portal_work_orders" %}', {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({
+                  id: currentWo.id,
+                  status: 'COMPLETED',
+                  resolution_notes: notes,
+                  machine_state: machineState,
+                  machineState: machineState,
+                  postRepairMachineState: machineState,
+                  maintenance_action: mAction,
+                  maintenanceAction: mAction
+              })
           })
-      })
-      .then(res => res.json())
-      .then(data => {
-          if (data.success) {
-              window.location.reload();
-          } else {
-              let msg = data.error || 'Có lỗi xảy ra khi hoàn thành Work Order';
-              if (typeof msg === 'string' && msg.includes("ErrorDetail(string='")) {
-                  const m = msg.match(/string='([^']+)'/);
-                  if (m) msg = m[1];
+          .then(res => res.json())
+          .then(data => {
+              if (data.success) {
+                  window.location.reload();
+              } else {
+                  let msg = data.error || 'Có lỗi xảy ra khi hoàn thành Work Order';
+                  if (typeof msg === 'string' && msg.includes("ErrorDetail(string='")) {
+                      const m = msg.match(/string='([^']+)'/);
+                      if (m) msg = m[1];
+                  }
+                  errEl.innerText = msg;
+                  errEl.classList.remove('hidden');
               }
-              errEl.innerText = msg;
+          })
+          .catch(e => {
+              errEl.innerText = e.message || 'Lỗi mạng khi cập nhật trạng thái';
               errEl.classList.remove('hidden');
-          }
-      })
-      .catch(e => {
-          errEl.innerText = e.message || 'Lỗi mạng khi cập nhật trạng thái';
-          errEl.classList.remove('hidden');
-      })
-      .finally(() => {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="ph-bold ph-check"></i> Xác nhận hoàn thành';
-      });
+          })
+          .finally(() => {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="ph-bold ph-check"></i> Xác nhận hoàn thành';
+          });
+      };
+
+      const fileInput = document.getElementById('wo-complete-attachment');
+      const file = fileInput && fileInput.files && fileInput.files[0];
+
+      if (file) {
+          const formData = new FormData();
+          formData.append('file', file);
+          fetch(`/api/v1/work-orders/${currentWo.id}/attachments/`, {
+              method: 'POST',
+              headers: {
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: formData
+          })
+          .then(res => res.json())
+          .then(resData => {
+              if (resData.success || resData.id) {
+                  proceedComplete();
+              } else {
+                  errEl.innerText = (resData.error && resData.error.message) || resData.message || 'Lỗi khi tải ảnh minh chứng';
+                  errEl.classList.remove('hidden');
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="ph-bold ph-check"></i> Xác nhận hoàn thành';
+              }
+          })
+          .catch(err => {
+              errEl.innerText = 'Lỗi kết nối khi tải ảnh: ' + err.message;
+              errEl.classList.remove('hidden');
+              btn.disabled = false;
+              btn.innerHTML = '<i class="ph-bold ph-check"></i> Xác nhận hoàn thành';
+          });
+      } else {
+          proceedComplete();
+      }
   }
 
   function openHoldWoModal() {
@@ -4382,26 +4708,271 @@
           body: JSON.stringify({
               id: currentWo.id,
               status: 'ON_HOLD',
+              notes: notes,
               resolution_notes: notes,
-              hold_reason: notes
+              hold_reason: document.getElementById('wo-hold-reason-select')?.value || 'WAITING_PARTS',
+              holdReason: document.getElementById('wo-hold-reason-select')?.value || 'WAITING_PARTS'
           })
       })
       .then(res => res.json())
       .then(data => {
           if (data.success) {
-              window.location.reload();
+              closeHoldWoModal();
+              syncWoStatusUI('ON_HOLD');
+              document.getElementById('wo-hold-notes').value = '';
+              btn.disabled = false;
+              btn.innerHTML = 'Xác nhận tạm dừng';
           } else {
               errEl.innerText = data.error || 'Có lỗi xảy ra khi tạm dừng Work Order';
               errEl.classList.remove('hidden');
+              btn.disabled = false;
+              btn.innerHTML = 'Xác nhận tạm dừng';
           }
       })
       .catch(e => {
           errEl.innerText = e.message || 'Lỗi mạng khi tạm dừng Work Order';
           errEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.innerHTML = 'Xác nhận tạm dừng';
       })
       .finally(() => {
           btn.disabled = false;
           btn.innerHTML = '<i class="ph-bold ph-pause"></i> Xác nhận tạm dừng';
+      });
+  }
+
+  // ==========================================
+  // PHASE 11.8: HSM ROLLBACK & AI CARD FUNCTIONS
+  // ==========================================
+  function displayHsmAiCard(data) {
+      const card = document.getElementById('wo-hsm-ai-card');
+      if (!card) return;
+      card.classList.remove('hidden');
+
+      const badge = document.getElementById('wo-hsm-severity-badge');
+      const marginalBanner = document.getElementById('wo-hsm-marginal-banner');
+      const explanationText = document.getElementById('wo-hsm-explanation-text');
+
+      const sev = data.severityLevel || data.severity_level || 'NORMAL';
+      if (badge) {
+          if (sev === 'CRITICAL_OVERHAUL') {
+              badge.className = 'px-2.5 py-1 rounded-full font-black text-[10px] uppercase tracking-wide bg-rose-100 text-rose-700 border border-rose-300';
+              badge.innerText = 'ĐẠI TU BỔ MÁY';
+          } else if (sev === 'SERIOUS_MONITOR') {
+              badge.className = 'px-2.5 py-1 rounded-full font-black text-[10px] uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300';
+              badge.innerText = 'BẢO TRÌ NÂNG CAO';
+          } else {
+              badge.className = 'px-2.5 py-1 rounded-full font-black text-[10px] uppercase tracking-wide bg-emerald-100 text-emerald-700 border border-emerald-300';
+              badge.innerText = 'BẢO TRÌ TIÊU CHUẨN';
+          }
+      }
+
+      if (marginalBanner) {
+          if (data.marginalBoundaryWarning || data.marginal_boundary_warning) {
+              marginalBanner.classList.remove('hidden');
+          } else {
+              marginalBanner.classList.add('hidden');
+          }
+      }
+
+      let explanation = data.decisionPathExplanation || data.decision_path_explanation || 'Đã phân tích và đề xuất quy trình kỹ thuật phù hợp.';
+      explanation = explanation.replace(/\s*\([A-Z_]+\)/g, '');
+      explanation = explanation.replace(/\(([^)]+)\)/g, '$1');
+
+      if (explanationText) {
+          explanationText.innerText = explanation;
+      }
+
+      const sevInput = document.getElementById('wo-severity-level');
+      if (sevInput) sevInput.value = sev;
+
+      const margInput = document.getElementById('wo-marginal-warning');
+      if (margInput) margInput.value = (data.marginalBoundaryWarning || data.marginal_boundary_warning) ? '1' : '0';
+
+      const explInput = document.getElementById('wo-decision-explanation');
+      if (explInput) explInput.value = explanation;
+  }
+
+  function applyHsmSuggestedChecklists(isUserClick = false) {
+      const data = window._lastHsmEvaluation;
+      if (!data) return;
+
+      if (data.recommendedMaintenanceAction || data.recommended_maintenance_action) {
+          const actionSelect = document.getElementById('wo-maintenance-action');
+          if (actionSelect) {
+              actionSelect.value = data.recommendedMaintenanceAction || data.recommended_maintenance_action;
+          }
+      }
+
+      if (data.recommendedPriority || data.recommended_priority) {
+          const prioSelect = document.getElementById('wo-priority');
+          if (prioSelect) {
+              prioSelect.value = data.recommendedPriority || data.recommended_priority;
+          }
+      }
+
+      const items = data.suggestedChecklists || data.suggested_checklists || [];
+      const container = document.getElementById('wo-modal-checklists-container');
+      const emptyEl = document.getElementById('wo-modal-checklists-empty');
+      if (container && items.length > 0) {
+          container.innerHTML = '';
+          if (emptyEl) emptyEl.classList.add('hidden');
+          items.forEach(c => {
+              renderWoModalChecklistRow({
+                  itemName: c.itemName || c.item_name,
+                  inputType: c.inputType || c.input_type || 'PASS_FAIL',
+                  expectedValue: c.expectedValue || c.expected_value || '',
+                  isMandatory: (c.isMandatory !== undefined) ? c.isMandatory : (c.is_mandatory !== undefined ? c.is_mandatory : true),
+                  stage: c.stage || ''
+              });
+          });
+
+          if (isUserClick) {
+              if (typeof showToast === 'function') {
+                  showToast("Đã áp dụng thành công toàn bộ quy trình Checklist HSM chuẩn vào phiếu!", "success");
+              }
+              const btn = document.getElementById('btn-apply-hsm-checklists');
+              if (btn) {
+                  const origHtml = btn.innerHTML;
+                  btn.innerHTML = '<i class="ph-bold ph-check text-sm"></i> Đã Áp Dụng Thành Công!';
+                  btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700', 'shadow-indigo-300');
+                  btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-300');
+                  setTimeout(() => {
+                      btn.innerHTML = origHtml;
+                      btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'shadow-emerald-300');
+                      btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700', 'shadow-indigo-300');
+                  }, 2500);
+              }
+              container.classList.add('ring-2', 'ring-emerald-400', 'rounded-xl', 'p-1', 'transition-all');
+              setTimeout(() => {
+                  container.classList.remove('ring-2', 'ring-emerald-400', 'rounded-xl', 'p-1');
+              }, 1500);
+          }
+      }
+  }
+
+  function openHsmRollbackModal() {
+      if (!currentWo) return;
+      document.getElementById('hsm-rollback-code-text').innerText = `Mã phiếu: #${currentWo.id.substring(0,8).toUpperCase()} - ${currentWo.title}`;
+      document.getElementById('hsm-rollback-reason').value = '';
+      document.getElementById('hsm-rollback-vib').value = '';
+      document.getElementById('hsm-rollback-temp').value = '';
+      document.getElementById('hsm-rollback-error').classList.add('hidden');
+      updateRollbackCharCount();
+      document.getElementById('hsm-rollback-modal').classList.remove('hidden');
+  }
+
+  function closeHsmRollbackModal() {
+      document.getElementById('hsm-rollback-modal').classList.add('hidden');
+  }
+
+  function updateRollbackCharCount() {
+      const reason = document.getElementById('hsm-rollback-reason')?.value || '';
+      const el = document.getElementById('hsm-rollback-char-count');
+      if (el) {
+          const len = reason.trim().length;
+          el.innerText = `${len} / 20 ký tự`;
+          if (len >= 20) {
+              el.className = 'text-emerald-600 font-bold';
+          } else {
+              el.className = 'text-amber-600 font-semibold';
+          }
+      }
+  }
+
+  function confirmHsmRollback() {
+      if (!currentWo) return;
+      const reason = (document.getElementById('hsm-rollback-reason')?.value || '').trim();
+      const vib = document.getElementById('hsm-rollback-vib')?.value;
+      const temp = document.getElementById('hsm-rollback-temp')?.value;
+      const errEl = document.getElementById('hsm-rollback-error');
+
+      if (reason.length < 20) {
+          if (errEl) {
+              errEl.innerText = 'Lý do kỹ thuật bắt buộc phải có ít nhất 20 ký tự để lưu vào hồ sơ audit.';
+              errEl.classList.remove('hidden');
+          }
+          return;
+      }
+
+      const btn = document.getElementById('btn-confirm-hsm-rollback');
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Đang xử lý...';
+      }
+
+      fetch(`/api/v1/work-orders/${currentWo.id}/hsm-rollback/`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '')
+          },
+          body: JSON.stringify({
+              reason: reason,
+              recheckVibration: vib ? parseFloat(vib) : null,
+              recheckTemperature: temp ? parseFloat(temp) : null
+          })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (data.success) {
+              closeHsmRollbackModal();
+              const payload = data.data || data;
+              if (currentWo && currentWo.id) {
+                  currentWo.status = payload.status || 'IN_PROGRESS';
+                  const statusEl = document.getElementById('detail-status');
+                  if (statusEl) {
+                      statusEl.innerText = currentWo.status;
+                      statusEl.className = 'px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap flex-shrink-0 bg-yellow-50 text-yellow-600 border-yellow-200';
+                  }
+                  if (payload.checklists) {
+                      const scriptEl = document.getElementById('checklists-' + currentWo.id);
+                      if (scriptEl) scriptEl.textContent = JSON.stringify(payload.checklists);
+                      if (window.WO_METADATA && window.WO_METADATA[currentWo.id]) {
+                          window.WO_METADATA[currentWo.id].checklists = payload.checklists;
+                      }
+                      renderChecklists(currentWo.id, payload.checklists);
+                  }
+                  const rowEl = document.querySelector(`tr[data-id="${currentWo.id}"]`);
+                  if (rowEl) {
+                      rowEl.setAttribute('data-status', currentWo.status);
+                      const statusTd = rowEl.querySelector('td:nth-child(5)');
+                      if (statusTd) {
+                          statusTd.innerHTML = '<span class="px-3 py-0.5 bg-yellow-50 text-yellow-600 border border-yellow-200 rounded-full text-xs font-bold">IN_PROGRESS</span>';
+                      }
+                  }
+              }
+              const rReason = document.getElementById('hsm-rollback-reason');
+              if (rReason) rReason.value = '';
+              const rVib = document.getElementById('hsm-rollback-vib');
+              if (rVib) rVib.value = '';
+              const rTemp = document.getElementById('hsm-rollback-temp');
+              if (rTemp) rTemp.value = '';
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="ph-bold ph-arrow-u-up-left"></i> Xác nhận lùi bước';
+              }
+          } else {
+              if (errEl) {
+                  errEl.innerText = (data.error && data.error.message) || data.message || 'Lỗi khi yêu cầu rollback';
+                  errEl.classList.remove('hidden');
+              }
+              if (btn) {
+                  btn.disabled = false;
+                  btn.innerHTML = '<i class="ph-bold ph-arrow-u-up-left"></i> Xác nhận lùi bước';
+              }
+          }
+      })
+      .catch(err => {
+          if (errEl) {
+              errEl.innerText = 'Lỗi kết nối: ' + err.message;
+              errEl.classList.remove('hidden');
+          }
+          if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="ph-bold ph-arrow-u-up-left"></i> Xác nhận lùi bước';
+          }
       });
   }
 
@@ -4557,6 +5128,10 @@
           if (item.expected_value) {
               tagsHtml += `<span class="text-neutral-500 font-normal text-xs ml-1">- Yêu cầu: ${item.expected_value}</span>`;
           }
+          if (item.stage) {
+              const stageName = STAGE_LABELS[item.stage] || item.stage;
+              tagsHtml += `<span class="ml-2 text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-bold uppercase tracking-wider">${stageName}</span>`;
+          }
           if (item.is_mandatory) {
               tagsHtml += `<span class="ml-2 text-[10px] px-1.5 py-0.5 bg-red-50 text-red-600 rounded font-bold uppercase tracking-wider">Bắt buộc</span>`;
           }
@@ -4633,6 +5208,7 @@
       // Auto-check if input has value
       if (isFromBlur && actualValue.trim() !== '') {
           payload.is_completed = true;
+          isCompleted = true;
       }
       
       fetch('{% url "portal_work_orders" %}', {
@@ -4647,12 +5223,40 @@
       .then(data => {
           if (!data.success) {
               alert(data.error || 'Lỗi khi cập nhật checklist');
+              const cb = document.getElementById('chk-box-' + itemId);
+              if (cb) cb.checked = !isCompleted;
+              return;
           }
-          window.location.reload();
+          // Smooth in-place DOM & cache update: no disruptive page reload!
+          if (currentWo && currentWo.id) {
+              const scriptEl = document.getElementById('checklists-' + currentWo.id);
+              if (scriptEl) {
+                  try {
+                      const items = JSON.parse(scriptEl.textContent);
+                      const it = items.find(x => String(x.id) === String(itemId));
+                      if (it) {
+                          it.is_completed = isCompleted;
+                          if (actualValue !== undefined) it.actual_value = actualValue;
+                          scriptEl.textContent = JSON.stringify(items);
+                      }
+                  } catch(e) {}
+              }
+              const cb = document.getElementById('chk-box-' + itemId);
+              if (cb) cb.checked = isCompleted;
+              const textSpan = cb?.closest('label')?.querySelector('span');
+              if (textSpan) {
+                  if (isCompleted) {
+                      textSpan.classList.add('line-through', 'text-neutral-400');
+                      textSpan.classList.remove('text-neutral-700', 'font-medium');
+                  } else {
+                      textSpan.classList.remove('line-through', 'text-neutral-400');
+                      textSpan.classList.add('text-neutral-700', 'font-medium');
+                  }
+              }
+          }
       })
       .catch(err => {
-          console.error(err);
-          window.location.reload();
+          console.error('Error updating checklist:', err);
       });
   }
 

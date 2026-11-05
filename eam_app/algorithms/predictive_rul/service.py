@@ -255,6 +255,13 @@ class RULPredictiveService:
                     created_by=current_user
                 )
 
+                # Phase 11.8: Tự động nạp bộ Checklist 4 giai đoạn bắt buộc cho ca đại tu RUL Critical
+                try:
+                    from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+                    DecisionTreeChecklistEngine.apply_overhaul_checklist(created_wo)
+                except Exception as hsm_err:
+                    logger.warning(f"Error applying overhaul checklist for predictive WO {created_wo.id}: {hsm_err}")
+
                 # Điều phối tức thời bằng giải thuật Hungarian (nếu có kỹ thuật viên khả dụng)
                 try:
                     from algorithms.hungarian.service import HungarianAssignmentService

@@ -36,7 +36,7 @@ User = get_user_model()
 class SensorAnomalyDetectionTestCase(TestCase):
     def setUp(self):
         clear_current_tenant()
-        self.tenant = Tenant.objects.create(name="Enterprise Factory Corp", tenant_code="T-EFC-01")
+        self.tenant = Tenant.objects.create(name="Enterprise Factory Corp", tenant_code="T-EFC-01", enable_geofencing=False)
 
         self.user = User.objects.create_user(
             username="tech_alice",
