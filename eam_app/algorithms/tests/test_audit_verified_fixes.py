@@ -1177,3 +1177,169 @@ class DeepAuditVerifiedFixesTests(TestCase):
         req_neg.user = self.tech_user
         resp_neg = portal_inventory(req_neg)
         self.assertEqual(resp_neg.status_code, 400)
+
+    # ------------------------------------------------------------------
+    # Test 23: Resume blocked when another WO is ASSIGNED or IN_PROGRESS (Issue 1 Hotfix)
+    # ------------------------------------------------------------------
+    def test_23_resume_when_another_wo_is_assigned_or_in_progress(self):
+        from algorithms.hungarian.service import HungarianAssignmentService
+        from algorithms.decision_tree_hsm.engine import DecisionTreeChecklistEngine
+        from users.models import TechnicianProfile
+
+        admin_user = User.objects.create(
+            username=f"admin_{uuid.uuid4().hex[:6]}",
+            tenant=self.tenant,
+            is_superuser=True
+        )
+
+        tech_profile, _ = TechnicianProfile.objects.get_or_create(
+            user=self.tech_user,
+            tenant=self.tenant,
+            defaults={
+                'availability_status': 'AVAILABLE',
+                'is_on_duty': True,
+                'skill_level': 5,
+                'skills': ['MECHANICAL']
+            }
+        )
+        tech_profile.availability_status = 'AVAILABLE'
+        tech_profile.is_on_duty = True
+        tech_profile.skills = ['MECHANICAL']
+        tech_profile.save()
+
+        wo1 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title="WO 001",
+            status="IN_PROGRESS",
+            type="CORRECTIVE",
+            assigned_to=self.tech_user
+        )
+        tech_profile.availability_status = 'BUSY'
+        tech_profile.save()
+
+        # Hold WO001 -> tech becomes AVAILABLE
+        DecisionTreeChecklistEngine.hold_work_order(wo1, admin_user, hold_reason="WAITING_PARTS")
+        tech_profile.refresh_from_db()
+        self.assertEqual(tech_profile.availability_status, 'AVAILABLE')
+
+        # Hungarian assigns tech to WO002 -> status ASSIGNED, tech BUSY
+        wo2 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title="WO 002",
+            status="CREATED",
+            type="CORRECTIVE",
+            required_skill="MECHANICAL"
+        )
+        assignments_data = [{
+            "workOrderId": str(wo2.id),
+            "technicianId": str(tech_profile.user_id),
+            "slotRole": "SOLO"
+        }]
+        HungarianAssignmentService.apply(self.tenant, assignments_data, current_user=admin_user)
+        wo2.refresh_from_db()
+        self.assertEqual(wo2.status, 'ASSIGNED')
+
+        # Resume WO001 while WO002 is ASSIGNED must fail
+        with self.assertRaises(ValidationError) as ctx:
+            DecisionTreeChecklistEngine.resume_work_order(wo1, admin_user)
+        self.assertIn("đã được phân công", str(ctx.exception))
+
+        # Advance WO002 to IN_PROGRESS -> Resume WO001 must also fail
+        wo2.status = 'IN_PROGRESS'
+        wo2.save()
+        with self.assertRaises(ValidationError) as ctx:
+            DecisionTreeChecklistEngine.resume_work_order(wo1, admin_user)
+        self.assertIn("đang thực hiện", str(ctx.exception))
+
+        # Complete WO002 -> Resume WO001 now succeeds
+        wo2.status = 'COMPLETED'
+        wo2.save()
+        tech_profile.availability_status = 'AVAILABLE'
+        tech_profile.save()
+
+        transition = DecisionTreeChecklistEngine.resume_work_order(wo1, admin_user)
+        wo1.refresh_from_db()
+        self.assertEqual(wo1.status, 'IN_PROGRESS')
+        self.assertIsNotNone(transition)
+
+    # ------------------------------------------------------------------
+    # Test 24: Raw current_value is strictly NOT used as Z-score (Issue 2 Hotfix)
+    # ------------------------------------------------------------------
+    def test_24_raw_current_value_not_used_as_z_score(self):
+        from assets.models import AssetAnomalyAlert
+        from algorithms.decision_tree_hsm.engine import DecisionTreeChecklistEngine, SEVERITY_NORMAL, ACTION_GENERAL
+
+        # Alert with raw temperature 85.5°C and no Z-score must NOT trigger critical overhaul
+        alert1 = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            metric_code='TEMPERATURE',
+            current_value=85.5,
+            z_score=None,
+            anomaly_score=None,
+            severity='WARNING',
+            status='OPEN'
+        )
+        res1 = DecisionTreeChecklistEngine.evaluate(alert=alert1, asset=self.asset)
+        self.assertEqual(res1['suggestedSeverity'], SEVERITY_NORMAL)
+        self.assertEqual(res1['suggestedMaintenanceAction'], ACTION_GENERAL)
+        self.assertNotIn('85.50', res1['decision_path_explanation'])
+        self.assertIn('0.00', res1['decision_path_explanation'])
+
+        # Alert with valid Z-score 1.2 uses Z-score properly
+        alert2 = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            metric_code='TEMPERATURE',
+            current_value=85.5,
+            z_score=1.2,
+            anomaly_score=None,
+            severity='WARNING',
+            status='OPEN'
+        )
+        res2 = DecisionTreeChecklistEngine.evaluate(alert=alert2, asset=self.asset)
+        self.assertEqual(res2['suggestedSeverity'], SEVERITY_NORMAL)
+        self.assertIn('1.20', res2['decision_path_explanation'])
+
+        # Alert with multivariate anomaly_score 0.75 is NOT treated as Z-score
+        alert3 = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            metric_code='MULTIVARIATE',
+            current_value=1.0,
+            z_score=None,
+            anomaly_score=0.75,
+            severity='CRITICAL',
+            status='OPEN'
+        )
+        res3 = DecisionTreeChecklistEngine.evaluate(alert=alert3, asset=self.asset)
+        self.assertNotIn('0.75', res3['decision_path_explanation'])
+        self.assertIn('0.00', res3['decision_path_explanation'])
+
+    # ------------------------------------------------------------------
+    # Test 25: Recurrence calculation strictly counts root failure orders (Issue 3 Hotfix)
+    # ------------------------------------------------------------------
+    def test_25_recurrence_calculation_strictly_failure_orders(self):
+        from algorithms.decision_tree_hsm.engine import DecisionTreeChecklistEngine
+
+        # 2 completed corrective repairs
+        c_wo1 = WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='CORRECTIVE', status='COMPLETED', title='Fix Leak')
+        c_wo2 = WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='CORRECTIVE', status='COMPLETED', title='Replace Seal')
+        # 1 child follow-up ticket (same incident as c_wo2 -> excluded)
+        WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='CORRECTIVE', status='COMPLETED', title='Follow-up Check', parent_id=c_wo2)
+        # 1 in-progress corrective repair -> counted
+        WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='CORRECTIVE', status='IN_PROGRESS', title='Motor Repair')
+        # 2 completed PMs -> excluded
+        WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='PREVENTIVE', status='COMPLETED', title='Weekly Grease 1')
+        WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='PREVENTIVE', status='COMPLETED', title='Weekly Grease 2')
+        # 1 cancelled ticket -> excluded
+        WorkOrder.objects.create(tenant=self.tenant, asset=self.asset, type='CORRECTIVE', status='CANCELLED', title='Cancelled Ticket')
+
+        self.assertEqual(WorkOrder.objects.filter(asset=self.asset).count(), 7)
+
+        res = DecisionTreeChecklistEngine.evaluate(asset=self.asset, z_score=1.0, rul_days=60.0, estimated_cost=1000000.0)
+        # Only 3 root failure incidents counted, NOT 7!
+        self.assertIn('3 lần/90 ngày', res['decision_path_explanation'])
+        self.assertNotIn('7 lần/90 ngày', res['decision_path_explanation'])

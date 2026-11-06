@@ -326,17 +326,12 @@ class DecisionTreeChecklistEngine:
         if recurrence_count is None:
             recurrence_count = kwargs.get('failure_recurrence') or kwargs.get('failureRecurrence')
 
-        # 1. Trích xuất Z-score từ alert hoặc tham số
+        # 1. Trích xuất Z-score từ alert hoặc tham số (Tuyệt đối không dùng current_value cảm biến thô hoặc anomaly_score Isolation Forest)
         eff_z_score = 0.0
         if z_score is not None:
             eff_z_score = float(z_score)
-        elif alert:
-            if getattr(alert, 'z_score', None) is not None:
-                eff_z_score = float(alert.z_score)
-            elif getattr(alert, 'anomaly_score', None) is not None:
-                eff_z_score = float(alert.anomaly_score)
-            elif getattr(alert, 'current_value', None) is not None:
-                eff_z_score = float(alert.current_value)
+        elif alert and getattr(alert, 'z_score', None) is not None:
+            eff_z_score = float(alert.z_score)
 
         # 2. Trích xuất RUL days (ưu tiên RUL mô hình LSTM Task 11.5)
         eff_rul_days = 60.0
@@ -367,6 +362,8 @@ class DecisionTreeChecklistEngine:
             cost_ratio = float(eff_est_cost) / purchase_cost
 
         # 4. Trích xuất Số lần hỏng hóc lặp lại trong 90 ngày
+        # Nghiệp vụ chuẩn: Chỉ đếm các sự cố kỹ thuật gốc (CORRECTIVE, EMERGENCY, BREAKDOWN),
+        # loại trừ bảo dưỡng định kỳ (PREVENTIVE, PREDICTIVE_PM), phiếu hủy (CANCELLED) và phiếu phụ theo dõi (parent_id)
         eff_recurrence = 0
         if recurrence_count is not None:
             eff_recurrence = int(recurrence_count)
@@ -374,7 +371,12 @@ class DecisionTreeChecklistEngine:
             ninety_days_ago = timezone.now() - timedelta(days=90)
             eff_recurrence = WorkOrder.objects.filter(
                 asset=asset,
+                type__in=['CORRECTIVE', 'EMERGENCY', 'BREAKDOWN'],
                 created_at__gte=ninety_days_ago
+            ).exclude(
+                status='CANCELLED'
+            ).filter(
+                parent_id__isnull=True
             ).count()
 
         # 5. Phân loại qua Cây quyết định
@@ -621,9 +623,9 @@ class DecisionTreeChecklistEngine:
                 if tp:
                     other_active = WorkOrder.objects.filter(
                         assigned_to=assigned_user,
-                        status='IN_PROGRESS'
+                        status__in=['ASSIGNED', 'IN_PROGRESS']
                     ).exclude(id=wo.id).exists()
-                    # Chỉ chuyển về AVAILABLE nếu hiện tại đang BUSY (bảo toàn nếu đang ON_LEAVE hoặc UNAVAILABLE)
+                    # Chỉ chuyển về AVAILABLE nếu hiện tại đang BUSY và không có phiếu ASSIGNED hoặc IN_PROGRESS nào khác
                     if not other_active and tp.availability_status == 'BUSY':
                         tp.availability_status = 'AVAILABLE'
                         tp.save(update_fields=['availability_status', 'updated_at'])
@@ -684,17 +686,18 @@ class DecisionTreeChecklistEngine:
                             f"Vui lòng phân công kỹ thuật viên khác trước khi tiếp tục."
                         )
 
-                    # 2. Kiểm tra kỹ thuật viên có đang thực hiện phiếu IN_PROGRESS khác không
+                    # 2. Kiểm tra kỹ thuật viên có đang giữ hoặc thực hiện phiếu khác (ASSIGNED hoặc IN_PROGRESS)
                     other_active = WorkOrder.objects.filter(
                         assigned_to=assigned_user,
-                        status='IN_PROGRESS'
+                        status__in=['ASSIGNED', 'IN_PROGRESS']
                     ).exclude(id=wo.id)
                     if other_active.exists():
                         other_wo = other_active.first()
+                        status_str = "đang thực hiện" if other_wo.status == 'IN_PROGRESS' else "đã được phân công"
                         raise ValidationError(
                             f"Không thể tiếp tục phiếu: Kỹ thuật viên {assigned_user.get_full_name() or assigned_user.username} "
-                            f"hiện đang thực hiện phiếu công việc khác ({other_wo.code or other_wo.title}). "
-                            f"Vui lòng hoàn thành/tạm hoãn phiếu đó hoặc điều chuyển kỹ thuật viên khác trước khi tiếp tục."
+                            f"hiện {status_str} phiếu công việc khác ({other_wo.code or other_wo.title} - Trạng thái: {other_wo.status}). "
+                            f"Vui lòng hoàn thành/tái phân công phiếu đó trước khi tiếp tục."
                         )
 
                     # Nếu hợp lệ, đưa trạng thái kỹ thuật viên sang BUSY
