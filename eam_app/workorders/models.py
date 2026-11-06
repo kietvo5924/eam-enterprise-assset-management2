@@ -407,17 +407,12 @@ class HsmStageTransition(BaseTenantModel):
     temperature_reading = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    from_stage = models.CharField(max_length=32, null=True, blank=True, help_text='Giai đoạn trước khi chuyển đổi')
+    to_stage = models.CharField(max_length=32, null=True, blank=True, help_text='Giai đoạn sau khi chuyển đổi')
+
     @property
     def action(self):
         return self.action_type
-
-    @property
-    def from_stage(self):
-        return 'TRIAL_ACCEPTANCE'
-
-    @property
-    def to_stage(self):
-        return 'OVERHAUL_EXECUTION'
 
     @property
     def recheck_vibration(self):

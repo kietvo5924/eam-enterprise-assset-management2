@@ -46,37 +46,63 @@ class DecisionTreeChecklistEngine:
         Khởi tạo và huấn luyện cây quyết định max_depth=4 trên miền dữ liệu tri thức chuyên gia.
         Features vector: [z_score, rul_days, cost_ratio, recurrence_count]
         Class label: 0 -> NORMAL_MAINTENANCE, 1 -> CRITICAL_OVERHAUL
+        Đảm bảo cả 4 đặc trưng đều tham gia vào các nút rẽ nhánh quyết định của cây.
         """
         X = np.array([
             # [z_score, rul_days, cost_ratio, recurrence]
-            # Nhánh 1: Bảo dưỡng thông thường (Z < 2.0, RUL > 30, chi phí thấp, ít hỏng lặp lại)
-            [0.5, 90.0, 0.02, 0],
-            [1.0, 60.0, 0.05, 1],
-            [1.2, 45.0, 0.08, 0],
-            [1.5, 50.0, 0.10, 1],
-            [1.8, 35.0, 0.12, 1],
-            [0.8, 80.0, 0.03, 0],
-            [1.4, 40.0, 0.07, 2],
-            [1.9, 32.0, 0.15, 1],
-            
-            # Nhánh 2: Đại tu cốt lõi (Z >= 2.5 hoặc RUL <= 15 hoặc chi phí/tần suất cao)
-            [2.8, 6.0, 0.45, 3],
-            [3.2, 12.0, 0.35, 2],
-            [2.6, 25.0, 0.25, 2],
-            [1.8, 8.0, 0.30, 2],
-            [1.2, 10.0, 0.20, 1],
-            [2.5, 14.0, 0.40, 3],
-            [3.5, 4.0, 0.60, 4],
-            [2.9, 15.0, 0.50, 3],
-            [2.2, 13.0, 0.38, 3],
-            [1.6, 12.0, 0.25, 2],
-            [2.7, 50.0, 0.30, 1],
-            [1.9, 28.0, 0.55, 4],
+            # Nhánh 1: Bảo dưỡng thông thường (RUL > 15, Z < 2.5, Cost <= 0.25, Recurrence <= 2)
+            [0.5, 90.0, 0.05, 0],
+            [0.8, 80.0, 0.08, 0],
+            [1.0, 60.0, 0.10, 1],
+            [1.2, 45.0, 0.12, 0],
+            [1.4, 40.0, 0.15, 1],
+            [1.6, 50.0, 0.18, 0],
+            [1.8, 35.0, 0.22, 1],
+            [2.0, 30.0, 0.15, 0],
+            [2.1, 45.0, 0.10, 1],
+            [2.2, 35.0, 0.20, 0],
+            [2.3, 40.0, 0.12, 1],
+            [2.45, 30.0, 0.15, 0],  # Điểm cận biên Z < 2.50 thuộc Zone C cảnh báo nhưng chưa bổ máy
+            [0.6, 80.0, 0.05, 2],  # Máy có 2 lần bảo dưỡng định kỳ trước đó nhưng còn rất tốt -> NORMAL
+            [1.1, 55.0, 0.18, 2],  # Recurrence 2, độ rung thấp, RUL dài -> NORMAL
+            [1.5, 38.0, 0.22, 2],  # Recurrence 2, chi phí hợp lý -> NORMAL
+            [1.0, 25.0, 0.10, 0],  # RUL 25 ngày (> 15), độ rung êm -> NORMAL
+            [1.3, 20.0, 0.15, 1],  # RUL 20 ngày (> 15) -> NORMAL
+            [1.6, 22.0, 0.20, 0],  # RUL 22 ngày (> 15) -> NORMAL
+            [1.7, 18.0, 0.25, 1],  # RUL 18 ngày (> 15) -> NORMAL
+
+            # Nhánh 2: Đại tu cốt lõi - Rung động nguy hiểm Zone D (Z >= 2.5)
+            [2.55, 30.0, 0.15, 0],  # Điểm cận biên Z >= 2.50 bắt đầu Zone D
+            [2.6, 45.0, 0.10, 0],
+            [2.8, 30.0, 0.15, 1],
+            [3.0, 50.0, 0.12, 0],
+            [3.2, 25.0, 0.20, 2],
+            [3.5, 60.0, 0.08, 1],
+
+            # Nhánh 3: Đại tu cốt lõi - Tuổi thọ cạn kiệt (RUL <= 15)
+            [0.8, 8.0,  0.10, 0],
+            [1.0, 12.0, 0.15, 1],
+            [1.4, 10.0, 0.12, 0],
+            [1.8, 14.0, 0.18, 1],
+            [2.2, 7.0,  0.20, 2],
+
+            # Nhánh 4: Đại tu cốt lõi - Tỷ lệ chi phí vượt ngưỡng nghiêm trọng (Cost >= 0.35)
+            [1.5, 35.0, 0.45, 0],
+            [1.8, 30.0, 0.40, 1],
+            [2.0, 40.0, 0.38, 0],
+
+            # Nhánh 5: Đại tu cốt lõi - Hỏng hóc lặp lại mãn tính (Recurrence >= 3)
+            [1.8, 30.0, 0.20, 3],
+            [2.0, 35.0, 0.18, 4],
+            [2.1, 40.0, 0.22, 3],
         ], dtype=float)
 
         y = np.array([
-            0, 0, 0, 0, 0, 0, 0, 0,
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  # 19 normal
+            1, 1, 1, 1, 1, 1,                                          # 6 critical Z
+            1, 1, 1, 1, 1,                                             # 5 critical RUL
+            1, 1, 1,                                                   # 3 high cost
+            1, 1, 1                                                    # 3 chronic recurrence
         ], dtype=int)
 
         clf = DecisionTreeClassifier(max_depth=4, criterion='gini', random_state=42)
@@ -157,8 +183,20 @@ class DecisionTreeChecklistEngine:
                     f"➔ Phân loại: ĐẠI TU BỔ MÁY BẮT BUỘC (CORE_REPLACEMENT)"
                 )
         else:
-            z_str = f"Z-score rung chấn ({z_score:.2f}) < {Z_SCORE_NORMAL_THRESHOLD:.2f}" if z_score is not None else "Chỉ số cảm biến ổn định"
-            rul_str = f"RUL còn lại ({rul_days:.1f} ngày) > 30.0 ngày" if rul_days is not None else "Tuổi thọ RUL an toàn"
+            if z_score is not None and z_score < Z_SCORE_NORMAL_THRESHOLD:
+                z_str = f"Z-score rung chấn ({z_score:.2f}) < {Z_SCORE_NORMAL_THRESHOLD:.2f}"
+            elif z_score is not None:
+                z_str = f"Z-score rung chấn ({z_score:.2f}) < {Z_SCORE_CRITICAL_THRESHOLD:.2f} (Ngưỡng cảnh báo nhẹ)"
+            else:
+                z_str = "Chỉ số cảm biến ổn định"
+
+            if rul_days is not None and rul_days > 30.0:
+                rul_str = f"RUL còn lại ({rul_days:.1f} ngày) > 30.0 ngày"
+            elif rul_days is not None:
+                rul_str = f"RUL còn lại ({rul_days:.1f} ngày) > {RUL_CRITICAL_THRESHOLD_DAYS:.1f} ngày (Tuổi thọ khả dụng)"
+            else:
+                rul_str = "Tuổi thọ RUL an toàn"
+
             msg = (
                 f"{z_str} ➔ {rul_str} "
                 f"➔ Phân loại: BẢO DƯỠNG THÔNG THƯỜNG (NORMAL_MAINTENANCE)"
@@ -292,18 +330,26 @@ class DecisionTreeChecklistEngine:
         eff_z_score = 0.0
         if z_score is not None:
             eff_z_score = float(z_score)
-        elif alert and hasattr(alert, 'metric_value') and alert.metric_value is not None:
-            eff_z_score = float(alert.metric_value)
+        elif alert:
+            if getattr(alert, 'z_score', None) is not None:
+                eff_z_score = float(alert.z_score)
+            elif getattr(alert, 'anomaly_score', None) is not None:
+                eff_z_score = float(alert.anomaly_score)
+            elif getattr(alert, 'current_value', None) is not None:
+                eff_z_score = float(alert.current_value)
 
-        # 2. Trích xuất RUL days
+        # 2. Trích xuất RUL days (ưu tiên RUL mô hình LSTM Task 11.5)
         eff_rul_days = 60.0
         has_rapid_alert = False
+        target_asset = asset or (alert.asset if alert and hasattr(alert, 'asset') else None)
         if rul_days is not None:
             eff_rul_days = float(rul_days)
-        elif asset:
-            if asset.current_rul_days is not None:
-                eff_rul_days = float(asset.current_rul_days)
-            has_rapid_alert = bool(getattr(asset, 'rapid_degradation_alert', False))
+        elif target_asset and target_asset.current_rul_days is not None:
+            eff_rul_days = float(target_asset.current_rul_days)
+            has_rapid_alert = bool(getattr(target_asset, 'rapid_degradation_alert', False))
+        elif alert and getattr(alert, 'days_remaining', None) is not None:
+            # Fallback sang ước tính suy thoái của Alert nếu máy chưa có dự báo RUL LSTM
+            eff_rul_days = float(alert.days_remaining)
 
         # 3. Trích xuất Chi phí ước tính & Tỷ lệ chi phí so với nguyên giá máy
         purchase_cost = 100_000_000.0
@@ -403,11 +449,11 @@ class DecisionTreeChecklistEngine:
         }
 
     @classmethod
-    def apply_overhaul_checklist(cls, work_order) -> list:
+    def apply_overhaul_checklist(cls, work_order, user=None) -> list:
         """
         Nạp bộ 4 giai đoạn Checklist bắt buộc vào một Work Order cụ thể (dành cho Task 11.5 hoặc Lập phiếu).
         """
-        from workorders.models import WorkOrderChecklistItem
+        from workorders.models import WorkOrderChecklistItem, HsmStageTransition
 
         templates = cls.get_overhaul_checklist_templates(work_order.asset)
         created_items = []
@@ -433,6 +479,19 @@ class DecisionTreeChecklistEngine:
         work_order.severity_level = SEVERITY_CRITICAL
         work_order.save(update_fields=['maintenance_action', 'severity_level', 'updated_at'])
 
+        # Audit AI_EVALUATE transition if not already recorded
+        if user and not work_order.hsm_transitions.filter(action_type='AI_EVALUATE').exists():
+            HsmStageTransition.objects.create(
+                tenant=work_order.tenant,
+                work_order=work_order,
+                action_type='AI_EVALUATE',
+                severity_assigned=SEVERITY_CRITICAL,
+                from_stage=None,
+                to_stage=STAGE_DIAGNOSIS,
+                reason="AI Cây quyết định tự động nạp quy trình đại tu 4 giai đoạn bắt buộc (CORE_REPLACEMENT)",
+                performed_by=user
+            )
+
         logger.info(f"Đã nạp {len(created_items)} checklist đại tu bổ máy cho WO {work_order.id}")
         return created_items
 
@@ -449,35 +508,45 @@ class DecisionTreeChecklistEngine:
         """
         Lùi bước kỹ thuật (HSM Rollback):
         Khi chạy thử phát hiện rung lắc hoặc không đạt, Quản đốc yêu cầu làm lại:
+        - Bắt buộc phiếu đang ở trạng thái IN_PROGRESS (chặn tuyệt đối nếu đã COMPLETED hoặc CANCELLED)
         - Bắt buộc lý do kỹ thuật >= 20 ký tự
         - Chuyển toàn bộ Checklist giai đoạn 3 (OVERHAUL_EXECUTION) & 4 (TRIAL_ACCEPTANCE) về False
+        - Tuyệt đối giữ nguyên kết quả Checklist giai đoạn 1 (DIAGNOSIS) & giai đoạn 2 (STAGING_PARTS)
         - Đưa trạng thái Work Order về IN_PROGRESS
-        - Ghi log HsmStageTransition (action_type='ROLLBACK')
+        - Ghi log HsmStageTransition (action_type='ROLLBACK', from_stage='TRIAL_ACCEPTANCE', to_stage='OVERHAUL_EXECUTION')
         """
         from workorders.models import HsmStageTransition
+
+        if work_order.status == 'COMPLETED':
+            raise ValidationError("Không thể Rollback phiếu đã hoàn thành (COMPLETED). Chi phí và mốc đại tu đã được đóng băng.")
+        if work_order.status == 'CANCELLED':
+            raise ValidationError("Không thể Rollback phiếu đã hủy (CANCELLED).")
+
+        clean_reason = str(reason or '').strip()
+        if len(clean_reason) < 20:
+            raise ValidationError("Lý do lùi bước kỹ thuật phải có ít nhất 20 ký tự mô tả chi tiết nguyên nhân.")
 
         if vibration_reading is None:
             vibration_reading = kwargs.get('recheck_vibration') or kwargs.get('recheckVibration')
         if temperature_reading is None:
             temperature_reading = kwargs.get('recheck_temperature') or kwargs.get('recheckTemperature')
 
-        clean_reason = str(reason or '').strip()
-        if len(clean_reason) < 20:
-            raise ValidationError("Lý do lùi bước kỹ thuật phải có ít nhất 20 ký tự mô tả chi tiết nguyên nhân.")
-
-        # Revert Stage 3 & 4 checklists
+        # Revert ONLY Stage 3 & 4 checklists
         target_stages = [STAGE_OVERHAUL_EXECUTION, STAGE_TRIAL_ACCEPTANCE]
         reverted_count = 0
 
         # Query all checklists of the work order
         for chk in work_order.checklists.all():
             should_revert = False
-            if chk.stage in target_stages:
-                should_revert = True
-            elif chk.input_type == 'NUMBER':
-                should_revert = True
-            elif any(w in chk.item_name.lower() for w in ['chạy thử', 'nghiệm thu', 'đo lại', 'thay thế', 'tháo rã']):
-                should_revert = True
+            if chk.stage:
+                should_revert = (chk.stage in target_stages)
+            else:
+                # Fallback nếu checklist không có stage: chỉ revert mục chạy thử/nghiệm thu/thay thế
+                # và TUYỆT ĐỐI không revert nếu là mục khảo sát hay vật tư
+                name_l = chk.item_name.lower()
+                is_stage_1_or_2 = any(w in name_l for w in ['khảo sát', 'chụp ảnh', 'vật tư', 'phụ tùng', 'sẵn sàng'])
+                is_stage_3_or_4 = any(w in name_l for w in ['chạy thử', 'nghiệm thu', 'đo lại', 'thay thế', 'tháo rã', 'lắp'])
+                should_revert = is_stage_3_or_4 and not is_stage_1_or_2
 
             if should_revert:
                 chk.is_completed = False
@@ -494,6 +563,8 @@ class DecisionTreeChecklistEngine:
             work_order=work_order,
             action_type='ROLLBACK',
             severity_assigned=work_order.severity_level,
+            from_stage=STAGE_TRIAL_ACCEPTANCE,
+            to_stage=STAGE_OVERHAUL_EXECUTION,
             reason=clean_reason,
             performed_by=user,
             vibration_reading=float(vibration_reading) if vibration_reading is not None else None,
@@ -521,54 +592,152 @@ class DecisionTreeChecklistEngine:
         """
         Tạm hoãn ngoại cảnh (ON_HOLD):
         Khi chờ phụ tùng hoặc chuyên gia, đóng băng đồng hồ tính SLA/MTTR.
+        Đồng bộ an toàn: chỉ chuyển thợ sang AVAILABLE nếu thợ đang BUSY và không có việc IN_PROGRESS nào khác.
         """
-        from workorders.models import HsmStageTransition
+        from django.db import transaction
+        from workorders.models import HsmStageTransition, WorkOrder
+        from users.models import TechnicianProfile
 
-        if hold_reason is None:
-            hold_reason = kwargs.get('reason') or kwargs.get('holdReason') or 'WAITING_PARTS'
+        with transaction.atomic():
+            # Lock work order row
+            wo = WorkOrder.objects.select_for_update().get(id=work_order.id)
+            if wo.status == 'COMPLETED':
+                raise ValidationError("Không thể tạm hoãn phiếu đã hoàn thành.")
 
-        now = timezone.now()
-        work_order.is_on_hold = True
-        work_order.hold_reason = (hold_reason or 'WAITING_PARTS')[:64]
-        work_order.hold_started_at = now
-        work_order.status = 'ON_HOLD'
-        work_order.save(update_fields=['is_on_hold', 'hold_reason', 'hold_started_at', 'status', 'updated_at'])
+            if hold_reason is None:
+                hold_reason = kwargs.get('reason') or kwargs.get('holdReason') or 'WAITING_PARTS'
 
-        transition = HsmStageTransition.objects.create(
-            tenant=work_order.tenant,
-            work_order=work_order,
-            action_type='HOLD',
-            severity_assigned=work_order.severity_level,
-            reason=f"Tạm hoãn phiếu: {work_order.hold_reason}. {notes}".strip(),
-            performed_by=user
-        )
-        return transition
+            now = timezone.now()
+            wo.is_on_hold = True
+            wo.hold_reason = (hold_reason or 'WAITING_PARTS')[:64]
+            wo.hold_started_at = now
+            wo.status = 'ON_HOLD'
+            wo.save(update_fields=['is_on_hold', 'hold_reason', 'hold_started_at', 'status', 'updated_at'])
+
+            # Đồng bộ giải phóng trạng thái kỹ thuật viên
+            assigned_user = wo.assigned_to
+            if assigned_user and hasattr(assigned_user, 'technician_profile'):
+                tp = TechnicianProfile.objects.select_for_update().filter(user=assigned_user).first()
+                if tp:
+                    other_active = WorkOrder.objects.filter(
+                        assigned_to=assigned_user,
+                        status='IN_PROGRESS'
+                    ).exclude(id=wo.id).exists()
+                    # Chỉ chuyển về AVAILABLE nếu hiện tại đang BUSY (bảo toàn nếu đang ON_LEAVE hoặc UNAVAILABLE)
+                    if not other_active and tp.availability_status == 'BUSY':
+                        tp.availability_status = 'AVAILABLE'
+                        tp.save(update_fields=['availability_status', 'updated_at'])
+
+            # Xác định stage hiện tại để lưu audit trail
+            current_stage = STAGE_OVERHAUL_EXECUTION
+            incomplete_items = wo.checklists.filter(is_completed=False).order_by('id')
+            if incomplete_items.exists():
+                first_incomplete = incomplete_items.first()
+                if first_incomplete.stage:
+                    current_stage = first_incomplete.stage
+
+            transition = HsmStageTransition.objects.create(
+                tenant=wo.tenant,
+                work_order=wo,
+                action_type='HOLD',
+                severity_assigned=wo.severity_level,
+                from_stage=current_stage,
+                to_stage='ON_HOLD',
+                reason=f"Tạm hoãn phiếu: {wo.hold_reason}. {notes}".strip(),
+                performed_by=user
+            )
+            return transition
 
     @classmethod
     def resume_work_order(cls, work_order, user, notes: str = ''):
         """
         Tiếp tục công việc sau tạm hoãn (RESUME):
         Tích lũy thời gian tạm hoãn vào hold_accumulated_seconds và đưa trạng thái về IN_PROGRESS.
+        Rào chắn an toàn: kiểm tra kỹ thuật viên không bị phân công chồng lấn và không trong thời gian nghỉ phép.
+        """
+        from django.db import transaction
+        from workorders.models import HsmStageTransition, WorkOrder
+        from users.models import TechnicianProfile
+
+        with transaction.atomic():
+            # Lock work order row
+            wo = WorkOrder.objects.select_for_update().get(id=work_order.id)
+            if wo.status != 'ON_HOLD':
+                raise ValidationError(f"Không thể tiếp tục (Resume) phiếu đang ở trạng thái {wo.status}. Chỉ có thể Resume từ trạng thái ON_HOLD.")
+
+            now = timezone.now()
+            if wo.hold_started_at:
+                delta_sec = int((now - wo.hold_started_at).total_seconds())
+                wo.hold_accumulated_seconds = (wo.hold_accumulated_seconds or 0) + max(0, delta_sec)
+                wo.hold_started_at = None
+
+            # Kiểm tra an toàn phân công kỹ thuật viên
+            assigned_user = wo.assigned_to
+            if assigned_user and hasattr(assigned_user, 'technician_profile'):
+                tp = TechnicianProfile.objects.select_for_update().filter(user=assigned_user).first()
+                if tp:
+                    # 1. Kiểm tra kỹ thuật viên có đang nghỉ phép hoặc không trong ca trực
+                    if tp.availability_status == 'ON_LEAVE' or not tp.is_on_duty:
+                        raise ValidationError(
+                            f"Không thể tiếp tục phiếu: Kỹ thuật viên {assigned_user.get_full_name() or assigned_user.username} "
+                            f"hiện không trong ca trực hoặc đang nghỉ phép (Trạng thái: {tp.availability_status}, Trực: {tp.is_on_duty}). "
+                            f"Vui lòng phân công kỹ thuật viên khác trước khi tiếp tục."
+                        )
+
+                    # 2. Kiểm tra kỹ thuật viên có đang thực hiện phiếu IN_PROGRESS khác không
+                    other_active = WorkOrder.objects.filter(
+                        assigned_to=assigned_user,
+                        status='IN_PROGRESS'
+                    ).exclude(id=wo.id)
+                    if other_active.exists():
+                        other_wo = other_active.first()
+                        raise ValidationError(
+                            f"Không thể tiếp tục phiếu: Kỹ thuật viên {assigned_user.get_full_name() or assigned_user.username} "
+                            f"hiện đang thực hiện phiếu công việc khác ({other_wo.code or other_wo.title}). "
+                            f"Vui lòng hoàn thành/tạm hoãn phiếu đó hoặc điều chuyển kỹ thuật viên khác trước khi tiếp tục."
+                        )
+
+                    # Nếu hợp lệ, đưa trạng thái kỹ thuật viên sang BUSY
+                    tp.availability_status = 'BUSY'
+                    tp.save(update_fields=['availability_status', 'updated_at'])
+
+            wo.is_on_hold = False
+            wo.hold_reason = None
+            wo.status = 'IN_PROGRESS'
+            wo.save(update_fields=['hold_accumulated_seconds', 'hold_started_at', 'is_on_hold', 'hold_reason', 'status', 'updated_at'])
+
+            resume_stage = STAGE_OVERHAUL_EXECUTION
+            incomplete_items = wo.checklists.filter(is_completed=False).order_by('id')
+            if incomplete_items.exists():
+                first_incomplete = incomplete_items.first()
+                if first_incomplete.stage:
+                    resume_stage = first_incomplete.stage
+
+            transition = HsmStageTransition.objects.create(
+                tenant=wo.tenant,
+                work_order=wo,
+                action_type='RESUME',
+                severity_assigned=wo.severity_level,
+                from_stage='ON_HOLD',
+                to_stage=resume_stage,
+                reason=f"Tiếp tục thực hiện phiếu sau tạm hoãn. {notes}".strip(),
+                performed_by=user
+            )
+            return transition
+
+    @classmethod
+    def record_override(cls, work_order, user, original_severity: str, assigned_severity: str, override_reason: str):
+        """
+        Lưu vết can thiệp đè phán quyết AI của Quản đốc (HsmStageTransition action_type='OVERRIDE').
         """
         from workorders.models import HsmStageTransition
-
-        now = timezone.now()
-        if work_order.hold_started_at:
-            delta_sec = int((now - work_order.hold_started_at).total_seconds())
-            work_order.hold_accumulated_seconds = (work_order.hold_accumulated_seconds or 0) + max(0, delta_sec)
-            work_order.hold_started_at = None
-
-        work_order.is_on_hold = False
-        work_order.hold_reason = None
-        work_order.status = 'IN_PROGRESS'
-        work_order.save(update_fields=['hold_accumulated_seconds', 'hold_started_at', 'is_on_hold', 'hold_reason', 'status', 'updated_at'])
-
-        transition = HsmStageTransition.objects.create(
+        return HsmStageTransition.objects.create(
             tenant=work_order.tenant,
             work_order=work_order,
-            action_type='RESUME',
-            severity_assigned=work_order.severity_level,
-            reason=f"Tiếp tục thực hiện phiếu sau tạm hoãn. {notes}".strip(),
+            action_type='OVERRIDE',
+            severity_assigned=assigned_severity,
+            from_stage=original_severity,
+            to_stage=assigned_severity,
+            reason=f"Quản đốc can thiệp điều chỉnh phán quyết AI: {override_reason}".strip(),
             performed_by=user
         )
-        return transition

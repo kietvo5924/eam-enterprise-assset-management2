@@ -1,6 +1,9 @@
 from decimal import Decimal
 from rest_framework import serializers
-from workorders.models import WorkOrder, WorkOrderChecklistItem, WorkOrderAttachment, WorkOrderMaterial, WorkOrderCost
+from workorders.models import (
+    WorkOrder, WorkOrderChecklistItem, WorkOrderAttachment,
+    WorkOrderMaterial, WorkOrderCost, HsmStageTransition
+)
 from assets.serializers import AssetSerializer, SparePartSerializer
 from users.serializers import UserSerializer
 
@@ -69,6 +72,24 @@ class WorkOrderCostSerializer(serializers.ModelSerializer):
             'isCostFrozen', 'costFrozenAt'
         ]
 
+class HsmStageTransitionSerializer(serializers.ModelSerializer):
+    action = serializers.CharField(source='action_type', read_only=True)
+    actionType = serializers.CharField(source='action_type', read_only=True)
+    fromStage = serializers.CharField(source='from_stage', read_only=True)
+    toStage = serializers.CharField(source='to_stage', read_only=True)
+    performedByName = serializers.CharField(source='performed_by.username', read_only=True, default=None)
+    vibrationReading = serializers.FloatField(source='vibration_reading', read_only=True)
+    temperatureReading = serializers.FloatField(source='temperature_reading', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+
+    class Meta:
+        model = HsmStageTransition
+        fields = [
+            'id', 'action', 'actionType', 'fromStage', 'toStage',
+            'severity_assigned', 'reason', 'performed_by', 'performedByName',
+            'vibrationReading', 'temperatureReading', 'createdAt'
+        ]
+
 class WorkOrderSerializer(serializers.ModelSerializer):
     code = serializers.CharField(read_only=True)
     assetId = serializers.UUIDField(source='asset.id', read_only=True)
@@ -118,6 +139,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     holdAccumulatedSeconds = serializers.IntegerField(source='hold_accumulated_seconds', read_only=True)
     componentId = serializers.UUIDField(source='component.id', read_only=True, default=None)
     componentName = serializers.CharField(source='component.name', read_only=True, default=None)
+    hsmTransitions = HsmStageTransitionSerializer(source='hsm_transitions', many=True, read_only=True)
 
     class Meta:
         model = WorkOrder
@@ -136,6 +158,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
             'severityLevel', 'marginalBoundaryWarning', 'decisionPathExplanation',
             'overrideReason', 'isOnHold', 'holdReason', 'holdStartedAt',
             'holdAccumulatedSeconds', 'componentId', 'componentName',
+            'hsmTransitions',
             'created_at', 'updated_at',
             'assetType', 'asset', 'checklists', 'attachments', 'materials'
         ]
@@ -225,6 +248,7 @@ class WorkOrderChecklistItemRequestSerializer(serializers.Serializer):
     expected_value = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     isMandatory = serializers.BooleanField(required=False, allow_null=True)
     is_mandatory = serializers.BooleanField(required=False, allow_null=True)
+    stage = serializers.CharField(max_length=32, required=False, allow_blank=True, allow_null=True)
 
     def validate(self, attrs):
         item_id = attrs.get('id') or attrs.get('itemId')

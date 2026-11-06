@@ -2370,6 +2370,9 @@ def portal_work_orders(request):
                 if not check_perm(request, 'work_order:update'):
                     return JsonResponse({'success': False, 'error': 'Permission denied: work_order:update required'}, status=403)
                 item = WorkOrderChecklistItem.objects.get(id=data.get('item_id'), tenant_id=tenant_id)
+                wo = item.work_order
+                if item.is_mandatory and (wo.maintenance_action == 'CORE_REPLACEMENT' or getattr(wo, 'severity_level', None) == 'CRITICAL_OVERHAUL'):
+                    return JsonResponse({'success': False, 'error': 'Không thể xóa mục checklist bắt buộc của quy trình đại tu CORE_REPLACEMENT.'}, status=400)
                 item.delete()
             else:
                 if not check_perm(request, 'work_order:delete'):

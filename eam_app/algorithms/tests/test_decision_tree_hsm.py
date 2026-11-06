@@ -718,3 +718,434 @@ class DecisionTreeHsmWorkflowTests(TestCase):
         # Total elapsed is 5 hours, hold is 2 hours -> net duration should be 3.0 hours
         self.assertAlmostEqual(updated_wo.actual_duration_hours, 3.0, places=1)
         self.assertAlmostEqual(updated_wo.actual_duration_minutes, 180, delta=2)
+
+    # ------------------------------------------------------------------
+    # TC-HSM-16: Đánh giá khả năng phân loại đa chiều của Cây Quyết Định Chuyên Gia
+    # ------------------------------------------------------------------
+    def test_tc_hsm_16_expert_decision_tree_operational_modes(self):
+        """TC-HSM-16: Decision tree accurately classifies all expert maintenance modes without artificial bias."""
+        clf = DecisionTreeChecklistEngine.get_classifier()
+
+        # 1. Máy chạy êm, RUL dài nhưng có 2 lần bảo dưỡng định kỳ trước đó -> KHÔNG được báo đại tu giả tạo
+        pred_normal_routine = clf.predict([[0.5, 90.0, 0.05, 2]])[0]
+        self.assertEqual(pred_normal_routine, 0, "Thiết bị hoạt động êm ái không được phân loại nhầm thành CRITICAL_OVERHAUL")
+
+        # 2. Cảnh báo rung chấn nguy cấp Zone D (Z=2.85 >= 2.5) -> BẮT BUỘC ĐẠI TU
+        pred_crit_vib = clf.predict([[2.85, 45.0, 0.10, 0]])[0]
+        self.assertEqual(pred_crit_vib, 1, "Rung chấn Zone D (Z >= 2.5) phải phân loại CRITICAL_OVERHAUL")
+
+        # 3. Tuổi thọ cạn kiệt (RUL=7 ngày <= 15) -> BẮT BUỘC ĐẠI TU
+        pred_crit_rul = clf.predict([[1.0, 7.0, 0.10, 0]])[0]
+        self.assertEqual(pred_crit_rul, 1, "Tuổi thọ cạn kiệt (RUL <= 15) phải phân loại CRITICAL_OVERHAUL")
+
+        # 4. Tỷ lệ chi phí sửa chữa vượt ngưỡng nghiêm trọng (Cost ratio = 45% >= 35%) -> ĐẠI TU
+        pred_crit_cost = clf.predict([[1.5, 40.0, 0.45, 0]])[0]
+        self.assertEqual(pred_crit_cost, 1, "Chi phí sửa chữa vượt ngưỡng nghiêm trọng phải phân loại CRITICAL_OVERHAUL")
+
+        # 5. Các đặc trưng chủ đạo z_score, rul_days, cost_ratio đều có trọng số đóng góp
+        importances = dict(zip(['z_score', 'rul_days', 'cost_ratio', 'recurrence'], clf.feature_importances_))
+        self.assertGreater(importances['z_score'], 0.10)
+        self.assertGreater(importances['rul_days'], 0.10)
+        self.assertGreater(importances['cost_ratio'], 0.10)
+
+    # ------------------------------------------------------------------
+    # TC-HSM-17: Trích xuất đúng alert.z_score và asset.current_rul_days
+    # ------------------------------------------------------------------
+    def test_tc_hsm_17_alert_z_score_and_rul_extraction(self):
+        """TC-HSM-17: Engine extracts real alert.z_score and asset.current_rul_days (not non-existent metric_value)."""
+        self.asset.current_rul_days = 8.0
+        self.asset.save(update_fields=['current_rul_days'])
+
+        alert = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            metric_code='VIBRATION',
+            current_value=6.5,
+            z_score=3.4,
+            severity='CRITICAL'
+        )
+
+        res = DecisionTreeChecklistEngine.evaluate(alert=alert)
+        self.assertEqual(res['severity_level'], SEVERITY_CRITICAL_OVERHAUL)
+        self.assertEqual(res['recommended_action'], ACTION_CORE_REPLACEMENT)
+        self.assertIn('3.40', res['decision_path_explanation'])
+        self.assertIn('8.0', res['decision_path_explanation'])
+
+    # ------------------------------------------------------------------
+    # TC-HSM-18: Tính nhất quán của chuỗi giải thích IF-THEN
+    # ------------------------------------------------------------------
+    def test_tc_hsm_18_explanation_consistency(self):
+        """TC-HSM-18: Verify decision path explanation has no contradictory comparisons."""
+        exp = DecisionTreeChecklistEngine.generate_decision_explanation(
+            severity=SEVERITY_NORMAL,
+            z_score=2.1,
+            rul_days=25.0,
+            cost_ratio=0.10,
+            recurrence=0
+        )
+        self.assertNotIn("2.10 < 2.00", exp)
+        self.assertNotIn("25.0 > 30.0", exp)
+        self.assertIn("2.10", exp)
+        self.assertIn("25.0", exp)
+
+    # ------------------------------------------------------------------
+    # TC-HSM-19: Chặn số đo NaN, Infinity, số âm và đúng bằng ngưỡng 4.5
+    # ------------------------------------------------------------------
+    def test_tc_hsm_19_measurement_validation_nan_infinity_negative_boundary(self):
+        """TC-HSM-19: Reject NaN, Infinity, negative values, and equal to threshold (>= 4.5)."""
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Kiểm thử số đo bất thường',
+            status='IN_PROGRESS',
+            priority='HIGH',
+            maintenance_action=ACTION_CORE_REPLACEMENT,
+            severity_level=SEVERITY_CRITICAL_OVERHAUL,
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        self._create_attachment(wo)
+
+        chk = WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            item_name='Đo vận tốc rung hiệu dụng RMS (mm/s)',
+            stage=STAGE_TRIAL_ACCEPTANCE,
+            input_type='NUMBER',
+            expected_value='< 4.5',
+            actual_value='NaN',
+            is_mandatory=True,
+            is_completed=True
+        )
+
+        # 1. NaN rejected
+        with self.assertRaises(ValidationError) as ctx:
+            WorkOrderTransitionService.transition(wo, 'COMPLETED', self.user)
+        self.assertIn("NaN", str(ctx.exception))
+
+        # 2. Infinity rejected
+        chk.actual_value = 'Infinity'
+        chk.save()
+        with self.assertRaises(ValidationError) as ctx:
+            WorkOrderTransitionService.transition(wo, 'COMPLETED', self.user)
+        self.assertIn("Infinity", str(ctx.exception))
+
+        # 3. Negative rejected
+        chk.actual_value = '-2.5'
+        chk.save()
+        with self.assertRaises(ValidationError) as ctx:
+            WorkOrderTransitionService.transition(wo, 'COMPLETED', self.user)
+        self.assertIn("số âm", str(ctx.exception))
+
+        # 4. Exactly 4.5 rejected (< 4.5 strictly requires smaller)
+        chk.actual_value = '4.5'
+        chk.save()
+        with self.assertRaises(ValidationError) as ctx:
+            WorkOrderTransitionService.transition(wo, 'COMPLETED', self.user)
+        self.assertIn("vượt ngưỡng an toàn cho phép", str(ctx.exception))
+
+        # 5. Non-vibration sensor (e.g. cold storage temperature) CAN have valid negative values
+        chk.item_name = 'Nhiệt độ buồng lạnh kho bảo quản'
+        chk.expected_value = '< 0'
+        chk.actual_value = '-18.5'
+        chk.save()
+        # Should not raise "số âm" error for valid negative cold storage temperature
+        try:
+            WorkOrderTransitionService.complete_work_order(
+                work_order_id=wo.id,
+                user=self.user,
+                post_repair_data={'vibration': 2.1, 'temperature': -18.5}
+            )
+        except ValidationError as ex:
+            self.assertNotIn("số âm", str(ex))
+
+    # ------------------------------------------------------------------
+    # TC-HSM-20: Chặn hoàn thành CORE_REPLACEMENT khi không có checklist
+    # ------------------------------------------------------------------
+    def test_tc_hsm_20_cannot_complete_core_replacement_without_checklists(self):
+        """TC-HSM-20: complete_work_order fails if CORE_REPLACEMENT has 0 checklist items."""
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Đại tu thiếu checklist',
+            status='IN_PROGRESS',
+            priority='HIGH',
+            maintenance_action=ACTION_CORE_REPLACEMENT,
+            severity_level=SEVERITY_CRITICAL_OVERHAUL,
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        self._create_attachment(wo)
+
+        with self.assertRaises(ValidationError) as ctx:
+            WorkOrderTransitionService.transition(wo, 'COMPLETED', self.user)
+        self.assertIn("chưa có danh mục kiểm tra", str(ctx.exception))
+
+    # ------------------------------------------------------------------
+    # TC-HSM-21: Chặn xóa hoặc hạ cờ bắt buộc của checklist đại tu
+    # ------------------------------------------------------------------
+    def test_tc_hsm_21_prevent_deleting_or_demoting_mandatory_checklist(self):
+        """TC-HSM-21: Mandatory overhaul checklists cannot be deleted or set to non-mandatory."""
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Đại tu bảo vệ checklist',
+            status='IN_PROGRESS',
+            priority='HIGH',
+            maintenance_action=ACTION_CORE_REPLACEMENT,
+            severity_level=SEVERITY_CRITICAL_OVERHAUL,
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        chk = WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            item_name='Đo kiểm rung động nghiệm thu',
+            stage=STAGE_TRIAL_ACCEPTANCE,
+            input_type='NUMBER',
+            expected_value='< 4.5',
+            is_mandatory=True,
+            is_completed=False
+        )
+
+        # 1. Attempt to demote isMandatory to False via API
+        url = f'/api/v1/work-orders/{wo.id}/checklists'
+        res = self.client.post(url, data={'id': str(chk.id), 'itemName': chk.item_name, 'isMandatory': False}, format='json')
+        self.assertEqual(res.status_code, 400)
+        chk.refresh_from_db()
+        self.assertTrue(chk.is_mandatory)
+
+        # 2. Attempt to delete mandatory overhaul checklist via API
+        del_url = f'/api/v1/work-orders/{wo.id}/checklists/{chk.id}'
+        del_res = self.client.delete(del_url)
+        self.assertEqual(del_res.status_code, 400)
+        self.assertTrue(WorkOrderChecklistItem.objects.filter(id=chk.id).exists())
+
+    # ------------------------------------------------------------------
+    # TC-HSM-22: Rollback từ chối tác động lên phiếu đã COMPLETED hoặc CANCELLED
+    # ------------------------------------------------------------------
+    def test_tc_hsm_22_rollback_rejects_completed_or_cancelled_wo(self):
+        """TC-HSM-22: Rollback must reject COMPLETED or CANCELLED work orders to protect immutable data."""
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Phiếu đã hoàn thành',
+            status='COMPLETED',
+            maintenance_action=ACTION_CORE_REPLACEMENT,
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            DecisionTreeChecklistEngine.rollback_work_order(
+                wo, self.user, reason="Yêu cầu làm lại sau khi đã đóng phiếu bảo trì"
+            )
+        self.assertIn("Không thể Rollback phiếu đã hoàn thành", str(ctx.exception))
+
+        wo.status = 'CANCELLED'
+        wo.save(update_fields=['status'])
+        with self.assertRaises(ValidationError) as ctx2:
+            DecisionTreeChecklistEngine.rollback_work_order(
+                wo, self.user, reason="Yêu cầu làm lại sau khi đã hủy phiếu bảo trì"
+            )
+        self.assertIn("Không thể Rollback phiếu đã hủy", str(ctx2.exception))
+
+    # ------------------------------------------------------------------
+    # TC-HSM-23: Rollback chỉ revert Stage 3 & 4, bảo vệ Stage 1 & 2
+    # ------------------------------------------------------------------
+    def test_tc_hsm_23_rollback_preserves_stage_1_and_2_even_with_number_type(self):
+        """TC-HSM-23: Stage 1 & 2 checklists are never reverted by Rollback even if input_type='NUMBER'."""
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Đại tu máy bơm',
+            status='IN_PROGRESS',
+            maintenance_action=ACTION_CORE_REPLACEMENT,
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        # Stage 1 with NUMBER type (e.g. initial clearance measurement)
+        chk_diag = WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            item_name='Đo độ rơ ban đầu trước khi tháo rã (mm)',
+            stage=STAGE_DIAGNOSIS,
+            input_type='NUMBER',
+            actual_value='0.15',
+            is_completed=True,
+            is_mandatory=True
+        )
+        # Stage 3
+        chk_exec = WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            item_name='Thay thế cụm vòng bi',
+            stage=STAGE_OVERHAUL_EXECUTION,
+            is_completed=True,
+            is_mandatory=True
+        )
+        # Stage 4
+        chk_trial = WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            item_name='Đo rung chạy thử',
+            stage=STAGE_TRIAL_ACCEPTANCE,
+            input_type='NUMBER',
+            actual_value='5.5',
+            is_completed=True,
+            is_mandatory=True
+        )
+
+        DecisionTreeChecklistEngine.rollback_work_order(
+            wo, self.user,
+            reason="Vận tốc rung hiệu dụng đo được 5.5 mm/s vượt ngưỡng cho phép 4.5 mm/s"
+        )
+
+        chk_diag.refresh_from_db()
+        chk_exec.refresh_from_db()
+        chk_trial.refresh_from_db()
+
+        # Stage 1 MUST stay True
+        self.assertTrue(chk_diag.is_completed)
+        self.assertEqual(chk_diag.actual_value, '0.15')
+        # Stage 3 and 4 reverted to False
+        self.assertFalse(chk_exec.is_completed)
+        self.assertFalse(chk_trial.is_completed)
+
+    # ------------------------------------------------------------------
+    # TC-HSM-24: Hold và Resume đồng bộ trạng thái kỹ thuật viên
+    # ------------------------------------------------------------------
+    def test_tc_hsm_24_hold_and_resume_technician_sync(self):
+        """TC-HSM-24: HOLD releases technician to AVAILABLE; RESUME restores technician to BUSY."""
+        from users.models import TechnicianProfile
+        tech_profile, _ = TechnicianProfile.objects.get_or_create(
+            user=self.user,
+            tenant=self.tenant,
+            defaults={'availability_status': 'BUSY'}
+        )
+        tech_profile.availability_status = 'BUSY'
+        tech_profile.save()
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Phiếu đồng bộ thợ',
+            status='IN_PROGRESS',
+            asset=self.asset,
+            assigned_to=self.user
+        )
+
+        # Hold -> Tech becomes AVAILABLE
+        t_hold = DecisionTreeChecklistEngine.hold_work_order(wo, self.user, hold_reason='WAITING_PARTS')
+        tech_profile.refresh_from_db()
+        self.assertEqual(tech_profile.availability_status, 'AVAILABLE')
+        self.assertEqual(t_hold.from_stage, STAGE_OVERHAUL_EXECUTION)
+        self.assertEqual(t_hold.to_stage, 'ON_HOLD')
+
+        # Resume -> Tech becomes BUSY
+        t_resume = DecisionTreeChecklistEngine.resume_work_order(wo, self.user)
+        tech_profile.refresh_from_db()
+        self.assertEqual(tech_profile.availability_status, 'BUSY')
+        self.assertEqual(t_resume.from_stage, 'ON_HOLD')
+        self.assertEqual(t_resume.to_stage, STAGE_OVERHAUL_EXECUTION)
+
+    # ------------------------------------------------------------------
+    # TC-HSM-25: Phiếu bảo trì GENERAL không đóng nhầm cảnh báo khác của thiết bị
+    # ------------------------------------------------------------------
+    def test_tc_hsm_25_general_wo_does_not_close_unrelated_alerts(self):
+        """TC-HSM-25: Completing a GENERAL maintenance WO does not resolve unlinked open alerts on asset."""
+        unrelated_alert = AssetAnomalyAlert.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            metric_code='TEMPERATURE',
+            current_value=88.0,
+            status='OPEN',
+            severity='CRITICAL'
+        )
+
+        general_wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Bảo dưỡng thông thường (quét dọn bệ máy)',
+            status='IN_PROGRESS',
+            maintenance_action=ACTION_GENERAL,
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        self._create_attachment(general_wo)
+
+        WorkOrderChecklistItem.objects.create(
+            tenant=self.tenant,
+            work_order=general_wo,
+            item_name='Vệ sinh lau chùi',
+            is_mandatory=True,
+            is_completed=True
+        )
+
+        WorkOrderTransitionService.transition(general_wo, 'COMPLETED', self.user)
+
+        unrelated_alert.refresh_from_db()
+        # Must still be OPEN!
+        self.assertEqual(unrelated_alert.status, 'OPEN')
+
+    # ------------------------------------------------------------------
+    # TC-HSM-26: Chặn Resume khi kỹ thuật viên đang bận làm phiếu IN_PROGRESS khác
+    # ------------------------------------------------------------------
+    def test_tc_hsm_26_resume_fails_when_technician_is_busy_on_another_wo(self):
+        """TC-HSM-26: Reject Resume if assigned technician is busy on another IN_PROGRESS work order."""
+        from users.models import TechnicianProfile
+        tech_profile, _ = TechnicianProfile.objects.get_or_create(
+            user=self.user,
+            tenant=self.tenant,
+            defaults={'availability_status': 'AVAILABLE', 'is_on_duty': True}
+        )
+        tech_profile.availability_status = 'AVAILABLE'
+        tech_profile.is_on_duty = True
+        tech_profile.save()
+
+        # WO1 bị tạm hoãn
+        wo1 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Phiếu đại tu tạm hoãn WO1',
+            status='IN_PROGRESS',
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        DecisionTreeChecklistEngine.hold_work_order(wo1, self.user, hold_reason='WAITING_PARTS')
+
+        # Trong lúc đó thợ được gán và đang làm WO2
+        wo2 = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Phiếu sửa chữa đột xuất WO2',
+            status='IN_PROGRESS',
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        tech_profile.availability_status = 'BUSY'
+        tech_profile.save()
+
+        # Thử Resume WO1 -> Phải từ chối vì thợ đang bận làm WO2 (chống double-assignment)
+        with self.assertRaises(ValidationError) as ctx:
+            DecisionTreeChecklistEngine.resume_work_order(wo1, self.user)
+        self.assertIn("đang thực hiện phiếu công việc khác", str(ctx.exception))
+
+    # ------------------------------------------------------------------
+    # TC-HSM-27: Chặn Resume khi kỹ thuật viên đang nghỉ phép hoặc ngoài ca trực
+    # ------------------------------------------------------------------
+    def test_tc_hsm_27_resume_fails_when_technician_is_on_leave(self):
+        """TC-HSM-27: Reject Resume if assigned technician is ON_LEAVE or off-duty."""
+        from users.models import TechnicianProfile
+        tech_profile, _ = TechnicianProfile.objects.get_or_create(
+            user=self.user,
+            tenant=self.tenant,
+            defaults={'availability_status': 'AVAILABLE', 'is_on_duty': True}
+        )
+
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            title='Phiếu tạm hoãn chờ thợ hết phép',
+            status='IN_PROGRESS',
+            asset=self.asset,
+            assigned_to=self.user
+        )
+        DecisionTreeChecklistEngine.hold_work_order(wo, self.user, hold_reason='WAITING_PARTS')
+
+        # Thợ xin nghỉ phép
+        tech_profile.availability_status = 'ON_LEAVE'
+        tech_profile.save()
+
+        with self.assertRaises(ValidationError) as ctx:
+            DecisionTreeChecklistEngine.resume_work_order(wo, self.user)
+        self.assertIn("đang nghỉ phép", str(ctx.exception))

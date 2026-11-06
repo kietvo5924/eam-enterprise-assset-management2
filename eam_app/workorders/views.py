@@ -138,21 +138,54 @@ class WorkOrderListView(APIView):
         from workorders.models import WorkOrderChecklistItem, WorkOrderMaterial
         from assets.models import SparePart
         from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
+        from algorithms.decision_tree_hsm.constants import (
+            STAGE_DIAGNOSIS, STAGE_STAGING_PARTS,
+            STAGE_OVERHAUL_EXECUTION, STAGE_TRIAL_ACCEPTANCE
+        )
         
         checklists = data.get('checklists', [])
         if checklists:
             for pc in checklists:
                 WorkOrderChecklistItem.objects.create(
                     work_order=wo,
-                    item_name=pc.get('itemName'),
-                    input_type=pc.get('inputType', 'PASS_FAIL'),
-                    expected_value=pc.get('expectedValue'),
-                    is_mandatory=pc.get('isMandatory', False),
+                    item_name=pc.get('itemName') or pc.get('item_name'),
+                    input_type=pc.get('inputType') or pc.get('input_type') or 'PASS_FAIL',
+                    expected_value=pc.get('expectedValue') or pc.get('expected_value'),
+                    is_mandatory=pc.get('isMandatory') if 'isMandatory' in pc else pc.get('is_mandatory', False),
                     stage=pc.get('stage'),
                     is_completed=False
                 )
-        elif wo.maintenance_action == 'CORE_REPLACEMENT' or wo.severity_level == 'CRITICAL_OVERHAUL':
-            DecisionTreeChecklistEngine.apply_overhaul_checklist(wo)
+
+        # Đảm bảo phiếu đại tu CORE_REPLACEMENT luôn có đủ 4 giai đoạn chuẩn
+        is_overhaul = (wo.maintenance_action == 'CORE_REPLACEMENT' or wo.severity_level == 'CRITICAL_OVERHAUL')
+        if is_overhaul:
+            required_stages = {STAGE_DIAGNOSIS, STAGE_STAGING_PARTS, STAGE_OVERHAUL_EXECUTION, STAGE_TRIAL_ACCEPTANCE}
+            existing_stages = set(wo.checklists.values_list('stage', flat=True))
+            if not checklists:
+                DecisionTreeChecklistEngine.apply_overhaul_checklist(wo, user=request.user)
+            elif (required_stages - existing_stages):
+                templates = DecisionTreeChecklistEngine.get_overhaul_checklist_templates(asset_obj)
+                for t in templates:
+                    if not wo.checklists.filter(stage=t['stage']).exists():
+                        WorkOrderChecklistItem.objects.create(
+                            work_order=wo,
+                            item_name=t['itemName'],
+                            input_type=t['inputType'],
+                            expected_value=t['expectedValue'],
+                            is_mandatory=t['isMandatory'],
+                            stage=t['stage'],
+                            is_completed=False
+                        )
+
+        # Audit trail nếu người dùng ghi nhận overrideReason
+        if data.get('overrideReason'):
+            DecisionTreeChecklistEngine.record_override(
+                work_order=wo,
+                user=request.user,
+                original_severity='CRITICAL_OVERHAUL' if wo.severity_level != 'CRITICAL_OVERHAUL' else 'NORMAL_MAINTENANCE',
+                assigned_severity=wo.severity_level or 'NORMAL_MAINTENANCE',
+                override_reason=data['overrideReason']
+            )
             
         # Save Materials and Deduct Inventory with select_for_update to avoid race conditions
         materials = data.get('materials', [])
@@ -466,6 +499,8 @@ class WorkOrderStatusView(APIView):
                 from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
                 r_notes = data.get('notes') or request.data.get('notes') or ''
                 DecisionTreeChecklistEngine.resume_work_order(wo, request.user, r_notes)
+                wo.refresh_from_db()
+                return success_response(WorkOrderSerializer(wo).data)
             else:
                 # Phase 11.7: Cổng 1 - Khóa 15 phút điểm danh sinh trắc học & định vị hiện trường khi BẮT ĐẦU
                 from algorithms.biometric.gatekeeper import verify_start_work_order_gate
@@ -501,11 +536,6 @@ class WorkOrderStatusView(APIView):
         if new_status == 'ON_HOLD':
             if wo.status != 'IN_PROGRESS':
                 raise ValidationError('Chỉ có thể tạm dừng phiếu đang thực hiện (IN_PROGRESS)')
-            assigned_user = wo.assigned_to or request.user
-            if hasattr(assigned_user, 'technician_profile'):
-                tp = assigned_user.technician_profile
-                tp.availability_status = 'AVAILABLE'
-                tp.save()
             from algorithms.decision_tree_hsm import DecisionTreeChecklistEngine
             h_reason = data.get('holdReason') or data.get('hold_reason') or request.data.get('holdReason') or request.data.get('hold_reason') or 'WAITING_PARTS'
             h_notes = data.get('notes') or request.data.get('notes') or ''
@@ -515,6 +545,8 @@ class WorkOrderStatusView(APIView):
                 hold_reason=h_reason,
                 notes=h_notes
             )
+            wo.refresh_from_db()
+            return success_response(WorkOrderSerializer(wo).data)
             
         if new_status == 'COMPLETED':
             if wo.assigned_to_id != request.user.id and not has_upd:
@@ -711,15 +743,20 @@ class WorkOrderChecklistView(APIView):
                 item_name=item_name,
                 is_mandatory=data.get('isMandatory', False),
                 input_type=data.get('inputType', 'PASS_FAIL'),
-                expected_value=data.get('expectedValue')
+                expected_value=data.get('expectedValue'),
+                stage=data.get('stage')
             )
         else:
             if 'inputType' in data:
                 item.input_type = data['inputType']
             if 'expectedValue' in data:
                 item.expected_value = data['expectedValue']
-            if 'isMandatory' in data:
+            if 'isMandatory' in data and data['isMandatory'] is not None:
+                if item.is_mandatory and data['isMandatory'] is False and (wo.maintenance_action == 'CORE_REPLACEMENT' or wo.severity_level == 'CRITICAL_OVERHAUL'):
+                    raise ValidationError("Không thể chuyển mục checklist bắt buộc của quy trình đại tu CORE_REPLACEMENT thành không bắt buộc.")
                 item.is_mandatory = data['isMandatory']
+            if 'stage' in data and data['stage']:
+                item.stage = data['stage']
             
         is_completed = data.get('isCompleted', item.is_completed)
         actual_val = data.get('actualValue', item.actual_value)
@@ -842,6 +879,8 @@ class WorkOrderChecklistDeleteView(APIView):
             item = WorkOrderChecklistItem.objects.filter(item_name=str(checklist_id), work_order=wo).first()
 
         if item:
+            if item.is_mandatory and (wo.maintenance_action == 'CORE_REPLACEMENT' or wo.severity_level == 'CRITICAL_OVERHAUL'):
+                raise ValidationError("Không thể xóa mục checklist bắt buộc trong quy trình đại tu cốt lõi (CORE_REPLACEMENT).")
             item.delete()
             return success_response(None)
             

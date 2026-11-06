@@ -107,6 +107,15 @@ class WorkOrderTransitionService:
             raise ValidationError("Work Order can only be completed from IN_PROGRESS state")
 
         # 3. Check mandatory checklist items & number validation
+        is_hsm_overhaul = (
+            wo.severity_level == 'CRITICAL_OVERHAUL' or
+            (wo.maintenance_action == 'CORE_REPLACEMENT' and wo.checklists.filter(stage__isnull=False).exists())
+        )
+        if (wo.severity_level == 'CRITICAL_OVERHAUL') and not wo.checklists.exists():
+            raise ValidationError("Không thể hoàn thành phiếu đại tu (CORE_REPLACEMENT): Phiếu chưa có danh mục kiểm tra (Checklist) quy trình.")
+
+        import math
+
         for item in wo.checklists.all():
             if item.is_mandatory:
                 if not item.is_completed:
@@ -120,16 +129,55 @@ class WorkOrderTransitionService:
                     except ValueError:
                         raise ValidationError(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' phải là một số hợp lệ.")
 
+                    if math.isnan(num_val) or math.isinf(num_val):
+                        raise ValidationError(f"Không thể hoàn thành: Số liệu đo kiểm của mục '{item.item_name}' không được là NaN hoặc Infinity.")
+
+                    # Chỉ cấm số âm đối với các phép đo độ rung (vibration RMS mm/s) theo ISO 10816
+                    is_vibration = any(w in item.item_name.lower() for w in ['rung', 'vibration', 'rms'])
+                    if is_vibration and num_val < 0.0:
+                        raise ValidationError(f"Không thể hoàn thành: Độ rung của mục '{item.item_name}' không được là số âm ({num_val}).")
+
                     if item.expected_value:
                         exp_clean = item.expected_value.strip()
-                        if exp_clean.startswith('<') or exp_clean.startswith('<='):
+                        if exp_clean.startswith('<='):
                             try:
-                                threshold = float(exp_clean.lstrip('<=').strip())
+                                threshold = float(exp_clean[2:].strip())
                                 if num_val > threshold:
                                     raise ValidationError(
                                         f"Không thể hoàn thành: Giá trị đo '{item.item_name}' ({num_val}) "
                                         f"vượt ngưỡng an toàn cho phép ({item.expected_value}). "
                                         f"Vui lòng thực hiện Lùi bước (Rollback) để căn chỉnh lại."
+                                    )
+                            except (ValueError, TypeError):
+                                pass
+                        elif exp_clean.startswith('<'):
+                            try:
+                                threshold = float(exp_clean[1:].strip())
+                                if num_val >= threshold:
+                                    raise ValidationError(
+                                        f"Không thể hoàn thành: Giá trị đo '{item.item_name}' ({num_val}) "
+                                        f"vượt ngưỡng an toàn cho phép ({item.expected_value}). "
+                                        f"Vui lòng thực hiện Lùi bước (Rollback) để căn chỉnh lại."
+                                    )
+                            except (ValueError, TypeError):
+                                pass
+                        elif exp_clean.startswith('>='):
+                            try:
+                                threshold = float(exp_clean[2:].strip())
+                                if num_val < threshold:
+                                    raise ValidationError(
+                                        f"Không thể hoàn thành: Giá trị đo '{item.item_name}' ({num_val}) "
+                                        f"chưa đạt ngưỡng tối thiểu ({item.expected_value})."
+                                    )
+                            except (ValueError, TypeError):
+                                pass
+                        elif exp_clean.startswith('>'):
+                            try:
+                                threshold = float(exp_clean[1:].strip())
+                                if num_val <= threshold:
+                                    raise ValidationError(
+                                        f"Không thể hoàn thành: Giá trị đo '{item.item_name}' ({num_val}) "
+                                        f"chưa đạt ngưỡng tối thiểu ({item.expected_value})."
                                     )
                             except (ValueError, TypeError):
                                 pass
@@ -165,14 +213,24 @@ class WorkOrderTransitionService:
         if post_repair_data and isinstance(post_repair_data, dict):
             if 'vibration' in post_repair_data and post_repair_data['vibration'] is not None:
                 vib_f = float(post_repair_data['vibration'])
-                if vib_f > 4.5 and wo.maintenance_action == 'CORE_REPLACEMENT':
+                if math.isnan(vib_f) or math.isinf(vib_f) or vib_f < 0.0:
+                    raise ValidationError("Độ rung nghiệm thu sau sửa chữa không hợp lệ (NaN, Infinity hoặc âm).")
+                if vib_f >= 4.5 and wo.maintenance_action == 'CORE_REPLACEMENT':
                     raise ValidationError(
                         f"Không thể hoàn thành: Độ rung nghiệm thu sau sửa chữa ({vib_f} mm/s) vượt ngưỡng an toàn cho phép (<= 4.5 mm/s theo ISO 10816). "
                         f"Vui lòng thực hiện Lùi bước (Rollback) để căn chỉnh lại."
                     )
                 wo.post_repair_vibration = vib_f
             if 'temperature' in post_repair_data and post_repair_data['temperature'] is not None:
-                wo.post_repair_temperature = float(post_repair_data['temperature'])
+                temp_f = float(post_repair_data['temperature'])
+                if math.isnan(temp_f) or math.isinf(temp_f):
+                    raise ValidationError("Nhiệt độ nghiệm thu sau sửa chữa không hợp lệ (NaN hoặc Infinity).")
+                if temp_f >= 75.0 and wo.maintenance_action == 'CORE_REPLACEMENT':
+                    raise ValidationError(
+                        f"Không thể hoàn thành: Nhiệt độ nghiệm thu sau sửa chữa ({temp_f} °C) vượt ngưỡng an toàn cho phép (< 75.0 °C). "
+                        f"Vui lòng thực hiện Lùi bước (Rollback) để căn chỉnh lại."
+                    )
+                wo.post_repair_temperature = temp_f
             if 'load_factor' in post_repair_data and post_repair_data['load_factor'] is not None:
                 wo.post_repair_load_factor = float(post_repair_data['load_factor'])
 
@@ -225,16 +283,27 @@ class WorkOrderTransitionService:
 
         # 10. Đóng vòng đời AssetAnomalyAlert
         if wo.asset_id:
-            AssetAnomalyAlert.objects.filter(
-                asset_id=wo.asset_id,
-                status__in=['OPEN', 'ACKNOWLEDGED', 'ACTIVE'],
-                created_at__lte=now
-            ).filter(
-                Q(draft_work_order=wo) | Q(draft_work_order__isnull=True)
-            ).update(
-                status='RESOLVED',
-                message='Đã tự động giải quyết sau khi hoàn thành đại tu bổ máy'
-            )
+            if wo.maintenance_action == 'CORE_REPLACEMENT':
+                AssetAnomalyAlert.objects.filter(
+                    asset_id=wo.asset_id,
+                    status__in=['OPEN', 'ACKNOWLEDGED', 'ACTIVE'],
+                    created_at__lte=now
+                ).filter(
+                    Q(draft_work_order=wo) | Q(draft_work_order__isnull=True)
+                ).update(
+                    status='RESOLVED',
+                    message='Đã tự động giải quyết sau khi hoàn thành đại tu bổ máy'
+                )
+            else:
+                # Phiếu bảo trì thông thường chỉ đóng cảnh báo đích danh liên kết với phiếu này
+                AssetAnomalyAlert.objects.filter(
+                    asset_id=wo.asset_id,
+                    status__in=['OPEN', 'ACKNOWLEDGED', 'ACTIVE'],
+                    draft_work_order=wo
+                ).update(
+                    status='RESOLVED',
+                    message=f'Đã tự động giải quyết sau khi hoàn thành công việc bảo trì {wo.code}'
+                )
 
         # 11. Task 11.6: Đóng băng bất biến snapshot chi phí và phân tách Gross vs Net Cost (Atomic)
         from algorithms.cost_forecasting import CostForecastingService

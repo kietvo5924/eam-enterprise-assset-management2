@@ -14,20 +14,25 @@ Trong nhà xưởng công nghiệp nặng, khi một thiết bị dừng đột 
 - Kỹ thuật viên hiện trường thường mô tả sự cố bằng tiếng lóng hoặc từ tượng thanh dân dã (*"máy kêu lạch cạch"*, *"chết heo"*, *"tụ bị phù"*), trong khi tài liệu của hãng lại dùng thuật ngữ hàn lâm (*"Cavitation"*, *"Harmonic Distortion"*).
 - **Rủi ro chí mạng**: Thao tác sai quy trình xả áp lực hoặc đọc nhầm tài liệu của máy đời khác có thể gây nổ bình tích áp, chập điện hoặc phá hỏng máy móc đắt tiền.
 
-### 1.2. Vai Trò Của Trợ Lý Kỹ Thuật RAG Chuyên Biệt
-Trợ lý RAG đóng vai trò là "Kỹ sư trưởng ảo" đồng hành cùng người thợ tại chân máy:
-- Kỹ thuật viên chụp mã QR trên máy hoặc mở phiếu Work Order, đặt câu hỏi bằng văn bản hoặc giọng nói tiếng Việt.
-- Hệ thống tự động dịch thuật ngữ dân dã, truy xuất song song tài liệu hãng và lịch sử mẹo sửa chữa thực tế của nhà máy, hiển thị quy trình từng bước chuẩn xác kèm bản vẽ sơ đồ, đồng thời kiểm tra ngay trong kho còn đồ nghề và phụ tùng thay thế hay không.
+### 1.2. Vai Trò Kép Của Trợ Lý Thông Minh AI RAG
+Trợ lý RAG đóng hai vai trò chiến lược đồng hành cùng người dùng trên cả Web Portal và Ứng dụng Di động:
+1. **Trợ lý Kỹ thuật Bảo trì Hiện trường (Field Maintenance Assistant)**: Đồng hành cùng kỹ thuật viên tại chân máy. Kỹ thuật viên quét mã QR trên máy hoặc mở phiếu Work Order, đặt câu hỏi bằng văn bản tiếng Việt. Hệ thống tự động dịch thuật ngữ tiếng lóng dân dã, truy xuất song song tài liệu hãng và lịch sử mẹo sửa chữa thực tế của nhà máy, hiển thị quy trình từng bước chuẩn xác kèm bản vẽ sơ đồ, đồng thời kiểm tra ngay trong kho còn đồ nghề và phụ tùng thay thế hay không.
+2. **Trợ lý Hướng dẫn Sử dụng Hệ thống Web & Mobile (System Feature & Navigation Guide)**: Hướng dẫn người dùng thao tác trên phần mềm EAM, giải thích ý nghĩa các nút bấm, các luồng chức năng (ví dụ: *"Nút này dùng để làm gì?"*, *"Cách tạo phiếu bảo trì đột xuất"*, *"Xem báo cáo KPI ở đâu?"*, *"Quy trình phê duyệt vật tư"*). Người dùng không còn bị bỡ ngỡ khi tiếp cận hệ thống mới.
 
 ---
 
 ## 2. Ràng Buộc Kế Thừa Hệ Thống (Existing System Constraints & Codebase Reuse)
 
-- **Tái Sử Dụng Mô Hình Multi-Tenancy**: Mọi tài liệu kỹ thuật, đoạn văn bản vector hóa và tri thức kinh nghiệm kế thừa `BaseTenantModel`, bảo đảm phân lập hoàn toàn giữa các Tenant qua `TenantManager`.
+- **Cơ Chế Phân Lập Đa Khách Hàng Kết Hợp Tri Thức Dùng Chung (Hybrid Multi-Tenancy & Global Knowledge)**:
+  - **Tri thức thiết bị & nhà xưởng (Tenant-Isolated Knowledge)**: Mọi tài liệu kỹ thuật OEM, đoạn văn bản vector hóa thiết bị, lịch sử Work Order và tri thức kinh nghiệm sửa chữa kế thừa `BaseTenantModel`, bảo đảm phân lập hoàn toàn giữa các Tenant qua `TenantManager`.
+  - **Tri thức hướng dẫn sử dụng hệ thống EAM (Global System Guide / App Navigation)**: Các hướng dẫn sử dụng giao diện Web/Mobile, định nghĩa nút bấm và luồng thao tác phần mềm được lưu trữ ở cấp độ hệ thống (**GLOBAL / Cross-Tenant**, `tenant_id IS NULL` hoặc `is_system_guide = TRUE`), **hoàn toàn KHÔNG cần chia tenant**, áp dụng chung cho mọi khách hàng/tenant trong hệ thống.
 - **Tái Sử Dụng Thực Thể Nghiệp Vụ Có Sẵn**:
   - `Asset`: Tự động tiêm ngữ cảnh mã máy (`model`, `manufacturer`, `serial_number`, `manufacture_year`) vào bộ lọc cứng của PGVector.
   - `WorkOrder`: Vector hóa toàn bộ các ghi chú giải quyết sự cố (`resolution_notes`) của các phiếu đã hoàn thành để biến thành nguồn tri thức ngầm; hỗ trợ nút tạo nhanh bản thảo Work Order từ đoạn chat.
   - `SparePart`: Liên kết trực tiếp kiểm tra tồn kho và vị trí kệ chứa của các phụ tùng được nhắc tới trong quy trình.
+- **Vị Trí Phân Hệ Quản Trị Tri Thức (Admin Knowledge Hub Placement)**:
+  - Trang quản trị tri thức trợ lý AI được tích hợp tại **phân hệ Admin**, nằm ngay tại khu vực bên dưới mục Cài đặt (Settings) chung (đường dẫn `/admin/rag-knowledge/`).
+  - Người dùng có quyền quản trị cài đặt hệ thống (`can_manage_settings` hoặc vai trò `ADMIN`, `CHIEF_ENGINEER`) sẽ có toàn quyền bổ sung câu hỏi - trả lời mẫu (Curated Q&A), duyệt hàng đợi phản hồi của thợ và quản lý thư viện tài liệu.
 - **Bảo Mật Dữ Liệu Công Nghệ (On-Premises LLM)**: Tuyệt đối không gửi tài liệu bí mật công nghệ hoặc dữ liệu vận hành nhà máy lên các API đám mây công cộng (OpenAI, Claude, v.v.). Hệ thống bắt buộc chạy mô hình mã nguồn mở trên máy chủ nội bộ thông qua dịch vụ Ollama cục bộ (`temperature = 0.1`).
 - **Kiến Trúc Đóng Gói Module Giải Thuật (Dedicated Algorithms Package)**: Toàn bộ mã nguồn trợ lý kỹ thuật AI RAG (bộ lọc ngắt an toàn sinh mạng Emergency Interceptor, kiểm định mâu thuẫn phủ định Negation Contradiction Check, pipeline sinh embeddings và truy xuất PGVector đa nguồn, client kết nối Ollama on-premises, và bộ lọc tiếng lóng chuyên ngành bảo trì) **bắt buộc phải được đặt trong thư mục riêng biệt `eam_app/algorithms/rag_chatbot/`** (vẫn nằm trong source backend). Tách biệt hoàn toàn tầng giải thuật AI RAG khỏi các tầng controller/CRUD thông thường.
 
@@ -184,11 +189,17 @@ Kỹ thuật viên đặt câu hỏi (Giọng nói Speech-to-Text hoặc Gõ ch�
 
 ## 5. Quy Tắc Bảo Mật, Phân Quyền & Đa Khách Hàng (Security, RBAC & Multi-Tenant Rules)
 
-- **Cô Lập Đa Khách Hàng (Multi-Tenancy)**: Mọi tài liệu PDF, đoạn vector và tri thức kiểm duyệt phân lập tuyệt đối theo `tenant_id`.
+- **Cơ Chế Phân Lập Đa Khách Hàng & Tri Thức Toàn Cục (Hybrid Multi-Tenancy & Global System Knowledge)**:
+  - **Tri thức thiết bị & xưởng (Tenant-Isolated)**: Mọi tài liệu PDF của hãng, đoạn vector của thiết bị, lịch sử Work Order và tri thức thẩm định máy móc bắt buộc phân lập tuyệt đối theo `tenant_id`.
+  - **Tri thức hướng dẫn sử dụng phần mềm Web & Mobile (Global Cross-Tenant)**: Toàn bộ cẩm nang hướng dẫn thao tác tính năng, giải thích công dụng các nút bấm và luồng nghiệp vụ phần mềm EAM được gắn cờ `is_system_guide = TRUE` (`tenant_id = NULL`), cho phép mọi người dùng thuộc bất kỳ Tenant nào cũng có thể tra cứu bình đẳng mà không bị rào cản Tenant ngăn cách.
 - **Ma Trận Phân Quyền (RBAC)**:
-  - `TECHNICIAN`: Đặt câu hỏi, xem bản vẽ trích dẫn, bấm nút tạo nhanh bản thảo Work Order, bấm 👍/👎.
-  - `CHIEF_ENGINEER` / `MAINTENANCE_MANAGER`: Quyền duyệt câu trả lời mẫu trong hàng đợi Curation Queue, tải lên tài liệu OEM mới, phân bổ dải năm sản xuất áp dụng.
-  - `SAFETY_OFFICER`: Kiểm tra và cập nhật danh mục từ khóa nguy hiểm ngắt khẩn cấp.
+  - `TECHNICIAN` / `OPERATOR`: Mở widget chat nổi (FAB), đặt câu hỏi kỹ thuật máy móc hoặc hỏi cách dùng phần mềm, xem sơ đồ kỹ thuật, bấm 1-chạm tạo bản thảo Work Order, gửi đánh giá 👍/👎.
+  - `ADMIN` / `SETTINGS_MANAGER` (Người có quyền quản trị cài đặt `can_manage_settings`): Có toàn quyền truy cập trang **Quản trị Tri thức Trợ lý Kỹ thuật & RAG Q&A** nằm trong phân hệ Admin (khu vực bên dưới mục Cài đặt chung) để:
+    - Thêm / sửa / xóa các cặp câu hỏi - trả lời mẫu (Curated Q&A), bao gồm cả Q&A máy móc và Q&A hướng dẫn sử dụng phần mềm Web/Mobile.
+    - Duyệt hàng đợi phản hồi của thợ (Curation Queue) khi nhận đánh giá 👎 để nâng cấp thành câu trả lời vàng.
+    - Tải lên tài liệu kỹ thuật OEM mới và kích hoạt re-indexing PGVector.
+  - `CHIEF_ENGINEER` / `MAINTENANCE_MANAGER`: Quyền chuyên môn phê duyệt câu trả lời chuẩn trong hàng đợi Curation Queue, thẩm định các quy trình bảo dưỡng và cấu hình dải năm/sê-ri máy áp dụng.
+  - `SAFETY_OFFICER`: Kiểm tra, tinh chỉnh và cập nhật danh mục từ khóa an toàn nguy hiểm ngắt khẩn cấp E-Stop.
 
 ---
 
@@ -197,7 +208,9 @@ Kỹ thuật viên đặt câu hỏi (Giọng nói Speech-to-Text hoặc Gõ ch�
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        GIAO DIỆN NGƯỜI DÙNG                            │
-│     Web Portal (Widget nổi góc dưới)  │  Flutter App (Giọng nói & Chữ) │
+│  Web Portal (Nút tròn nổi FAB góc phải) │  Flutter App (Nút tròn nổi FAB) │
+│  - Popup Chat Drawer $400 \times 620$px │  - Modal Bottom Sheet trượt lên │
+│  - Tự động nhận biết ngữ cảnh trang     │  - Nút gợi ý 1-chạm (Quick Chips)│
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ POST /api/v1/assistant/chat/
                                     ▼
@@ -209,6 +222,7 @@ Kỹ thuật viên đặt câu hỏi (Giọng nói Speech-to-Text hoặc Gõ ch�
 │  │ 2. Bộ biến đổi câu hỏi tiếng lóng (Query Expansion / Thesaurus)  │  │
 │  ├──────────────────────────────────────────────────────────────────┤  │
 │  │ 3. Động cơ truy xuất song luồng PGVector (OEM + Tacit History)   │  │
+│  │    • Phân luồng: Tri thức thiết bị (Tenant) & Hướng dẫn (Global)  │  │
 │  │    • Lọc cứng: tenant + model + year + serial range              │  │
 │  │    • Truy xuất Parent-Child: Nạp trọn vẹn Chương cha             │  │
 │  ├──────────────────────────────────────────────────────────────────┤  │
@@ -232,14 +246,16 @@ Kỹ thuật viên đặt câu hỏi (Giọng nói Speech-to-Text hoặc Gõ ch�
 
 ## 7. Mô Hình Dữ Liệu & Thực Thể (Data Model & Schema)
 
-### 7.1. Bảng `technical_documents` (Tài liệu kỹ thuật OEM gốc)
+### 7.1. Bảng `technical_documents` (Tài liệu kỹ thuật OEM gốc & Hướng dẫn hệ thống)
 ```sql
 CREATE TABLE technical_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  tenant_id UUID NULL REFERENCES tenants(id), -- NULL nếu là tài liệu hướng dẫn phần mềm dùng chung toàn hệ thống
+  is_system_guide BOOLEAN NOT NULL DEFAULT FALSE, -- TRUE: Cẩm nang hướng dẫn sử dụng phần mềm Web/Mobile (Global)
+  category VARCHAR(32) NOT NULL DEFAULT 'OEM_MANUAL', -- 'OEM_MANUAL', 'SYSTEM_SOFTWARE_GUIDE'
   title VARCHAR(255) NOT NULL,
-  file_path VARCHAR(500) NOT NULL, -- Đường dẫn MinIO
-  applicable_model VARCHAR(100) NOT NULL, -- Model thiết bị
+  file_path VARCHAR(500) NOT NULL, -- Đường dẫn MinIO hoặc tệp nội bộ
+  applicable_model VARCHAR(100) NULL, -- Model thiết bị (NULL nếu là hướng dẫn hệ thống)
   applicable_year_start INT NOT NULL DEFAULT 1900,
   applicable_year_end INT NOT NULL DEFAULT 2100,
   serial_number_prefix VARCHAR(50) NULL,
@@ -248,15 +264,17 @@ CREATE TABLE technical_documents (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_doc_tenant_model ON technical_documents(tenant_id, applicable_model, is_active);
+CREATE INDEX idx_doc_system_guide ON technical_documents(is_system_guide, is_active);
 ```
 
 ### 7.2. Bảng `document_chunks` (Đoạn văn bản, Vector 384d & Neo hình ảnh)
 ```sql
 CREATE TABLE document_chunks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  tenant_id UUID NULL REFERENCES tenants(id), -- NULL đối với tri thức toàn cục
+  is_system_guide BOOLEAN NOT NULL DEFAULT FALSE,
   document_id UUID NULL REFERENCES technical_documents(id) ON DELETE CASCADE,
-  source_type VARCHAR(32) NOT NULL DEFAULT 'OEM_MANUAL', -- 'OEM_MANUAL', 'TACIT_WORK_ORDER', 'CURATED_QA'
+  source_type VARCHAR(32) NOT NULL DEFAULT 'OEM_MANUAL', -- 'OEM_MANUAL', 'TACIT_WORK_ORDER', 'CURATED_QA', 'SYSTEM_GUIDE'
   work_order_id UUID NULL REFERENCES work_orders(id) ON DELETE SET NULL,
   content TEXT NOT NULL, -- Child Chunk
   parent_content TEXT NOT NULL, -- Parent Section hoàn chỉnh
@@ -273,21 +291,25 @@ USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
 CREATE INDEX idx_chunk_tenant_source ON document_chunks(tenant_id, source_type, is_active);
+CREATE INDEX idx_chunk_system_guide ON document_chunks(is_system_guide, is_active);
 ```
 
-### 7.3. Bảng `curated_qa_knowledge` (Tri thức thẩm định của Kỹ sư trưởng)
+### 7.3. Bảng `curated_qa_knowledge` (Tri thức thẩm định của Kỹ sư trưởng & Hướng dẫn phần mềm)
 ```sql
 CREATE TABLE curated_qa_knowledge (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID NOT NULL REFERENCES tenants(id),
+  tenant_id UUID NULL REFERENCES tenants(id), -- NULL nếu là tri thức dùng chung cho toàn bộ tenant
+  is_system_guide BOOLEAN NOT NULL DEFAULT FALSE, -- TRUE: Hướng dẫn chức năng phần mềm Web/Mobile
+  category VARCHAR(32) NOT NULL DEFAULT 'EQUIPMENT_MAINTENANCE', -- 'EQUIPMENT_MAINTENANCE', 'SYSTEM_FEATURE_GUIDE'
   question_pattern TEXT NOT NULL,
   gold_answer TEXT NOT NULL,
-  applicable_model VARCHAR(100) NOT NULL,
+  applicable_model VARCHAR(100) NULL, -- NULL nếu là hướng dẫn tính năng phần mềm
   approved_by UUID NOT NULL REFERENCES users(id),
   upvote_count INT DEFAULT 0,
   downvote_count INT DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_curated_tenant_cat ON curated_qa_knowledge(tenant_id, category, is_system_guide);
 ```
 
 ---
@@ -296,16 +318,22 @@ CREATE TABLE curated_qa_knowledge (
 
 ### Danh Mục Endpoints:
 
-| Phương Thức | Đường Dẫn | Chức Năng |
-| :--- | :--- | :--- |
-| `POST` | `/api/v1/assistant/chat/` | Gửi câu hỏi kỹ thuật (hỗ trợ chế độ chuẩn và luồng SSE `stream=true`) |
-| `POST` | `/api/v1/assistant/feedback/` | Gửi đánh giá 👍 / 👎 kèm phản hồi của thợ |
-| `POST` | `/api/v1/assistant/create-work-order-draft/` | Khởi tạo nhanh bản thảo Work Order từ nội dung chat |
-| `GET` | `/api/v1/assistant/offline-pack/{asset_id}/` | Tải gói dữ liệu ngoại tuyến (Pre-fetch) về lưu SQLite di động |
+| Phương Thức | Đường Dẫn | Quyền Truy Cập (RBAC) | Chức Năng |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/assistant/chat/` | `AUTHENTICATED` (Tất cả vai trò) | Gửi câu hỏi kỹ thuật máy móc hoặc hỏi cách dùng phần mềm Web/Mobile (hỗ trợ SSE `stream=true`) |
+| `POST` | `/api/v1/assistant/feedback/` | `AUTHENTICATED` (Kỹ thuật viên) | Gửi đánh giá 👍 / 👎 kèm lý do phản hồi của thợ |
+| `POST` | `/api/v1/assistant/create-work-order-draft/` | `AUTHENTICATED` (Thợ / Kỹ sư) | Khởi tạo nhanh bản thảo Work Order từ nội dung hội thoại |
+| `GET` | `/api/v1/assistant/offline-pack/{asset_id}/` | `AUTHENTICATED` | Tải gói dữ liệu ngoại tuyến (Pre-fetch) về lưu SQLite di động |
+| `GET` | `/api/v1/assistant/admin/qa-list/` | `can_manage_settings` / `ADMIN` | Lấy danh sách Q&A mẫu (hỗ trợ lọc theo Thiết bị hoặc Hướng dẫn phần mềm hệ thống) |
+| `POST` | `/api/v1/assistant/admin/qa/` | `can_manage_settings` / `ADMIN` | Thêm mới hoặc cập nhật cặp câu hỏi - câu trả lời mẫu |
+| `DELETE` | `/api/v1/assistant/admin/qa/{id}/` | `can_manage_settings` / `ADMIN` | Xóa cặp câu hỏi - đáp khỏi cơ sở tri thức |
+| `GET` | `/api/v1/assistant/admin/curation-queue/` | `can_manage_settings` / `CHIEF_ENG` | Lấy danh sách câu hỏi bị thợ đánh giá 👎 cần Kỹ sư trưởng phê duyệt |
+| `POST` | `/api/v1/assistant/admin/curation-queue/{id}/approve/` | `can_manage_settings` / `CHIEF_ENG` | Phê duyệt & lưu câu trả lời hiệu chỉnh thành Tri thức Vàng |
+| `POST` | `/api/v1/assistant/admin/upload-document/` | `can_manage_settings` / `ADMIN` | Tải lên tài liệu PDF OEM hoặc cẩm nang sử dụng phần mềm và kích hoạt vector hóa |
 
 ### Cấu Trúc Dữ Liệu Mẫu:
 
-#### 1. Gửi câu hỏi kỹ thuật (`POST /api/v1/assistant/chat/`):
+#### 1. Gửi câu hỏi kỹ thuật máy móc (`POST /api/v1/assistant/chat/`):
 *Payload Request*:
 ```json
 {
@@ -359,24 +387,123 @@ CREATE TABLE curated_qa_knowledge (
 }
 ```
 
+#### 2. Gửi câu hỏi hướng dẫn sử dụng phần mềm Web/Mobile (Global System Guide):
+*Payload Request*:
+```json
+{
+  "prompt": "Nút Phát hành phiếu sửa chữa có tác dụng gì và ai được bấm?",
+  "assetContext": null,
+  "stream": false
+}
+```
+
+*Response `200 OK` (Truy xuất tri thức hệ thống dùng chung, không chia tenant)*:
+```json
+{
+  "success": true,
+  "data": {
+    "expandedQuery": "work order issue dispatch button role permission guide",
+    "reply": "### ℹ️ HƯỚNG DẪN TÍNH NĂNG HỆ THỐNG EAM:\n**Nút [Phát hành phiếu sửa chữa] (Issue Work Order)** có chức năng chuyển đổi phiếu bảo trì từ trạng thái `DRAFT` (Bản thảo) sang `RELEASED` (Đã phát hành để giao việc):\n1. **Tác dụng**: Khóa thông tin sự cố, ghi nhận mốc thời gian bắt đầu quy trình sửa chữa và tự động kích hoạt thông báo Realtime (WebSocket/FCM) tới Kỹ thuật viên được giao việc.\n2. **Phân quyền thao tác**: Chỉ tài khoản có vai trò `MAINTENANCE_PLANNER`, `MAINTENANCE_SUPERVISOR` hoặc `ADMIN` mới có quyền bấm nút này. Kỹ thuật viên hiện trường (`TECHNICIAN`) chỉ có thể xem và bấm bắt đầu công việc.",
+    "isSystemGuide": true,
+    "citedSources": [
+      {
+        "documentName": "EAM_User_Manual_WorkOrder_Workflow.md",
+        "section": "Chương 4: Vòng đời Phiếu Bảo Trì",
+        "similarityScore": 0.925
+      }
+    ]
+  }
+}
+```
+
 ---
 
 ## 9. Đặc Tả Trải Nghiệm Người Dùng (UI/UX Behavioral Specifications)
 
-- **Khung Chat Thông Minh Đa Phương Tiện**:
-  - Tách bạch 2 khối nội dung bằng màu sắc: Khối xanh dương (Hướng dẫn sách hãng) và Khối vàng hổ phách (Mẹo thực tế nhà máy).
-  - Khung ảnh bản vẽ kỹ thuật phóng to khi chạm ngón tay vào màn hình điện thoại.
-  - Thanh trạng thái phụ tùng hiển thị trực quan: Màu xanh (Còn hàng trong kho) / Màu cam (Hết hàng).
-- **Nút Hành Động Nhanh (Action Button)**:
-  - Nút bấm màu xanh lá nổi bật: **"Tạo phiếu sửa chữa từ hội thoại này"**. Bấm vào sẽ mở màn hình tạo Work Order với các trường được điền sẵn tức thì.
-- **Biểu tượng Ngoại tuyến**:
-  - Khi mất mạng, thanh tiêu đề ứng dụng chuyển sang màu xám kèm biểu tượng sóng gạch chéo: *"Chế độ Ngoại tuyến (Đang dùng dữ liệu đệm máy)"*.
+Hệ thống được thiết kế hoàn chỉnh theo 2 không gian trải nghiệm: **Widget Nút Nổi Thông Minh Hiện Trường** dành cho toàn bộ người dùng và **Trung Tâm Quản Trị Tri Thức** dành cho người có quyền Cài đặt hệ thống.
+
+### 9.1. Giao Diện Nút Nổi Thông Minh Góc Dưới Bên Phải (Floating Action Button - FAB)
+
+```
+       Web Portal                                  Mobile Flutter App
+┌─────────────────────────────────┐        ┌───────────────────────────────┐
+│                                 │        │                               │
+│   [Màn hình chi tiết Thiết bị]  │        │   [Màn hình Phiếu Bảo Trì]    │
+│   hoặc [Phiếu Work Order]       │        │                               │
+│                                 │        │                               │
+│                                 │        │                               │
+│                      ┌────────┐ │        │                    ┌────────┐ │
+│                      │ 🤖 FAB │ │        │                    │ 🤖 FAB │ │
+│                      └────────┘ │        │                    └────────┘ │
+└─────────────────────────────────┘        └───────────────────────────────┘
+```
+
+1. **Vị Trí & Hiệu Ứng Trực Quan**:
+   - Nằm cố định ở góc dưới bên phải màn hình trên cả Web Portal và Mobile App (`bottom: 24px; right: 24px; z-index: 9999;`).
+   - Nút tròn đường kính $60\text{px}$, nền xanh công nghiệp thương hiệu EAM, icon Robot kỹ thuật viền sáng.
+   - Khi bấm vào nút:
+     - **Trên Web**: Bung mở một cửa sổ popup chat dạng drawer kích thước $400 \times 620\text{px}$ nổi lên ở góc phải màn hình, có nút thu nhỏ (minimize), nút phóng to toàn màn hình và nút đóng. Không làm gián đoạn hay che khuất dữ liệu người dùng đang xem.
+     - **Trên Mobile**: Mở ra một **Modal Bottom Sheet** trượt từ dưới lên (hỗ trợ kéo mở rộng nửa màn hình hoặc toàn màn hình).
+2. **Cơ Chế Tự Động Nhận Biết Ngữ Cảnh (Context-Aware Binding)**:
+   - Khi người dùng đang đứng ở trang chi tiết thiết bị (`/assets/<id>/`) hoặc trang phiếu sửa chữa (`/work-orders/<id>/`):
+     - Nút FAB hiển thị một chấm xanh nhỏ báo hiệu: `Đang liên kết: [Mã Thiết Bị]`.
+     - Khi mở khung chat, hệ thống tự động tiêm ngầm thông số máy (`assetId`, `model`, `year`, `serial`) vào ngữ cảnh truy vấn. Người thợ chỉ cần gõ câu hỏi cộc lốc: *"Máy kêu lạch cạch xử lý sao?"* $\rightarrow$ AI tự động hiểu và truy xuất tài liệu của đúng con máy đó mà thợ không cần gõ lại tên máy.
+   - Khi mở khung chat tại các trang chung (Dashboard, Danh mục): Hệ thống hiển thị thanh chọn nhanh thiết bị (Asset Selector) hoặc nút quét mã QR.
+3. **Nút Gợi Ý Câu Hỏi Nhanh 1-Chạm (Quick Action Chips)**:
+   - Ngay dưới lời chào mừng của Chatbot, hiển thị sẵn 4 viên thuốc gợi ý thao tác nhanh để thợ không cần gõ phím:
+     - 🔍 *Quy trình bảo dưỡng định kỳ SOP*
+     - ⚡ *Tra cứu mã lỗi & Khắc phục khẩn cấp*
+     - 🔩 *Kiểm tra phụ tùng có sẵn trong kho*
+     - ❓ *Nút trên trang này dùng để làm gì?*
+4. **Trợ Lý Hướng Dẫn Tính Năng & Nút Bấm Hệ Thống (EAM Web/Mobile System Guide)**:
+   - Khi người dùng hỏi bất kỳ câu hỏi nào về cách sử dụng phần mềm (ví dụ: *"Làm sao tạo phiếu bảo trì?"*, *"Nút Xuất Excel ở đâu?"*, *"Nút này có tác dụng gì?"*):
+   - Chatbot tự động nhận diện và truy xuất cơ sở tri thức hệ thống dùng chung (Global Knowledge), giải thích rõ ý nghĩa nút bấm, luồng đi và điều kiện phân quyền tương ứng.
+5. **Giao Diện Hội Thoại Đa Phương Tiện & Trực Quan Hóa Minh Bạch**:
+   - Tách biệt rõ 2 khối nội dung bằng màu sắc: Khối xanh dương (Hướng dẫn sách hãng OEM) và Khối vàng hổ phách (Mẹo thực tế nhà máy kế thừa từ Work Order).
+   - Thẻ neo sơ đồ kỹ thuật (`image_anchors`): Chạm vào ảnh bản vẽ để phóng to toàn màn hình xem rõ từng chi tiết bu-lông và số hiệu phụ tùng.
+   - Thẻ trạng thái tồn kho thời gian thực: Hiển thị trực quan số lượng và vị trí kệ kho (Xanh lá = Còn hàng, Cam = Đang mượn / Hết hàng).
+   - Thẻ trích dẫn minh bạch (Source Citation): Hiển thị rõ tên tài liệu, số trang và điểm tin cậy tương đồng $\text{Sim} \ge 85\%$, kèm nút bấm **[Xem trang tài liệu gốc]** để mở popup xem trực tiếp đúng trang PDF sơ đồ đó.
+6. **Nút 1-Chạm Tạo Phiếu Sửa Chữa (Actionable Chat-to-WorkOrder)**:
+   - Ở cuối câu trả lời chẩn đoán sự cố, hiển thị nút bấm màu xanh lá nổi bật:
+     > 🔘 **[🛠️ Tạo Phiếu Sửa Chữa Đột Xuất Từ Hội Thoại Này]**
+   - Chạm vào nút sẽ điều hướng mở ngay màn hình tạo Work Order mới với toàn bộ các trường `asset_id`, mã lỗi, mô tả sự cố và phụ tùng đề xuất đã được điền sẵn tức thì.
+7. **Phương Thức Tương Tác**:
+   - Hệ thống tối ưu hóa hoàn toàn bằng **Văn bản gõ (Text Input)** và **Các nút bấm trực quan (Action Chips)**; loại bỏ nút ghi âm giọng nói để đảm bảo tính ổn định và tính tất định trong môi trường nhà xưởng công nghiệp nhiều tiếng ồn.
+
+---
+
+### 9.2. Giao Diện Quản Trị Tri Thức Trong Phân Hệ Admin (Nằm Dưới Mục Settings Chung)
+
+- **Vị Trí Cây Thư Mục Giao Diện**:
+  - Nằm trong phân hệ **Admin**, ở khu vực ngay bên dưới mục Cài đặt (Settings) chung:
+    👉 **Admin Portal $\rightarrow$ Cài đặt & Cấu hình $\rightarrow$ Quản trị Tri thức Trợ lý AI (RAG Knowledge Hub)** (Đường dẫn: `/admin/rag-knowledge/`).
+- **Phân Quyền Truy Cập (RBAC)**:
+  - Chỉ dành riêng cho người dùng có quyền quản trị cài đặt hệ thống (`can_manage_settings = True` hoặc vai trò `ADMIN`, `CHIEF_ENGINEER`).
+
+- **Cấu Trúc 4 Tab Nghiệp Vụ Chuyên Sâu**:
+  1. **Tab 1: Quản lý Tri thức Mẫu (Curated Q&A Knowledge)**:
+     - Bảng danh sách các cặp Hỏi - Đáp mẫu chuẩn vàng.
+     - Phân loại rõ ràng thành 2 nhóm thẻ (Filter Badge):
+       - 🏭 **Tri thức Bảo trì Thiết bị**: Phân lập theo Tenant, có chọn Model máy và dải năm sản xuất áp dụng.
+       - 💻 **Hướng dẫn Sử dụng Hệ thống Web & Mobile**: Tri thức toàn cục (**Global Cross-Tenant**, `tenant_id = NULL`), hướng dẫn cách dùng các tính năng và nút bấm trên phần mềm.
+     - Nút **[+ Thêm Câu Hỏi & Trả Lời Mới]**: Mở modal nhập câu hỏi mẫu, câu trả lời định dạng Markdown, chọn nhóm tri thức và bấm Lưu.
+  2. **Tab 2: Hàng Đợi Phê Duyệt Của Kỹ Sư Trưởng (Curation Queue)**:
+     - Danh sách các câu hỏi bị kỹ thuật viên hiện trường bấm nút 👎 (không hài lòng).
+     - Giao diện hiển thị: Câu hỏi của thợ, Câu trả lời mà AI đã sinh, Lý do thợ chê (*"Tài liệu không khớp thực tế"*, *"Thiếu bước tháo phốt"*...).
+     - Kỹ sư trưởng đọc, chỉnh sửa lại câu trả lời thành bản chuẩn hoàn hảo và bấm nút **[Duyệt & Lưu Thành Tri Thức Vàng]** $\rightarrow$ Hệ thống lập tức lưu vào bảng `curated_qa_knowledge`, lần sau thợ hỏi câu tương tự AI sẽ ưu tiên trả lời theo câu trả lời chuẩn này.
+  3. **Tab 3: Thư Viện Tài Liệu Kỹ Thuật (OEM & System Documents Library)**:
+     - Bảng quản lý các tài liệu PDF/Word đã tải lên MinIO/PostgreSQL.
+     - Thông tin chi tiết: Tên file, Model máy áp dụng, Dải năm sản xuất, Dung lượng, Số lượng đoạn (Chunks) đã phân tách.
+     - Nút **[Tải Lên Tài Liệu Mới]** và nút **[Đồng Bộ Lại Chỉ Mục PGVector (Re-index)]**.
+  4. **Tab 4: Cấu Hình Từ Điển Tiếng Lóng & Ngắt An Toàn Sinh Mạng**:
+     - Bảng quản lý từ điển tiếng lóng cơ khí xưởng: Cho phép người quản trị thêm các từ lóng dân dã mới của địa phương (ví dụ: *"cháy bố"*, *"xì phốt"*, *"kẹt ty"* $\rightarrow$ dịch sang thuật ngữ kỹ thuật tương đương nào).
+     - Danh mục từ khóa nguy cấp kích hoạt E-Stop khẩn cấp: Cho phép cán bộ an toàn (`SAFETY_OFFICER`) bổ sung các từ khóa nguy hiểm chết người.
 
 ---
 
 ## 10. Tiêu Chí Chấp Nhận & Ma Trận Kịch Bản Kiểm Thử (Acceptance Criteria & Test Scenarios)
 
-### 10.1. Ma Trận 12 Kịch Bản Kiểm Thử Nghiệp Vụ & An Toàn Kỹ Thuật
+### 10.1. Ma Trận 15 Kịch Bản Kiểm Thử Nghiệp Vụ, An Toàn Kỹ Thuật & UI/UX
 
 | Mã Test | Tên Kịch Bản | Điều Kiện Thử Nghiệm | Hành Vi Kỳ Vọng | Trạng Thái |
 | :--- | :--- | :--- | :--- | :--- |
@@ -392,6 +519,9 @@ CREATE TABLE curated_qa_knowledge (
 | **TC-RAG-10** | Vòng lặp thẩm định Kỹ sư trưởng *(Bổ sung 4)* | Thợ bấm nút 👎 vào câu trả lời | Đẩy đoạn chat vào Curation Queue để Kỹ sư trưởng hiệu chỉnh thành Curated QA | Chưa thực hiện |
 | **TC-RAG-11** | Nút 1-chạm tạo Work Order từ hội thoại *(Bổ sung 5)* | Bấm nút "Tạo phiếu bảo trì đột xuất" trên chat | Mở màn hình tạo Work Order với các thông số máy, mã lỗi và phụ tùng điền sẵn | Chưa thực hiện |
 | **TC-RAG-12** | Ngưỡng cắt thoái lui an toàn $\text{Sim} < 0.65$ | Hỏi về mã lỗi hoàn toàn không có trong tài liệu | Trả về thông báo từ chối an toàn, không tự ý sáng tác câu trả lời | Chưa thực hiện |
+| **TC-RAG-13** | Trợ lý hướng dẫn tính năng phần mềm EAM (Global Guide) | Hỏi: "Nút phát hành phiếu bảo trì có tác dụng gì?" | Truy xuất tri thức dùng chung (`is_system_guide=True`), không bị chặn tenant, hướng dẫn chuẩn xác | Chưa thực hiện |
+| **TC-RAG-14** | Quản trị viên Settings thêm Q&A trong Admin Hub | User có quyền `can_manage_settings` thêm Q&A trong `/admin/rag-knowledge/` | Lưu thành công vào database và Chatbot lập tức trả lời được câu hỏi đó | Chưa thực hiện |
+| **TC-RAG-15** | Nút FAB nổi tự động nhận biết ngữ cảnh trang | Mở chat khi đang đứng ở trang chi tiết `PUMP-X100` | Nút FAB tự động tiêm `assetContext` PUMP-X100 vào truy vấn ngầm | Chưa thực hiện |
 
 ---
 
@@ -449,21 +579,23 @@ def retrieve_parent_child_context(query_embedding: list, model: str, year: int, 
 
 - [ ] **Task 11.9.1 — PGVector Extension & Multi-Source Schema**
   - [ ] Kích hoạt extension `pgvector` trên cơ sở dữ liệu PostgreSQL.
-  - [ ] Xây dựng bảng `technical_documents` có dải năm sản xuất và dải số sê-ri.
-  - [ ] Xây dựng bảng `document_chunks` hỗ trợ Parent-Child và lưu trữ neo hình ảnh `image_anchors`.
-  - [ ] Xây dựng bảng `curated_qa_knowledge` lưu trữ tri thức đã thẩm định.
+  - [ ] Xây dựng bảng `technical_documents` hỗ trợ cả tài liệu OEM theo tenant và cẩm nang hướng dẫn phần mềm dùng chung (`is_system_guide = TRUE`).
+  - [ ] Xây dựng bảng `document_chunks` hỗ trợ Parent-Child, lưu trữ neo hình ảnh `image_anchors` và cờ tri thức hệ thống.
+  - [ ] Xây dựng bảng `curated_qa_knowledge` hỗ trợ phân loại `EQUIPMENT_MAINTENANCE` (theo tenant) và `SYSTEM_FEATURE_GUIDE` (global dùng chung).
 - [ ] **Task 11.9.2 — Ingestion Pipeline & Dual-Stream Vectorization**
-  - [ ] Cài đặt bộ phân tích PDF bảo toàn bảng Markdown và neo bản vẽ kỹ thuật.
+  - [ ] Cài đặt bộ phân tích Markdown/PDF bảo toàn bảng mã lỗi và neo bản vẽ kỹ thuật.
   - [ ] Xây dựng pipeline tự động vector hóa ghi chú giải quyết sự cố (`resolution_notes`) từ Work Order.
+  - [ ] Xây dựng pipeline nạp tri thức hướng dẫn sử dụng tính năng phần mềm EAM Web & Mobile.
   - [ ] Nhúng mô hình `sentence-transformers/all-MiniLM-L6-v2` tạo vector 384 chiều.
 - [ ] **Task 11.9.3 — Query Expansion, Safety Interceptor & Contradiction Guard**
-  - [ ] Cài đặt bộ biến đổi câu hỏi tiếng lóng / từ tượng thanh sang thuật ngữ tiêu chuẩn.
+  - [ ] Cài đặt bộ biến đổi câu hỏi tiếng lóng / từ tượng thanh sang thuật ngữ tiêu chuẩn (`SLANG_TECHNICAL_DICTIONARY`).
   - [ ] Cài đặt bộ ngắt an toàn sinh mạng khẩn cấp (E-Stop).
   - [ ] Cài đặt bộ kiểm định mâu thuẫn từ phủ định an toàn (Contradiction Guard).
 - [ ] **Task 11.9.4 — Live Inventory Interlock, Actionable Chat & Offline Package**
-  - [ ] Tích hợp API gọi ngầm kiểm tra tồn kho phụ tùng và dụng cụ thực tế.
+  - [ ] Tích hợp API gọi ngầm kiểm tra tồn kho phụ tùng và dụng cụ thực tế (`SparePart`).
   - [ ] Xây dựng endpoint tải gói dữ liệu ngoại tuyến (Pre-fetch) cho ứng dụng di động Flutter (SQLite FTS5).
-  - [ ] Xây dựng API tạo nhanh bản thảo Work Order trực tiếp từ đoạn chat.
-- [ ] **Task 11.9.5 — UI Integration & Test Matrix Verification**
-  - [ ] Thiết kế giao diện chat tách 2 khối (Sách hãng & Mẹo nhà máy), xem ảnh sơ đồ, và nút 1-chạm tạo phiếu.
-  - [ ] Triển khai bộ kiểm thử tự động 12 test cases (`TC-RAG-01` đến `TC-RAG-12`).
+  - [ ] Xây dựng API tạo nhanh bản thảo Work Order trực tiếp từ đoạn chat (`Chat-to-WorkOrder`).
+- [ ] **Task 11.9.5 — UI Integration, Admin Knowledge Hub & Test Matrix Verification**
+  - [ ] Xây dựng Widget nút nổi tròn FAB ở góc dưới bên phải màn hình Web & Mobile kèm cơ chế tự động nhận diện ngữ cảnh (`assetContext`).
+  - [ ] Xây dựng Trung tâm Quản trị Tri thức Trợ lý AI trong phân hệ Admin (khu vực dưới mục Settings chung `/admin/rag-knowledge/`) với 4 Tab: Curated Q&A, Curation Queue, OEM Document Ingestion, Slang & Safety Settings.
+  - [ ] Triển khai bộ kiểm thử tự động 15 test cases (`TC-RAG-01` đến `TC-RAG-15`).

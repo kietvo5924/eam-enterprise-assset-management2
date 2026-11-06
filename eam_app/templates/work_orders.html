@@ -3063,6 +3063,7 @@
               if (techAccBody) techAccBody.classList.remove('hidden');
 
               // Phase 11.8: AI Decision Tree & HSM Checklist Evaluation
+              // Lấy đúng Z-score thực tế từ URL hoặc để backend tự trích xuất từ Alert & Asset (Task 11.4 & 11.5)
               fetch('/api/v1/work-orders/evaluate-alert/', {
                   method: 'POST',
                   headers: {
@@ -3072,8 +3073,8 @@
                   body: JSON.stringify({
                       assetId: assetId,
                       alertId: alertId,
-                      anomalyZscore: val ? parseFloat(val) : null,
-                      currentRulDays: daysRem ? parseFloat(daysRem) : null
+                      anomalyZscore: urlParams.get('z_score') ? parseFloat(urlParams.get('z_score')) : null,
+                      currentRulDays: urlParams.get('rul_days') ? parseFloat(urlParams.get('rul_days')) : null
                   })
               })
               .then(res => res.json())

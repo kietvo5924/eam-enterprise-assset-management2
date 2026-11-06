@@ -26,6 +26,12 @@ class WorkOrder {
   final String? bleBeaconUuid;
   final String? bleMacAddress;
 
+  final String? severityLevel;
+  final bool? marginalBoundaryWarning;
+  final bool? isOnHold;
+  final String? holdReason;
+  final int? holdAccumulatedSeconds;
+
   final List<WorkOrderChecklist> checklists;
   final List<WorkOrderAttachment> attachments;
 
@@ -52,6 +58,11 @@ class WorkOrder {
     this.requireBleBeacon = true,
     this.bleBeaconUuid,
     this.bleMacAddress,
+    this.severityLevel,
+    this.marginalBoundaryWarning,
+    this.isOnHold,
+    this.holdReason,
+    this.holdAccumulatedSeconds,
     this.checklists = const [],
     this.attachments = const [],
   });
@@ -185,6 +196,11 @@ class WorkOrder {
       deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline']) : null,
       assigneeUsername: json['assignee']?['username'] ?? json['assigneeName'],
       resolutionNotes: json['resolutionNotes'],
+      severityLevel: json['severityLevel'] ?? json['severity_level'],
+      marginalBoundaryWarning: json['marginalBoundaryWarning'] ?? json['marginal_boundary_warning'],
+      isOnHold: json['isOnHold'] ?? json['is_on_hold'] ?? (json['status'] == 'ON_HOLD'),
+      holdReason: json['holdReason'] ?? json['hold_reason'],
+      holdAccumulatedSeconds: json['holdAccumulatedSeconds'] as int? ?? json['hold_accumulated_seconds'] as int?,
       checklists: (json['checklists'] as List<dynamic>?)?.map((c) => WorkOrderChecklist.fromJson(c)).toList() ?? [],
       attachments: (json['attachments'] as List<dynamic>?)?.map((a) => WorkOrderAttachment.fromJson(a)).toList() ?? [],
     );
@@ -199,6 +215,7 @@ class WorkOrderChecklist {
   final String? expectedValue;
   String? actualValue;
   final bool isMandatory;
+  final String? stage;
 
   WorkOrderChecklist({
     required this.id,
@@ -208,6 +225,7 @@ class WorkOrderChecklist {
     this.expectedValue,
     this.actualValue,
     this.isMandatory = false,
+    this.stage,
   });
 
   factory WorkOrderChecklist.fromJson(Map<String, dynamic> json) {
@@ -219,6 +237,7 @@ class WorkOrderChecklist {
       expectedValue: json['expectedValue'],
       actualValue: json['actualValue'],
       isMandatory: json['isMandatory'] ?? json['is_mandatory'] ?? false,
+      stage: json['stage'],
     );
   }
 
@@ -231,6 +250,7 @@ class WorkOrderChecklist {
       'expectedValue': expectedValue,
       'actualValue': actualValue,
       'isMandatory': isMandatory,
+      'stage': stage,
     };
   }
 }

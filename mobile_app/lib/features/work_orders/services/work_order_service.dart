@@ -445,6 +445,7 @@ class WorkOrderService {
     String? expectedValue,
     bool? isMandatory,
     String? checklistId,
+    String? stage,
   ]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -461,6 +462,7 @@ class WorkOrderService {
             if (inputType != null) 'inputType': inputType,
             if (expectedValue != null) 'expectedValue': expectedValue,
             if (isMandatory != null) 'isMandatory': isMandatory,
+            if (stage != null) 'stage': stage,
           };
           final response = await _dio.post(
             '/api/v1/work-orders/$woId/checklists',
@@ -488,6 +490,7 @@ class WorkOrderService {
           if (inputType != null) 'inputType': inputType,
           if (expectedValue != null) 'expectedValue': expectedValue,
           if (isMandatory != null) 'isMandatory': isMandatory,
+          if (stage != null) 'stage': stage,
         });
         await AppDatabase.instance.transaction(() async {
           final existingTasks = await (AppDatabase.instance.select(AppDatabase.instance.syncQueues)
@@ -558,6 +561,7 @@ class WorkOrderService {
                 if (inputType != null) item['inputType'] = inputType;
                 if (expectedValue != null) item['expectedValue'] = expectedValue;
                 if (isMandatory != null) item['isMandatory'] = isMandatory;
+                if (stage != null) item['stage'] = stage;
                 checklists[i] = item;
                 found = true;
                 break;
@@ -571,6 +575,7 @@ class WorkOrderService {
                 if (inputType != null) 'inputType': inputType,
                 if (expectedValue != null) 'expectedValue': expectedValue,
                 if (isMandatory != null) 'isMandatory': isMandatory,
+                if (stage != null) 'stage': stage,
               });
             }
             await AppDatabase.instance.workOrderDao.insertOrUpdateWorkOrder(

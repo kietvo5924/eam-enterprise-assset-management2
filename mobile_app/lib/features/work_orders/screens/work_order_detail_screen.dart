@@ -84,6 +84,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
       item.expectedValue,
       item.isMandatory,
       item.id,
+      item.stage,
     );
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,6 +102,19 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
   }
 
   Future<void> _handleDeleteChecklist(WorkOrderChecklist item) async {
+    final bool isOverhaulMandatory = item.isMandatory &&
+        (_workOrder?.maintenanceAction == 'CORE_REPLACEMENT' ||
+         _workOrder?.severityLevel == 'CRITICAL_OVERHAUL');
+    if (isOverhaulMandatory) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Không thể xóa mục checklist bắt buộc của quy trình đại tu cốt lõi!"),
+          backgroundColor: AppTheme.dangerColor,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     final checklistIdentifier = item.id.isNotEmpty ? item.id : item.itemName;
     final success = await _service.deleteChecklist(
       widget.workOrderId,
@@ -1626,11 +1640,30 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 ),
 
               ..._workOrder!.checklists.map((chk) {
+                final bool isOverhaulMandatory = chk.isMandatory &&
+                    (_workOrder!.maintenanceAction == 'CORE_REPLACEMENT' ||
+                     _workOrder!.severityLevel == 'CRITICAL_OVERHAUL');
+                String? stageLabel;
+                switch (chk.stage) {
+                  case 'DIAGNOSIS':
+                    stageLabel = 'GĐ 1: Khảo sát hiện trạng';
+                    break;
+                  case 'STAGING_PARTS':
+                    stageLabel = 'GĐ 2: Chuẩn bị vật tư';
+                    break;
+                  case 'OVERHAUL_EXECUTION':
+                    stageLabel = 'GĐ 3: Thao tác đại tu cốt lõi';
+                    break;
+                  case 'TRIAL_ACCEPTANCE':
+                    stageLabel = 'GĐ 4: Nghiệm thu chạy thử';
+                    break;
+                }
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12.0),
                   child: SwipeableChecklistTile(
                     id: chk.id,
                     title: chk.itemName,
+                    subtitle: stageLabel,
                     initialCompleted: chk.isCompleted,
                     inputType: chk.inputType,
                     expectedValue: chk.expectedValue,
@@ -1665,7 +1698,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                               },
                             );
                           },
-                    onDelete: _workOrder!.status == 'COMPLETED'
+                    onDelete: (_workOrder!.status == 'COMPLETED' || isOverhaulMandatory)
                         ? null
                         : () => _handleDeleteChecklist(chk),
                   ),
