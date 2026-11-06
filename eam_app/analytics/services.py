@@ -280,6 +280,7 @@ class PMComplianceService:
             type='PREVENTIVE'
         ).filter(
             Q(deadline__gte=start_date, deadline__lte=now) |
+            Q(completed_at__gte=start_date, completed_at__lte=now) |
             Q(created_at__gte=start_date, deadline__isnull=True)
         )
         total_due = pm_due_qs.count()

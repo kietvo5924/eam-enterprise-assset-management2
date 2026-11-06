@@ -103,8 +103,24 @@ _db_host = env('POSTGRES_HOST', default=env('DB_HOST', default='localhost'))
 _db_port = env('POSTGRES_PORT', default=env('DB_PORT', default='5432'))
 _db_name = env('POSTGRES_DB', default=env('DB_NAME', default='eam_db'))
 
+_default_db = env.db('DATABASE_URL', default=f"postgres://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}")
+_default_db.setdefault('USER', _db_user)
+_default_db.setdefault('PASSWORD', _db_pass)
+_default_db.setdefault('HOST', _db_host)
+_default_db.setdefault('PORT', _db_port)
+_default_db.setdefault('NAME', _db_name)
+
+# Tường minh cấu hình TEST database để test runner luôn kết nối đúng role postgres
+_default_db['TEST'] = {
+    'NAME': f"test_{_default_db.get('NAME') or _db_name}",
+    'USER': _default_db.get('USER') or _db_user,
+    'PASSWORD': _default_db.get('PASSWORD') or _db_pass,
+    'HOST': _default_db.get('HOST') or _db_host,
+    'PORT': _default_db.get('PORT') or _db_port,
+}
+
 DATABASES = {
-    'default': env.db('DATABASE_URL', default=f"postgres://{_db_user}:{_db_pass}@{_db_host}:{_db_port}/{_db_name}")
+    'default': _default_db
 }
 
 

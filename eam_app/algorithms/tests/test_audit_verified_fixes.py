@@ -1068,7 +1068,8 @@ class DeepAuditVerifiedFixesTests(TestCase):
             'postRepairTemperature': 48.5,
             'vendorCost': '0.00',
             'warrantyCoveredAmount': '0.00',
-            'insuranceCoveredAmount': '0.00'
+            'insuranceCoveredAmount': '0.00',
+            'rssi': -65
         }
         req = factory.put(f'/api/v1/work-orders/{wo.id}/status', data=payload, format='json')
         force_authenticate(req, user=self.tech_user)

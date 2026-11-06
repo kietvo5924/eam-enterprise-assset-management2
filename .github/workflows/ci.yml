@@ -9,6 +9,12 @@ on:
 jobs:
   django-backend-checks:
     runs-on: ubuntu-latest
+    env:
+      PGUSER: postgres
+      PGPASSWORD: password
+      PGDATABASE: eam_db
+      PGHOST: localhost
+      PGPORT: 5432
     services:
       postgres:
         image: postgres:15-alpine
@@ -61,6 +67,11 @@ jobs:
         DB_PASSWORD: password
         DB_HOST: localhost
         DB_PORT: 5432
+        PGUSER: postgres
+        PGPASSWORD: password
+        PGDATABASE: eam_db
+        PGHOST: localhost
+        PGPORT: 5432
       run: |
         python eam_app/manage.py check
 
@@ -79,6 +90,11 @@ jobs:
         DB_PASSWORD: password
         DB_HOST: localhost
         DB_PORT: 5432
+        PGUSER: postgres
+        PGPASSWORD: password
+        PGDATABASE: eam_db
+        PGHOST: localhost
+        PGPORT: 5432
       run: |
         python eam_app/manage.py test algorithms.tests analytics core notifications --noinput
 
