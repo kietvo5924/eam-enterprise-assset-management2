@@ -32,6 +32,7 @@ class Command(BaseCommand):
                 ('work_order:execute', 'Receive & Execute Work Order', 'Allows user to be assigned to and execute work orders'),
                 ('workforce:read', 'Read Workforce & Tools', 'Tra cứu tài nguyên nhân lực: kỹ năng, chứng chỉ, công cụ đo kiểm và bảng xếp ca trực KTV'),
                 ('user:read', 'Read Users', 'Xem danh sách người dùng, hồ sơ năng lực thợ (kỹ năng, bằng cấp chứng chỉ) và xem bảng xếp ca trực KTV'),
+                ('user:create', 'Create User', 'Tạo tài khoản người dùng mới'),
                 ('user:update', 'Update User', 'Cập nhật tài khoản, hồ sơ thợ (gán kỹ năng, bằng cấp kèm hạn dùng) và xếp ca trực ngày cho KTV'),
                 ('audit_logs:read', 'Read Audit Logs', 'View audit logs'),
                 ('system:admin', 'System Administration', 'Manage tenants and system settings'),
@@ -53,6 +54,8 @@ class Command(BaseCommand):
                 ('inventory:delete', 'Delete Inventory', 'Can delete spare parts'),
                 ('reports:read', 'Read Enterprise Reports', 'Can view enterprise analytics and valuation reports'),
                 ('reports:export', 'Export Enterprise Reports', 'Can export enterprise reports to Excel, PDF, CSV'),
+                ('cost_forecast:read', 'Dự báo Chi phí & Ngân sách', 'Xem dự báo chi phí và phân tích kế hoạch ngân sách bảo trì'),
+                ('assistant:manage_knowledge', 'Quản trị Tri thức AI', 'Toàn quyền quản trị Tri thức AI: thêm/xóa Q&A mẫu, phê duyệt hàng đợi thẩm định và tải lên tài liệu OEM/Hệ thống'),
             ]
 
             for p_id, name, desc in permissions_data:

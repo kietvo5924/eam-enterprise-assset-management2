@@ -38,4 +38,7 @@ urlpatterns = [
     path('audit-logs/', views.portal_audit_logs, name='portal_audit_logs'),
     path('reports/', views.portal_reports, name='portal_reports'),
     path('cost-forecasting/', views.portal_cost_forecasting, name='portal_cost_forecasting'),
+    path('admin/rag-knowledge/', views.portal_rag_knowledge, name='portal_rag_knowledge'),
+    path('rag-knowledge/', views.portal_rag_knowledge, name='portal_rag_knowledge_alias'),
 ]
+

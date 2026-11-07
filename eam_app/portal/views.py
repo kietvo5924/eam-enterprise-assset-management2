@@ -3205,6 +3205,7 @@ def custom_403_view(request, exception=None):
         'asset_category:read': 'Cấu hình phân loại tài sản (Asset Config)',
         'workforce:read': 'Quản lý lực lượng & công cụ (Workforce & Specialized Tools)',
         'cost_forecast:read': 'Dự báo chi phí & ngân sách (Cost Forecasting & Budgeting)',
+        'assistant:manage_knowledge': 'Quản trị Tri thức AI (AI Knowledge Management)',
     }
 
     context = {
@@ -4279,6 +4280,77 @@ def portal_tool_reservations_api(request):
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
     return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+
+
+@login_required(login_url='portal_login')
+def portal_rag_knowledge(request):
+    """
+    Admin RAG Knowledge Hub view (Phase 11.9).
+    Located in Admin Portal, under General Settings (/admin/rag-knowledge/).
+    Features 4 business tabs:
+    1. Curated Q&A Knowledge (Equipment vs Global System Guides)
+    2. Chief Engineer Curation Queue
+    3. OEM & System Documents Library
+    4. Slang Dictionary & Life-Safety Interlock Configuration
+    """
+    from django.db.models import Q
+    from users.permissions import HasPermission
+    from assistant.models import TechnicalDocument, DocumentChunk, CuratedQAKnowledge, CurationQueueItem
+    from algorithms.rag_chatbot.constants import SLANG_TECHNICAL_DICTIONARY, EMERGENCY_HAZARDS
+
+    # Check permission: assistant:manage_knowledge, tenant:update, or admin
+    checker = HasPermission('assistant:manage_knowledge')()
+    if not (checker.has_permission(request, None) or request.user.is_superuser):
+        return render(request, '403.html', {'error': 'Yêu cầu quyền hạn: assistant:manage_knowledge'}, status=403)
+
+    tenant_id = getattr(request.user, 'tenant_id', None)
+
+    # Tab 1: Curated Q&A
+    curated_qa_qs = CuratedQAKnowledge.all_objects.all()
+    if tenant_id:
+        curated_qa_qs = curated_qa_qs.filter(
+            Q(tenant_id=tenant_id) | Q(is_system_guide=True, tenant_id__isnull=True)
+        )
+    curated_qa_list = list(curated_qa_qs.order_by('-created_at'))
+
+    # Tab 2: Curation Queue
+    queue_qs = CurationQueueItem.all_objects.filter(status='PENDING')
+    if tenant_id:
+        queue_qs = queue_qs.filter(tenant_id=tenant_id)
+    curation_queue_list = list(queue_qs.order_by('-created_at'))
+
+    # Tab 3: Technical Documents
+    doc_qs = TechnicalDocument.all_objects.all()
+    if tenant_id:
+        doc_qs = doc_qs.filter(
+            Q(tenant_id=tenant_id) | Q(is_system_guide=True, tenant_id__isnull=True)
+        )
+    technical_docs = list(doc_qs.prefetch_related('chunks').order_by('-created_at'))
+
+    can_curate = True
+    can_configure_safety = True
+
+    from assets.models import Asset
+    asset_qs = Asset.objects.all()
+    if tenant_id:
+        asset_qs = asset_qs.filter(tenant_id=tenant_id)
+    available_models = list(asset_qs.exclude(model__isnull=True).exclude(model='').values_list('model', flat=True).distinct().order_by('model'))
+    if not available_models:
+        available_models = ['PUMP-X100', 'COMP-Z50', 'CONV-01', 'GEN-A200']
+
+    context = {
+        'curated_qa_list': curated_qa_list,
+        'curation_queue_list': curation_queue_list,
+        'technical_docs': technical_docs,
+        'slang_dict': SLANG_TECHNICAL_DICTIONARY,
+        'emergency_hazards': EMERGENCY_HAZARDS,
+        'can_curate': can_curate,
+        'can_configure_safety': can_configure_safety,
+        'available_models': available_models,
+        'active_tab': request.GET.get('tab', 'qa'),
+    }
+    return render(request, 'rag_knowledge.html', context)
+
 
 
 

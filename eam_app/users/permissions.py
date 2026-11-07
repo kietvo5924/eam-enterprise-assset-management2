@@ -26,6 +26,28 @@ class HasPermission:
                 if 'system:admin' in request._user_permissions_cache:
                     return True
                     
-                return required_permission in request._user_permissions_cache
+                # Explicit permission grant
+                if required_permission in request._user_permissions_cache:
+                    return True
+
+                # Assistant RBAC matrix mappings (Section 5 Harmonized RBAC Matrix)
+                user_roles = [r.name.upper() for r in request.user.roles.all()]
+                if required_permission == 'assistant:chat':
+                    # All authenticated users have access to field assistant chat
+                    return True
+                elif required_permission == 'assistant:manage_knowledge':
+                    if 'tenant:update' in request._user_permissions_cache:
+                        return True
+                    if any(r in user_roles for r in ['ADMIN', 'TENANT_ADMIN', 'MAINTENANCE_MANAGER', 'CHIEF_ENGINEER']):
+                        return True
+                elif required_permission == 'assistant:curate_qa':
+                    if any(r in user_roles for r in ['CHIEF_ENGINEER', 'MAINTENANCE_MANAGER', 'ADMIN', 'TENANT_ADMIN']):
+                        return True
+                elif required_permission == 'assistant:configure_safety':
+                    if any(r in user_roles for r in ['SAFETY_OFFICER', 'ADMIN', 'TENANT_ADMIN']):
+                        return True
+
+                return False
                 
         return _HasPermission
+

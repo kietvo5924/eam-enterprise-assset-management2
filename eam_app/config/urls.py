@@ -37,7 +37,10 @@ from django.http import HttpResponse
 from django.conf import settings
 from django.views.static import serve
 
+from portal import views as portal_views
+
 urlpatterns = [
+    path('admin/rag-knowledge/', portal_views.portal_rag_knowledge, name='portal_rag_knowledge'),
     path('admin/', admin.site.urls),
     path('', include('portal.urls')),
     path('portal/', include('portal.urls')),
@@ -48,6 +51,7 @@ urlpatterns = [
     path('api/v1/', include('workorders.urls')),
     path('api/v1/', include('maintenance.urls')),
     path('api/v1/', include('notifications.urls')),
+    path('api/v1/assistant/', include('assistant.urls')),
     path('api/v1/dashboard/', include('analytics.urls')),
     path('api/v1/reports/', include('analytics.report_urls')),
     path('api/v1/cost-forecasting/', include('analytics.cost_forecasting_urls')),

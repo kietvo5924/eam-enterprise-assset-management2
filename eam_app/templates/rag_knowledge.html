@@ -1,0 +1,1024 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Quản trị Tri thức Trợ lý AI | EAM System{% endblock %}
+{% block breadcrumb %}Tri Thức AI{% endblock %}
+
+{% block content %}
+<div class="h-full flex flex-col overflow-hidden bg-neutral-50" id="rag-knowledge-app">
+  <!-- Top Header Banner -->
+  <div class="bg-white border-b border-neutral-200 px-6 py-4 shrink-0 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 text-xs text-neutral-500 font-medium mb-1">
+        <span>Cài đặt & Cấu hình</span>
+        <i class="ph ph-caret-right text-[10px]"></i>
+        <span class="text-primary font-semibold">Trợ lý Kỹ thuật AI</span>
+      </div>
+      <h1 class="text-xl font-bold text-neutral-900 flex items-center gap-2">
+        <i class="ph-fill ph-brain text-primary text-2xl"></i>
+        <span>Trung Tâm Quản Trị Tri Thức AI</span>
+      </h1>
+      <p class="text-xs text-neutral-500 mt-0.5">
+        Quản lý tri thức thiết bị, cẩm nang sử dụng hệ thống, hàng đợi thẩm định của Kỹ sư trưởng và cấu hình rào chắn an toàn.
+      </p>
+    </div>
+
+    <!-- Quick action buttons -->
+    <div class="flex items-center gap-2 shrink-0">
+      <button onclick="openAddQAModal()" class="px-3.5 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs">
+        <i class="ph ph-plus-circle text-sm font-bold"></i>
+        <span>Thêm Q&A Mẫu</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 4 Business Navigation Tabs -->
+  <div class="bg-white border-b border-neutral-200 px-6 shrink-0 flex gap-6 text-sm font-medium">
+    <button onclick="switchTab('qa')" id="tab-btn-qa" class="py-3 border-b-2 text-primary border-primary font-bold flex items-center gap-2 cursor-pointer transition-colors">
+      <i class="ph ph-book-open-text text-base"></i>
+      <span>Tri Thức Mẫu</span>
+      <span class="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full font-semibold">{{ curated_qa_list|length }}</span>
+    </button>
+    <button onclick="switchTab('queue')" id="tab-btn-queue" class="py-3 border-b-2 text-neutral-500 border-transparent hover:text-neutral-700 flex items-center gap-2 cursor-pointer transition-colors">
+      <i class="ph ph-tray text-base"></i>
+      <span>Hàng Đợi Thẩm Định</span>
+      {% if curation_queue_list %}
+        <span class="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full font-bold animate-pulse">{{ curation_queue_list|length }}</span>
+      {% endif %}
+    </button>
+    <button onclick="switchTab('docs')" id="tab-btn-docs" class="py-3 border-b-2 text-neutral-500 border-transparent hover:text-neutral-700 flex items-center gap-2 cursor-pointer transition-colors">
+      <i class="ph ph-file-pdf text-base"></i>
+      <span>Thư Viện Tài Liệu OEM & Hệ Thống</span>
+      <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 text-xs rounded-full font-semibold">{{ technical_docs|length }}</span>
+    </button>
+  </div>
+
+  <!-- Tab Contents Area -->
+  <div class="flex-1 overflow-y-auto p-6">
+
+    <!-- TAB 1: CURATED Q&A -->
+    <div id="tab-content-qa" class="space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-neutral-200">
+        <div class="flex items-center gap-2">
+          <button onclick="filterQACategory('ALL')" id="filter-all" class="px-3 py-1 rounded-lg text-xs font-semibold bg-primary text-white cursor-pointer transition-colors">Tất cả ({{ curated_qa_list|length }})</button>
+          <button onclick="filterQACategory('EQUIPMENT_MAINTENANCE')" id="filter-equip" class="px-3 py-1 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 cursor-pointer transition-colors">🏭 Bảo trì Thiết bị</button>
+          <button onclick="filterQACategory('SYSTEM_FEATURE_GUIDE')" id="filter-sys" class="px-3 py-1 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 cursor-pointer transition-colors">💻 Hướng dẫn Phần mềm</button>
+        </div>
+        <div class="w-full sm:w-64">
+          <input type="text" id="qa-search-input" onkeyup="filterQATable()" placeholder="Tìm kiếm câu hỏi, câu trả lời..." class="w-full px-3 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary">
+        </div>
+      </div>
+
+      <!-- Scrollable Table with Overflow-x-auto & Pagination -->
+      <div class="overflow-x-auto w-full border border-neutral-200 rounded-xl bg-white shadow-xs">
+        <table class="w-full min-w-[950px] text-left text-xs text-neutral-700" id="qa-table">
+          <thead class="bg-neutral-50 text-[11px] font-bold text-neutral-500 uppercase tracking-wider border-b border-neutral-200">
+            <tr>
+              <th class="px-4 py-3 w-36">Phân loại</th>
+              <th class="px-4 py-3 w-72">Câu hỏi mẫu</th>
+              <th class="px-4 py-3">Câu trả lời vàng</th>
+              <th class="px-4 py-3 w-40">Thiết bị / Năm</th>
+              <th class="px-4 py-3 w-36">Phê duyệt bởi</th>
+              <th class="px-4 py-3 w-20 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-200" id="qa-table-body">
+            {% for qa in curated_qa_list %}
+            <tr class="hover:bg-neutral-50/80 transition-colors qa-row" data-cat="{{ qa.category }}">
+              <td class="px-4 py-3 whitespace-nowrap">
+                {% if qa.is_system_guide %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    <i class="ph ph-laptop"></i> Hướng dẫn Hệ thống
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    <i class="ph ph-wrench"></i> Bảo trì Thiết bị
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 font-semibold text-neutral-900 max-w-[280px] break-words" title="{{ qa.question_pattern }}">
+                {{ qa.question_pattern }}
+              </td>
+              <td class="px-4 py-3 text-neutral-600 max-w-[360px] break-words font-mono text-[11px]" title="{{ qa.gold_answer }}">
+                {{ qa.gold_answer }}
+              </td>
+              <td class="px-4 py-3 text-neutral-500 whitespace-nowrap">
+                {% if qa.applicable_model %}
+                  <span class="font-semibold text-neutral-700">{{ qa.applicable_model }}</span>
+                  <span class="text-[10px] text-neutral-400 block">{{ qa.applicable_year_start }} - {{ qa.applicable_year_end }}</span>
+                {% else %}
+                  <span class="text-neutral-400">Toàn hệ thống</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap text-neutral-600">
+                {{ qa.approved_by.username|default:"Quản trị viên" }}
+              </td>
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <button onclick="deleteQA('{{ qa.id }}')" class="p-1.5 text-neutral-400 hover:text-red-600 rounded hover:bg-neutral-100 transition-colors cursor-pointer" title="Xóa">
+                  <i class="ph ph-trash text-sm"></i>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr id="qa-empty-row">
+              <td colspan="6" class="px-4 py-8 text-center text-neutral-400">
+                <i class="ph ph-empty text-3xl mb-1 text-neutral-300 block"></i>
+                Chưa có câu hỏi mẫu nào. Bấm <b>[+ Thêm Q&A Mẫu]</b> để khởi tạo tri thức chuẩn vàng.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <!-- Tab 1 Pagination Toolbar -->
+        <div class="px-4 py-3 bg-neutral-50 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-600">
+          <div id="qa-pagination-info">Đang tải phân trang...</div>
+          <div class="flex items-center gap-1" id="qa-pagination-controls"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: CURATION QUEUE -->
+    <div id="tab-content-queue" class="hidden space-y-4">
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+        <i class="ph ph-info text-amber-600 text-xl shrink-0 mt-0.5"></i>
+        <div class="text-xs text-amber-800">
+          <div class="font-bold mb-0.5">Hàng đợi Thẩm định Tri thức</div>
+          Các câu hỏi do kỹ thuật viên hiện trường bấm nút 👎 chưa hài lòng sẽ tự động tập hợp tại đây.
+          Kỹ sư trưởng rà soát, viết lại câu trả lời chuẩn mực và duyệt để lưu thành Tri thức Vàng vào hệ thống PGVector.
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4">
+        {% for item in curation_queue_list %}
+        <div class="bg-white rounded-xl border border-neutral-200 p-5 shadow-xs space-y-3" id="queue-card-{{ item.id }}">
+          <div class="flex items-center justify-between border-b border-neutral-100 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 flex items-center gap-1">
+                <i class="ph ph-thumbs-down"></i> Thợ chưa hài lòng
+              </span>
+              <span class="text-xs text-neutral-400">Gửi bởi: <b class="text-neutral-700">{{ item.user.username|default:"KTV Hiện trường" }}</b></span>
+            </div>
+            <span class="text-xs text-neutral-400">{{ item.created_at|date:"d/m/Y H:i" }}</span>
+          </div>
+
+          <div>
+            <div class="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Câu hỏi của thợ:</div>
+            <div class="text-sm font-semibold text-neutral-900 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200">
+              "{{ item.user_query }}"
+            </div>
+          </div>
+
+          <div>
+            <div class="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Câu trả lời AI đã sinh - Bị đánh giá 👎:</div>
+            <div class="text-xs text-neutral-600 bg-neutral-50 p-2.5 rounded-lg border border-neutral-200 font-mono">
+              {{ item.generated_answer|truncatechars:250 }}
+            </div>
+          </div>
+
+          {% if item.technician_feedback %}
+          <div class="bg-amber-50/50 p-2 rounded border border-amber-200/50 text-xs text-amber-900">
+            <b>Lý do phản hồi:</b> {{ item.technician_feedback }}
+          </div>
+          {% endif %}
+
+          <div class="pt-2">
+            <label class="block text-xs font-bold text-neutral-700 mb-1">Kỹ sư trưởng biên tập câu trả lời chuẩn:</label>
+            <textarea id="curated-text-{{ item.id }}" rows="3" class="w-full text-xs p-2.5 rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary font-sans" placeholder="Nhập câu trả lời chuẩn xác theo kinh nghiệm xưởng và quy trình SOP...">{{ item.generated_answer }}</textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-1">
+            <button onclick="approveQueueItem('{{ item.id }}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs">
+              <i class="ph ph-check-circle text-base"></i>
+              <span>Duyệt & Lưu Thành Tri Thức Vàng</span>
+            </button>
+          </div>
+        </div>
+        {% empty %}
+        <div class="bg-white rounded-xl border border-neutral-200 p-12 text-center text-neutral-400">
+          <i class="ph ph-seal-check text-4xl mb-2 text-emerald-500 block"></i>
+          <div class="font-bold text-neutral-700 text-sm mb-1">Hàng đợi trống!</div>
+          Hiện không có câu hỏi nào bị đánh giá không tốt cần Kỹ sư trưởng phê duyệt.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- TAB 3: TECHNICAL DOCUMENTS LIBRARY -->
+    <div id="tab-content-docs" class="hidden space-y-4">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-neutral-200">
+        <div class="text-xs text-neutral-600">
+          Quản lý tài liệu sổ tay OEM của hãng và cẩm nang hướng dẫn sử dụng phần mềm EAM.
+        </div>
+        <button onclick="openUploadDocModal()" class="px-3.5 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs">
+          <i class="ph ph-upload-simple font-bold"></i>
+          <span>Tải Lên Tài Liệu Mới</span>
+        </button>
+      </div>
+
+      <!-- Scrollable Table with Overflow-x-auto, Actions & Pagination -->
+      <div class="overflow-x-auto w-full border border-neutral-200 rounded-xl bg-white shadow-xs">
+        <table class="w-full min-w-[950px] text-left text-xs text-neutral-700" id="docs-table">
+          <thead class="bg-neutral-50 text-[11px] font-bold text-neutral-500 uppercase tracking-wider border-b border-neutral-200">
+            <tr>
+              <th class="px-4 py-3">Tên tài liệu</th>
+              <th class="px-4 py-3 w-36">Phân loại</th>
+              <th class="px-4 py-3 w-36">Thiết bị áp dụng</th>
+              <th class="px-4 py-3 w-32">Dải năm</th>
+              <th class="px-4 py-3 w-32">Số đoạn Chunks</th>
+              <th class="px-4 py-3 w-28">Dung lượng</th>
+              <th class="px-4 py-3 w-36">Ngày tạo</th>
+              <th class="px-4 py-3 w-28 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-neutral-200" id="docs-table-body">
+            {% for doc in technical_docs %}
+            <tr class="hover:bg-neutral-50/80 transition-colors docs-row">
+              <td class="px-4 py-3 font-semibold text-neutral-900">
+                <a href="javascript:void(0)" onclick="viewDocDetail('{{ doc.id }}')" class="hover:text-primary flex items-center gap-2 group cursor-pointer">
+                  <i class="ph ph-file-text text-primary text-base shrink-0 group-hover:scale-110 transition-transform"></i>
+                  <span class="underline-offset-2 hover:underline">{{ doc.title }}</span>
+                </a>
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                {% if doc.is_system_guide %}
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Hướng dẫn Hệ thống</span>
+                {% else %}
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Sổ tay OEM</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 font-semibold text-neutral-700 whitespace-nowrap">
+                {{ doc.applicable_model|default:"Tất cả thiết bị" }}
+              </td>
+              <td class="px-4 py-3 text-neutral-500 whitespace-nowrap">
+                {{ doc.applicable_year_start }} - {{ doc.applicable_year_end }}
+              </td>
+              <td class="px-4 py-3 font-bold text-neutral-800 whitespace-nowrap">
+                {{ doc.chunks.count }} chunks
+              </td>
+              <td class="px-4 py-3 text-neutral-500 whitespace-nowrap">
+                {{ doc.file_size_bytes|filesizeformat }}
+              </td>
+              <td class="px-4 py-3 text-neutral-400 whitespace-nowrap">
+                {{ doc.created_at|date:"d/m/Y H:i" }}
+              </td>
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <button type="button" onclick="viewDocDetail('{{ doc.id }}')" class="px-2.5 py-1 bg-primary-50 hover:bg-primary-100 text-primary rounded-lg text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors" title="Xem chi tiết nội dung tài liệu">
+                  <i class="ph ph-eye text-sm"></i>
+                  <span>Xem Chi Tiết</span>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr id="docs-empty-row">
+              <td colspan="8" class="px-4 py-8 text-center text-neutral-400">
+                <i class="ph ph-file-x text-3xl mb-1 text-neutral-300 block"></i>
+                Chưa có tài liệu kỹ thuật nào. Bấm <b>[Tải Lên Tài Liệu Mới]</b> để bổ sung.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <!-- Tab 3 Pagination Toolbar -->
+        <div class="px-4 py-3 bg-neutral-50 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-600">
+          <div id="docs-pagination-info">Đang tải phân trang...</div>
+          <div class="flex items-center gap-1" id="docs-pagination-controls"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: Thêm Q&A Mẫu (Có Dropdown Model & Lọc) -->
+<div id="add-qa-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl mx-auto overflow-hidden">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
+      <h3 class="font-bold text-sm text-neutral-900 flex items-center gap-2">
+        <i class="ph ph-plus-circle text-primary text-lg"></i>
+        <span>Thêm Cặp Hỏi - Đáp Mẫu</span>
+      </h3>
+      <button onclick="closeAddQAModal()" class="text-neutral-400 hover:text-neutral-600 cursor-pointer p-1">
+        <i class="ph ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Nhóm Tri Thức *</label>
+        <select id="modal-qa-category" class="w-full text-xs p-2 rounded-lg border border-neutral-300 focus:ring-1 focus:ring-primary" onchange="toggleModalFields()">
+          <option value="EQUIPMENT_MAINTENANCE">🏭 Bảo trì Thiết bị</option>
+          <option value="SYSTEM_FEATURE_GUIDE">💻 Hướng dẫn Sử dụng Hệ thống Toàn cục</option>
+        </select>
+      </div>
+
+      <!-- Model Thiết Bị: Dropdown + Input Searchable Filter -->
+      <div id="modal-equip-fields" class="space-y-3">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold text-neutral-700">Model Thiết Bị</label>
+            <span class="text-[10px] text-neutral-400">Chọn từ danh mục hoặc tự nhập</span>
+          </div>
+          <div class="flex gap-2">
+            <select id="modal-qa-model-select" onchange="syncModelSelection('modal-qa-model-select', 'modal-qa-model')" class="w-1/2 text-xs p-2 rounded-lg border border-neutral-300 bg-white focus:ring-1 focus:ring-primary cursor-pointer">
+              <option value="">-- Chọn Model có sẵn --</option>
+              {% for m in available_models %}
+                <option value="{{ m }}">{{ m }}</option>
+              {% endfor %}
+              <option value="CUSTOM">Khác (Tự gõ model)...</option>
+            </select>
+            <input type="text" id="modal-qa-model" list="asset-models-datalist" placeholder="Ví dụ: PUMP-X100" class="w-1/2 text-xs p-2 rounded-lg border border-neutral-300 focus:ring-1 focus:ring-primary">
+            <datalist id="asset-models-datalist">
+              {% for m in available_models %}
+                <option value="{{ m }}">{{ m }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 mb-1">Năm bắt đầu</label>
+            <input type="number" id="modal-qa-year-start" value="1900" class="w-full text-xs p-2 rounded-lg border border-neutral-300">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 mb-1">Năm kết thúc</label>
+            <input type="number" id="modal-qa-year-end" value="2100" class="w-full text-xs p-2 rounded-lg border border-neutral-300">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Câu hỏi mẫu *</label>
+        <input type="text" id="modal-qa-question" placeholder="Ví dụ: Bơm ly tâm kêu lạch cạch xử lý thế nào?" class="w-full text-xs p-2 rounded-lg border border-neutral-300 focus:ring-1 focus:ring-primary">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Câu trả lời chuẩn vàng *</label>
+        <textarea id="modal-qa-answer" rows="4" placeholder="Nhập câu trả lời chi tiết định dạng Markdown..." class="w-full text-xs p-2 rounded-lg border border-neutral-300 focus:ring-1 focus:ring-primary font-sans"></textarea>
+      </div>
+    </div>
+    <div class="px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-2">
+      <button onclick="closeAddQAModal()" class="px-3.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer">Hủy</button>
+      <button onclick="saveCuratedQA()" class="px-4 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer">Lưu Tri Thức</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Tải Lên Tài Liệu Mới (Hỗ trợ File PDF, Word, Markdown, Text) -->
+<div id="upload-doc-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl mx-auto overflow-hidden">
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
+      <h3 class="font-bold text-sm text-neutral-900 flex items-center gap-2">
+        <i class="ph ph-upload-simple text-primary text-lg font-bold"></i>
+        <span>Tải Lên & Vector Hóa Tài Liệu Mới</span>
+      </h3>
+      <button onclick="closeUploadDocModal()" class="text-neutral-400 hover:text-neutral-600 cursor-pointer p-1">
+        <i class="ph ph-x text-lg"></i>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <!-- File Selector Dropzone -->
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Chọn Tệp Đính Kèm (PDF, Word, Markdown, Text)</label>
+        <div class="border-2 border-dashed border-neutral-300 hover:border-primary rounded-xl p-4 text-center cursor-pointer transition-colors bg-neutral-50/50 hover:bg-primary-50/20 relative" onclick="document.getElementById('modal-doc-file').click()">
+          <input type="file" id="modal-doc-file" accept=".pdf,.doc,.docx,.txt,.md" class="hidden" onchange="handleDocFileSelected(this)">
+          
+          <div id="doc-file-empty-state">
+            <i class="ph-fill ph-file-arrow-up text-3xl text-primary mb-1 inline-block"></i>
+            <p class="text-xs font-semibold text-neutral-800" id="doc-file-prompt">Bấm để chọn tệp PDF, Word (.docx), Markdown hoặc kéo thả vào đây</p>
+            <p class="text-[10px] text-neutral-400 mt-0.5">Hỗ trợ các định dạng .pdf, .docx, .md, .txt (tự động phân đoạn và vector hóa)</p>
+          </div>
+
+          <div id="doc-file-active-state" class="hidden flex items-center justify-between bg-white p-2.5 rounded-lg border border-neutral-200">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <i class="ph-fill ph-file-pdf text-2xl text-red-500 shrink-0" id="doc-file-icon"></i>
+              <div class="text-left min-w-0">
+                <div class="text-xs font-bold text-neutral-900 truncate" id="doc-file-name-label">filename.pdf</div>
+                <div class="text-[10px] text-neutral-400" id="doc-file-size-label">0 KB</div>
+              </div>
+            </div>
+            <button type="button" onclick="event.stopPropagation(); clearDocFileSelection()" class="p-1 text-neutral-400 hover:text-red-600 rounded cursor-pointer" title="Hủy chọn file">
+              <i class="ph ph-trash text-sm"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Tiêu đề tài liệu *</label>
+        <input type="text" id="modal-doc-title" placeholder="Ví dụ: PUMP-X100_Service_Manual_Rev2018.pdf" class="w-full text-xs p-2 rounded-lg border border-neutral-300">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Loại tài liệu</label>
+          <select id="modal-doc-category" class="w-full text-xs p-2 rounded-lg border border-neutral-300">
+            <option value="OEM_MANUAL">Sổ tay kỹ thuật OEM</option>
+            <option value="SYSTEM_SOFTWARE_GUIDE">Cẩm nang hướng dẫn phần mềm</option>
+          </select>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold text-neutral-700">Model áp dụng</label>
+          </div>
+          <div class="flex gap-1.5">
+            <select id="modal-doc-model-select" onchange="syncModelSelection('modal-doc-model-select', 'modal-doc-model')" class="w-1/2 text-xs p-2 rounded-lg border border-neutral-300 bg-white focus:ring-1 focus:ring-primary cursor-pointer">
+              <option value="">-- Chọn Model --</option>
+              {% for m in available_models %}
+                <option value="{{ m }}">{{ m }}</option>
+              {% endfor %}
+              <option value="CUSTOM">Khác...</option>
+            </select>
+            <input type="text" id="modal-doc-model" list="asset-models-datalist" placeholder="PUMP-X100" class="w-1/2 text-xs p-2 rounded-lg border border-neutral-300">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-neutral-700 mb-1">Nội dung văn bản (Xem trước hoặc dán trực tiếp)</label>
+        <textarea id="modal-doc-content" rows="4" placeholder="Nếu không tải file PDF/Word, bạn có thể dán nội dung hướng dẫn bảo trì SOP hoặc cẩm nang Markdown vào đây..." class="w-full text-xs p-2 rounded-lg border border-neutral-300 font-mono"></textarea>
+      </div>
+    </div>
+    <div class="px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-2">
+      <button onclick="closeUploadDocModal()" class="px-3.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer">Hủy</button>
+      <button onclick="uploadDocument()" id="modal-doc-submit-btn" class="px-4 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5">
+        <i class="ph ph-upload text-sm"></i>
+        <span>Tải Lên & Vector Hóa</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Xem Chi Tiết Nội Dung Tài Liệu Kỹ Thuật (Tab 3) -->
+<div id="view-doc-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
+      <div class="min-w-0 pr-4">
+        <h3 class="font-bold text-sm text-neutral-900 truncate flex items-center gap-2">
+          <i class="ph-fill ph-file-text text-primary text-xl shrink-0"></i>
+          <span id="detail-doc-title">Chi Tiết Tài Liệu</span>
+        </h3>
+        <p class="text-[11px] text-neutral-500 mt-0.5 truncate" id="detail-doc-meta">Đang tải thông tin...</p>
+      </div>
+      <button onclick="closeDocDetailModal()" class="text-neutral-400 hover:text-neutral-600 cursor-pointer p-1.5 rounded-lg hover:bg-neutral-200 transition-colors">
+        <i class="ph ph-x text-lg"></i>
+      </button>
+    </div>
+    
+    <!-- Body Scrollable Chunks Content -->
+    <div class="p-6 overflow-y-auto space-y-4 flex-1 bg-neutral-50/50" id="detail-doc-content-body">
+      <div class="flex items-center justify-center py-16 text-neutral-400">
+        <i class="ph ph-spinner animate-spin text-2xl mr-2 text-primary"></i> Đang tải dữ liệu đoạn tri thức...
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex justify-between items-center shrink-0">
+      <span class="text-xs font-semibold text-neutral-600" id="detail-chunks-count">0 đoạn chunks</span>
+      <button onclick="closeDocDetailModal()" class="px-4 py-1.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Tab Switching
+function switchTab(tabName) {
+  const tabs = ['qa', 'queue', 'docs'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`tab-btn-${t}`);
+    const content = document.getElementById(`tab-content-${t}`);
+    if (t === tabName) {
+      btn.className = 'py-3 border-b-2 text-primary border-primary font-bold flex items-center gap-2 cursor-pointer transition-colors';
+      content.classList.remove('hidden');
+    } else {
+      btn.className = 'py-3 border-b-2 text-neutral-500 border-transparent hover:text-neutral-700 flex items-center gap-2 cursor-pointer transition-colors';
+      content.classList.add('hidden');
+    }
+  });
+}
+
+// Modal open/close
+function openAddQAModal() {
+  document.getElementById('add-qa-modal').classList.remove('hidden');
+}
+function closeAddQAModal() {
+  document.getElementById('add-qa-modal').classList.add('hidden');
+}
+function openUploadDocModal() {
+  document.getElementById('upload-doc-modal').classList.remove('hidden');
+}
+function closeUploadDocModal() {
+  document.getElementById('upload-doc-modal').classList.add('hidden');
+}
+function closeDocDetailModal() {
+  document.getElementById('view-doc-detail-modal').classList.add('hidden');
+}
+
+// Model dropdown synchronizer
+function syncModelSelection(selectId, inputId) {
+  const sel = document.getElementById(selectId);
+  const inp = document.getElementById(inputId);
+  if (sel.value && sel.value !== 'CUSTOM') {
+    inp.value = sel.value;
+  } else if (sel.value === 'CUSTOM') {
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+function toggleModalFields() {
+  const cat = document.getElementById('modal-qa-category').value;
+  const equipFields = document.getElementById('modal-equip-fields');
+  if (cat === 'SYSTEM_FEATURE_GUIDE') {
+    equipFields.classList.add('hidden');
+  } else {
+    equipFields.classList.remove('hidden');
+  }
+}
+
+// File Selection Handler
+function handleDocFileSelected(input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    const emptyState = document.getElementById('doc-file-empty-state');
+    const activeState = document.getElementById('doc-file-active-state');
+    const nameLabel = document.getElementById('doc-file-name-label');
+    const sizeLabel = document.getElementById('doc-file-size-label');
+    const iconElem = document.getElementById('doc-file-icon');
+    const titleInput = document.getElementById('modal-doc-title');
+
+    nameLabel.innerText = file.name;
+    sizeLabel.innerText = formatFileSize(file.size);
+    emptyState.classList.add('hidden');
+    activeState.classList.remove('hidden');
+
+    // Auto set title if empty
+    if (!titleInput.value.trim()) {
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
+      titleInput.value = cleanName;
+    }
+
+    // Set appropriate icon
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+      iconElem.className = 'ph-fill ph-file-pdf text-2xl text-red-500 shrink-0';
+    } else if (ext === 'docx' || ext === 'doc') {
+      iconElem.className = 'ph-fill ph-file-doc text-2xl text-blue-500 shrink-0';
+    } else {
+      iconElem.className = 'ph-fill ph-file-text text-2xl text-emerald-500 shrink-0';
+    }
+
+    // If text file, preview content
+    if (ext === 'txt' || ext === 'md') {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('modal-doc-content').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+  }
+}
+
+function clearDocFileSelection() {
+  const fileInput = document.getElementById('modal-doc-file');
+  fileInput.value = '';
+  document.getElementById('doc-file-empty-state').classList.remove('hidden');
+  document.getElementById('doc-file-active-state').classList.add('hidden');
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// Upload Document with File / Text
+async function uploadDocument() {
+  const title = document.getElementById('modal-doc-title').value.trim();
+  const category = document.getElementById('modal-doc-category').value;
+  const isSystemGuide = category === 'SYSTEM_SOFTWARE_GUIDE';
+  const model = document.getElementById('modal-doc-model').value.trim();
+  const content = document.getElementById('modal-doc-content').value.trim();
+  const fileInput = document.getElementById('modal-doc-file');
+  const submitBtn = document.getElementById('modal-doc-submit-btn');
+
+  if (!title && (!fileInput.files || fileInput.files.length === 0)) {
+    alert('Vui lòng nhập tiêu đề hoặc chọn tệp tải lên.');
+    return;
+  }
+
+  const formData = new FormData();
+  if (title) formData.append('title', title);
+  formData.append('category', category);
+  formData.append('isSystemGuide', isSystemGuide);
+  if (!isSystemGuide && model) {
+    formData.append('applicableModel', model);
+  }
+  if (content) {
+    formData.append('content', content);
+  }
+  if (fileInput.files && fileInput.files.length > 0) {
+    formData.append('file', fileInput.files[0]);
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="ph ph-spinner animate-spin text-sm"></i> Đang tải lên & vector hóa...';
+
+  try {
+    const res = await fetch('/api/v1/assistant/admin/upload-document/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(data.message || 'Tải lên và xử lý tài liệu thành công!');
+      location.reload();
+    } else {
+      alert('Lỗi: ' + (data.error || 'Không thể tải lên'));
+    }
+  } catch (err) {
+    alert('Lỗi kết nối máy chủ khi tải lên.');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="ph ph-upload text-sm"></i><span>Tải Lên & Vector Hóa</span>';
+  }
+}
+
+// View Document Details Modal
+async function viewDocDetail(docId) {
+  const modal = document.getElementById('view-doc-detail-modal');
+  const titleElem = document.getElementById('detail-doc-title');
+  const metaElem = document.getElementById('detail-doc-meta');
+  const bodyElem = document.getElementById('detail-doc-content-body');
+  const countElem = document.getElementById('detail-chunks-count');
+
+  modal.classList.remove('hidden');
+  titleElem.innerText = 'Đang tải dữ liệu...';
+  metaElem.innerText = '';
+  bodyElem.innerHTML = `
+    <div class="flex items-center justify-center py-16 text-neutral-400">
+      <i class="ph ph-spinner animate-spin text-2xl mr-2 text-primary"></i> Đang tải dữ liệu đoạn tri thức...
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`/api/v1/assistant/admin/documents/${docId}/`, {
+      headers: { 'X-CSRFToken': getCsrfToken() }
+    });
+    const resData = await res.json();
+    if (!resData.success) {
+      bodyElem.innerHTML = `<div class="p-4 bg-red-50 text-red-700 text-xs rounded-xl">${resData.error || 'Lỗi tải chi tiết'}</div>`;
+      return;
+    }
+
+    const doc = resData.data;
+    titleElem.innerText = doc.title;
+    metaElem.innerText = `Phân loại: ${doc.categoryDisplay} • Model: ${doc.applicableModel} • Năm: ${doc.applicableYearStart}-${doc.applicableYearEnd} • Ngày tạo: ${doc.createdAt}`;
+    countElem.innerText = `${doc.chunksCount} đoạn phân đoạn vector (Chunks)`;
+
+    if (doc.chunks && doc.chunks.length > 0) {
+      let chunksHtml = '';
+      doc.chunks.forEach((chunk, idx) => {
+        let anchorsHtml = '';
+        if (chunk.imageAnchors && chunk.imageAnchors.length > 0) {
+          anchorsHtml = `
+            <div class="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-neutral-100">
+              ${chunk.imageAnchors.map(a => `
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  <i class="ph ph-image"></i> Neo sơ đồ: ${escapeHtml(a.anchorCode || a.caption || '')} (Trang ${a.pageNumber || 1})
+                </span>
+              `).join('')}
+            </div>
+          `;
+        }
+
+        chunksHtml += `
+          <div class="bg-white rounded-xl border border-neutral-200 p-4 shadow-2xs space-y-2">
+            <div class="flex items-center justify-between border-b border-neutral-100 pb-2">
+              <span class="text-xs font-bold text-primary flex items-center gap-1.5">
+                <i class="ph ph-hash"></i> Đoạn #${idx + 1} • Trang ${chunk.pageNumber || 1}
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-600">
+                ${chunk.sourceType || 'OEM_MANUAL'}
+              </span>
+            </div>
+            <div class="text-xs text-neutral-800 leading-relaxed font-sans whitespace-pre-line bg-neutral-50/50 p-3 rounded-lg border border-neutral-100 font-mono text-[11px]">
+              ${escapeHtml(chunk.content)}
+            </div>
+            ${anchorsHtml}
+          </div>
+        `;
+      });
+      bodyElem.innerHTML = chunksHtml;
+    } else {
+      bodyElem.innerHTML = `<div class="p-8 text-center text-neutral-400 text-xs">Tài liệu này chưa có đoạn vector chunks nào.</div>`;
+    }
+
+  } catch (err) {
+    bodyElem.innerHTML = `<div class="p-4 bg-red-50 text-red-700 text-xs rounded-xl">Lỗi kết nối khi tải chi tiết tài liệu.</div>`;
+  }
+}
+
+// Save Curated Q&A
+async function saveCuratedQA() {
+  const category = document.getElementById('modal-qa-category').value;
+  const isSystemGuide = category === 'SYSTEM_FEATURE_GUIDE';
+  const model = document.getElementById('modal-qa-model').value.trim();
+  const yearStart = parseInt(document.getElementById('modal-qa-year-start').value) || 1900;
+  const yearEnd = parseInt(document.getElementById('modal-qa-year-end').value) || 2100;
+  const question = document.getElementById('modal-qa-question').value.trim();
+  const answer = document.getElementById('modal-qa-answer').value.trim();
+
+  if (!question || !answer) {
+    alert('Vui lòng nhập đầy đủ câu hỏi và câu trả lời.');
+    return;
+  }
+
+  const payload = {
+    category: category,
+    isSystemGuide: isSystemGuide,
+    applicableModel: isSystemGuide ? null : model,
+    applicableYearStart: yearStart,
+    applicableYearEnd: yearEnd,
+    questionPattern: question,
+    goldAnswer: answer
+  };
+
+  try {
+    const res = await fetch('/api/v1/assistant/admin/qa/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('Đã lưu Tri thức Vàng thành công!');
+      location.reload();
+    } else {
+      alert('Lỗi: ' + (data.error || 'Không thể lưu'));
+    }
+  } catch (err) {
+    alert('Lỗi kết nối máy chủ.');
+  }
+}
+
+// Delete QA
+async function deleteQA(id) {
+  if (!confirm('Bạn có chắc chắn muốn xóa câu hỏi tri thức này?')) return;
+  try {
+    const res = await fetch(`/api/v1/assistant/admin/qa/${id}/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': getCsrfToken() }
+    });
+    const data = await res.json();
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Lỗi xóa câu hỏi: ' + data.error);
+    }
+  } catch (err) {
+    alert('Lỗi kết nối.');
+  }
+}
+
+// Approve Curation Queue
+async function approveQueueItem(id) {
+  const curatedText = document.getElementById(`curated-text-${id}`).value.trim();
+  if (!curatedText) {
+    alert('Vui lòng nhập câu trả lời chuẩn.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/assistant/admin/curation-queue/${id}/approve/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({ curatedAnswer: curatedText })
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert('Đã phê duyệt và lưu thành Tri thức Vàng!');
+      const card = document.getElementById(`queue-card-${id}`);
+      if (card) card.remove();
+    } else {
+      alert('Lỗi phê duyệt: ' + data.error);
+    }
+  } catch (err) {
+    alert('Lỗi kết nối.');
+  }
+}
+
+// Reindex Work Orders
+async function triggerReindex() {
+  if (!confirm('Kích hoạt quét toàn bộ phiếu Work Order hoàn thành để nạp tri thức ngầm vào PGVector?')) return;
+  try {
+    const res = await fetch('/api/v1/assistant/admin/reindex/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }
+    });
+    const data = await res.json();
+    if (data.success) {
+      alert(data.message);
+      location.reload();
+    } else {
+      alert('Lỗi: ' + data.error);
+    }
+  } catch (err) {
+    alert('Lỗi kết nối.');
+  }
+}
+
+// CSRF & Utilities
+function getCsrfToken() {
+  const cookieValue = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1];
+  return cookieValue || '';
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/[&<>"']/g, function(m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+  });
+}
+
+// Client-Side Pagination for Tables
+let qaCurrentPage = 1;
+let qaPageSize = 8;
+let qaCurrentFilterCat = 'ALL';
+let qaSearchQuery = '';
+
+let docsCurrentPage = 1;
+let docsPageSize = 8;
+
+function renderQAPagination() {
+  const rows = Array.from(document.querySelectorAll('.qa-row'));
+  const filteredRows = rows.filter(r => {
+    const catMatch = qaCurrentFilterCat === 'ALL' || r.getAttribute('data-cat') === qaCurrentFilterCat;
+    const searchMatch = !qaSearchQuery || r.innerText.toLowerCase().includes(qaSearchQuery);
+    return catMatch && searchMatch;
+  });
+
+  const total = filteredRows.length;
+  const totalPages = Math.ceil(total / qaPageSize) || 1;
+  if (qaCurrentPage > totalPages) qaCurrentPage = totalPages;
+  if (qaCurrentPage < 1) qaCurrentPage = 1;
+
+  // Hide all rows first
+  rows.forEach(r => r.style.display = 'none');
+
+  // Show page slice
+  const startIdx = (qaCurrentPage - 1) * qaPageSize;
+  const endIdx = Math.min(startIdx + qaPageSize, total);
+  for (let i = startIdx; i < endIdx; i++) {
+    filteredRows[i].style.display = '';
+  }
+
+  // Update empty row
+  const emptyRow = document.getElementById('qa-empty-row');
+  if (emptyRow) {
+    emptyRow.style.display = total === 0 ? '' : 'none';
+  }
+
+  // Info label
+  const infoElem = document.getElementById('qa-pagination-info');
+  if (total === 0) {
+    infoElem.innerText = 'Không tìm thấy câu hỏi phù hợp.';
+  } else {
+    infoElem.innerText = `Hiển thị ${startIdx + 1} - ${endIdx} trong tổng số ${total} câu hỏi`;
+  }
+
+  // Controls
+  const controlsElem = document.getElementById('qa-pagination-controls');
+  if (totalPages <= 1) {
+    controlsElem.innerHTML = '';
+    return;
+  }
+
+  let btnsHtml = `
+    <button onclick="changeQAPage(${qaCurrentPage - 1})" ${qaCurrentPage === 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-neutral-300 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+      <i class="ph ph-caret-left"></i>
+    </button>
+  `;
+
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || (p >= qaCurrentPage - 1 && p <= qaCurrentPage + 1)) {
+      btnsHtml += `
+        <button onclick="changeQAPage(${p})" class="px-2.5 py-1 rounded text-xs font-semibold ${p === qaCurrentPage ? 'bg-primary text-white border border-primary' : 'border border-neutral-300 hover:bg-neutral-100 text-neutral-700'} cursor-pointer">
+          ${p}
+        </button>
+      `;
+    } else if (p === qaCurrentPage - 2 || p === qaCurrentPage + 2) {
+      btnsHtml += `<span class="px-1 text-neutral-400">...</span>`;
+    }
+  }
+
+  btnsHtml += `
+    <button onclick="changeQAPage(${qaCurrentPage + 1})" ${qaCurrentPage === totalPages ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-neutral-300 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+      <i class="ph ph-caret-right"></i>
+    </button>
+  `;
+
+  controlsElem.innerHTML = btnsHtml;
+}
+
+function changeQAPage(page) {
+  qaCurrentPage = page;
+  renderQAPagination();
+}
+
+function filterQACategory(cat) {
+  qaCurrentFilterCat = cat;
+  qaCurrentPage = 1;
+
+  // Active button styling
+  const btns = { 'ALL': 'filter-all', 'EQUIPMENT_MAINTENANCE': 'filter-equip', 'SYSTEM_FEATURE_GUIDE': 'filter-sys' };
+  Object.keys(btns).forEach(k => {
+    const b = document.getElementById(btns[k]);
+    if (b) {
+      if (k === cat) {
+        b.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-primary text-white cursor-pointer transition-colors';
+      } else {
+        b.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600 hover:bg-neutral-200 cursor-pointer transition-colors';
+      }
+    }
+  });
+
+  renderQAPagination();
+}
+
+function filterQATable() {
+  qaSearchQuery = document.getElementById('qa-search-input').value.toLowerCase().trim();
+  qaCurrentPage = 1;
+  renderQAPagination();
+}
+
+// Docs Table Pagination
+function renderDocsPagination() {
+  const rows = Array.from(document.querySelectorAll('.docs-row'));
+  const total = rows.length;
+  const totalPages = Math.ceil(total / docsPageSize) || 1;
+  if (docsCurrentPage > totalPages) docsCurrentPage = totalPages;
+  if (docsCurrentPage < 1) docsCurrentPage = 1;
+
+  rows.forEach(r => r.style.display = 'none');
+  const startIdx = (docsCurrentPage - 1) * docsPageSize;
+  const endIdx = Math.min(startIdx + docsPageSize, total);
+  for (let i = startIdx; i < endIdx; i++) {
+    rows[i].style.display = '';
+  }
+
+  const emptyRow = document.getElementById('docs-empty-row');
+  if (emptyRow) {
+    emptyRow.style.display = total === 0 ? '' : 'none';
+  }
+
+  const infoElem = document.getElementById('docs-pagination-info');
+  if (total === 0) {
+    infoElem.innerText = 'Chưa có tài liệu nào.';
+  } else {
+    infoElem.innerText = `Hiển thị ${startIdx + 1} - ${endIdx} trong tổng số ${total} tài liệu`;
+  }
+
+  const controlsElem = document.getElementById('docs-pagination-controls');
+  if (totalPages <= 1) {
+    controlsElem.innerHTML = '';
+    return;
+  }
+
+  let btnsHtml = `
+    <button onclick="changeDocsPage(${docsCurrentPage - 1})" ${docsCurrentPage === 1 ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-neutral-300 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+      <i class="ph ph-caret-left"></i>
+    </button>
+  `;
+  for (let p = 1; p <= totalPages; p++) {
+    btnsHtml += `
+      <button onclick="changeDocsPage(${p})" class="px-2.5 py-1 rounded text-xs font-semibold ${p === docsCurrentPage ? 'bg-primary text-white border border-primary' : 'border border-neutral-300 hover:bg-neutral-100 text-neutral-700'} cursor-pointer">
+        ${p}
+      </button>
+    `;
+  }
+  btnsHtml += `
+    <button onclick="changeDocsPage(${docsCurrentPage + 1})" ${docsCurrentPage === totalPages ? 'disabled' : ''} class="px-2.5 py-1 rounded border border-neutral-300 text-xs hover:bg-neutral-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+      <i class="ph ph-caret-right"></i>
+    </button>
+  `;
+  controlsElem.innerHTML = btnsHtml;
+}
+
+function changeDocsPage(page) {
+  docsCurrentPage = page;
+  renderDocsPagination();
+}
+
+// Initial Run
+document.addEventListener('DOMContentLoaded', function() {
+  renderQAPagination();
+  renderDocsPagination();
+});
+</script>
+{% endblock %}
