@@ -52,6 +52,19 @@ def embed_text(text: str) -> List[float]:
     return vec.tolist()
 
 
+def embed_texts(texts: List[str], batch_size: int = 64) -> List[List[float]]:
+    """
+    Computes 384-dimensional dense semantic embedding vectors for a batch of texts.
+    """
+    if not texts:
+        return []
+    model = get_embedding_model()
+    # Normalize empty strings to avoid errors
+    safe_texts = [t if t else " " for t in texts]
+    vecs = model.encode(safe_texts, batch_size=batch_size, convert_to_numpy=True)
+    return vecs.tolist()
+
+
 def format_vector_for_sql(vector: List[float]) -> str:
     """Formats a list of floats into a PostgreSQL vector string '[0.1, 0.2, ...]'."""
     return "[" + ",".join(f"{v:.6f}" for v in vector) + "]"

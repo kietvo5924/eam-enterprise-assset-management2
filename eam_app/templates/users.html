@@ -42,7 +42,7 @@
   </div>
 
   <!-- Metrics Dashboard (Compact) -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
     <div class="bg-white rounded-xl p-3.5 sm:p-4 border border-neutral-200/60 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
       <div class="absolute top-0 right-0 w-20 h-20 bg-primary-50/50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-start relative z-10">
@@ -123,8 +123,8 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-auto p-2">
-      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table min-w-max">
+    <div class="flex-1 overflow-x-auto overflow-y-auto p-2 sm:p-4 custom-scrollbar">
+      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table min-w-[700px]">
         <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200/80">
           <tr>
             <th class="px-4 py-2.5 font-bold cursor-pointer select-none" onclick="setSort('username')">Tên tài khoản <i id="sort-icon-username" class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50 sort-icon"></i></th>
@@ -237,7 +237,7 @@
 </div>
 
 <!-- Add/Edit User Modal -->
-<div id="user-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+<div id="user-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-[500px] overflow-hidden flex flex-col max-h-[90vh]">
     <div class="px-5 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
@@ -253,10 +253,10 @@
         <i class="ph ph-x"></i>
       </button>
     </div>
-    <div class="overflow-y-auto p-5">
-        <form id="user-form" class="space-y-3.5">
-          <input type="hidden" id="user-id" />
-          <div id="user-msg" class="hidden mb-3 p-2.5 rounded-lg text-xs"></div>
+    <form id="user-form" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <input type="hidden" id="user-id" />
+      <div class="overflow-y-auto p-4 sm:p-5 flex-1 custom-scrollbar space-y-3.5">
+        <div id="user-msg" class="hidden mb-3 p-2.5 rounded-lg text-xs"></div>
           
           <div>
             <label class="block text-xs font-bold text-neutral-700 mb-1">Tên đăng nhập <span class="text-danger">*</span></label>
@@ -435,18 +435,17 @@
               </p>
             </div>
           </div>
-          
-          <div class="pt-3 flex justify-end gap-2.5 mt-5">
-            <button type="button" onclick="closeUserModal()" class="h-9 px-4 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition">Hủy</button>
-            <button type="submit" id="btn-save-user" class="h-9 px-5 text-xs font-bold rounded-lg bg-gradient-to-r from-primary to-primary-600 border-0 shadow-xs shadow-primary/30 text-white hover:scale-102 transition-transform disabled:opacity-50">Lưu Người Dùng</button>
-          </div>
-        </form>
-    </div>
+      </div>
+      <div class="px-5 py-3.5 bg-neutral-50/50 border-t border-neutral-100 shrink-0 flex flex-wrap justify-end gap-2.5">
+        <button type="button" onclick="closeUserModal()" class="h-9 px-4 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition">Hủy</button>
+        <button type="submit" id="btn-save-user" class="h-9 px-5 text-xs font-bold rounded-lg bg-gradient-to-r from-primary to-primary-600 border-0 shadow-xs shadow-primary/30 text-white hover:scale-102 transition-transform disabled:opacity-50">Lưu Người Dùng</button>
+      </div>
+    </form>
   </div>
 </div>
 
 <!-- Invite User Modal -->
-<div id="invite-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+<div id="invite-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-[500px] overflow-hidden flex flex-col max-h-[90vh]">
     <div class="px-5 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
@@ -462,54 +461,53 @@
         <i class="ph ph-x"></i>
       </button>
     </div>
-    <div class="overflow-y-auto p-5">
-        <form id="invite-form" class="space-y-3.5">
-          <div id="invite-msg" class="hidden mb-3 p-2.5 rounded-lg text-xs"></div>
-          
-          <div>
-            <label class="block text-xs font-bold text-neutral-700 mb-1">Tên đăng nhập <span class="text-danger">*</span></label>
-            <input type="text" id="invite-username" required class="w-full px-3.5 h-10 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="Nhập tên đăng nhập..." />
-          </div>
-          
-          <div>
-            <label class="block text-xs font-bold text-neutral-700 mb-1">Địa chỉ Email <span class="text-danger">*</span></label>
-            <input type="email" id="invite-email" required class="w-full px-3.5 h-10 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="user@company.com" />
-          </div>
+    <form id="invite-form" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div class="overflow-y-auto p-4 sm:p-5 flex-1 custom-scrollbar space-y-3.5">
+        <div id="invite-msg" class="hidden mb-3 p-2.5 rounded-lg text-xs"></div>
+        
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Tên đăng nhập <span class="text-danger">*</span></label>
+          <input type="text" id="invite-username" required class="w-full px-3.5 h-10 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="Nhập tên đăng nhập..." />
+        </div>
+        
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Địa chỉ Email <span class="text-danger">*</span></label>
+          <input type="email" id="invite-email" required class="w-full px-3.5 h-10 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="user@company.com" />
+        </div>
 
-          <div>
-            <label class="block text-xs font-bold text-neutral-700 mb-1">Mật khẩu tạm thời <span class="text-danger">*</span></label>
-            <input type="password" id="invite-password" required minlength="6" class="w-full px-3.5 h-10 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="Nhập mật khẩu tạm thời..." />
-          </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Mật khẩu tạm thời <span class="text-danger">*</span></label>
+          <input type="password" id="invite-password" required minlength="6" class="w-full px-3.5 h-10 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:border-primary focus:bg-white hover:border-primary transition" placeholder="Nhập mật khẩu tạm thời..." />
+        </div>
 
-          <div>
-            <label class="block text-xs font-bold text-neutral-700 mb-1">Vai trò (Roles)</label>
-            <select id="invite-roles" multiple placeholder="Chọn vai trò..." autocomplete="off">
-                {% for r in roles %}
-                <option value="{{ r.id }}">{{ r.name }}</option>
-                {% endfor %}
-            </select>
-          </div>
-          
-          <div class="pt-3 flex justify-end gap-2.5 mt-5">
-            <button type="button" onclick="closeInviteModal()" class="h-9 px-4 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition">Hủy</button>
-            <button type="submit" id="btn-invite-user" class="h-9 px-5 text-xs font-bold rounded-lg bg-gradient-to-r from-primary to-primary-600 border-0 shadow-xs shadow-primary/30 text-white hover:scale-102 transition-transform disabled:opacity-50">Gửi Lời Mời</button>
-          </div>
-        </form>
-    </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 mb-1">Vai trò (Roles)</label>
+          <select id="invite-roles" multiple placeholder="Chọn vai trò..." autocomplete="off">
+              {% for r in roles %}
+              <option value="{{ r.id }}">{{ r.name }}</option>
+              {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="px-5 py-3.5 bg-neutral-50/50 border-t border-neutral-100 shrink-0 flex flex-wrap justify-end gap-2.5">
+        <button type="button" onclick="closeInviteModal()" class="h-9 px-4 text-xs font-semibold rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition">Hủy</button>
+        <button type="submit" id="btn-invite-user" class="h-9 px-5 text-xs font-bold rounded-lg bg-gradient-to-r from-primary to-primary-600 border-0 shadow-xs shadow-primary/30 text-white hover:scale-102 transition-transform disabled:opacity-50">Gửi Lời Mời</button>
+      </div>
+    </form>
   </div>
 </div>
 
 
 <!-- Import Users Modal -->
-<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-  <div class="bg-white rounded-3xl shadow-xl w-full max-w-[560px] overflow-hidden flex flex-col p-0">
+<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-3xl shadow-xl w-full max-w-[560px] max-h-[90vh] overflow-hidden flex flex-col p-0">
     <div class="absolute top-4 right-4 z-50">
       <button type="button" onclick="closeImportModal()" class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white hover:bg-danger hover:border-danger transition-all">
         <i class="ph ph-x text-base"></i>
       </button>
     </div>
     
-    <div class="relative overflow-hidden bg-white flex flex-col">
+    <div class="relative overflow-y-auto max-h-[90vh] bg-white flex flex-col custom-scrollbar">
       <!-- Header Section -->
       <div class="relative p-6 pb-10 bg-gradient-to-br from-primary-600 to-info overflow-hidden shrink-0">
         <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
@@ -557,7 +555,7 @@
           </div>
         </div>
 
-        <div class="mt-4 flex justify-end gap-3 hidden" id="import-actions">
+        <div class="mt-4 flex flex-wrap justify-end gap-3 hidden" id="import-actions">
            <button type="button" onclick="document.getElementById('import-file').value = ''; resetImportUI();" class="px-4 py-2 text-sm font-bold text-neutral-600 bg-neutral-100 rounded-lg">Clear</button>
            <button type="button" onclick="submitImport()" id="btn-submit-import" class="px-6 py-2 bg-primary text-white text-sm font-bold rounded-lg shadow-md shadow-primary/20">Upload & Import</button>
         </div>

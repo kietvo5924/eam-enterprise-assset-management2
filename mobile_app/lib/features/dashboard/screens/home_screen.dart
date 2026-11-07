@@ -93,6 +93,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.neutral50,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 72.0),
+        child: FloatingActionButton.extended(
+          heroTag: 'home_assistant_fab',
+          onPressed: () => context.push('/assistant'),
+          backgroundColor: const Color(0xFF0F172A),
+          elevation: 4,
+          icon: Icon(
+            PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+            color: const Color(0xFF38BDF8),
+            size: 18,
+          ),
+          label: const Text(
+            'Trợ lý AI',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -505,6 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 18),
 
               // Section Title

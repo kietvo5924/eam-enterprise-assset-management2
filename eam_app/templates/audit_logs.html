@@ -28,7 +28,7 @@
   </div>
 
   <!-- Metrics Dashboard (Compact) -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
     <div class="bg-white rounded-xl p-3.5 sm:p-4 border border-neutral-200/60 shadow-sm hover:shadow-md transition relative overflow-hidden group">
       <div class="absolute top-0 right-0 w-20 h-20 bg-primary-50/50 rounded-bl-full -mr-3 -mt-3 transition-transform group-hover:scale-110"></div>
       <div class="flex justify-between items-start relative z-10">
@@ -87,17 +87,17 @@
     
     <!-- Filter Bar (Compact) -->
     <div class="p-3 sm:p-4 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md shrink-0 relative z-10 flex flex-wrap gap-2.5 items-center">
-      <select id="filter-action" onchange="applyFilters()" class="w-[170px] h-9 px-3 rounded-lg border border-neutral-300 bg-white text-xs font-medium focus:outline-none focus:border-primary">
+      <select id="filter-action" onchange="applyFilters()" class="w-full sm:w-[170px] h-9 px-3 rounded-lg border border-neutral-300 bg-white text-xs font-medium focus:outline-none focus:border-primary">
         <option value="">Tất cả thao tác</option>
         <option value="CREATE">CREATE (Tạo mới)</option>
         <option value="UPDATE">UPDATE (Cập nhật)</option>
         <option value="DELETE">DELETE (Xóa bỏ)</option>
       </select>
       
-      <input type="text" id="filter-entity" onkeyup="applyFilters()" placeholder="Loại đối tượng (VD: User)" class="w-[190px] h-9 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-primary">
+      <input type="text" id="filter-entity" onkeyup="applyFilters()" placeholder="Loại đối tượng (VD: User)" class="w-full sm:w-[190px] h-9 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-primary">
       
-      <input type="text" id="filter-user" onkeyup="applyFilters()" placeholder="Mã người dùng (User ID)" class="w-[190px] h-9 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-primary">
-      <div class="ml-auto flex gap-2">
+      <input type="text" id="filter-user" onkeyup="applyFilters()" placeholder="Mã người dùng (User ID)" class="w-full sm:w-[190px] h-9 px-3 rounded-lg border border-neutral-300 text-xs font-medium focus:outline-none focus:border-primary">
+      <div class="flex flex-wrap gap-2 sm:ml-auto w-full sm:w-auto justify-end">
         <button onclick="resetFilters()" class="h-9 px-4 rounded-lg font-semibold text-xs text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-colors">Đặt lại</button>
         <button onclick="applyFilters()" class="h-9 px-4 rounded-lg bg-primary text-white text-xs font-bold shadow-sm shadow-primary/30 hover:bg-primary-600 transition-colors">
           Lọc dữ liệu
@@ -106,8 +106,8 @@
     </div>
 
     <!-- Data Table -->
-    <div class="flex-1 flex flex-col p-2 overflow-auto relative">
-      <table class="w-full text-xs text-left whitespace-nowrap" id="auditTable">
+    <div class="flex-1 flex flex-col p-2 overflow-x-auto overflow-y-auto relative custom-scrollbar">
+      <table class="w-full min-w-[700px] text-xs text-left whitespace-nowrap" id="auditTable">
         <thead class="text-[11px] text-neutral-500 uppercase bg-neutral-50/80 backdrop-blur-sm border-b border-neutral-200 sticky top-0 z-10">
           <tr>
             <th class="px-5 py-3 font-bold tracking-wider cursor-pointer" onclick="sortTable(0)">Thời gian <span class="sr-only">Time</span> <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
@@ -189,7 +189,7 @@
       </div>
     </div>
 
-    <div class="border border-neutral-200 rounded-lg overflow-hidden">
+    <div class="border border-neutral-200 rounded-lg overflow-x-auto">
       <table class="w-full text-sm">
         <tbody class="divide-y divide-neutral-100">
           <tr>

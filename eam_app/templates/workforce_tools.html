@@ -117,7 +117,7 @@
   </div>
 
   <!-- Unified Tab Bar -->
-  <div class="bg-white rounded-2xl p-2 border border-neutral-200/80 shadow-sm flex items-center gap-2 overflow-x-auto shrink-0">
+  <div class="bg-white rounded-2xl p-2 border border-neutral-200/80 shadow-sm flex items-center gap-2 overflow-x-auto whitespace-nowrap shrink-0">
     <button onclick="switchTab('skills')" id="tab-btn-skills" class="tab-btn px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2.5 transition-all duration-200 {% if active_tab == 'skills' %}bg-primary text-white shadow-md shadow-primary/25{% else %}text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900{% endif %}">
       <i class="ph ph-graduation-cap text-lg"></i>
       <span>1. Kỹ năng & Chứng chỉ</span>
@@ -149,7 +149,7 @@
       <!-- Card Kỹ Năng -->
       <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col">
         <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-neutral-50/50 to-white">
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-lg font-bold">
               <i class="ph-fill ph-gear-six"></i>
             </div>
@@ -166,7 +166,7 @@
         </div>
 
         <div class="overflow-x-auto flex-1">
-          <table class="w-full text-left text-sm">
+          <table class="w-full text-left text-sm min-w-[600px]">
             <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
               <tr>
                 <th class="py-3 px-4">Mã</th>
@@ -218,7 +218,7 @@
       <!-- Card Chứng Chỉ -->
       <div class="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden flex flex-col">
         <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-neutral-50/50 to-white">
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-2 sm:gap-3">
             <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg font-bold">
               <i class="ph-fill ph-certificate"></i>
             </div>
@@ -235,7 +235,7 @@
         </div>
 
         <div class="overflow-x-auto flex-1">
-          <table class="w-full text-left text-sm">
+          <table class="w-full text-left text-sm min-w-[600px]">
             <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
               <tr>
                 <th class="py-3 px-4">Mã</th>
@@ -381,7 +381,7 @@
             <tr class="hover:bg-neutral-50/60 transition {% if row.tech.id == request.user.id %}bg-primary-50/40 border-l-4 border-primary font-semibold{% endif %}">
               <!-- Cột KTV -->
               <td class="py-3 px-4">
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                   <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-primary-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
                     {{ row.tech.first_name|default:row.tech.username|slice:":2"|upper }}
                   </div>
@@ -467,7 +467,7 @@
           <p class="text-xs text-neutral-500 m-0 mt-0.5">Quản lý từng thiết bị theo Serial, ngày hiệu chuẩn gần nhất và thời hạn kiểm định định kỳ</p>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
           {% if can_manage_tools %}
           <button onclick="openToolModal()" class="px-3.5 py-1.5 rounded-xl border border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-bold text-xs flex items-center gap-1.5 transition">
             <i class="ph ph-plus-circle text-primary"></i> Thêm Chủng loại công cụ
@@ -515,7 +515,7 @@
 
       <!-- Table Tool Instances -->
       <div class="overflow-x-auto flex-1">
-        <table class="w-full text-left text-sm">
+        <table class="w-full text-left text-sm min-w-[850px]">
           <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
             <tr>
               <th class="py-3 px-4">Chủng loại công cụ</th>
@@ -612,7 +612,7 @@
       </div>
 
       <div class="overflow-x-auto flex-1">
-        <table class="w-full text-left text-sm">
+        <table class="w-full text-left text-sm min-w-[750px]">
           <thead class="bg-neutral-50 text-neutral-500 font-bold text-xs uppercase border-b border-neutral-200">
             <tr>
               <th class="py-3 px-4">Lệnh bảo trì</th>
@@ -686,309 +686,321 @@
 
 <!-- 1. Modal Kỹ Năng -->
 <div id="modal-skill" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all max-h-[90vh] flex flex-col">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white shrink-0">
       <h3 id="skill-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Kỹ năng mới</h3>
       <button onclick="closeModal('modal-skill')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
     </div>
-    <form id="form-skill" onsubmit="submitSkill(event)" class="p-6 space-y-4">
+    <form id="form-skill" onsubmit="submitSkill(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <input type="hidden" id="skill-id" name="id">
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Kỹ năng *</label>
-        <input type="text" id="skill-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary uppercase" placeholder="VD: WELD_6G, PLC_SIEMENS">
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Kỹ năng *</label>
+          <input type="text" id="skill-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary uppercase" placeholder="VD: WELD_6G, PLC_SIEMENS">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Kỹ năng *</label>
+          <input type="text" id="skill-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Hàn áp lực cao 6G">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Nhóm Ngành nghề</label>
+          <select id="skill-category" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+            <option value="Cơ khí">Cơ khí & Gia công</option>
+            <option value="Điện">Điện & Trạm biến áp</option>
+            <option value="Tự động hóa">Tự động hóa & PLC</option>
+            <option value="Nhiệt lạnh">HVAC & Làm lạnh công nghiệp</option>
+            <option value="Tổng hợp">Bảo trì tổng hợp</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mô tả chi tiết</label>
+          <textarea id="skill-desc" rows="2" class="w-full p-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Mô tả tiêu chuẩn năng lực..."></textarea>
+        </div>
+        <div class="flex items-center gap-2 pt-2">
+          <input type="checkbox" id="skill-active" checked class="w-4 h-4 text-primary rounded">
+          <label for="skill-active" class="text-sm font-semibold text-neutral-700">Kích hoạt kỹ năng này</label>
+        </div>
       </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Kỹ năng *</label>
-        <input type="text" id="skill-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Hàn áp lực cao 6G">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Nhóm Ngành nghề</label>
-        <select id="skill-category" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
-          <option value="Cơ khí">Cơ khí & Gia công</option>
-          <option value="Điện">Điện & Trạm biến áp</option>
-          <option value="Tự động hóa">Tự động hóa & PLC</option>
-          <option value="Nhiệt lạnh">HVAC & Làm lạnh công nghiệp</option>
-          <option value="Tổng hợp">Bảo trì tổng hợp</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mô tả chi tiết</label>
-        <textarea id="skill-desc" rows="2" class="w-full p-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Mô tả tiêu chuẩn năng lực..."></textarea>
-      </div>
-      <div class="flex items-center gap-2 pt-2">
-        <input type="checkbox" id="skill-active" checked class="w-4 h-4 text-primary rounded">
-        <label for="skill-active" class="text-sm font-semibold text-neutral-700">Kích hoạt kỹ năng này</label>
-      </div>
-      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
-        <button type="button" onclick="closeModal('modal-skill')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold shadow-md shadow-primary/25 hover:bg-primary-600">Lưu Kỹ năng</button>
+      <div class="p-3 sm:px-6 sm:py-3.5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 shrink-0 bg-neutral-50/50">
+        <button type="button" onclick="closeModal('modal-skill')" class="px-4 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold shadow-md shadow-primary/25 hover:bg-primary-600">Lưu Kỹ năng</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- 2. Modal Chứng Chỉ -->
-<div id="modal-cert" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white">
+<div id="modal-cert" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all max-h-[90vh] flex flex-col">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-purple-50 to-white shrink-0">
       <h3 id="cert-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Loại Chứng chỉ</h3>
       <button onclick="closeModal('modal-cert')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
     </div>
-    <form id="form-cert" onsubmit="submitCert(event)" class="p-6 space-y-4">
+    <form id="form-cert" onsubmit="submitCert(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <input type="hidden" id="cert-id" name="id">
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Chứng chỉ *</label>
-        <input type="text" id="cert-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary uppercase" placeholder="VD: CERT_HIGH_VOLTAGE">
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Chứng chỉ *</label>
+          <input type="text" id="cert-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono focus:border-primary focus:ring-1 focus:ring-primary uppercase" placeholder="VD: CERT_HIGH_VOLTAGE">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Chứng chỉ *</label>
+          <input type="text" id="cert-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Chứng chỉ an toàn điện cao áp">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Cơ quan / Tổ chức cấp</label>
+          <input type="text" id="cert-body" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Cục Kỹ thuật An toàn Lao động">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Thời hạn hiệu lực theo tháng</label>
+          <input type="number" id="cert-validity" value="12" min="0" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="0 = Vô thời hạn, 12 = 1 năm, 24 = 2 năm">
+        </div>
       </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Chứng chỉ *</label>
-        <input type="text" id="cert-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Chứng chỉ an toàn điện cao áp">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Cơ quan / Tổ chức cấp</label>
-        <input type="text" id="cert-body" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="VD: Cục Kỹ thuật An toàn Lao động">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Thời hạn hiệu lực theo tháng</label>
-        <input type="number" id="cert-validity" value="12" min="0" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary focus:ring-1 focus:ring-primary" placeholder="0 = Vô thời hạn, 12 = 1 năm, 24 = 2 năm">
-      </div>
-      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
-        <button type="button" onclick="closeModal('modal-cert')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 text-white text-sm font-bold shadow-md shadow-purple-600/25 hover:bg-purple-700">Lưu Chứng chỉ</button>
+      <div class="p-3 sm:px-6 sm:py-3.5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 shrink-0 bg-neutral-50/50">
+        <button type="button" onclick="closeModal('modal-cert')" class="px-4 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-purple-600 text-white text-xs sm:text-sm font-bold shadow-md shadow-purple-600/25 hover:bg-purple-700">Lưu Chứng chỉ</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- 3. Modal Ca Trực -->
-<div id="modal-shift" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-amber-50 to-white">
+<div id="modal-shift" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all max-h-[90vh] flex flex-col">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-amber-50 to-white shrink-0">
       <h3 id="shift-modal-title" class="font-black text-lg text-neutral-900 m-0">Khung Mẫu Ca Trực</h3>
       <button onclick="closeModal('modal-shift')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
     </div>
-    <form id="form-shift" onsubmit="submitShift(event)" class="p-6 space-y-4">
+    <form id="form-shift" onsubmit="submitShift(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <input type="hidden" id="shift-id" name="id">
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Ca *</label>
-        <input type="text" id="shift-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: SHIFT_1, SHIFT_NIGHT">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Ca trực *</label>
-        <input type="text" id="shift-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Ca 1 Sáng, Ca Đêm">
-      </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Giờ bắt đầu *</label>
-          <input type="time" id="shift-start" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Ca *</label>
+          <input type="text" id="shift-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: SHIFT_1, SHIFT_NIGHT">
         </div>
         <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Giờ kết thúc *</label>
-          <input type="time" id="shift-end" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Ca trực *</label>
+          <input type="text" id="shift-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Ca 1 Sáng, Ca Đêm">
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Giờ bắt đầu *</label>
+            <input type="time" id="shift-start" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Giờ kết thúc *</label>
+            <input type="time" id="shift-end" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+          </div>
+        </div>
+        <div class="flex items-center gap-2 pt-2">
+          <input type="checkbox" id="shift-overnight" class="w-4 h-4 text-primary rounded">
+          <label for="shift-overnight" class="text-sm font-semibold text-neutral-700">Ca trực kéo dài qua ngày hôm sau</label>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Màu sắc nhận diện</label>
+          <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <input type="color" id="shift-color" value="#0284c7" class="w-10 h-10 p-0 border-0 rounded-lg cursor-pointer">
+            <span class="text-xs text-neutral-500">Màu hiển thị trên ma trận lịch trực</span>
+          </div>
         </div>
       </div>
-      <div class="flex items-center gap-2 pt-2">
-        <input type="checkbox" id="shift-overnight" class="w-4 h-4 text-primary rounded">
-        <label for="shift-overnight" class="text-sm font-semibold text-neutral-700">Ca trực kéo dài qua ngày hôm sau</label>
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Màu sắc nhận diện</label>
-        <div class="flex items-center gap-3">
-          <input type="color" id="shift-color" value="#0284c7" class="w-10 h-10 p-0 border-0 rounded-lg cursor-pointer">
-          <span class="text-xs text-neutral-500">Màu hiển thị trên ma trận lịch trực</span>
-        </div>
-      </div>
-      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
-        <button type="button" onclick="closeModal('modal-shift')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-amber-600 text-white text-sm font-bold shadow-md hover:bg-amber-700">Lưu Mẫu ca</button>
+      <div class="p-3 sm:px-6 sm:py-3.5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 shrink-0 bg-neutral-50/50">
+        <button type="button" onclick="closeModal('modal-shift')" class="px-4 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-amber-600 text-white text-xs sm:text-sm font-bold shadow-md hover:bg-amber-700">Lưu Mẫu ca</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- 4. Modal Xếp Ca Lịch Trực KTV -->
-<div id="modal-schedule" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-primary-50 to-white">
+<div id="modal-schedule" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all max-h-[90vh] flex flex-col">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-primary-50 to-white shrink-0">
       <div>
         <h3 class="font-black text-lg text-neutral-900 m-0">Xếp Ca Trực</h3>
         <p id="schedule-modal-subtitle" class="text-xs text-neutral-500 m-0 mt-0.5">KTV: Nguyễn Văn An — Ngày: 03/10/2026</p>
       </div>
       <button onclick="closeModal('modal-schedule')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
     </div>
-    <form id="form-schedule" onsubmit="submitSchedule(event)" class="p-6 space-y-4">
+    <form id="form-schedule" onsubmit="submitSchedule(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <input type="hidden" id="sched-user-id">
       <input type="hidden" id="sched-work-date">
 
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-2">Trạng thái làm việc trong ngày *</label>
-        <div class="grid grid-cols-3 gap-2">
-          <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-primary has-[:checked]:bg-primary-50">
-            <input type="radio" name="sched-status" value="ON_DUTY" checked onchange="toggleShiftSelect(true)" class="hidden">
-            <i class="ph ph-briefcase text-xl text-primary mb-1"></i>
-            <span class="text-xs font-bold text-neutral-800">Đi ca</span>
-          </label>
-          <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100">
-            <input type="radio" name="sched-status" value="OFF" onchange="toggleShiftSelect(false)" class="hidden">
-            <i class="ph ph-prohibit text-xl text-slate-500 mb-1"></i>
-            <span class="text-xs font-bold text-neutral-800">Nghỉ ca</span>
-          </label>
-          <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
-            <input type="radio" name="sched-status" value="LEAVE" onchange="toggleShiftSelect(false)" class="hidden">
-            <i class="ph ph-airplane-tilt text-xl text-amber-600 mb-1"></i>
-            <span class="text-xs font-bold text-neutral-800">Nghỉ phép</span>
-          </label>
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-2">Trạng thái làm việc trong ngày *</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-primary has-[:checked]:bg-primary-50">
+              <input type="radio" name="sched-status" value="ON_DUTY" checked onchange="toggleShiftSelect(true)" class="hidden">
+              <i class="ph ph-briefcase text-xl text-primary mb-1"></i>
+              <span class="text-xs font-bold text-neutral-800">Đi ca</span>
+            </label>
+            <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100">
+              <input type="radio" name="sched-status" value="OFF" onchange="toggleShiftSelect(false)" class="hidden">
+              <i class="ph ph-prohibit text-xl text-slate-500 mb-1"></i>
+              <span class="text-xs font-bold text-neutral-800">Nghỉ ca</span>
+            </label>
+            <label class="flex flex-col items-center p-3 rounded-xl border border-neutral-200 cursor-pointer hover:bg-neutral-50 text-center has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+              <input type="radio" name="sched-status" value="LEAVE" onchange="toggleShiftSelect(false)" class="hidden">
+              <i class="ph ph-airplane-tilt text-xl text-amber-600 mb-1"></i>
+              <span class="text-xs font-bold text-neutral-800">Nghỉ phép</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="sched-shift-container">
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Chọn Ca trực *</label>
+          <select id="sched-shift-id" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            {% for sh in shift_templates %}
+            <option value="{{ sh.id }}">{{ sh.name }} ({{ sh.start_time|time:'H:i' }} - {{ sh.end_time|time:'H:i' }}){% if sh.is_overnight %} [Qua đêm]{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div id="sched-zone-container" class="space-y-2">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold text-neutral-700 uppercase">
+              Khu vực phân công trực ca (Duty Zone) <span id="sched-duty-zone-req-star" class="text-danger hidden">*</span>
+            </label>
+            <span id="sched-duty-zone-req-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+              Bắt buộc theo quyền hạn
+            </span>
+          </div>
+          <select id="sched-duty-zone" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            <option value="">-- Chọn khu vực trực thuộc mặt bằng --</option>
+          </select>
+          <p id="sched-duty-zone-hint" class="text-[11px] text-neutral-500 mt-1">
+            Chỉ hiển thị các phân xưởng/khu vực trực thuộc mặt bằng đã gán cho nhân viên này.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ghi chú phân ca</label>
+          <input type="text" id="sched-notes" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Đổi ca trực với thợ B...">
         </div>
       </div>
 
-      <div id="sched-shift-container">
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Chọn Ca trực *</label>
-        <select id="sched-shift-id" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
-          {% for sh in shift_templates %}
-          <option value="{{ sh.id }}">{{ sh.name }} ({{ sh.start_time|time:'H:i' }} - {{ sh.end_time|time:'H:i' }}){% if sh.is_overnight %} [Qua đêm]{% endif %}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div id="sched-zone-container" class="space-y-2">
-        <div class="flex items-center justify-between mb-1">
-          <label class="block text-xs font-bold text-neutral-700 uppercase">
-            Khu vực phân công trực ca (Duty Zone) <span id="sched-duty-zone-req-star" class="text-danger hidden">*</span>
-          </label>
-          <span id="sched-duty-zone-req-badge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
-            Bắt buộc theo quyền hạn
-          </span>
-        </div>
-        <select id="sched-duty-zone" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
-          <option value="">-- Chọn khu vực trực thuộc mặt bằng --</option>
-        </select>
-        <p id="sched-duty-zone-hint" class="text-[11px] text-neutral-500 mt-1">
-          Chỉ hiển thị các phân xưởng/khu vực trực thuộc mặt bằng đã gán cho nhân viên này.
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ghi chú phân ca</label>
-        <input type="text" id="sched-notes" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Đổi ca trực với thợ B...">
-      </div>
-
-      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
-        <button type="button" onclick="closeModal('modal-schedule')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold shadow-md hover:bg-primary-600">Cập nhật Lịch trực</button>
+      <div class="p-3 sm:px-6 sm:py-3.5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 shrink-0 bg-neutral-50/50">
+        <button type="button" onclick="closeModal('modal-schedule')" class="px-4 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold shadow-md hover:bg-primary-600">Cập nhật Lịch trực</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- 5. Modal Thêm/Sửa Serial Thiết Bị Đo Kiểm -->
-<div id="modal-tool-instance" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
+<div id="modal-tool-instance" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all max-h-[90vh] flex flex-col">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white shrink-0">
       <h3 id="instance-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Serial Thiết bị Đo Kiểm</h3>
       <button onclick="closeModal('modal-tool-instance')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
     </div>
-    <form id="form-tool-instance" onsubmit="submitToolInstance(event)" class="p-6 space-y-4">
+    <form id="form-tool-instance" onsubmit="submitToolInstance(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <input type="hidden" id="inst-id" name="id">
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Chủng loại Công cụ cha *</label>
-        <select id="inst-tool-id" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
-          {% for t in tools %}
-          <option value="{{ t.id }}">{{ t.name }} - {{ t.code }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
         <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số Serial S/N *</label>
-          <input type="text" id="inst-serial" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: SN-FLK-88912">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã tài sản</label>
-          <input type="text" id="inst-tag" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: TAG-0045">
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ngày hiệu chuẩn gần nhất</label>
-          <input type="date" id="inst-cal-date" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Hạn hiệu chuẩn kế tiếp *</label>
-          <input type="date" id="inst-due-date" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Kết quả kiểm định</label>
-          <select id="inst-inspection" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
-            <option value="PASSED">Đạt chuẩn</option>
-            <option value="DUE_SOON">Sắp đến hạn</option>
-            <option value="EXPIRED">Quá hạn kiểm định</option>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Chủng loại Công cụ cha *</label>
+          <select id="inst-tool-id" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            {% for t in tools %}
+            <option value="{{ t.id }}">{{ t.name }} - {{ t.code }}</option>
+            {% endfor %}
           </select>
         </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số Serial S/N *</label>
+            <input type="text" id="inst-serial" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: SN-FLK-88912">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã tài sản</label>
+            <input type="text" id="inst-tag" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: TAG-0045">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ngày hiệu chuẩn gần nhất</label>
+            <input type="date" id="inst-cal-date" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Hạn hiệu chuẩn kế tiếp *</label>
+            <input type="date" id="inst-due-date" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Kết quả kiểm định</label>
+            <select id="inst-inspection" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+              <option value="PASSED">Đạt chuẩn</option>
+              <option value="DUE_SOON">Sắp đến hạn</option>
+              <option value="EXPIRED">Quá hạn kiểm định</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Trạng thái máy</label>
+            <select id="inst-status" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+              <option value="AVAILABLE">Khả dụng</option>
+              <option value="IN_USE">Đang sử dụng</option>
+              <option value="MAINTENANCE">Đang bảo dưỡng</option>
+            </select>
+          </div>
+        </div>
         <div>
-          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Trạng thái máy</label>
-          <select id="inst-status" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
-            <option value="AVAILABLE">Khả dụng</option>
-            <option value="IN_USE">Đang sử dụng</option>
-            <option value="MAINTENANCE">Đang bảo dưỡng</option>
-          </select>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ghi chú tình trạng</label>
+          <input type="text" id="inst-notes" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Tem kiểm định dán tại phòng thí nghiệm Quatest 3...">
         </div>
       </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Ghi chú tình trạng</label>
-        <input type="text" id="inst-notes" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Tem kiểm định dán tại phòng thí nghiệm Quatest 3...">
-      </div>
-      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
-        <button type="button" onclick="closeModal('modal-tool-instance')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Thiết bị Serial</button>
+      <div class="p-3 sm:px-6 sm:py-3.5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 shrink-0 bg-neutral-50/50">
+        <button type="button" onclick="closeModal('modal-tool-instance')" class="px-4 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Thiết bị Serial</button>
       </div>
     </form>
   </div>
 </div>
 
 <!-- 6. Modal Chủng loại công cụ -->
-<div id="modal-tool" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white">
+<div id="modal-tool" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-100 transform transition-all max-h-[90vh] flex flex-col">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-emerald-50 to-white shrink-0">
       <h3 id="tool-modal-title" class="font-black text-lg text-neutral-900 m-0">Thêm Dòng Công cụ</h3>
       <button onclick="closeModal('modal-tool')" class="text-neutral-400 hover:text-neutral-600"><i class="ph ph-x text-lg"></i></button>
     </div>
-    <form id="form-tool" onsubmit="submitTool(event)" class="p-6 space-y-4">
+    <form id="form-tool" onsubmit="submitTool(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
       <input type="hidden" id="tool-id" name="id">
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Công cụ *</label>
-        <input type="text" id="tool-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: TOOL_THERMAL_CAM">
+      <div class="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mã Công cụ *</label>
+          <input type="text" id="tool-code" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm font-mono uppercase" placeholder="VD: TOOL_THERMAL_CAM">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Công cụ *</label>
+          <input type="text" id="tool-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Camera Nhiệt Fluke Ti480 Pro">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số lượng khả dụng mặc định *</label>
+          <input type="number" id="tool-qty" value="1" min="1" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mặt bằng (Tùy chọn lọc khu vực)</label>
+          <select id="tool-floorplan" onchange="filterToolLocations()" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            <option value="">-- Tất cả mặt bằng / Chọn để lọc --</option>
+            {% for fp in floorplans %}
+            <option value="{{ fp.id }}">{{ fp.name }} [{{ fp.code }}]</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Khu vực / Nơi cất giữ công cụ</label>
+          <select id="tool-location" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
+            <option value="">-- Mặc định tại Kho tổng / Chưa chỉ định --</option>
+            {% for loc in locations %}
+            <option value="{{ loc.id }}">{{ loc.name }} [{{ loc.code }}]{% if loc.floor_level %} - Tầng {{ loc.floor_level }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Tên Công cụ *</label>
-        <input type="text" id="tool-name" required class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm" placeholder="VD: Camera Nhiệt Fluke Ti480 Pro">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Số lượng khả dụng mặc định *</label>
-        <input type="number" id="tool-qty" value="1" min="1" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm">
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Mặt bằng (Tùy chọn lọc khu vực)</label>
-        <select id="tool-floorplan" onchange="filterToolLocations()" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
-          <option value="">-- Tất cả mặt bằng / Chọn để lọc --</option>
-          {% for fp in floorplans %}
-          <option value="{{ fp.id }}">{{ fp.name }} [{{ fp.code }}]</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="block text-xs font-bold text-neutral-700 uppercase mb-1">Khu vực / Nơi cất giữ công cụ</label>
-        <select id="tool-location" class="w-full h-10 px-3 rounded-xl border border-neutral-300 text-sm focus:border-primary">
-          <option value="">-- Mặc định tại Kho tổng / Chưa chỉ định --</option>
-          {% for loc in locations %}
-          <option value="{{ loc.id }}">{{ loc.name }} [{{ loc.code }}]{% if loc.floor_level %} - Tầng {{ loc.floor_level }}{% endif %}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="pt-4 border-t border-neutral-100 flex justify-end gap-3">
-        <button type="button" onclick="closeModal('modal-tool')" class="px-4 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
-        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Dòng Công cụ</button>
+      <div class="p-3 sm:px-6 sm:py-3.5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 shrink-0 bg-neutral-50/50">
+        <button type="button" onclick="closeModal('modal-tool')" class="px-4 py-2 rounded-xl border border-neutral-300 text-xs sm:text-sm font-semibold text-neutral-600 hover:bg-neutral-50">Hủy</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-bold shadow-md hover:bg-emerald-700">Lưu Dòng Công cụ</button>
       </div>
     </form>
   </div>

@@ -199,8 +199,8 @@
         </div>
 
         <!-- Data Grid View Panel -->
-        <div id="panelGrid" class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse">
+        <div id="panelGrid" class="overflow-x-auto overflow-y-auto custom-scrollbar">
+          <table class="w-full text-left text-xs border-collapse min-w-[700px]">
             <thead id="reportTableHead" class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
               <!-- Injected via JS -->
             </thead>
@@ -224,9 +224,9 @@
 </div>
 
 <!-- Modal Xuất Báo Cáo (Async Export Modal) -->
-<div id="exportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+<div id="exportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+    <div class="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center text-xl shrink-0">
           <i class="ph-bold ph-cloud-arrow-down"></i>
@@ -241,7 +241,7 @@
       </button>
     </div>
 
-    <div class="p-6 space-y-4">
+    <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div>
         <label class="block text-xs font-bold text-slate-700 mb-2">Phân Hệ Báo Cáo:</label>
         <div id="exportModalReportLabel" class="p-3 bg-slate-100 rounded-xl font-bold text-slate-800 text-xs flex items-center gap-2">
@@ -283,7 +283,7 @@
       </div>
     </div>
 
-    <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+    <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-end gap-2 shrink-0">
       <button onclick="closeExportModal()" class="px-4 py-2 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-100 transition-colors">
         Hủy Bỏ
       </button>
@@ -296,9 +296,9 @@
 </div>
 
 <!-- Modal Lịch Sử Xuất Tệp (History Modal) -->
-<div id="historyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[80vh]">
-    <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+<div id="historyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-xl shrink-0">
           <i class="ph-bold ph-clock-counter-clockwise"></i>
@@ -313,11 +313,11 @@
       </button>
     </div>
 
-    <div class="p-6 overflow-y-auto flex-1 divide-y divide-slate-100" id="historyListContainer">
+    <div class="p-4 sm:p-6 overflow-y-auto flex-1 divide-y divide-slate-100 custom-scrollbar" id="historyListContainer">
       <!-- Injected via JS -->
     </div>
 
-    <div class="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0 text-xs text-slate-500">
+    <div class="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2 shrink-0 text-xs text-slate-500">
       <span>* Liên kết tải tệp có hiệu lực trong 24 giờ.</span>
       <button onclick="closeHistoryModal()" class="px-4 py-1.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-100 transition-colors">
         Đóng
@@ -327,7 +327,7 @@
 </div>
 
 <!-- Floating Background Job Progress Drawer (Góc Phải Dưới) -->
-<div id="floatingJobDrawer" class="fixed bottom-6 right-6 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-80 transform translate-y-32 opacity-0 pointer-events-none transition-all duration-300">
+<div id="floatingJobDrawer" class="fixed bottom-6 right-6 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-80 max-w-[calc(100vw-32px)] transform translate-y-32 opacity-0 pointer-events-none transition-all duration-300">
   <div class="flex justify-between items-start mb-2">
     <div class="flex items-center gap-2">
       <div id="jobDrawerIcon" class="w-7 h-7 rounded-lg bg-primary-50 text-primary flex items-center justify-center text-sm animate-spin">

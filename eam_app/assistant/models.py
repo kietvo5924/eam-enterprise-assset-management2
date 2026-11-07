@@ -1,6 +1,24 @@
 import uuid
 from django.db import models
-from pgvector.django import VectorField, HnswIndex
+
+try:
+    from pgvector.django import VectorField, HnswIndex
+except ImportError:
+    class VectorField(models.Field):
+        def __init__(self, *args, **kwargs):
+            kwargs.pop('dimensions', None)
+            super().__init__(*args, **kwargs)
+
+        def db_type(self, connection):
+            return 'vector'
+
+    class HnswIndex(models.Index):
+        def __init__(self, *args, **kwargs):
+            kwargs.pop('m', None)
+            kwargs.pop('ef_construction', None)
+            kwargs.pop('opclasses', None)
+            super().__init__(*args, **kwargs)
+
 from core.tenant_context import get_current_tenant
 
 

@@ -276,30 +276,32 @@
           </div>
         </div>
 
-        <div class="p-6 flex-1 flex flex-col justify-between">
+        <div class="p-4 sm:p-6 flex-1 flex flex-col justify-between overflow-hidden">
           <!-- Interactive Trend Chart Canvas / SVG Container -->
-          <div class="relative w-full h-72" id="trend-chart-container">
-            <!-- Dynamic SVG Chart injected via JS -->
-            <svg id="trend-svg-chart" viewBox="0 0 840 240" class="w-full h-full overflow-visible">
-              <!-- Will be rendered dynamically via JS based on trends_json -->
-            </svg>
-            <!-- Hover Tooltip -->
-            <div id="chart-tooltip" class="absolute hidden pointer-events-none bg-neutral-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl text-xs shadow-2xl z-20 border border-neutral-700/50 transition-opacity duration-100">
-              <div class="font-bold text-[11px] text-neutral-300 mb-1.5 flex items-center gap-1.5" id="tooltip-date">
-                <i class="ph-bold ph-calendar text-primary"></i> <span>--/--</span>
-              </div>
-              <div class="space-y-1">
-                <div class="flex items-center justify-between gap-4">
-                  <span class="flex items-center gap-1.5 text-neutral-300">
-                    <span class="w-2 h-2 rounded-full bg-primary"></span> Tạo mới:
-                  </span>
-                  <span class="font-black text-white" id="tooltip-created">0</span>
+          <div class="w-full overflow-x-auto custom-scrollbar">
+            <div class="relative min-w-[500px] sm:min-w-full h-72" id="trend-chart-container">
+              <!-- Dynamic SVG Chart injected via JS -->
+              <svg id="trend-svg-chart" viewBox="0 0 840 240" class="w-full h-full overflow-visible">
+                <!-- Will be rendered dynamically via JS based on trends_json -->
+              </svg>
+              <!-- Hover Tooltip -->
+              <div id="chart-tooltip" class="absolute hidden pointer-events-none bg-neutral-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl text-xs shadow-2xl z-20 border border-neutral-700/50 transition-opacity duration-100">
+                <div class="font-bold text-[11px] text-neutral-300 mb-1.5 flex items-center gap-1.5" id="tooltip-date">
+                  <i class="ph-bold ph-calendar text-primary"></i> <span>--/--</span>
                 </div>
-                <div class="flex items-center justify-between gap-4">
-                  <span class="flex items-center gap-1.5 text-neutral-300">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Hoàn tất:
-                  </span>
-                  <span class="font-black text-white" id="tooltip-completed">0</span>
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="flex items-center gap-1.5 text-neutral-300">
+                      <span class="w-2 h-2 rounded-full bg-primary"></span> Tạo mới:
+                    </span>
+                    <span class="font-black text-white" id="tooltip-created">0</span>
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <span class="flex items-center gap-1.5 text-neutral-300">
+                      <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Hoàn tất:
+                    </span>
+                    <span class="font-black text-white" id="tooltip-completed">0</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -369,7 +371,7 @@
             <i class="ph-fill ph-wrench text-primary"></i>
           </h3>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <!-- MTBF -->
             <div class="bg-neutral-50 p-4 rounded-2xl border border-neutral-100">
               <p class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">MTBF (Trung bình giữa sự cố)</p>

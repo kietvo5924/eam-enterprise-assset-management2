@@ -98,18 +98,18 @@
     </div>
 
     <!-- Tabs Header -->
-    <div class="flex gap-4 border-b border-neutral-200 px-4 pt-3">
+    <div class="flex gap-4 border-b border-neutral-200 px-4 pt-3 overflow-x-auto whitespace-nowrap custom-scrollbar">
         <button onclick="switchTab('categories')" id="tab-categories" class="px-4 py-2 text-xs font-bold border-b-2 transition-colors border-primary text-primary">Phân Loại Tài Sản</button>
         <button onclick="switchTab('templates')" id="tab-templates" class="px-4 py-2 text-xs font-bold border-b-2 transition-colors border-transparent text-neutral-500 hover:text-primary">Mẫu Cây Phân Cấp</button>
         <button onclick="switchTab('locations')" id="tab-locations" class="px-4 py-2 text-xs font-bold border-b-2 transition-colors border-transparent text-neutral-500 hover:text-primary">Khu Vực & Mặt Bằng</button>
     </div>
 
     <!-- Tabs Content -->
-    <div class="p-2 flex-1 flex flex-col overflow-x-auto relative">
+    <div class="p-2 flex-1 flex flex-col overflow-x-auto relative custom-scrollbar">
         
         <!-- Categories Tab -->
         <div id="content-categories" class="tab-content block">
-            <table id="categories-table" class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+            <table id="categories-table" class="w-full text-left border-collapse custom-beautiful-table min-w-[650px]">
                 <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
                     <tr class="border-b border-neutral-200/60">
                         <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('categories-table', 0)">Tên Phân Loại <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
@@ -171,7 +171,7 @@
 
         <!-- Templates Tab -->
         <div id="content-templates" class="tab-content hidden">
-            <table id="templates-table" class="w-full text-left border-collapse custom-beautiful-table min-w-max">
+            <table id="templates-table" class="w-full text-left border-collapse custom-beautiful-table min-w-[650px]">
                 <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
                     <tr class="border-b border-neutral-200/60">
                         <th class="px-4 py-3 font-bold tracking-wider cursor-pointer select-none" onclick="sortTable('templates-table', 0)">Tên Mẫu Phân Cấp <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
@@ -262,8 +262,8 @@
             </div>
 
             <!-- SUB-VIEW 1: Hierarchical Table -->
-            <div id="locations-view-table" class="flex-1 flex flex-col overflow-x-auto">
-                <table class="w-full text-left border-collapse custom-beautiful-table min-w-full">
+            <div id="locations-view-table" class="flex-1 flex flex-col overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse custom-beautiful-table min-w-[750px]">
                     <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/50">
                         <tr class="border-b border-neutral-200/60">
                             <th class="px-4 py-3 font-bold tracking-wider min-w-[240px]">Mã & Tên Khu vực</th>
@@ -479,7 +479,7 @@
                 <div class="flex-1 flex overflow-hidden min-h-[580px] relative">
                     
                     <!-- LEFT: DRAW.IO SHAPE PALETTE / STENCIL LIBRARY -->
-                    <div id="studio-left-sidebar" class="w-80 md:w-84 bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl backdrop-blur-md overflow-hidden transition-all duration-200">
+                    <div id="studio-left-sidebar" class="w-80 md:w-84 max-w-full bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl backdrop-blur-md overflow-hidden transition-all duration-200">
                         <!-- Palette Tabs (2 Categories: Khu vực | Không gian) & Close Button -->
                         <div class="flex items-center p-1 gap-1 bg-slate-950/80 border-b border-slate-800 shrink-0">
                             <div class="grid grid-cols-2 gap-1 flex-1 min-w-0">
@@ -716,9 +716,9 @@
 </div>
 
 <!-- Unified Modal -->
-<div id="unified-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] fancy-modal">
-    <div class="px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
+<div id="unified-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col fancy-modal">
+    <div class="px-5 sm:px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
         <h3 class="text-xl font-black text-neutral-900 m-0" id="unified-modal-title">New Item</h3>
       </div>
@@ -726,7 +726,7 @@
         <i class="ph ph-x text-xl font-bold"></i>
       </button>
     </div>
-    <div class="overflow-y-auto p-6">
+    <div class="overflow-y-auto p-4 sm:p-6 flex-1 custom-scrollbar">
         <form id="unified-form" class="space-y-5">
           {% csrf_token %}
           <input type="hidden" id="item-id" />
@@ -837,9 +837,9 @@
             </label>
           </div>
           
-          <div class="pt-2 flex justify-end gap-3 mt-6 border-t border-neutral-100 pt-6">
-            <button type="button" onclick="closeModal()" class="rounded-xl h-10 px-6 font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Hủy Bỏ</button>
-            <button type="submit" id="btn-save" class="rounded-xl h-10 px-8 bg-primary hover:bg-primary-600 text-white font-bold transition-colors shadow-md shadow-primary/20"><span>Lưu Thông Tin</span><span class="sr-only">Save</span></button>
+          <div class="pt-2 flex flex-wrap justify-end gap-3 mt-6 border-t border-neutral-100">
+            <button type="button" onclick="closeModal()" class="rounded-xl h-10 px-5 sm:px-6 font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Hủy Bỏ</button>
+            <button type="submit" id="btn-save" class="rounded-xl h-10 px-6 sm:px-8 bg-primary hover:bg-primary-600 text-white font-bold transition-colors shadow-md shadow-primary/20"><span>Lưu Thông Tin</span><span class="sr-only">Save</span></button>
           </div>
         </form>
     </div>
@@ -847,9 +847,9 @@
 </div>
 
 <!-- Create Floorplan Modal -->
-<div id="modal-create-floorplan" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] border border-neutral-200">
-    <div class="px-6 py-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white">
+<div id="modal-create-floorplan" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col border border-neutral-200">
+    <div class="px-5 sm:px-6 py-4 sm:py-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
           <i class="ph-bold ph-buildings text-2xl"></i>
@@ -863,7 +863,7 @@
         <i class="ph ph-x text-xl font-bold"></i>
       </button>
     </div>
-    <div class="overflow-y-auto p-6">
+    <div class="overflow-y-auto p-4 sm:p-6 flex-1 custom-scrollbar">
       <form id="form-create-floorplan" onsubmit="submitCreateFloorplan(event)" class="space-y-4">
         {% csrf_token %}
         <div id="create-floorplan-msg" class="hidden p-3 rounded-xl text-sm font-medium"></div>
@@ -903,7 +903,7 @@
           <textarea id="fp-desc" rows="2" placeholder="Ghi chú vị trí địa lý, địa chỉ hoặc quy mô phân xưởng..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
         </div>
 
-        <div class="pt-4 flex justify-end gap-3 border-t border-neutral-100">
+        <div class="pt-4 flex flex-wrap justify-end gap-3 border-t border-neutral-100">
           <button type="button" onclick="closeCreateFloorplanModal()" class="rounded-xl h-10 px-5 font-bold text-xs text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition">Hủy</button>
           <button type="submit" id="btn-submit-fp" class="rounded-xl h-10 px-6 bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-md shadow-primary/20 flex items-center gap-1.5 transition hover:scale-105">
             <i class="ph-bold ph-plus"></i>

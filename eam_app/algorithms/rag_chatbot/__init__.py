@@ -6,7 +6,8 @@ Self-contained research algorithms package.
 from .safety_classifier import classify_safety_context
 from .query_expansion import expand_slang_query
 from .vector_engine import (
-    embed_text, 
+    embed_text,
+    embed_texts, 
     retrieve_relevant_chunks, 
     classify_similarity_tier,
     get_embedding_model

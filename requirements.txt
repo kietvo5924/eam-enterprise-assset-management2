@@ -1,4 +1,4 @@
-﻿amqp==5.3.1
+amqp==5.3.1
 anyio==4.15.1
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
@@ -55,6 +55,7 @@ openpyxl==3.1.5
 opencv-python-headless>=4.8.0
 opentelemetry-api==1.44.0
 packaging==26.3
+pgvector==0.5.1
 pillow==12.3.0
 playwright==1.41.2
 pluggy==1.6.0
@@ -81,6 +82,9 @@ reportlab==5.0.1
 requests==2.34.2
 scikit-learn==1.9.1
 scipy==1.17.1
+sentence-transformers>=2.2.0
+torch>=2.0.0
+transformers>=4.30.0
 six==1.17.0
 sqlparse==0.6.0
 text-unidecode==1.3

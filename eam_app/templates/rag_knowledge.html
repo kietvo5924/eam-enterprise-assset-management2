@@ -290,9 +290,9 @@
 </div>
 
 <!-- Modal: Thêm Q&A Mẫu (Có Dropdown Model & Lọc) -->
-<div id="add-qa-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl mx-auto overflow-hidden">
-    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
+<div id="add-qa-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
+  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl mx-auto max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="px-5 sm:px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <h3 class="font-bold text-sm text-neutral-900 flex items-center gap-2">
         <i class="ph ph-plus-circle text-primary text-lg"></i>
         <span>Thêm Cặp Hỏi - Đáp Mẫu</span>
@@ -301,7 +301,7 @@
         <i class="ph ph-x text-lg"></i>
       </button>
     </div>
-    <div class="p-6 space-y-4">
+    <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div>
         <label class="block text-xs font-bold text-neutral-700 mb-1">Nhóm Tri Thức *</label>
         <select id="modal-qa-category" class="w-full text-xs p-2 rounded-lg border border-neutral-300 focus:ring-1 focus:ring-primary" onchange="toggleModalFields()">
@@ -356,7 +356,7 @@
         <textarea id="modal-qa-answer" rows="4" placeholder="Nhập câu trả lời chi tiết định dạng Markdown..." class="w-full text-xs p-2 rounded-lg border border-neutral-300 focus:ring-1 focus:ring-primary font-sans"></textarea>
       </div>
     </div>
-    <div class="px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-2">
+    <div class="px-5 sm:px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button onclick="closeAddQAModal()" class="px-3.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer">Hủy</button>
       <button onclick="saveCuratedQA()" class="px-4 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer">Lưu Tri Thức</button>
     </div>
@@ -364,9 +364,9 @@
 </div>
 
 <!-- Modal: Tải Lên Tài Liệu Mới (Hỗ trợ File PDF, Word, Markdown, Text) -->
-<div id="upload-doc-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl mx-auto overflow-hidden">
-    <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
+<div id="upload-doc-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
+  <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-xl mx-auto max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="px-5 sm:px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <h3 class="font-bold text-sm text-neutral-900 flex items-center gap-2">
         <i class="ph ph-upload-simple text-primary text-lg font-bold"></i>
         <span>Tải Lên & Vector Hóa Tài Liệu Mới</span>
@@ -375,7 +375,7 @@
         <i class="ph ph-x text-lg"></i>
       </button>
     </div>
-    <div class="p-6 space-y-4">
+    <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <!-- File Selector Dropzone -->
       <div>
         <label class="block text-xs font-bold text-neutral-700 mb-1">Chọn Tệp Đính Kèm (PDF, Word, Markdown, Text)</label>
@@ -438,7 +438,7 @@
         <textarea id="modal-doc-content" rows="4" placeholder="Nếu không tải file PDF/Word, bạn có thể dán nội dung hướng dẫn bảo trì SOP hoặc cẩm nang Markdown vào đây..." class="w-full text-xs p-2 rounded-lg border border-neutral-300 font-mono"></textarea>
       </div>
     </div>
-    <div class="px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-2">
+    <div class="px-5 sm:px-6 py-3 bg-neutral-50 border-t border-neutral-200 flex flex-wrap justify-end gap-2 shrink-0">
       <button onclick="closeUploadDocModal()" class="px-3.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer">Hủy</button>
       <button onclick="uploadDocument()" id="modal-doc-submit-btn" class="px-4 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5">
         <i class="ph ph-upload text-sm"></i>
@@ -449,7 +449,7 @@
 </div>
 
 <!-- Modal: Xem Chi Tiết Nội Dung Tài Liệu Kỹ Thuật (Tab 3) -->
-<div id="view-doc-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+<div id="view-doc-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-3 sm:p-4">
   <div class="bg-white rounded-2xl border border-neutral-200 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
     <!-- Header -->
     <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">

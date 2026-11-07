@@ -301,9 +301,9 @@
 
 
 <!-- Modal: Mô Phỏng Tác Động Chi Phí Thiết Bị (Simulation) -->
-<div id="lemonSimulationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
-  <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
-    <div class="px-6 py-4.5 bg-white border-b border-slate-100 flex items-center justify-between">
+<div id="lemonSimulationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
+  <div class="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+    <div class="px-5 sm:px-6 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl shrink-0 shadow-xs border border-rose-100/60">
           <i class="ph-bold ph-chart-polar"></i>
@@ -321,7 +321,7 @@
       </button>
     </div>
 
-    <div class="p-6 space-y-4">
+    <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div class="p-4 bg-rose-50/50 rounded-xl border border-rose-200/60 space-y-2">
         <div class="flex justify-between items-center text-xs">
           <span class="text-slate-600 font-bold">Thiết bị phân tích:</span>
@@ -373,12 +373,13 @@
         <i class="ph-bold ph-info text-base text-amber-600 shrink-0 mt-0.5"></i>
         <span id="simDisclaimerText">Giả định kịch bản: ước tính giảm 70% chi phí sự cố lịch sử của thiết bị này trong kỳ tới (tham số mô phỏng giả định, không đảm bảo chắc chắn). Thao tác này tuyệt đối KHÔNG làm thay đổi trạng thái, danh mục hay dữ liệu tài sản thực tế trong hệ thống.</span>
       </div>
+    </div>
 
-      <div class="pt-2 flex justify-end">
-        <button type="button" onclick="closeLemonSimulationModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-all cursor-pointer">
-          Đóng Cửa Sổ Mô Phỏng
-        </button>
-      </div>
+    <!-- Modal Footer -->
+    <div class="px-5 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-end shrink-0">
+      <button type="button" onclick="closeLemonSimulationModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition-all cursor-pointer">
+        Đóng Cửa Sổ Mô Phỏng
+      </button>
     </div>
   </div>
 </div>
@@ -387,10 +388,10 @@
 <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
 <!-- Modal: Cấu Hình Ngân Sách & Tham Số Tài Chính Đa Doanh Nghiệp -->
-<div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
-  <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+<div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity">
+  <div class="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
     <!-- Modal Header -->
-    <div class="px-6 py-4.5 bg-white border-b border-slate-100 flex items-center justify-between">
+    <div class="px-5 sm:px-6 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-primary-50 text-primary flex items-center justify-center text-xl shrink-0 shadow-xs border border-primary-100/60">
           <i class="ph-bold ph-sliders-horizontal"></i>
@@ -408,87 +409,89 @@
       </button>
     </div>
 
-    <!-- Modal Body -->
-    <form id="formSettings" onsubmit="saveFinancialSettings(event)" class="p-6 space-y-4">
-      {% if not can_write %}
-      <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
-        <i class="ph-bold ph-lock-simple text-base text-amber-600 shrink-0"></i>
-        <span>Chế độ chỉ xem: Bạn không có quyền thay đổi hạn mức ngân sách hoặc tham số tài chính của doanh nghiệp.</span>
-      </div>
-      {% endif %}
+    <!-- Modal Form with Scrollable Body and Pinned Footer -->
+    <form id="formSettings" onsubmit="saveFinancialSettings(event)" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
+        {% if not can_write %}
+        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+          <i class="ph-bold ph-lock-simple text-base text-amber-600 shrink-0"></i>
+          <span>Chế độ chỉ xem: Bạn không có quyền thay đổi hạn mức ngân sách hoặc tham số tài chính của doanh nghiệp.</span>
+        </div>
+        {% endif %}
 
-      <!-- Input 1: Ngân sách được duyệt cho kỳ đang chọn -->
-      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
-        <div class="flex items-center justify-between mb-1.5">
-          <label class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <i class="ph-bold ph-coins text-primary"></i>
-            <span>Ngân Sách Được Duyệt (<span id="modalPeriodLabel">2026-Q4</span>)</span>
-          </label>
-          <span class="text-[10px] text-slate-400 font-semibold" id="modalCostCenterLabel">Toàn nhà máy</span>
-        </div>
-        <div class="relative">
-          <input type="text" id="inputApprovedBudget" {% if not can_write %}disabled{% endif %} oninput="formatNumberInput(this)" placeholder="Ví dụ: 1,500,000,000" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-14 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
-          <div class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">VNĐ</div>
-        </div>
-        <div class="flex items-center justify-between mt-2">
-          <span class="text-[11px] text-slate-500">Hạn mức tài chính thực tế do Ban Giám đốc duyệt</span>
-          {% if can_write %}
-          <button type="button" onclick="suggestApprovedBudget()" class="text-[11px] text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer">
-            <i class="ph-bold ph-magic-wand"></i>
-            <span>Gợi ý: PM + 10%</span>
-          </button>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Input 2: Đơn giá giờ công thợ -->
-      <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Đơn Giá Giờ Công Thợ Tiêu Chuẩn (VNĐ / Giờ)
-        </label>
-        <div class="relative">
-          <input type="text" id="inputHourlyRate" {% if not can_write %}disabled{% endif %} oninput="formatNumberInput(this)" placeholder="150,000" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-20 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
-          <div class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">VNĐ / h</div>
-        </div>
-        <p class="text-[11px] text-slate-500 mt-1">Dùng để tính định mức giờ công bảo dưỡng PM và giờ thợ sửa sự cố.</p>
-      </div>
-
-      <!-- 2 Columns: Lạm phát & Dự phòng -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-            Lạm Phát Vật Tư (%/năm)
-          </label>
+        <!-- Input 1: Ngân sách được duyệt cho kỳ đang chọn -->
+        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="ph-bold ph-coins text-primary"></i>
+              <span>Ngân Sách Được Duyệt (<span id="modalPeriodLabel">2026-Q4</span>)</span>
+            </label>
+            <span class="text-[10px] text-slate-400 font-semibold" id="modalCostCenterLabel">Toàn nhà máy</span>
+          </div>
           <div class="relative">
-            <input type="number" step="0.1" min="0" max="30" id="inputInflationRate" {% if not can_write %}disabled{% endif %} placeholder="4.5" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
-            <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
+            <input type="text" id="inputApprovedBudget" {% if not can_write %}disabled{% endif %} oninput="formatNumberInput(this)" placeholder="Ví dụ: 1,500,000,000" class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-14 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
+            <div class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">VNĐ</div>
+          </div>
+          <div class="flex items-center justify-between mt-2">
+            <span class="text-[11px] text-slate-500">Hạn mức tài chính thực tế do Ban Giám đốc duyệt</span>
+            {% if can_write %}
+            <button type="button" onclick="suggestApprovedBudget()" class="text-[11px] text-primary hover:underline font-bold flex items-center gap-1 cursor-pointer">
+              <i class="ph-bold ph-magic-wand"></i>
+              <span>Gợi ý: PM + 10%</span>
+            </button>
+            {% endif %}
           </div>
         </div>
+
+        <!-- Input 2: Đơn giá giờ công thợ -->
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-            Quỹ Dự Phòng Khẩn Cấp (%)
+            Đơn Giá Giờ Công Thợ Tiêu Chuẩn (VNĐ / Giờ)
           </label>
           <div class="relative">
-            <input type="number" step="0.5" min="0" max="30" id="inputContingencyRate" {% if not can_write %}disabled{% endif %} placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
-            <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
+            <input type="text" id="inputHourlyRate" {% if not can_write %}disabled{% endif %} oninput="formatNumberInput(this)" placeholder="150,000" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-20 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
+            <div class="absolute right-3.5 top-2.5 text-xs font-bold text-slate-400">VNĐ / h</div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Dùng để tính định mức giờ công bảo dưỡng PM và giờ thợ sửa sự cố.</p>
+        </div>
+
+        <!-- 2 Columns: Lạm phát & Dự phòng -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Lạm Phát Vật Tư (%/năm)
+            </label>
+            <div class="relative">
+              <input type="number" step="0.1" min="0" max="30" id="inputInflationRate" {% if not can_write %}disabled{% endif %} placeholder="4.5" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
+              <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              Quỹ Dự Phòng Khẩn Cấp (%)
+            </label>
+            <div class="relative">
+              <input type="number" step="0.5" min="0" max="30" id="inputContingencyRate" {% if not can_write %}disabled{% endif %} placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
+              <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Input 3: Tỷ lệ linh kiện cốt lõi máy nguy cấp -->
-      <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-          Ước Tính Linh Kiện Máy Nguy Cấp RUL (% Nguyên Giá)
-        </label>
-        <div class="relative">
-          <input type="number" step="0.5" min="1" max="50" id="inputSpareRatio" {% if not can_write %}disabled{% endif %} placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
-          <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
+        <!-- Input 3: Tỷ lệ linh kiện cốt lõi máy nguy cấp -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Ước Tính Linh Kiện Máy Nguy Cấp RUL (% Nguyên Giá)
+          </label>
+          <div class="relative">
+            <input type="number" step="0.5" min="1" max="50" id="inputSpareRatio" {% if not can_write %}disabled{% endif %} placeholder="5.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all pr-8 {% if not can_write %}opacity-60 cursor-not-allowed{% endif %}" />
+            <div class="absolute right-3 top-2.5 text-xs font-bold text-slate-400">%</div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Khi máy sắp hỏng (Task 11.5) nhưng chưa có BOM, ước tính phụ tùng = % nguyên giá máy.</p>
         </div>
-        <p class="text-[11px] text-slate-500 mt-1">Khi máy sắp hỏng (Task 11.5) nhưng chưa có BOM, ước tính phụ tùng = % nguyên giá máy.</p>
       </div>
 
-      <!-- Modal Footer Actions -->
-      <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
+      <!-- Pinned Modal Footer Actions -->
+      <div class="px-5 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2.5 sm:gap-3 shrink-0">
         <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer">
           {% if can_write %}Hủy Bỏ{% else %}Đóng{% endif %}
         </button>

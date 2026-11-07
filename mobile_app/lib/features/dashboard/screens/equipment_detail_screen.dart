@@ -90,6 +90,27 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           icon: Icon(PhosphorIcons.arrowLeft(), color: AppTheme.neutral900),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Hỏi Trợ lý AI về thiết bị này',
+            icon: Icon(
+              PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+              color: AppTheme.primaryColor,
+              size: 22,
+            ),
+            onPressed: () {
+              context.push('/assistant', extra: {
+                'assetContext': {
+                  'assetId': widget.equipment['id'],
+                  'name': widget.equipment['name'],
+                  'model': widget.equipment['model'],
+                  'serialNumber': widget.equipment['serialNumber'],
+                  'manufactureYear': widget.equipment['manufactureYear'],
+                },
+              });
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(

@@ -60,27 +60,122 @@ STRONG_SOFTWARE_INDICATORS = [
     'chức năng hệ thống', 'chức năng phần mềm'
 ]
 
+DYNAMIC_ACTION_INDICATORS = [
+    # Nút bấm & Thao tác giao diện
+    'nút', 'button', 'bấm vào đâu', 'bấm ở đâu', 'bấm đâu', 'nhấn vào đâu', 'nhấn ở đâu', 'nhấn đâu',
+    'click ở đâu', 'click đâu', 'ấn ở đâu', 'ấn đâu', 'chọn đâu', 'vào đâu', 'ở đâu', 'ở mô', 'chỗ nào', 'chỗ mô', 'nơi nào',
+    'sử dụng nút', 'dùng nút', 'bấm nút', 'nhấn nút', 'click nút', 'ấn nút', 'nút bấm', 'nút nào',
+    'nút trên trang', 'nút này', 'hướng dẫn bấm', 'nằm ở đâu', 'nút ở đâu', 'menu ở đâu', 'tab ở đâu',
+    'chỉ tôi', 'chỉ mình', 'chỉ em', 'chỉ giùm', 'chỉ cho tôi', 'chỉ cách',
+    'bày tôi', 'bày em', 'bày cách', 'bày giùm', 'hướng dẫn tôi', 'hướng dẫn em', 'hướng dẫn thao tác',
+    'làm sao để tạo', 'làm thế nào để tạo', 'cách tạo', 'làm sao để xuất', 'cách xuất', 'làm sao để',
+    'cách dùng nút', 'cách bấm nút', 'hướng dẫn dùng',
+    
+    # Biểu mẫu & Form fields
+    'điền form', 'cách điền form', 'điền biểu mẫu', 'biểu mẫu', 'mẫu form',
+    'form này', 'trường này', 'điền gì', 'nhập gì', 'các trường trong form',
+    'các trường cần điền', 'trường bắt buộc', 'ý nghĩa từng trường', 'ô này điền gì', 'mục này điền gì',
+    'nhập thông tin', 'các ô trong form',
+    
+    # Xuất nhập file & QR
+    'xuất excel', 'xuất file', 'xuất pdf', 'tải excel', 'tải file', 'nhập excel',
+    'import excel', 'in tem', 'in qr', 'in mã qr', 'quét qr', 'quét mã qr',
+    'quét mã', 'quét tem',
+    
+    # Quyền hạn & Phân vai RBAC
+    'cần quyền gì', 'ai được bấm', 'ai có quyền', 'quyền hạn nào', 'điều kiện quyền',
+    'quyền gì để', 'ai được phép', 'phân quyền', 'ma trận quyền', 'quyền rbac',
+    
+    # Thao tác nghiệp vụ phần mềm cụ thể
+    'thêm vật tư', 'nhập kho', 'xuất kho', 'kiểm kê kho', 'min-stock', 'vào kho', 'trong kho',
+    'thêm phụ tùng', 'nhập phụ tùng', 'xuất phụ tùng', 'kho phụ tùng', 'thêm linh kiện', 'nhập linh kiện',
+    'tạo phiếu', 'lập phiếu', 'phiếu bảo trì', 'phiếu sửa chữa', 'phiếu wo', 'vòng đời phiếu',
+    'báo hỏng', 'báo sự cố', 'giao việc', 'bắt đầu sửa chữa', 'nghiệm thu phiếu', 'hoàn thành phiếu',
+    'điều phối', 'hungarian', 'lập lịch ca', 'lập lịch cả ca', 'ca trực', 'lịch trực',
+    'xếp lịch', 'xếp ca', 'bảng xếp ca', 'phân ca', 'genetic', 'tsp', 'lộ trình di chuyển',
+    'tạo kế hoạch pm', 'kế hoạch pm', 'kích hoạt thủ công', 'chỉ số đồng hồ', 'log meter',
+    'thêm tài sản', 'sửa tài sản', 'cây tài sản', 'danh mục tài sản', 'phân loại thiết bị',
+    'thêm thiết bị', 'sửa thiết bị', 'tạo thiết bị', 'thiết bị serial', 'dụng cụ đo kiểm',
+    'thêm người dùng', 'tạo tài khoản nhân viên', 'tạo tài khoản', 'quản lý người dùng',
+    'đổi logo', 'cài đặt đơn vị', 'cài đặt hệ thống', 'nhận diện thương hiệu',
+    'tri thức ai', 'trợ lý ai', 'tri thức vàng', 'hàng đợi thẩm định', 'duyệt tri thức',
+    'báo cáo kpi', 'dự báo chi phí', 'chi phí lcc', 'nhật ký hệ thống', 'audit logs'
+]
+
+
+def extract_software_action_query(prompt: str) -> str:
+    """
+    For composite queries containing physical conditions and software intent
+    (e.g., 'máy bơm bị xì nhớt thì bấm nút tạo phiếu ở đâu',
+           'khi thiết bị gặp sự cố để tạo phiếu bảo trì thì bấm ở đâu'),
+    extracts the pure software action clause with its target object to maximize vector retrieval relevance.
+    """
+    lower = prompt.lower().strip()
+
+    # Target objects / actions that ensure the extracted clause is meaningful and specific
+    target_terms = [
+        'tạo phiếu', 'lập phiếu', 'phiếu bảo trì', 'phiếu sửa chữa', 'phiếu wo', 'báo hỏng',
+        'thêm vật tư', 'nhập kho', 'xuất kho', 'phụ tùng', 'vật tư', 'linh kiện',
+        'kỹ năng', 'chứng chỉ', 'ca trực', 'lịch trực', 'hungarian', 'ga', 'tsp',
+        'kế hoạch pm', 'thiết bị serial', 'vai trò', 'phân loại', 'cài đặt', 'logo',
+        'tri thức', 'nhật ký', 'excel', 'qr'
+    ]
+
+    splitters = [' thì ', ' để ', ' muốn ', ' làm sao để ', ' cần ']
+    for sp in splitters:
+        if sp in lower:
+            parts = prompt.split(sp, 1)
+            candidate = parts[1].strip()
+            cand_lower = candidate.lower()
+            if any(t in cand_lower for t in target_terms):
+                return candidate
+
+    return prompt
+
 
 def is_system_feature_query(prompt: str, asset_context: Optional[Dict[str, Any]] = None) -> bool:
     """Detects if query is asking about EAM software usage rather than machine repairs."""
     lower = prompt.lower().strip()
     
-    # 1. Any direct inquiry about portal pages ("trang ...", "màn hình ...", "giao diện ...")
-    if lower.startswith('trang ') or ' trang ' in lower or lower.startswith('màn hình ') or ' màn hình ' in lower:
+    # 1. Any direct inquiry about portal pages ("trang ...", "màn hình ...", "giao diện ...", "menu ...")
+    if (lower.startswith('trang ') or ' trang ' in lower or 
+        lower.startswith('màn hình ') or ' màn hình ' in lower or 
+        lower.startswith('giao diện ') or ' giao diện ' in lower or
+        lower.startswith('menu ') or ' menu ' in lower or
+        lower.startswith('tab ') or ' tab ' in lower):
         return True
+
+    # 2. Check dynamic action indicators, strong indicators, and system guide keywords
+    has_action_indicator = any(k in lower for k in DYNAMIC_ACTION_INDICATORS)
+    has_strong_indicator = any(k in lower for k in STRONG_SOFTWARE_INDICATORS)
+    has_system_keyword = any(k in lower for k in SYSTEM_GUIDE_KEYWORDS)
+
+    if has_action_indicator or has_strong_indicator or has_system_keyword:
+        # Check if the query is strictly physical machine fault troubleshooting
+        machine_fault_terms = [
+            'xì nhớt', 'xì dầu', 'rò rỉ', 'áp suất tụt', 'áp suất giảm',
+            'quá nhiệt', 'kêu cọc cọc', 'nóng máy', 'rung lắc', 'hỏng bạc đạn', 'cháy nổ',
+            'cân chỉnh góc đặt', 'cân chỉnh đồng trục', 'tháo bu-lông'
+        ]
+        has_machine_fault = any(term in lower for term in machine_fault_terms)
         
-    # 2. Check strong indicators
-    if any(k in lower for k in STRONG_SOFTWARE_INDICATORS):
-        # Exclude physical machine troubleshooting like "áp suất tụt", "xì nhớt", "bị hỏng"
-        machine_fault_terms = ['xì nhớt', 'xì dầu', 'rò rỉ', 'áp suất tụt', 'áp suất giảm', 'quá nhiệt', 'kêu cọc cọc', 'nóng máy', 'rung lắc', 'hỏng bạc đạn']
-        if any(term in lower for term in machine_fault_terms):
-            return False
+        # If machine fault terms are present, only treat as system guide if explicit UI/software terms exist
+        if has_machine_fault:
+            explicit_software = [
+                'nút', 'button', 'phần mềm', 'hệ thống', 'trang', 'màn hình',
+                'phiếu bảo trì', 'phiếu wo', 'phiếu sửa chữa', 'tạo phiếu', 'lập phiếu', 
+                'menu', 'form', 'biểu mẫu', 'vào đâu', 'ở đâu', 'ở mô', 'chỗ nào', 'ấn đâu', 'bấm đâu'
+            ]
+            if not any(sw in lower for sw in explicit_software):
+                return False
+
+        # When asking about software actions or buttons, route to system guide even if asset_context exists
         return True
-        
+
     if asset_context and asset_context.get('model'):
         return False
-        
-    return any(k in lower for k in SYSTEM_GUIDE_KEYWORDS)
+
+    return False
 
 
 def process_rag_query(
@@ -129,14 +224,39 @@ def process_rag_query(
         manufacture_year = asset_context.get('manufactureYear') or asset_context.get('manufacture_year')
 
     # Step 4: Multi-source PGVector Retrieval (Rule 4, Rule 5)
+    # For system guides, query directly with user prompt to avoid English technical slang pollution
+    search_query = prompt if is_sys_guide else expanded_query
+
     retrieved_chunks = retrieve_relevant_chunks(
-        query_text=expanded_query,
+        query_text=search_query,
         tenant_id=tenant_id,
         asset_model=asset_model,
         manufacture_year=manufacture_year,
         is_system_query=is_sys_guide,
         limit=4
     )
+
+    # For system guides, if query contains a compound condition, perform dual retrieval with action intent
+    if is_sys_guide:
+        action_intent = extract_software_action_query(prompt)
+        if action_intent and action_intent.lower() != search_query.lower():
+            action_chunks = retrieve_relevant_chunks(
+                query_text=action_intent,
+                tenant_id=tenant_id,
+                is_system_query=True,
+                limit=4
+            )
+            if action_chunks:
+                top_action_sim = action_chunks[0]['similarity']
+                top_retrieved_sim = retrieved_chunks[0]['similarity'] if retrieved_chunks else 0.0
+                if top_action_sim > top_retrieved_sim:
+                    seen_ids = set()
+                    merged = []
+                    for c in action_chunks + retrieved_chunks:
+                        if c['id'] not in seen_ids:
+                            seen_ids.add(c['id'])
+                            merged.append(c)
+                    retrieved_chunks = merged[:4]
 
     # Step 5: Similarity Tier Classification (Rule 10, TC-RAG-12)
     top_score = retrieved_chunks[0]['similarity'] if retrieved_chunks else 0.0
@@ -232,10 +352,13 @@ def process_rag_query(
         if is_sys_guide or system_texts:
             # Extract the exact matching section for the queried page/feature
             extracted_section = parent_sections[0] if parent_sections else full_context
-            raw_reply = (
-                "### ℹ️ HƯỚNG DẪN TÍNH NĂNG HỆ THỐNG EAM:\n"
-                f"{extracted_section}"
-            )
+            if extracted_section.startswith("### ℹ️ HƯỚNG DẪN TÍNH NĂNG HỆ THỐNG EAM:"):
+                raw_reply = extracted_section
+            else:
+                raw_reply = (
+                    "### ℹ️ HƯỚNG DẪN TÍNH NĂNG HỆ THỐNG EAM:\n"
+                    f"{extracted_section}"
+                )
         else:
             oem_part = "\n".join(oem_texts) if oem_texts else full_context
             tacit_part = "\n".join(tacit_texts) if tacit_texts else "Chưa có mẹo bổ sung từ lịch sử phiếu bảo trì trước."

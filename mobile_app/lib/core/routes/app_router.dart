@@ -12,6 +12,7 @@ import '../../features/scanner/screens/qr_scanner_screen.dart';
 import '../../features/dashboard/screens/equipment_detail_screen.dart';
 import '../../features/dashboard/screens/floorplan_viewer_screen.dart';
 import '../../features/work_orders/screens/technician_route_screen.dart';
+import '../../features/assistant/screens/assistant_chat_screen.dart';
 
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -96,6 +97,21 @@ class AppRouter {
               final extra = state.extra as Map<String, dynamic>?;
               final workOrderIds = (extra?['workOrderIds'] as List?)?.map((e) => e.toString()).toList();
               return TechnicianRouteScreen(initialWorkOrderIds: workOrderIds);
+            },
+          ),
+          GoRoute(
+            path: 'assistant',
+            builder: (context, state) {
+              final extra = state.extra;
+              Map<String, dynamic>? assetContext;
+              if (extra is Map<String, dynamic>) {
+                if (extra.containsKey('assetContext') && extra['assetContext'] is Map<String, dynamic>) {
+                  assetContext = extra['assetContext'] as Map<String, dynamic>;
+                } else {
+                  assetContext = extra;
+                }
+              }
+              return AssistantChatScreen(initialAssetContext: assetContext);
             },
           ),
         ],

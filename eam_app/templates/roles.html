@@ -99,8 +99,8 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-auto p-3 sm:p-4 custom-scrollbar">
-      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table" id="rolesTable">
+    <div class="flex-1 overflow-x-auto overflow-y-auto p-3 sm:p-4 custom-scrollbar">
+      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table min-w-[700px]" id="rolesTable">
         <thead class="text-xs text-neutral-500 bg-neutral-50/50 border-b border-neutral-200/80">
           <tr>
             <th class="px-4 py-2.5 font-bold cursor-pointer" onclick="sortTable(0)">Tên vai trò <i class="ph-bold ph-arrows-down-up text-[10px] ml-1 opacity-50"></i></th>
@@ -154,10 +154,10 @@
 </div>
 
 <!-- Modal Create/Edit -->
-<div id="role-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+<div id="role-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-3 sm:p-4">
   <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" onclick="closeRoleModal()"></div>
   <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="role-modal-content">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-start bg-white shrink-0 relative">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-start bg-white shrink-0 relative">
       <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
       <div class="flex items-center gap-4">
         <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100 border border-primary/20 flex items-center justify-center text-primary shadow-inner">
@@ -218,7 +218,7 @@
       </form>
     </div>
     
-    <div class="p-4 sm:p-5 border-t border-neutral-100 flex justify-end gap-2.5 bg-white shrink-0">
+    <div class="p-4 sm:p-5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 bg-white shrink-0">
       <button onclick="closeRoleModal()" class="px-4 h-9 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg text-xs font-bold transition-colors">Hủy</button>
       <button onclick="saveRole()" id="btn-save-role" class="px-5 h-9 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-500 hover:to-primary-700 text-white rounded-lg text-xs font-bold shadow-xs shadow-primary/40 transition-transform active:scale-[0.98]">Lưu Vai Trò</button>
     </div>
@@ -226,10 +226,10 @@
 </div>
 
 <!-- Reassign Modal (Delete Fallback) -->
-<div id="reassign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center">
+<div id="reassign-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-3 sm:p-4">
   <div class="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm" onclick="closeReassignModal()"></div>
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="reassign-modal-content">
-    <div class="p-5 border-b border-neutral-100 flex items-center gap-3 bg-white">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col relative z-10 transition-transform transform scale-95" id="reassign-modal-content">
+    <div class="p-4 sm:p-5 border-b border-neutral-100 flex items-center gap-3 bg-white shrink-0">
       <div class="w-10 h-10 rounded-xl bg-danger/10 border border-danger/20 flex items-center justify-center text-danger shrink-0">
         <i class="ph-fill ph-warning-circle text-xl"></i>
       </div>
@@ -241,7 +241,7 @@
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-5">
+    <div class="p-4 sm:p-5 overflow-y-auto flex-1 custom-scrollbar">
       <div class="mb-4 p-3 bg-warning/10 rounded-xl border border-warning/20 text-neutral-700 font-medium text-xs leading-relaxed">
         Vai trò <strong class="text-neutral-900" id="delete-role-name"></strong> hiện đang được gán cho một hoặc nhiều người dùng. 
         Vui lòng chọn một vai trò thay thế để chuyển giao cho các người dùng này trước khi xóa vai trò.
@@ -255,7 +255,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="p-4 sm:p-5 border-t border-neutral-100 flex justify-end gap-2.5 bg-white">
+    <div class="p-4 sm:p-5 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 bg-white shrink-0">
       <button onclick="closeReassignModal()" class="px-4 h-9 bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded-lg text-xs font-bold transition-colors">Hủy</button>
       <button onclick="confirmDeleteRole()" id="btn-confirm-delete" class="px-4 h-9 bg-danger hover:bg-red-600 text-white rounded-lg text-xs font-bold shadow-xs shadow-danger/30 transition-transform active:scale-[0.98]">Chuyển Vai Trò & Xóa</button>
     </div>

@@ -70,7 +70,7 @@
   </div>
 
   <!-- KPI Grid (Compact) -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 shrink-0">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 shrink-0">
     <div class="bg-white p-3.5 rounded-xl border border-neutral-200/80 shadow-xs hover:shadow-sm transition relative overflow-hidden group">
       <div class="flex items-center justify-between">
         <div>
@@ -136,8 +136,8 @@
       </div>
     </div>
 
-    <div class="p-2 flex-1 flex flex-col overflow-x-auto min-h-0">
-      <table class="w-full text-sm text-left min-w-max custom-beautiful-table" id="woTable">
+    <div class="p-2 flex-1 flex flex-col overflow-x-auto overflow-y-auto min-h-0 custom-scrollbar">
+      <table class="w-full text-sm text-left min-w-[850px] custom-beautiful-table" id="woTable">
         <thead class="text-xs text-neutral-500 bg-neutral-50 border-b border-neutral-200">
           <tr>
             <th class="px-3 py-3 w-10 text-center">
@@ -328,8 +328,8 @@
 <!-- Create/Edit Modal/Drawer (Sliding Drawer from Right) -->
 <div id="wo-modal" class="fixed inset-0 z-[100] hidden">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeWoModal()"></div>
-  <div class="absolute right-0 top-0 bottom-0 w-[500px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
-    <div class="p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative">
+  <div class="absolute right-0 top-0 bottom-0 w-full max-w-[500px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300">
+    <div class="p-4 sm:p-6 border-b border-neutral-100 flex justify-between items-center bg-white relative shrink-0">
       <div class="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary-200 to-transparent"></div>
       <div>
           <h3 class="font-black text-2xl text-neutral-800" id="wo-modal-title">Tạo Work Order</h3>
@@ -766,7 +766,7 @@
         </div>
       </form>
     </div>
-    <div class="p-6 border-t border-neutral-100 flex justify-end gap-3 bg-white">
+    <div class="p-4 sm:p-6 border-t border-neutral-100 flex flex-wrap justify-end gap-2.5 sm:gap-3 bg-white shrink-0">
       <button onclick="closeWoModal()" class="px-5 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-sm font-bold transition-colors">Hủy bỏ</button>
       <button onclick="saveWo()" id="btn-save-wo" class="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white rounded-xl text-sm font-bold shadow-md shadow-primary/20 transition-all flex items-center gap-2">
         <i class="ph-bold ph-floppy-disk"></i> Lưu Work Order
@@ -776,7 +776,7 @@
 </div>
 
 <!-- Assign Modal -->
-<div id="assign-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-4">
+<div id="assign-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-3 sm:p-4">
   <div class="absolute inset-0 bg-neutral-900/40 backdrop-blur-sm" onclick="closeAssignModal()"></div>
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col relative z-10 max-h-[90vh]">
     <div class="p-5 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/90">
@@ -1078,9 +1078,9 @@
 </div>
 
 <!-- Modal Ghi Nhận Chỉ Số Đo Kiểm Trong Work Order -->
-<div id="wo-meter-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
-    <div class="p-5 bg-gradient-to-r from-indigo-900 via-indigo-800 to-neutral-900 text-white flex justify-between items-center">
+<div id="wo-meter-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-indigo-900 via-indigo-800 to-neutral-900 text-white flex justify-between items-center shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl text-indigo-300">
           <i class="ph-fill ph-gauge"></i>
@@ -1094,7 +1094,7 @@
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+    <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <!-- Presets for fast testing -->
       <div class="p-3 bg-neutral-50 rounded-xl border border-neutral-200/60">
         <div class="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Mẫu số đo thử nghiệm nhanh:</div>
@@ -1152,7 +1152,7 @@
       </div>
       <div id="wo-meter-error-msg" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-medium"></div>
     </div>
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-end gap-2 shrink-0">
       <button type="button" onclick="closeWoMeterModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">
         Hủy
       </button>
@@ -1164,9 +1164,9 @@
 </div>
 
 <!-- Modal Hoàn Thành Work Order -->
-<div id="wo-complete-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
-    <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center">
+<div id="wo-complete-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-emerald-200">
           <i class="ph-bold ph-check-circle"></i>
@@ -1180,7 +1180,7 @@
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-5 space-y-4">
+    <div class="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div>
         <label class="block text-xs font-bold text-neutral-700 mb-1">Trạng thái vận hành máy sau bảo trì (Machine State) <span class="text-danger">*</span></label>
         <select id="wo-complete-machine-state" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 focus:outline-none focus:border-primary">
@@ -1214,7 +1214,7 @@
 
       <div id="wo-complete-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-end gap-2 shrink-0">
       <button type="button" onclick="closeCompleteWoModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-confirm-complete-wo" onclick="confirmCompleteWo()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-check"></i> Xác nhận hoàn thành
@@ -1224,9 +1224,9 @@
 </div>
 
 <!-- Modal Tạm Dừng Work Order -->
-<div id="wo-hold-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
-    <div class="p-5 bg-gradient-to-r from-amber-500 to-orange-600 text-white flex justify-between items-center">
+<div id="wo-hold-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-amber-500 to-orange-600 text-white flex justify-between items-center shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-amber-200">
           <i class="ph-bold ph-pause-circle"></i>
@@ -1240,7 +1240,7 @@
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-5 space-y-4">
+    <div class="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div>
         <label class="block text-xs font-bold text-neutral-700 mb-1">Phân loại lý do tạm dừng <span class="text-danger">*</span></label>
         <select id="wo-hold-reason-select" class="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-800 focus:outline-none focus:border-primary mb-2">
@@ -1257,7 +1257,7 @@
 
       <div id="wo-hold-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-end gap-2 shrink-0">
       <button type="button" onclick="closeHoldWoModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-confirm-hold-wo" onclick="confirmHoldWo()" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-pause"></i> Xác nhận tạm dừng
@@ -1267,9 +1267,9 @@
 </div>
 
 <!-- Modal Yêu Cầu Làm Lại (HSM Rollback - Phase 11.8) -->
-<div id="hsm-rollback-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[125] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
-    <div class="p-5 bg-gradient-to-r from-rose-600 to-red-700 text-white flex justify-between items-center">
+<div id="hsm-rollback-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[125] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-rose-600 to-red-700 text-white flex justify-between items-center shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-rose-200">
           <i class="ph-bold ph-arrow-u-up-left"></i>
@@ -1283,7 +1283,7 @@
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-5 space-y-4">
+    <div class="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div class="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-800 leading-relaxed font-medium">
         <i class="ph-bold ph-info text-rose-600 mr-1"></i> Hệ thống sẽ tự động chuyển trạng thái Checklist Giai đoạn 3 (Thao tác đại tu) và Giai đoạn 4 (Nghiệm thu chạy thử) về chưa đạt.
       </div>
@@ -1309,7 +1309,7 @@
       </div>
       <div id="hsm-rollback-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-end gap-2 shrink-0">
       <button type="button" onclick="closeHsmRollbackModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-confirm-hsm-rollback" onclick="confirmHsmRollback()" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-arrow-u-up-left"></i> Xác nhận lùi bước
@@ -1319,9 +1319,9 @@
 </div>
 
 <!-- Modal Yêu Cầu Phân Công Lại (Request Reassignment) -->
-<div id="wo-request-reassign-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
-    <div class="p-5 bg-gradient-to-r from-indigo-600 to-primary-700 text-white flex justify-between items-center">
+<div id="wo-request-reassign-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-indigo-600 to-primary-700 text-white flex justify-between items-center shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-indigo-200">
           <i class="ph-bold ph-user-switch"></i>
@@ -1335,7 +1335,7 @@
         <i class="ph-bold ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-5 space-y-4">
+    <div class="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-800 leading-relaxed">
         <p class="m-0 font-medium"><i class="ph-fill ph-info"></i> Phiếu sẽ được chuyển về trạng thái <strong>Tạm dừng (ON_HOLD)</strong> và gửi thông báo trực tiếp tới Quản đốc / Supervisor để tái phân bổ.</p>
       </div>
@@ -1346,7 +1346,7 @@
 
       <div id="wo-reassign-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-end gap-2 shrink-0">
       <button type="button" onclick="closeRequestReassignModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-confirm-request-reassign" onclick="confirmRequestReassign()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-paper-plane-tilt"></i> Gửi yêu cầu
@@ -1356,9 +1356,9 @@
 </div>
 
 <!-- Modal Báo Cáo Sự Cố Phát Sinh Tại Hiện Trường (Tình huống B) -->
-<div id="report-incident-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
-    <div class="p-5 bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 text-white flex justify-between items-center">
+<div id="report-incident-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[120] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+    <div class="p-4 sm:p-5 bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 text-white flex justify-between items-center shrink-0">
       <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-xl text-amber-200">
           <i class="ph-bold ph-warning-octagon"></i>
@@ -1373,7 +1373,7 @@
       </button>
     </div>
     
-    <div class="p-5 space-y-4">
+    <div class="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
         <div class="font-bold flex items-center gap-1.5 mb-1 text-amber-800">
           <i class="ph-fill ph-info"></i> Quy trình xử lý phát sinh tại chỗ:
@@ -1407,7 +1407,7 @@
       <div id="report-incident-error" class="hidden p-3 rounded-xl bg-red-50 text-red-600 text-xs font-semibold"></div>
     </div>
 
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-end gap-2">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-end gap-2 shrink-0">
       <button type="button" onclick="closeReportIncidentModal()" class="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 rounded-xl text-xs font-bold hover:bg-neutral-100 transition cursor-pointer">Hủy</button>
       <button type="button" id="btn-submit-report-incident" onclick="submitReportIncident()" class="px-5 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer">
         <i class="ph-bold ph-paper-plane-tilt"></i> Gửi Báo Cáo Lên Quản Đốc
@@ -1419,10 +1419,10 @@
 
 
 <!-- Modal Thông Báo Kiểm Tra Điều Kiện Thuật Toán -->
-<div id="algo-condition-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 hidden">
-  <div class="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden border border-neutral-200/80 transform transition-all animate-in fade-in zoom-in-95 duration-200">
+<div id="algo-condition-modal" class="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-3 sm:p-4 hidden">
+  <div class="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200/80 transform transition-all animate-in fade-in zoom-in-95 duration-200">
     <!-- Header -->
-    <div class="p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-100 flex items-start gap-4">
+    <div class="p-4 sm:p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-100 flex items-start gap-4 shrink-0">
       <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-2xl shrink-0 border border-amber-200 shadow-sm">
         <i class="ph-fill ph-warning-circle"></i>
       </div>
@@ -1440,7 +1440,7 @@
     </div>
 
     <!-- Body -->
-    <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+    <div class="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
       <!-- Issues List -->
       <div class="space-y-2.5" id="algo-condition-issues-list">
         <!-- Rendered by JS -->
@@ -1449,7 +1449,7 @@
       <!-- Resource Summary Stats -->
       <div class="bg-neutral-50 rounded-2xl p-4 border border-neutral-100">
         <div class="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2.5">Tổng quan tài nguyên hiện tại</div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="bg-white p-3 rounded-xl border border-neutral-200/60 shadow-xs">
             <div class="text-[11px] text-neutral-500 font-medium">Kỹ thuật viên rảnh / trực:</div>
             <div class="text-base font-black text-neutral-900 mt-0.5" id="algo-condition-tech-stat">0 / 0</div>
@@ -1471,7 +1471,7 @@
     </div>
 
     <!-- Footer -->
-    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between gap-3">
+    <div class="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-wrap items-center justify-between gap-3 shrink-0">
       <span class="text-xs text-neutral-400">Kiểm tra tự động theo thời gian thực</span>
       <div class="flex items-center gap-2">
         <button onclick="closeAlgoConditionModal()" class="px-5 py-2.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-bold rounded-xl text-sm transition-colors cursor-pointer">

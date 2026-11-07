@@ -3,7 +3,7 @@ name: e-eam
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: eam_postgres
     environment:
       POSTGRES_USER: eam_user

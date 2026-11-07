@@ -108,8 +108,8 @@
       </div>
     </div>
 
-    <div class="overflow-x-auto p-2 sm:p-3">
-      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table" id="templates-table">
+    <div class="overflow-x-auto p-2 sm:p-3 custom-scrollbar">
+      <table class="w-full text-xs sm:text-sm text-left custom-beautiful-table min-w-[700px]" id="templates-table">
         <thead class="text-xs text-neutral-500 uppercase bg-neutral-50/70 border-b border-neutral-200/80">
           <tr>
             <th class="px-4 py-3 font-bold tracking-wider">Tên Mẫu <span class="sr-only">Name</span></th>
@@ -172,7 +172,7 @@
 </div>
 
 <!-- Template Modal -->
-<div id="template-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+<div id="template-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] fancy-modal">
     <div class="px-5 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
@@ -182,45 +182,44 @@
         <i class="ph ph-x text-lg font-bold"></i>
       </button>
     </div>
-    <div class="overflow-y-auto p-5">
-        <form id="template-form" class="space-y-4">
-          <input type="hidden" id="template-id" />
-          <div id="template-msg" class="hidden p-3 rounded-lg text-sm font-medium mb-3"></div>
-          
-          <div>
-            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Tên Mẫu Phân Cấp <span class="text-danger">*</span></label>
-            <input type="text" id="template-name" required placeholder="Nhập tên mẫu..." class="w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
-          </div>
+    <form id="template-form" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <input type="hidden" id="template-id" />
+      <div class="overflow-y-auto p-4 sm:p-5 flex-1 custom-scrollbar space-y-4">
+        <div id="template-msg" class="hidden p-3 rounded-lg text-sm font-medium mb-3"></div>
+        
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Tên Mẫu Phân Cấp <span class="text-danger">*</span></label>
+          <input type="text" id="template-name" required placeholder="Nhập tên mẫu..." class="w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium" />
+        </div>
 
-          <div>
-            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Cấu trúc phân nhánh (Path Structure)</label>
-            <div id="path-tags-container" class="space-y-2">
-              <!-- Dynamic tags will be appended here -->
-            </div>
-            <button type="button" onclick="addPathTag()" class="w-full rounded-xl h-9 mt-2 border border-primary/30 border-dashed text-primary hover:text-primary-600 hover:border-primary font-semibold bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-xs">
-              <i class="ph ph-plus font-bold"></i> Thêm cấp con
-            </button>
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Cấu trúc phân nhánh (Path Structure)</label>
+          <div id="path-tags-container" class="space-y-2">
+            <!-- Dynamic tags will be appended here -->
           </div>
-          
-          <div>
-            <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Mô Tả</label>
-            <textarea id="template-desc" rows="3" placeholder="Nhập mô tả chi tiết..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
-          </div>
+          <button type="button" onclick="addPathTag()" class="w-full rounded-xl h-9 mt-2 border border-primary/30 border-dashed text-primary hover:text-primary-600 hover:border-primary font-semibold bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 text-xs">
+            <i class="ph ph-plus font-bold"></i> Thêm cấp con
+          </button>
+        </div>
+        
+        <div>
+          <label class="block text-xs font-extrabold text-neutral-700 uppercase mb-1.5">Mô Tả</label>
+          <textarea id="template-desc" rows="3" placeholder="Nhập mô tả chi tiết..." class="w-full px-4 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"></textarea>
+        </div>
 
-          <div class="flex items-center justify-between">
-            <label class="text-xs font-extrabold text-neutral-700 uppercase">Trạng Thái Hoạt Động</label>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="template-active" class="sr-only peer" checked>
-              <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
-          
-          <div class="pt-2 flex justify-end gap-3 mt-4 border-t border-neutral-100 pt-4">
-            <button type="button" onclick="closeTemplateModal()" class="rounded-xl h-10 px-5 font-bold text-xs text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Hủy Bỏ</button>
-            <button type="submit" id="btn-save-template" class="rounded-xl h-10 px-6 bg-primary hover:bg-primary-600 text-white font-bold text-xs transition-colors shadow-sm shadow-primary/20"><span>Lưu Thông Tin</span><span class="sr-only">Save</span></button>
-          </div>
-        </form>
-    </div>
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-extrabold text-neutral-700 uppercase">Trạng Thái Hoạt Động</label>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="template-active" class="sr-only peer" checked>
+            <div class="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+          </label>
+        </div>
+      </div>
+      <div class="px-5 py-3.5 bg-neutral-50/50 border-t border-neutral-100 shrink-0 flex flex-wrap justify-end gap-2.5 sm:gap-3">
+        <button type="button" onclick="closeTemplateModal()" class="rounded-xl h-10 px-5 font-bold text-xs text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 transition-colors">Hủy Bỏ</button>
+        <button type="submit" id="btn-save-template" class="rounded-xl h-10 px-6 bg-primary hover:bg-primary-600 text-white font-bold text-xs transition-colors shadow-sm shadow-primary/20"><span>Lưu Thông Tin</span><span class="sr-only">Save</span></button>
+      </div>
+    </form>
   </div>
 </div>
 

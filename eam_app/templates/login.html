@@ -84,9 +84,9 @@
 </div>
 
 <!-- Forgot Password Modal -->
-<div id="forgot-password-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col mx-4">
-    <div class="px-5 py-3.5 border-b border-neutral-200 flex justify-between items-center bg-neutral-50">
+<div id="forgot-password-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="px-5 py-3.5 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <h3 class="text-base font-bold text-neutral-800 m-0">Khôi Phục Mật Khẩu <span class="sr-only">Reset Password</span></h3>
       <button onclick="closeForgotModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
         <i class="ph ph-x text-lg"></i>
@@ -94,7 +94,7 @@
     </div>
     
     <!-- Step 1: Request Code -->
-    <form id="forgot-email-form" class="p-5 space-y-4">
+    <form id="forgot-email-form" class="p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
       <div id="forgot-msg" class="hidden mb-3 p-3 rounded-xl text-xs font-semibold"></div>
       <div>
         <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wide mb-1.5">Nhập địa chỉ email đăng ký</label>
@@ -106,7 +106,7 @@
     </form>
 
     <!-- Step 2: Reset Password -->
-    <form id="reset-password-form" class="hidden p-5 space-y-4">
+    <form id="reset-password-form" class="hidden p-5 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
       <div id="reset-msg" class="hidden mb-3 p-3 rounded-xl text-xs font-semibold"></div>
       <div>
         <label class="block text-xs font-bold text-neutral-700 uppercase tracking-wide mb-1.5">Mã xác nhận 6 số từ email</label>

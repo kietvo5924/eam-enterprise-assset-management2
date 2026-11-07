@@ -1324,6 +1324,25 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
           onPressed: () => context.pop(true),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Hỏi Trợ lý AI về sự cố này',
+            icon: Icon(
+              PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+              color: AppTheme.primaryColor,
+              size: 20,
+            ),
+            onPressed: () {
+              context.push('/assistant', extra: {
+                'assetContext': {
+                  'assetId': _workOrder?.assetId,
+                  'name': _workOrder?.assetName,
+                  'workOrderId': _workOrder?.id,
+                  'workOrderCode': _workOrder?.code,
+                  'title': _workOrder?.title,
+                },
+              });
+            },
+          ),
           if (_isUploading)
             Padding(
               padding: const EdgeInsets.only(right: 20),

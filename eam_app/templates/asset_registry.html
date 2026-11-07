@@ -6,9 +6,9 @@
 
 {% block content %}
 <!-- Main Content -->
-<div class="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
+<div class="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6 overflow-hidden h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
   <!-- Left Pane: Asset List -->
-  <div id="left-pane" class="w-full md:w-1/3 md:min-w-[320px] md:max-w-sm flex bg-white border border-neutral-200 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex-col overflow-hidden transition-all duration-300 relative h-full max-h-full">
+  <div id="left-pane" class="w-full lg:w-1/3 lg:min-w-[320px] lg:max-w-sm flex bg-white border border-neutral-200 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex-col overflow-hidden transition-all duration-300 relative h-full max-h-full">
 
     <!-- Full Header -->
     <div id="left-pane-header" class="p-3 border-b border-neutral-200 bg-white flex items-center justify-between z-10 shadow-sm shrink-0">
@@ -106,7 +106,7 @@
   </div>
 
   <!-- Right Pane: Asset Details -->
-  <div id="right-pane" class="flex-1 bg-white border border-neutral-200 rounded-xl flex-col overflow-hidden min-w-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hidden md:flex relative h-full max-h-full">
+  <div id="right-pane" class="flex-1 bg-white border border-neutral-200 rounded-xl flex-col overflow-hidden min-w-0 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hidden lg:flex relative h-full max-h-full">
     
     <!-- Empty State -->
     <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-neutral-400 p-6">
@@ -121,7 +121,7 @@
         <div class="absolute top-0 right-0 -mr-16 -mt-16 w-[300px] h-[300px] rounded-full bg-gradient-to-bl from-info/10 via-primary-100/20 to-transparent blur-3xl opacity-50 pointer-events-none"></div>
         <div class="flex flex-wrap justify-between items-start gap-4 sm:gap-6 relative z-10">
           <div class="flex items-start gap-3 sm:gap-4 flex-auto min-w-0 md:min-w-[320px]">
-            <button class="md:hidden mt-1 w-9 h-9 bg-neutral-100 hover:bg-neutral-200 rounded-xl flex items-center justify-center text-neutral-600 shrink-0 transition-colors" onclick="closeDetails()">
+            <button class="lg:hidden mt-1 w-9 h-9 bg-neutral-100 hover:bg-neutral-200 rounded-xl flex items-center justify-center text-neutral-600 shrink-0 transition-colors cursor-pointer" onclick="closeDetails()" title="Quay lại cây tài sản">
               <i class="ph-bold ph-arrow-left"></i>
             </button>
             <div class="w-11 h-11 sm:w-12 sm:h-12 bg-primary-50 rounded-xl flex items-center justify-center text-primary text-xl sm:text-2xl shrink-0 shadow-inner mt-0.5">
@@ -410,8 +410,8 @@
 </div>
 
 <!-- Add Meter Reading / Condition Monitoring Modal -->
-<div id="add-meter-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+<div id="add-meter-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <div class="flex items-center gap-2">
         <i class="ph-bold ph-gauge text-xl text-primary"></i>
@@ -422,7 +422,7 @@
       </button>
     </div>
     
-    <div class="p-6 space-y-4">
+    <div class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
       {% csrf_token %}
       <!-- Trạng thái máy lúc đo (Quy Tắc 1) -->
       <div>
@@ -520,7 +520,7 @@
       <div id="meter-submit-result" class="hidden p-3 rounded-xl text-xs font-medium"></div>
     </div>
 
-    <div class="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-3">
+    <div class="px-5 sm:px-6 py-3.5 sm:py-4 bg-neutral-50 border-t border-neutral-200 flex flex-wrap justify-end gap-2.5 shrink-0">
       <button type="button" onclick="closeAddMeterModal()" class="px-4 py-2 border border-neutral-200 rounded-xl text-sm font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors">
         Hủy
       </button>
@@ -533,8 +533,8 @@
 </div>
 
 <!-- Override Phantom Recovery Modal -->
-<div id="override-phantom-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+<div id="override-phantom-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <div class="flex items-center gap-2">
         <i class="ph-bold ph-shield-check text-xl text-amber-600"></i>
@@ -544,7 +544,7 @@
         <i class="ph ph-x text-xl"></i>
       </button>
     </div>
-    <div class="p-6 space-y-4">
+    <div class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
       <p class="text-xs text-neutral-600 leading-relaxed m-0">
         Bạn đang xác thực bỏ qua cảnh báo hồi phục ảo (Phantom Recovery). Hành động này chỉ nên thực hiện khi Quản đốc đã trực tiếp thẩm định hiện trường và xác nhận thiết bị an toàn.
       </p>
@@ -554,7 +554,7 @@
       </div>
       <div id="override-phantom-error" class="hidden p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium"></div>
     </div>
-    <div class="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex justify-end gap-3">
+    <div class="px-5 sm:px-6 py-3.5 sm:py-4 bg-neutral-50 border-t border-neutral-200 flex flex-wrap justify-end gap-2.5 shrink-0">
       <button type="button" onclick="closeOverridePhantomModal()" class="px-4 py-2 border border-neutral-200 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition-colors">
         Hủy
       </button>
@@ -567,15 +567,15 @@
 </div>
 
 <!-- Move Asset Modal -->
-<div id="move-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+<div id="move-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <h3 class="text-lg font-bold text-neutral-800 m-0">Di chuyển tài sản</h3>
       <button onclick="closeMoveModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
         <i class="ph ph-x text-xl"></i>
       </button>
     </div>
-    <div class="p-6 space-y-4">
+    <div class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
         <div>
           <label class="block text-sm font-bold text-neutral-700 mb-1.5">Mặt Bằng mới</label>
           <select id="move-floorplan" onchange="onMoveFloorplanChange(this.value)" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium">
@@ -591,25 +591,25 @@
               <option value="">-- Chọn Khu Vực --</option>
           </select>
         </div>
-        <div class="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-          <button onclick="closeMoveModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
-          <button onclick="submitMoveAsset()" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Lưu thay đổi</button>
-        </div>
+    </div>
+    <div class="flex flex-wrap justify-end gap-2.5 px-5 sm:px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/50 shrink-0">
+      <button onclick="closeMoveModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
+      <button onclick="submitMoveAsset()" class="px-6 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg transition-colors shadow-md shadow-primary/20">Lưu thay đổi</button>
     </div>
   </div>
 </div>
 
-<div id="asset-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-  <div class="bg-white rounded-[24px] shadow-xl w-full max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col fancy-modal relative">
-    <div class="px-6 pt-6 pb-3 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
-      <h3 class="text-xl font-black text-neutral-900 m-0" id="asset-modal-title">Thêm Tài Sản Mới</h3>
+<div id="asset-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-2xl sm:rounded-[24px] shadow-xl w-full max-w-[700px] max-h-[90vh] overflow-hidden flex flex-col fancy-modal relative">
+    <div class="px-5 sm:px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
+      <h3 class="text-lg sm:text-xl font-black text-neutral-900 m-0" id="asset-modal-title">Thêm Tài Sản Mới</h3>
       <button type="button" onclick="closeAssetModal()" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 transition-colors z-50">
         <i class="ph ph-x text-base"></i>
       </button>
     </div>
-    <div class="p-6 overflow-y-auto custom-scrollbar bg-white">
-      <form id="asset-form" onsubmit="event.preventDefault(); submitAsset();">
-        <input type="hidden" id="asset-id" value="">
+    <form id="asset-form" onsubmit="event.preventDefault(); submitAsset();" class="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <input type="hidden" id="asset-id" value="">
+      <div class="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
           <!-- Column 1 -->
           <div>
@@ -722,27 +722,28 @@
           </div>
         </div>
         <div id="asset-error" class="hidden mt-4 p-3 rounded-lg text-sm bg-red-50 text-red-600 border border-red-200"></div>
-        <div class="flex justify-end pt-6 mt-6 border-t border-neutral-100">
-          <button type="submit" id="btn-save-asset" class="px-8 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-xl h-10 transition-colors">
-            Tạo Mới
-          </button>
-        </div>
-      </form>
-    </div>
+      </div>
+      <div class="flex flex-wrap justify-end gap-2.5 px-5 sm:px-6 py-3.5 border-t border-neutral-100 bg-neutral-50/50 shrink-0">
+        <button type="button" onclick="closeAssetModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg sm:rounded-xl transition-colors">Hủy</button>
+        <button type="submit" id="btn-save-asset" class="px-6 sm:px-8 py-2 bg-primary hover:bg-primary-600 text-white text-sm font-bold rounded-lg sm:rounded-xl h-10 transition-colors shadow-md shadow-primary/20">
+          Tạo Mới
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
 
 <!-- Print Filter Modal -->
-<div id="bulk-filter-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+<div id="bulk-filter-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
     <div class="px-6 py-4 border-b border-neutral-200 flex justify-between items-center bg-neutral-50 shrink-0">
       <h3 class="text-lg font-bold text-neutral-800 m-0">Bộ lọc In / Xuất Tài Sản</h3>
       <button onclick="closeBulkFilterModal()" class="text-neutral-400 hover:text-neutral-600 transition-colors">
         <i class="ph ph-x text-xl"></i>
       </button>
     </div>
-    <div class="p-6 space-y-4">
+    <div class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
       <div>
         <label class="block text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2">Trạng thái</label>
         <select id="bulk-status" class="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-lg text-sm">
@@ -788,7 +789,7 @@
         </select>
       </div>
     </div>
-    <div class="flex justify-end gap-3 px-6 py-4 border-t border-neutral-100 bg-neutral-50">
+    <div class="flex flex-wrap justify-end gap-2.5 px-5 sm:px-6 py-3.5 sm:py-4 border-t border-neutral-100 bg-neutral-50 shrink-0">
       <button onclick="closeBulkFilterModal()" class="px-4 py-2 text-sm font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">Hủy</button>
       <button onclick="executeExportData()" class="px-4 py-2 bg-white border border-neutral-300 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2"><i class="ph ph-file-xls"></i> Xuất Excel</button>
       <button onclick="executePrintAllQR()" class="px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-2"><i class="ph ph-printer"></i> In Mã QR</button>
@@ -797,12 +798,12 @@
 </div>
 
 <!-- Import Assets Modal -->
-<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-  <div class="bg-white rounded-3xl shadow-xl w-full max-w-[560px] overflow-hidden flex flex-col p-0 fancy-modal relative">
+<div id="import-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+  <div class="bg-white rounded-3xl shadow-xl w-full max-w-[560px] max-h-[90vh] overflow-hidden flex flex-col p-0 fancy-modal relative">
     <button onclick="closeImportModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white hover:bg-danger hover:border-danger transition-all z-50 cursor-pointer">
       <i class="ph ph-x text-base"></i>
     </button>
-    <div class="relative overflow-hidden bg-white flex flex-col">
+    <div class="relative overflow-hidden bg-white flex flex-col max-h-full">
       <div class="relative p-6 pb-10 bg-gradient-to-br from-primary-600 to-info overflow-hidden shrink-0">
         <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
         <div class="relative z-10 flex items-center gap-4">
@@ -815,7 +816,7 @@
           </div>
         </div>
       </div>
-      <div class="p-6 -mt-6 bg-white rounded-t-3xl relative z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] flex-1">
+      <div class="p-6 -mt-6 bg-white rounded-t-3xl relative z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] flex-1 overflow-y-auto">
         <div class="mb-5 p-3.5 bg-info/5 rounded-xl border border-info/20 flex items-start gap-3">
           <i class="ph-fill ph-info text-info text-xl mt-0.5 shrink-0"></i>
           <div>
@@ -1155,8 +1156,8 @@
         activeBadge.innerText = 'INACTIVE';
       }
       
-      // On mobile view, show right pane and hide left pane
-      if (window.innerWidth < 768) {
+      // On mobile & tablet view (< 1024px), show right pane and hide left pane
+      if (window.innerWidth < 1024) {
         document.getElementById('left-pane').classList.add('hidden');
         document.getElementById('right-pane').classList.remove('hidden');
         document.getElementById('right-pane').classList.add('flex');
@@ -2788,10 +2789,12 @@
     const params = new URLSearchParams(window.location.search);
     let targetAssetId = params.get('assetId');
     if (!targetAssetId) {
-      // If no assetId in URL, auto select the first available asset in tree
-      const firstAssetEl = document.querySelector('.asset-item');
-      if (firstAssetEl) {
-        targetAssetId = firstAssetEl.id.replace('asset-item-', '');
+      // If no assetId in URL, auto select on desktop screens only (keep tree view on mobile/tablet)
+      if (window.innerWidth >= 1024) {
+        const firstAssetEl = document.querySelector('.asset-item');
+        if (firstAssetEl) {
+          targetAssetId = firstAssetEl.id.replace('asset-item-', '');
+        }
       }
     }
     if (targetAssetId && assetsData[targetAssetId]) {
