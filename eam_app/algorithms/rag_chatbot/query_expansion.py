@@ -6,6 +6,7 @@ to bridge the semantic distance gap in PGVector embeddings.
 
 from typing import Dict, Any, Optional, List
 from .constants import SLANG_TECHNICAL_DICTIONARY
+from .safety_config import ensure_safety_config_loaded
 
 
 def expand_slang_query(prompt: str, asset_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -32,6 +33,7 @@ def expand_slang_query(prompt: str, asset_context: Optional[Dict[str, Any]] = No
             'technical_additions': []
         }
 
+    ensure_safety_config_loaded()
     lower_prompt = prompt.lower()
     detected_slangs: List[str] = []
     technical_additions: List[str] = []

@@ -1595,6 +1595,35 @@ def scan_and_index_system_knowledge() -> Dict[str, Any]:
 
     items_to_index: List[Dict[str, Any]] = []
     qa_to_create: List[Dict[str, Any]] = []
+    seen_contents = set()
+    seen_qa_patterns = set()
+
+    # Helper to add unique chunk
+    def add_chunk(section_title: str, content: str, parent_content: str, page_number: int):
+        clean_content = content.strip().lower()
+        if not clean_content:
+            return
+        chunk_key = (clean_content, page_number)
+        if chunk_key not in seen_contents:
+            seen_contents.add(chunk_key)
+            items_to_index.append({
+                "section_title": section_title,
+                "content": clean_content,
+                "parent_content": parent_content,
+                "page_number": page_number
+            })
+
+    def add_qa(pattern: str, answer: str):
+        clean_pat = pattern.strip()
+        if not clean_pat:
+            return
+        pat_key = clean_pat.lower()
+        if pat_key not in seen_qa_patterns:
+            seen_qa_patterns.add(pat_key)
+            qa_to_create.append({
+                "question_pattern": clean_pat,
+                "gold_answer": answer
+            })
 
     # Iterate over all portal modules
     for page_idx, mod in enumerate(PORTAL_MODULES_METADATA, start=1):
@@ -1603,20 +1632,11 @@ def scan_and_index_system_knowledge() -> Dict[str, Any]:
 
         # 1. Module-level child chunks
         for trig in mod['triggers']:
-            clean_trig = trig.strip().lower()
-            items_to_index.append({
-                "section_title": section_title,
-                "content": clean_trig,
-                "parent_content": guide_md,
-                "page_number": page_idx
-            })
+            add_chunk(section_title, trig, guide_md, page_idx)
 
         # Register primary module Q&A
-        primary_question = mod['triggers'][0]
-        qa_to_create.append({
-            "question_pattern": primary_question,
-            "gold_answer": guide_md
-        })
+        if mod['triggers']:
+            add_qa(mod['triggers'][0], guide_md)
 
         # 2. Detailed action buttons deep child chunks
         for act in mod.get('action_details', []):
@@ -1626,13 +1646,7 @@ def scan_and_index_system_knowledge() -> Dict[str, Any]:
             # Action triggers dynamically generated
             dynamic_triggers = generate_dynamic_action_triggers(act, mod)
             for act_trig in dynamic_triggers:
-                clean_act_trig = act_trig.strip().lower()
-                items_to_index.append({
-                    "section_title": act_title,
-                    "content": clean_act_trig,
-                    "parent_content": act_md,
-                    "page_number": page_idx
-                })
+                add_chunk(act_title, act_trig, act_md, page_idx)
 
             # Action semantic summary chunk
             summary_chunk = (
@@ -1641,56 +1655,22 @@ def scan_and_index_system_knowledge() -> Dict[str, Any]:
                 f"Quy trình: {act['trigger_workflow']}. "
                 f"Quyền hạn yêu cầu: {act['permission']}."
             )
-            items_to_index.append({
-                "section_title": act_title,
-                "content": summary_chunk.lower(),
-                "parent_content": act_md,
-                "page_number": page_idx
-            })
+            add_chunk(act_title, summary_chunk, act_md, page_idx)
 
             # Form fields individual chunks
             for fld in act.get('form_fields', []):
                 clean_fld = fld.strip()
-                items_to_index.append({
-                    "section_title": act_title,
-                    "content": f"trường {clean_fld.lower()} trong biểu mẫu form nút {act['name'].lower()}",
-                    "parent_content": act_md,
-                    "page_number": page_idx
-                })
-                items_to_index.append({
-                    "section_title": act_title,
-                    "content": f"hướng dẫn điền và ý nghĩa {clean_fld.lower()} ({mod['title'].lower()})",
-                    "parent_content": act_md,
-                    "page_number": page_idx
-                })
+                add_chunk(act_title, fld, act_md, page_idx)
+                add_chunk(act_title, f"hướng dẫn điền và ý nghĩa {clean_fld} ({mod['title']})", act_md, page_idx)
                 if '(' in clean_fld:
-                    label = clean_fld.split('(')[0].strip().lower()
+                    label = clean_fld.split('(')[0].strip()
                     if label:
-                        items_to_index.append({
-                            "section_title": act_title,
-                            "content": f"trường {label} trong form {act['name'].lower()} là gì",
-                            "parent_content": act_md,
-                            "page_number": page_idx
-                        })
-                        items_to_index.append({
-                            "section_title": act_title,
-                            "content": f"ý nghĩa trường {label} trong form {act['name'].lower()}",
-                            "parent_content": act_md,
-                            "page_number": page_idx
-                        })
-                        items_to_index.append({
-                            "section_title": act_title,
-                            "content": f"trường {label} điền gì",
-                            "parent_content": act_md,
-                            "page_number": page_idx
-                        })
+                        add_chunk(act_title, f"trường {label} trong form {act['name']} là gì", act_md, page_idx)
+                        add_chunk(act_title, f"ý nghĩa trường {label} trong form {act['name']}", act_md, page_idx)
+                        add_chunk(act_title, f"trường {label} điền gì", act_md, page_idx)
 
             if dynamic_triggers:
-                primary_act_trig = dynamic_triggers[0]
-                qa_to_create.append({
-                    "question_pattern": primary_act_trig,
-                    "gold_answer": act_md
-                })
+                add_qa(dynamic_triggers[0], act_md)
 
     # Batch compute embeddings for all child chunk texts
     texts_to_embed = [item['content'] for item in items_to_index]
@@ -1723,16 +1703,19 @@ def scan_and_index_system_knowledge() -> Dict[str, Any]:
         DocumentChunk.objects.bulk_create(chunk_objs, batch_size=250)
         indexed_count = len(chunk_objs)
 
-        # Register Curated Gold Q&As
+        # Register Curated Gold Q&As (strictly scoped to system guides)
         for qa_item in qa_to_create:
             CuratedQAKnowledge.all_objects.filter(
+                is_system_guide=True,
+                tenant_id__isnull=True,
+                category='SYSTEM_FEATURE_GUIDE',
                 question_pattern__iexact=qa_item['question_pattern']
             ).delete()
 
             CuratedQAKnowledge.objects.create(
                 tenant_id=None,
                 is_system_guide=True,
-                category='SYSTEM_FEATURE',
+                category='SYSTEM_FEATURE_GUIDE',
                 question_pattern=qa_item['question_pattern'],
                 gold_answer=qa_item['gold_answer'],
                 applicable_model=None

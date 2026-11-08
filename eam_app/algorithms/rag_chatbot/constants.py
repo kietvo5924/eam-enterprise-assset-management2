@@ -187,11 +187,11 @@ THEORETICAL_KEYWORDS = [
     'hướng dẫn phòng', 'làm sao để phòng', 'biện pháp phòng'
 ]
 
-# 4. Từ phủ định an toàn (không phải sự cố nguy cấp)
+# 4. Từ phủ định an toàn (phủ định trực tiếp hiện tượng nguy cấp)
 NEGATION_WORDS = [
-    'không bị', 'chưa bị', 'không có', 'chưa thấy', 'chẳng bị', 
-    'không xì', 'chưa xì', 'không cháy', 'chưa bốc khói', 'chưa nổ',
-    'không gây', 'tránh', 'không hề cháy', 'chưa hề bốc khói', 'không phải sự cố'
+    'không bị', 'chưa bị', 'không có rò rỉ', 'không có cháy', 'không có sự cố',
+    'chưa thấy', 'chẳng bị', 'không xì', 'chưa xì', 'không cháy', 'chưa bốc khói',
+    'chưa nổ', 'không gây', 'không hề cháy', 'chưa hề bốc khói', 'không phải sự cố'
 ]
 
 # 5. Từ cấm kỵ dùng cho Contradiction Guard

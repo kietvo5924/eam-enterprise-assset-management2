@@ -75,12 +75,15 @@ def retrieve_relevant_chunks(
     tenant_id: Optional[str] = None,
     asset_model: Optional[str] = None,
     manufacture_year: Optional[int] = None,
+    serial_number: Optional[str] = None,
     is_system_query: bool = False,
     limit: int = 5
 ) -> List[Dict[str, Any]]:
     """
     Dual-stream PGVector retrieval using Cosine Distance (<=>).
     Returns list of matched chunks with full parent_content, metadata, and similarity score.
+    Strictly filters by tenant_id, asset_model, manufacture_year, and serial_number across
+    OEM Manuals, Tacit Work Orders, and Curated QA.
     """
     query_vec = embed_text(query_text)
     vec_str = format_vector_for_sql(query_vec)
@@ -119,87 +122,138 @@ def retrieve_relevant_chunks(
                 cursor.execute(sql, [vec_str, vec_str, limit])
         else:
             # Nhánh 1: Tri thức Thiết bị & Nhà xưởng (Tenant-Isolated)
-            # Lọc cứng theo tenant_id, model, và dải năm sản xuất nếu có
-            if asset_model:
-                year_val = manufacture_year if manufacture_year else 2020
-                if tenant_id:
-                    sql = """
-                        SELECT dc.id, dc.content, dc.parent_content, dc.image_anchors, dc.source_type,
-                               dc.provenance_wo_code, td.title, 1 - (dc.embedding <=> %s::vector) AS similarity,
-                               dc.is_system_guide, dc.page_number
-                        FROM document_chunks dc
-                        LEFT JOIN technical_documents td ON dc.document_id = td.id
-                        WHERE dc.is_active = TRUE
-                          AND (dc.tenant_id = %s OR (dc.is_system_guide = TRUE AND dc.tenant_id IS NULL))
-                          AND (
-                              -- Luồng 1: Sổ tay OEM khớp Model và dải năm
-                              (dc.source_type = 'OEM_MANUAL' AND td.applicable_model = %s AND %s BETWEEN td.applicable_year_start AND td.applicable_year_end)
-                              OR
-                              -- Luồng 2: Tri thức ngầm từ Work Order COMPLETED đã kiểm định
-                              (dc.source_type = 'TACIT_WORK_ORDER' AND dc.is_verified_tacit = TRUE)
-                              OR
-                              -- Luồng 3: Tri thức hỏi đáp chuẩn mực đã phê duyệt
-                              (dc.source_type = 'CURATED_QA')
-                              OR
-                              -- Luồng 4: Hướng dẫn hệ thống
-                              (dc.source_type = 'SYSTEM_GUIDE' OR dc.is_system_guide = TRUE)
+            # Lọc linh hoạt theo tenant_id, model, dải năm sản xuất và serial nếu có
+            if tenant_id:
+                sql = """
+                    SELECT dc.id, dc.content, dc.parent_content, dc.image_anchors, dc.source_type,
+                           dc.provenance_wo_code, td.title, 1 - (dc.embedding <=> %s::vector) AS similarity,
+                           dc.is_system_guide, dc.page_number
+                    FROM document_chunks dc
+                    LEFT JOIN technical_documents td ON dc.document_id = td.id
+                    LEFT JOIN work_orders w ON dc.work_order_id = w.id
+                    LEFT JOIN assets a ON w.asset_id = a.id
+                    WHERE dc.is_active = TRUE
+                      AND (dc.tenant_id = %s OR (dc.is_system_guide = TRUE AND dc.tenant_id IS NULL))
+                      AND (
+                          -- Luồng 1: Sổ tay OEM khớp Model và dải năm (+ serial prefix nếu có)
+                          (
+                              dc.source_type = 'OEM_MANUAL'
+                              AND (%s IS NULL OR td.applicable_model IS NULL OR td.applicable_model = %s)
+                              AND (%s IS NULL OR %s BETWEEN COALESCE(td.applicable_year_start, 1900) AND COALESCE(td.applicable_year_end, 2100))
+                              AND (%s IS NULL OR td.serial_number_prefix IS NULL OR td.serial_number_prefix = '' OR %s LIKE CONCAT(td.serial_number_prefix, '%%'))
                           )
-                        ORDER BY dc.embedding <=> %s::vector
-                        LIMIT %s;
-                    """
-                    cursor.execute(sql, [vec_str, tenant_id, asset_model, year_val, vec_str, limit])
-                else:
-                    sql = """
-                        SELECT dc.id, dc.content, dc.parent_content, dc.image_anchors, dc.source_type,
-                               dc.provenance_wo_code, td.title, 1 - (dc.embedding <=> %s::vector) AS similarity,
-                               dc.is_system_guide, dc.page_number
-                        FROM document_chunks dc
-                        LEFT JOIN technical_documents td ON dc.document_id = td.id
-                        WHERE dc.is_active = TRUE
-                          AND (
-                              -- Luồng 1: Sổ tay OEM khớp Model và dải năm
-                              (dc.source_type = 'OEM_MANUAL' AND td.applicable_model = %s AND %s BETWEEN td.applicable_year_start AND td.applicable_year_end)
-                              OR
-                              -- Luồng 2: Tri thức ngầm từ Work Order COMPLETED đã kiểm định
-                              (dc.source_type = 'TACIT_WORK_ORDER' AND dc.is_verified_tacit = TRUE)
-                              OR
-                              -- Luồng 3: Tri thức hỏi đáp chuẩn mực đã phê duyệt
-                              (dc.source_type = 'CURATED_QA')
-                              OR
-                              -- Luồng 4: Hướng dẫn hệ thống
-                              (dc.source_type = 'SYSTEM_GUIDE' OR dc.is_system_guide = TRUE)
+                          OR
+                          -- Luồng 2: Tri thức ngầm từ Work Order COMPLETED đã kiểm định (khớp Model & Serial của Asset)
+                          (
+                              dc.source_type = 'TACIT_WORK_ORDER'
+                              AND dc.is_verified_tacit = TRUE
+                              AND (%s IS NULL OR a.model IS NULL OR a.model = %s)
+                              AND (%s IS NULL OR a.serial_number IS NULL OR a.serial_number = %s)
+                              AND (%s IS NULL OR a.purchase_date IS NULL OR EXTRACT(YEAR FROM a.purchase_date) = %s)
                           )
-                        ORDER BY dc.embedding <=> %s::vector
-                        LIMIT %s;
-                    """
-                    cursor.execute(sql, [vec_str, asset_model, year_val, vec_str, limit])
+                          OR
+                          -- Luồng 3: Tri thức hỏi đáp chuẩn mực đã phê duyệt (khớp Model và dải năm, dùng EXISTS để triệt tiêu trùng lặp)
+                          (
+                              dc.source_type = 'CURATED_QA'
+                              AND (
+                                  NOT EXISTS (
+                                      SELECT 1 FROM curated_qa_knowledge cqa_check
+                                      WHERE (dc.content = cqa_check.question_pattern OR dc.parent_content = cqa_check.gold_answer)
+                                        AND (cqa_check.tenant_id = dc.tenant_id OR (cqa_check.is_system_guide = TRUE AND dc.is_system_guide = TRUE))
+                                  )
+                                  OR EXISTS (
+                                      SELECT 1 FROM curated_qa_knowledge cqa
+                                      WHERE (dc.content = cqa.question_pattern OR dc.parent_content = cqa.gold_answer)
+                                        AND (cqa.tenant_id = dc.tenant_id OR (cqa.is_system_guide = TRUE AND dc.is_system_guide = TRUE))
+                                        AND (%s IS NULL OR cqa.applicable_model IS NULL OR cqa.applicable_model = '' OR cqa.applicable_model = %s)
+                                        AND (%s IS NULL OR %s BETWEEN COALESCE(cqa.applicable_year_start, 1900) AND COALESCE(cqa.applicable_year_end, 2100))
+                                  )
+                              )
+                          )
+                          OR
+                          -- Luồng 4: Hướng dẫn hệ thống
+                          (dc.source_type = 'SYSTEM_GUIDE' OR dc.is_system_guide = TRUE)
+                      )
+                    ORDER BY dc.embedding <=> %s::vector
+                    LIMIT %s;
+                """
+                cursor.execute(sql, [
+                    vec_str, tenant_id,
+                    asset_model, asset_model,
+                    manufacture_year, manufacture_year,
+                    serial_number, serial_number,
+                    asset_model, asset_model,
+                    serial_number, serial_number,
+                    manufacture_year, manufacture_year,
+                    asset_model, asset_model,
+                    manufacture_year, manufacture_year,
+                    vec_str, limit
+                ])
             else:
-                # Không có asset_model: tra cứu trên toàn bộ tài liệu tenant + system guide
-                if tenant_id:
-                    sql = """
-                        SELECT dc.id, dc.content, dc.parent_content, dc.image_anchors, dc.source_type,
-                               dc.provenance_wo_code, td.title, 1 - (dc.embedding <=> %s::vector) AS similarity,
-                               dc.is_system_guide, dc.page_number
-                        FROM document_chunks dc
-                        LEFT JOIN technical_documents td ON dc.document_id = td.id
-                        WHERE dc.is_active = TRUE
-                          AND (dc.tenant_id = %s OR (dc.is_system_guide = TRUE AND dc.tenant_id IS NULL))
-                        ORDER BY dc.embedding <=> %s::vector
-                        LIMIT %s;
-                    """
-                    cursor.execute(sql, [vec_str, tenant_id, vec_str, limit])
-                else:
-                    sql = """
-                        SELECT dc.id, dc.content, dc.parent_content, dc.image_anchors, dc.source_type,
-                               dc.provenance_wo_code, td.title, 1 - (dc.embedding <=> %s::vector) AS similarity,
-                               dc.is_system_guide, dc.page_number
-                        FROM document_chunks dc
-                        LEFT JOIN technical_documents td ON dc.document_id = td.id
-                        WHERE dc.is_active = TRUE
-                        ORDER BY dc.embedding <=> %s::vector
-                        LIMIT %s;
-                    """
-                    cursor.execute(sql, [vec_str, vec_str, limit])
+                sql = """
+                    SELECT dc.id, dc.content, dc.parent_content, dc.image_anchors, dc.source_type,
+                           dc.provenance_wo_code, td.title, 1 - (dc.embedding <=> %s::vector) AS similarity,
+                           dc.is_system_guide, dc.page_number
+                    FROM document_chunks dc
+                    LEFT JOIN technical_documents td ON dc.document_id = td.id
+                    LEFT JOIN work_orders w ON dc.work_order_id = w.id
+                    LEFT JOIN assets a ON w.asset_id = a.id
+                    WHERE dc.is_active = TRUE
+                      AND (
+                          -- Luồng 1: Sổ tay OEM khớp Model và dải năm (+ serial prefix nếu có)
+                          (
+                              dc.source_type = 'OEM_MANUAL'
+                              AND (%s IS NULL OR td.applicable_model IS NULL OR td.applicable_model = %s)
+                              AND (%s IS NULL OR %s BETWEEN COALESCE(td.applicable_year_start, 1900) AND COALESCE(td.applicable_year_end, 2100))
+                              AND (%s IS NULL OR td.serial_number_prefix IS NULL OR td.serial_number_prefix = '' OR %s LIKE CONCAT(td.serial_number_prefix, '%%'))
+                          )
+                          OR
+                          -- Luồng 2: Tri thức ngầm từ Work Order COMPLETED đã kiểm định
+                          (
+                              dc.source_type = 'TACIT_WORK_ORDER'
+                              AND dc.is_verified_tacit = TRUE
+                              AND (%s IS NULL OR a.model IS NULL OR a.model = %s)
+                              AND (%s IS NULL OR a.serial_number IS NULL OR a.serial_number = %s)
+                              AND (%s IS NULL OR a.purchase_date IS NULL OR EXTRACT(YEAR FROM a.purchase_date) = %s)
+                          )
+                          OR
+                          -- Luồng 3: Tri thức hỏi đáp chuẩn mực đã phê duyệt (khớp Model và dải năm, dùng EXISTS để triệt tiêu trùng lặp)
+                          (
+                              dc.source_type = 'CURATED_QA'
+                              AND (
+                                  NOT EXISTS (
+                                      SELECT 1 FROM curated_qa_knowledge cqa_check
+                                      WHERE (dc.content = cqa_check.question_pattern OR dc.parent_content = cqa_check.gold_answer)
+                                        AND (cqa_check.tenant_id = dc.tenant_id OR (cqa_check.is_system_guide = TRUE AND dc.is_system_guide = TRUE))
+                                  )
+                                  OR EXISTS (
+                                      SELECT 1 FROM curated_qa_knowledge cqa
+                                      WHERE (dc.content = cqa.question_pattern OR dc.parent_content = cqa.gold_answer)
+                                        AND (cqa.tenant_id = dc.tenant_id OR (cqa.is_system_guide = TRUE AND dc.is_system_guide = TRUE))
+                                        AND (%s IS NULL OR cqa.applicable_model IS NULL OR cqa.applicable_model = '' OR cqa.applicable_model = %s)
+                                        AND (%s IS NULL OR %s BETWEEN COALESCE(cqa.applicable_year_start, 1900) AND COALESCE(cqa.applicable_year_end, 2100))
+                                  )
+                              )
+                          )
+                          OR
+                          -- Luồng 4: Hướng dẫn hệ thống
+                          (dc.source_type = 'SYSTEM_GUIDE' OR dc.is_system_guide = TRUE)
+                      )
+                    ORDER BY dc.embedding <=> %s::vector
+                    LIMIT %s;
+                """
+                cursor.execute(sql, [
+                    vec_str,
+                    asset_model, asset_model,
+                    manufacture_year, manufacture_year,
+                    serial_number, serial_number,
+                    asset_model, asset_model,
+                    serial_number, serial_number,
+                    manufacture_year, manufacture_year,
+                    asset_model, asset_model,
+                    manufacture_year, manufacture_year,
+                    vec_str, limit
+                ])
 
         rows = cursor.fetchall()
         for row in rows:

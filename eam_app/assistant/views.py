@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
+from core.models import Tenant
 from users.permissions import HasPermission
 from assets.models import Asset, SparePart
 from workorders.models import WorkOrder
@@ -121,9 +122,17 @@ class AssistantCreateWorkOrderDraftView(APIView):
         asset = None
         if asset_id:
             try:
-                asset = Asset.all_objects.get(id=asset_id)
+                qs = Asset.all_objects.filter(id=asset_id)
+                if tenant_id:
+                    qs = qs.filter(tenant_id=tenant_id)
+                asset = qs.first()
             except Exception:
                 pass
+            if not asset:
+                return Response(
+                    {"success": False, "error": "Thiết bị không tồn tại hoặc không thuộc quyền quản lý của đơn vị bạn."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         if not asset:
             # Fallback to first available asset in tenant
@@ -176,6 +185,11 @@ class AssistantOfflinePackView(APIView):
     def get(self, request, asset_id):
         tenant_id = getattr(request.user, 'tenant_id', None)
         pack = generate_offline_package(str(asset_id), tenant_id=str(tenant_id) if tenant_id else None)
+        if pack is None:
+            return Response(
+                {"success": False, "error": "Không tìm thấy thiết bị hoặc bạn không có quyền truy cập gói offline của thiết bị này."},
+                status=status.HTTP_404_NOT_FOUND
+            )
         return Response({
             "success": True,
             "data": pack
@@ -251,22 +265,62 @@ class AssistantAdminQACreateUpdateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        tenant_id = None if is_system_guide else getattr(request.user, 'tenant_id', None)
+        user_tenant_id = getattr(request.user, 'tenant_id', None)
+        is_sys_tenant = (not user_tenant_id) or (str(user_tenant_id) == '00000000-0000-0000-0000-000000000000')
+
+        if is_system_guide:
+            if not request.user.is_superuser:
+                is_system_guide = False
+                tenant_id = user_tenant_id
+            else:
+                tenant_id = None
+        else:
+            req_target_tenant = request.data.get('tenant_id') or request.data.get('targetTenantId')
+            if request.user.is_superuser:
+                if is_sys_tenant:
+                    target_tenant_id = req_target_tenant
+                else:
+                    target_tenant_id = req_target_tenant or user_tenant_id
+
+                if not target_tenant_id or str(target_tenant_id) == '00000000-0000-0000-0000-000000000000':
+                    return Response({"success": False, "error": "Vui lòng chọn Tenant hợp lệ khi tạo tri thức thiết bị."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if not Tenant.objects.filter(id=target_tenant_id).exists():
+                    return Response({"success": False, "error": "Tenant được chọn không tồn tại trên hệ thống."}, status=status.HTTP_400_BAD_REQUEST)
+
+                tenant_id = target_tenant_id
+            else:
+                if req_target_tenant and str(req_target_tenant) != str(user_tenant_id):
+                    return Response({"success": False, "error": "Bạn không có quyền tạo tri thức cho Tenant khác."}, status=status.HTTP_403_FORBIDDEN)
+                
+                if not user_tenant_id or str(user_tenant_id) == '00000000-0000-0000-0000-000000000000':
+                    return Response({"success": False, "error": "Tài khoản không thuộc Tenant hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
+                tenant_id = user_tenant_id
+
+        if not is_system_guide and not tenant_id:
+            return Response({"success": False, "error": "Tri thức thiết bị bắt buộc phải thuộc một Tenant cụ thể."}, status=status.HTTP_400_BAD_REQUEST)
 
         old_question = None
         if qa_id:
             try:
-                qa = CuratedQAKnowledge.all_objects.get(id=qa_id)
+                qs = CuratedQAKnowledge.all_objects.filter(id=qa_id)
+                if not request.user.is_superuser and user_tenant_id:
+                    qs = qs.filter(tenant_id=user_tenant_id)
+                qa = qs.first()
+                if not qa:
+                    return Response({"success": False, "error": "Không tìm thấy bản ghi Q&A hoặc bạn không có quyền sửa."}, status=status.HTTP_404_NOT_FOUND)
                 old_question = qa.question_pattern
+                tenant_id = qa.tenant_id
+                is_system_guide = qa.is_system_guide
                 qa.question_pattern = question
                 qa.gold_answer = answer
                 qa.category = category
-                qa.is_system_guide = is_system_guide
                 qa.applicable_model = applicable_model
                 qa.applicable_year_start = app_year_start
                 qa.applicable_year_end = app_year_end
                 qa.save()
-            except CuratedQAKnowledge.DoesNotExist:
+            except Exception:
                 return Response({"success": False, "error": "Không tìm thấy bản ghi Q&A."}, status=404)
         else:
             qa = CuratedQAKnowledge.objects.create(
@@ -281,10 +335,21 @@ class AssistantAdminQACreateUpdateView(APIView):
                 approved_by=request.user
             )
 
-        # Remove existing/old chunk to prevent duplicates
+        # Remove existing/old chunk to prevent duplicates with strict tenant boundary
+        chunk_del_qs = DocumentChunk.all_objects.filter(source_type='CURATED_QA')
+        if tenant_id:
+            chunk_del_qs = chunk_del_qs.filter(tenant_id=tenant_id)
+        elif is_system_guide:
+            chunk_del_qs = chunk_del_qs.filter(is_system_guide=True, tenant_id__isnull=True)
+        else:
+            if user_tenant_id:
+                chunk_del_qs = chunk_del_qs.filter(tenant_id=user_tenant_id)
+            else:
+                chunk_del_qs = chunk_del_qs.none()
+
         if old_question:
-            DocumentChunk.all_objects.filter(source_type='CURATED_QA', content=old_question).delete()
-        DocumentChunk.all_objects.filter(source_type='CURATED_QA', content=question).delete()
+            chunk_del_qs.filter(content=old_question).delete()
+        chunk_del_qs.filter(content=question).delete()
 
         # Vectorize and save as DocumentChunk for immediate PGVector search
         vec = embed_text(f"{question} {answer}")
@@ -318,14 +383,28 @@ class AssistantAdminQADeleteView(APIView):
     permission_classes = [IsAuthenticated, HasPermission('assistant:manage_knowledge')]
 
     def delete(self, request, id):
-        try:
-            qa = CuratedQAKnowledge.all_objects.get(id=id)
-            # Clean up vector chunk so it is no longer retrieved
-            DocumentChunk.all_objects.filter(source_type='CURATED_QA', content=qa.question_pattern).delete()
-            qa.delete()
-            return Response({"success": True, "message": "Xóa câu hỏi thành công."}, status=status.HTTP_200_OK)
-        except CuratedQAKnowledge.DoesNotExist:
-            return Response({"success": False, "error": "Không tìm thấy bản ghi."}, status=status.HTTP_404_NOT_FOUND)
+        user_tenant_id = getattr(request.user, 'tenant_id', None)
+        qs = CuratedQAKnowledge.all_objects.filter(id=id)
+        if not request.user.is_superuser and user_tenant_id:
+            qs = qs.filter(tenant_id=user_tenant_id)
+        qa = qs.first()
+        if not qa:
+            return Response({"success": False, "error": "Không tìm thấy bản ghi hoặc bạn không có quyền xóa."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Clean up vector chunk so it is no longer retrieved
+        chunk_qs = DocumentChunk.all_objects.filter(source_type='CURATED_QA', content=qa.question_pattern)
+        if qa.tenant_id:
+            chunk_qs = chunk_qs.filter(tenant_id=qa.tenant_id)
+        elif qa.is_system_guide:
+            chunk_qs = chunk_qs.filter(is_system_guide=True, tenant_id__isnull=True)
+        else:
+            if user_tenant_id:
+                chunk_qs = chunk_qs.filter(tenant_id=user_tenant_id)
+            else:
+                chunk_qs = chunk_qs.none()
+        chunk_qs.delete()
+        qa.delete()
+        return Response({"success": True, "message": "Xóa câu hỏi thành công."}, status=status.HTTP_200_OK)
 
 
 class AssistantAdminCurationQueueView(APIView):
@@ -369,10 +448,13 @@ class AssistantAdminCurationApproveView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            item = CurationQueueItem.all_objects.get(id=id)
-        except CurationQueueItem.DoesNotExist:
-            return Response({"success": False, "error": "Không tìm thấy yêu cầu thẩm định."}, status=404)
+        user_tenant_id = getattr(request.user, 'tenant_id', None)
+        qs = CurationQueueItem.all_objects.filter(id=id)
+        if not request.user.is_superuser and user_tenant_id:
+            qs = qs.filter(tenant_id=user_tenant_id)
+        item = qs.first()
+        if not item:
+            return Response({"success": False, "error": "Không tìm thấy yêu cầu thẩm định hoặc bạn không có quyền thao tác."}, status=status.HTTP_404_NOT_FOUND)
 
         # Update queue item
         item.status = 'APPROVED'
@@ -505,9 +587,58 @@ class AssistantAdminUploadDocumentView(APIView):
         if not file_size_bytes:
             file_size_bytes = len(content.encode('utf-8'))
 
-        tenant_id = None if is_system_guide else getattr(request.user, 'tenant_id', None)
+        user_tenant_id = getattr(request.user, 'tenant_id', None)
+        is_sys_tenant = (not user_tenant_id) or (str(user_tenant_id) == '00000000-0000-0000-0000-000000000000')
 
-        file_path_val = f"manuals/{uploaded_file.name}" if uploaded_file else f"manuals/{title.lower().replace(' ', '_')}.md"
+        if is_system_guide:
+            if not request.user.is_superuser:
+                is_system_guide = False
+                tenant_id = user_tenant_id
+            else:
+                tenant_id = None
+        else:
+            req_target_tenant = request.data.get('tenant_id') or request.data.get('targetTenantId')
+            if request.user.is_superuser:
+                if is_sys_tenant:
+                    target_tenant_id = req_target_tenant
+                else:
+                    target_tenant_id = req_target_tenant or user_tenant_id
+
+                if not target_tenant_id or str(target_tenant_id) == '00000000-0000-0000-0000-000000000000':
+                    return Response({"success": False, "error": "Vui lòng chọn Tenant hợp lệ khi tải lên tài liệu thiết bị."}, status=status.HTTP_400_BAD_REQUEST)
+
+                if not Tenant.objects.filter(id=target_tenant_id).exists():
+                    return Response({"success": False, "error": "Tenant được chọn không tồn tại trên hệ thống."}, status=status.HTTP_400_BAD_REQUEST)
+
+                tenant_id = target_tenant_id
+            else:
+                if req_target_tenant and str(req_target_tenant) != str(user_tenant_id):
+                    return Response({"success": False, "error": "Bạn không có quyền tải lên tài liệu cho Tenant khác."}, status=status.HTTP_403_FORBIDDEN)
+                
+                if not user_tenant_id or str(user_tenant_id) == '00000000-0000-0000-0000-000000000000':
+                    return Response({"success": False, "error": "Tài khoản không thuộc Tenant hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
+                tenant_id = user_tenant_id
+
+        if not is_system_guide and not tenant_id:
+            return Response({"success": False, "error": "Tài liệu thiết bị bắt buộc phải thuộc một Tenant cụ thể."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Persist uploaded file to storage
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+        from django.utils.text import get_valid_filename
+        if uploaded_file:
+            try:
+                uploaded_file.seek(0)
+            except Exception:
+                pass
+            safe_name = get_valid_filename(uploaded_file.name)
+            saved_name = default_storage.save(f"manuals/{safe_name}", uploaded_file)
+            file_path_val = saved_name
+        else:
+            safe_fname = get_valid_filename(f"{title.lower().replace(' ', '_')}.md")
+            saved_name = default_storage.save(f"manuals/{safe_fname}", ContentFile(content.encode('utf-8')))
+            file_path_val = saved_name
 
         doc = TechnicalDocument.objects.create(
             tenant_id=tenant_id,
@@ -613,10 +744,17 @@ class AssistantAdminReindexView(APIView):
         ingested_count = 0
         for wo in qs:
             if is_valid_tacit_work_order(wo):
-                # Check if already vectorized
-                if not DocumentChunk.objects.filter(work_order=wo).exists():
-                    vec = embed_text(f"{wo.title} {wo.resolution_notes}")
-                    anchors = extract_diagram_anchors(wo.resolution_notes)
+                vec = embed_text(f"{wo.title} {wo.resolution_notes}")
+                anchors = extract_diagram_anchors(wo.resolution_notes)
+                existing = DocumentChunk.objects.filter(work_order=wo).first()
+                if existing:
+                    existing.content = f"{wo.title}: {wo.resolution_notes[:200]}"
+                    existing.parent_content = f"Work Order {wo.code} ({wo.title}):\n{wo.resolution_notes}"
+                    existing.embedding = vec
+                    existing.image_anchors = anchors
+                    existing.is_active = True
+                    existing.save()
+                else:
                     DocumentChunk.objects.create(
                         tenant_id=wo.tenant_id,
                         is_system_guide=False,
@@ -630,7 +768,7 @@ class AssistantAdminReindexView(APIView):
                         image_anchors=anchors,
                         is_active=True
                     )
-                    ingested_count += 1
+                ingested_count += 1
 
         return Response({
             "success": True,
@@ -639,16 +777,58 @@ class AssistantAdminReindexView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+from algorithms.rag_chatbot.safety_config import (
+    load_persisted_safety_config,
+    save_persisted_safety_config,
+    ensure_safety_config_loaded,
+    CONFIG_STORAGE_PATH,
+)
+
+
 class AssistantAdminSafetyConfigView(APIView):
     """
     GET / POST /api/v1/assistant/admin/safety-config/
-    Safety categories, hazard keywords and slang dictionary viewer.
+    Safety categories, hazard keywords and slang dictionary viewer and dynamic config manager.
+    Persists configuration across application restarts and worker processes.
+    Requires permission: assistant:configure_safety (SAFETY_OFFICER, ADMIN, TENANT_ADMIN).
     """
-    permission_classes = [IsAuthenticated, HasPermission('assistant:manage_knowledge')]
+    permission_classes = [IsAuthenticated, HasPermission('assistant:configure_safety')]
 
     def get(self, request):
+        load_persisted_safety_config(force=True)
         return Response({
             "success": True,
+            "data": {
+                "slangDictionary": SLANG_TECHNICAL_DICTIONARY,
+                "emergencyHazards": EMERGENCY_HAZARDS
+            }
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        custom_slang = request.data.get('custom_slang') or request.data.get('slangDictionary')
+        custom_hazards = request.data.get('custom_hazards') or request.data.get('emergencyHazards')
+
+        cleaned_slang = {}
+        if custom_slang and isinstance(custom_slang, dict):
+            for k, v in custom_slang.items():
+                clean_k = str(k).lower().strip()
+                clean_v = str(v).strip()
+                if clean_k and clean_v:
+                    SLANG_TECHNICAL_DICTIONARY[clean_k] = clean_v
+                    cleaned_slang[clean_k] = clean_v
+
+        cleaned_hazards = {}
+        if custom_hazards and isinstance(custom_hazards, dict):
+            for h_code, h_body in custom_hazards.items():
+                if isinstance(h_body, dict) and 'keywords' in h_body:
+                    EMERGENCY_HAZARDS[h_code] = h_body
+                    cleaned_hazards[h_code] = h_body
+
+        save_persisted_safety_config(cleaned_slang, cleaned_hazards)
+
+        return Response({
+            "success": True,
+            "message": "Cấu hình an toàn và từ điển kỹ thuật đã được cập nhật thành công và lưu trữ lâu dài.",
             "data": {
                 "slangDictionary": SLANG_TECHNICAL_DICTIONARY,
                 "emergencyHazards": EMERGENCY_HAZARDS

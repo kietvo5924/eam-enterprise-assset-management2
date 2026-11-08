@@ -12,13 +12,75 @@ import time
 import logging
 import threading
 from typing import Optional
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
 
 _loop_started = False
 _loop_lock = threading.Lock()
+
+
+def sync_work_order_tacit_chunk(wo):
+    """
+    Synchronizes or purges tacit knowledge chunk for an individual WorkOrder instance.
+    Called directly by post_save/post_delete signals for real-time responsiveness.
+    """
+    from assistant.models import DocumentChunk
+    from algorithms.rag_chatbot.tacit_ingestion import is_valid_tacit_work_order, extract_diagram_anchors
+    from algorithms.rag_chatbot.vector_engine import embed_text
+
+    try:
+        if is_valid_tacit_work_order(wo):
+            expected_parent = f"Work Order {wo.code} ({wo.title}):\n{wo.resolution_notes}"
+            expected_content = f"{wo.title}: {wo.resolution_notes[:200]}"
+            chunk = DocumentChunk.objects.filter(work_order=wo).first()
+            if chunk:
+                if chunk.parent_content != expected_parent or chunk.content != expected_content:
+                    vec = embed_text(f"{wo.title} {wo.resolution_notes}")
+                    anchors = extract_diagram_anchors(wo.resolution_notes)
+                    chunk.content = expected_content
+                    chunk.parent_content = expected_parent
+                    chunk.embedding = vec
+                    chunk.image_anchors = anchors
+                    chunk.is_active = True
+                    chunk.save()
+                    logger.info(f"[AutoIngest] Realtime updated tacit chunk for Work Order {wo.code}")
+            else:
+                vec = embed_text(f"{wo.title} {wo.resolution_notes}")
+                anchors = extract_diagram_anchors(wo.resolution_notes)
+                DocumentChunk.objects.create(
+                    tenant_id=wo.tenant_id,
+                    is_system_guide=False,
+                    source_type='TACIT_WORK_ORDER',
+                    work_order=wo,
+                    is_verified_tacit=True,
+                    provenance_wo_code=wo.code,
+                    content=expected_content,
+                    parent_content=expected_parent,
+                    embedding=vec,
+                    image_anchors=anchors,
+                    is_active=True
+                )
+                logger.info(f"[AutoIngest] Realtime created tacit chunk for Work Order {wo.code}")
+        else:
+            DocumentChunk.objects.filter(work_order=wo).delete()
+    except Exception as e:
+        logger.error(f"[AutoIngest] Error syncing tacit chunk for WO {getattr(wo, 'code', '')}: {e}")
+
+
+@receiver(post_save, sender='workorders.WorkOrder')
+def work_order_post_save_sync(sender, instance, **kwargs):
+    sync_work_order_tacit_chunk(instance)
+
+
+@receiver(post_delete, sender='workorders.WorkOrder')
+def work_order_post_delete_sync(sender, instance, **kwargs):
+    from assistant.models import DocumentChunk
+    try:
+        DocumentChunk.objects.filter(work_order_id=instance.id).delete()
+    except Exception:
+        pass
 
 
 def ingest_completed_workorders(tenant_id: Optional[str] = None) -> int:
@@ -32,6 +94,13 @@ def ingest_completed_workorders(tenant_id: Optional[str] = None) -> int:
     from algorithms.rag_chatbot.vector_engine import embed_text
 
     try:
+        # 1. Cleanup chunks for Work Orders that are no longer COMPLETED
+        invalid_qs = WorkOrder.all_objects.exclude(status='COMPLETED')
+        if tenant_id:
+            invalid_qs = invalid_qs.filter(tenant_id=tenant_id)
+        DocumentChunk.objects.filter(work_order__in=invalid_qs).delete()
+
+        # 2. Ingest or update COMPLETED Work Orders
         qs = WorkOrder.all_objects.filter(status='COMPLETED')
         if tenant_id:
             qs = qs.filter(tenant_id=tenant_id)
@@ -39,8 +108,24 @@ def ingest_completed_workorders(tenant_id: Optional[str] = None) -> int:
         ingested_count = 0
         for wo in qs:
             if is_valid_tacit_work_order(wo):
-                # Check if already vectorized
-                if not DocumentChunk.objects.filter(work_order=wo).exists():
+                expected_parent = f"Work Order {wo.code} ({wo.title}):\n{wo.resolution_notes}"
+                expected_content = f"{wo.title}: {wo.resolution_notes[:200]}"
+                
+                existing_chunk = DocumentChunk.objects.filter(work_order=wo).first()
+                if existing_chunk:
+                    # Check if notes or title changed
+                    if existing_chunk.parent_content != expected_parent or existing_chunk.content != expected_content:
+                        vec = embed_text(f"{wo.title} {wo.resolution_notes}")
+                        anchors = extract_diagram_anchors(wo.resolution_notes)
+                        existing_chunk.content = expected_content
+                        existing_chunk.parent_content = expected_parent
+                        existing_chunk.embedding = vec
+                        existing_chunk.image_anchors = anchors
+                        existing_chunk.is_active = True
+                        existing_chunk.save()
+                        logger.info(f"[AutoIngest] Successfully updated vector chunk for Work Order {wo.code} ({wo.title})")
+                    ingested_count += 1
+                else:
                     vec = embed_text(f"{wo.title} {wo.resolution_notes}")
                     anchors = extract_diagram_anchors(wo.resolution_notes)
                     DocumentChunk.objects.create(
@@ -50,14 +135,16 @@ def ingest_completed_workorders(tenant_id: Optional[str] = None) -> int:
                         work_order=wo,
                         is_verified_tacit=True,
                         provenance_wo_code=wo.code,
-                        content=f"{wo.title}: {wo.resolution_notes[:200]}",
-                        parent_content=f"Work Order {wo.code} ({wo.title}):\n{wo.resolution_notes}",
+                        content=expected_content,
+                        parent_content=expected_parent,
                         embedding=vec,
                         image_anchors=anchors,
                         is_active=True
                     )
                     ingested_count += 1
                     logger.info(f"[AutoIngest] Successfully vectorized Work Order {wo.code} ({wo.title})")
+            else:
+                DocumentChunk.objects.filter(work_order=wo).delete()
 
         return ingested_count
     except Exception as e:

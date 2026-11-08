@@ -4297,38 +4297,57 @@ def portal_rag_knowledge(request):
     from users.permissions import HasPermission
     from assistant.models import TechnicalDocument, DocumentChunk, CuratedQAKnowledge, CurationQueueItem
     from algorithms.rag_chatbot.constants import SLANG_TECHNICAL_DICTIONARY, EMERGENCY_HAZARDS
+    from algorithms.rag_chatbot.safety_config import ensure_safety_config_loaded
 
-    # Check permission: assistant:manage_knowledge, tenant:update, or admin
-    checker = HasPermission('assistant:manage_knowledge')()
-    if not (checker.has_permission(request, None) or request.user.is_superuser):
-        return render(request, '403.html', {'error': 'Yêu cầu quyền hạn: assistant:manage_knowledge'}, status=403)
+    ensure_safety_config_loaded()
+
+    # Check permission: assistant:manage_knowledge OR assistant:configure_safety OR superuser
+    checker_manage = HasPermission('assistant:manage_knowledge')()
+    checker_safety = HasPermission('assistant:configure_safety')()
+    can_manage = bool(checker_manage.has_permission(request, None) or request.user.is_superuser)
+    can_configure_safety = bool(checker_safety.has_permission(request, None) or request.user.is_superuser)
+
+    if not (can_manage or can_configure_safety):
+        return render(request, '403.html', {'error': 'Yêu cầu quyền hạn: assistant:manage_knowledge hoặc assistant:configure_safety'}, status=403)
 
     tenant_id = getattr(request.user, 'tenant_id', None)
 
-    # Tab 1: Curated Q&A
-    curated_qa_qs = CuratedQAKnowledge.all_objects.all()
-    if tenant_id:
-        curated_qa_qs = curated_qa_qs.filter(
-            Q(tenant_id=tenant_id) | Q(is_system_guide=True, tenant_id__isnull=True)
-        )
-    curated_qa_list = list(curated_qa_qs.order_by('-created_at'))
+    curated_qa_list = []
+    curation_queue_list = []
+    technical_docs = []
 
-    # Tab 2: Curation Queue
-    queue_qs = CurationQueueItem.all_objects.filter(status='PENDING')
-    if tenant_id:
-        queue_qs = queue_qs.filter(tenant_id=tenant_id)
-    curation_queue_list = list(queue_qs.order_by('-created_at'))
+    if can_manage:
+        # Tab 1: Curated Q&A
+        curated_qa_qs = CuratedQAKnowledge.all_objects.all()
+        if tenant_id:
+            curated_qa_qs = curated_qa_qs.filter(
+                Q(tenant_id=tenant_id) | Q(is_system_guide=True, tenant_id__isnull=True)
+            )
+        curated_qa_list = list(curated_qa_qs.order_by('-created_at'))
 
-    # Tab 3: Technical Documents
-    doc_qs = TechnicalDocument.all_objects.all()
-    if tenant_id:
-        doc_qs = doc_qs.filter(
-            Q(tenant_id=tenant_id) | Q(is_system_guide=True, tenant_id__isnull=True)
-        )
-    technical_docs = list(doc_qs.prefetch_related('chunks').order_by('-created_at'))
+        # Tab 2: Curation Queue
+        queue_qs = CurationQueueItem.all_objects.filter(status='PENDING')
+        if tenant_id:
+            queue_qs = queue_qs.filter(tenant_id=tenant_id)
+        curation_queue_list = list(queue_qs.order_by('-created_at'))
 
-    can_curate = True
-    can_configure_safety = True
+        # Tab 3: Technical Documents
+        doc_qs = TechnicalDocument.all_objects.all()
+        if tenant_id:
+            doc_qs = doc_qs.filter(
+                Q(tenant_id=tenant_id) | Q(is_system_guide=True, tenant_id__isnull=True)
+            )
+        technical_docs = list(doc_qs.prefetch_related('chunks').order_by('-created_at'))
+
+    default_tab = 'qa' if can_manage else 'safety'
+    active_tab = request.GET.get('tab', default_tab)
+    if active_tab not in ['qa', 'queue', 'docs', 'safety']:
+        active_tab = default_tab
+    if not can_manage and active_tab in ['qa', 'queue', 'docs']:
+        active_tab = 'safety'
+    if not can_configure_safety and active_tab == 'safety':
+        active_tab = default_tab
+    can_curate = can_manage
 
     from assets.models import Asset
     asset_qs = Asset.objects.all()
@@ -4344,10 +4363,11 @@ def portal_rag_knowledge(request):
         'technical_docs': technical_docs,
         'slang_dict': SLANG_TECHNICAL_DICTIONARY,
         'emergency_hazards': EMERGENCY_HAZARDS,
+        'can_manage': can_manage,
         'can_curate': can_curate,
         'can_configure_safety': can_configure_safety,
         'available_models': available_models,
-        'active_tab': request.GET.get('tab', 'qa'),
+        'active_tab': active_tab,
     }
     return render(request, 'rag_knowledge.html', context)
 

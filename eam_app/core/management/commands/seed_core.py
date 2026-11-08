@@ -56,6 +56,7 @@ class Command(BaseCommand):
                 ('reports:export', 'Export Enterprise Reports', 'Can export enterprise reports to Excel, PDF, CSV'),
                 ('cost_forecast:read', 'Dự báo Chi phí & Ngân sách', 'Xem dự báo chi phí và phân tích kế hoạch ngân sách bảo trì'),
                 ('assistant:manage_knowledge', 'Quản trị Tri thức AI', 'Toàn quyền quản trị Tri thức AI: thêm/xóa Q&A mẫu, phê duyệt hàng đợi thẩm định và tải lên tài liệu OEM/Hệ thống'),
+                ('assistant:configure_safety', 'Cấu hình Rào chắn An toàn & Từ điển', 'Thêm/sửa danh mục từ khóa an toàn khẩn cấp, thiết lập hướng dẫn an toàn theo phân loại nguy cơ, cập nhật từ điển tiếng lóng bảo trì'),
             ]
 
             for p_id, name, desc in permissions_data:
@@ -127,4 +128,13 @@ class Command(BaseCommand):
             tenant_admin_perms = Permission.objects.exclude(id='system:admin')
             tenant_admin_role.permissions.set(tenant_admin_perms)
 
-            self.stdout.write(self.style.SUCCESS('Successfully seeded core data!'))
+        # 6. Seed Dynamic System Knowledge for AI Assistant
+        try:
+            from assistant.system_knowledge_scanner import scan_and_index_system_knowledge
+            self.stdout.write('Scanning and indexing system knowledge for AI Assistant...')
+            res = scan_and_index_system_knowledge()
+            self.stdout.write(f"System knowledge initialized: {res.get('indexed_chunks', 0)} chunks.")
+        except Exception as e:
+            self.stdout.write(f"Warning: could not initialize system knowledge: {e}")
+
+        self.stdout.write(self.style.SUCCESS('Successfully seeded core data!'))

@@ -4,6 +4,12 @@ Self-contained research algorithms package.
 """
 
 from .safety_classifier import classify_safety_context
+from .safety_config import (
+    load_persisted_safety_config,
+    save_persisted_safety_config,
+    ensure_safety_config_loaded,
+    CONFIG_STORAGE_PATH,
+)
 from .query_expansion import expand_slang_query
 from .vector_engine import (
     embed_text,
@@ -25,6 +31,10 @@ from .pipeline import process_rag_query
 
 __all__ = [
     'classify_safety_context',
+    'load_persisted_safety_config',
+    'save_persisted_safety_config',
+    'ensure_safety_config_loaded',
+    'CONFIG_STORAGE_PATH',
     'expand_slang_query',
     'embed_text',
     'retrieve_relevant_chunks',

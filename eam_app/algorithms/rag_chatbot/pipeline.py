@@ -219,9 +219,30 @@ def process_rag_query(
 
     asset_model = None
     manufacture_year = None
+    serial_number = None
     if asset_context and not is_sys_guide:
         asset_model = asset_context.get('model') or asset_context.get('applicable_model')
         manufacture_year = asset_context.get('manufactureYear') or asset_context.get('manufacture_year')
+        serial_number = asset_context.get('serialNumber') or asset_context.get('serial_number')
+
+        # Auto-lookup asset metadata from database if assetId is provided
+        asset_id = asset_context.get('assetId') or asset_context.get('asset_id')
+        if asset_id and (not asset_model or not serial_number):
+            try:
+                from assets.models import Asset
+                qs_a = Asset.all_objects.filter(id=asset_id)
+                if tenant_id:
+                    qs_a = qs_a.filter(tenant_id=tenant_id)
+                asset_obj = qs_a.first()
+                if asset_obj:
+                    if not asset_model:
+                        asset_model = asset_obj.model
+                    if not serial_number:
+                        serial_number = asset_obj.serial_number
+                    if not manufacture_year and asset_obj.purchase_date:
+                        manufacture_year = asset_obj.purchase_date.year
+            except Exception:
+                pass
 
     # Step 4: Multi-source PGVector Retrieval (Rule 4, Rule 5)
     # For system guides, query directly with user prompt to avoid English technical slang pollution
@@ -232,6 +253,7 @@ def process_rag_query(
         tenant_id=tenant_id,
         asset_model=asset_model,
         manufacture_year=manufacture_year,
+        serial_number=serial_number,
         is_system_query=is_sys_guide,
         limit=4
     )

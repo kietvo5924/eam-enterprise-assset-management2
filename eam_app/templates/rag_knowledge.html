@@ -25,15 +25,18 @@
 
     <!-- Quick action buttons -->
     <div class="flex items-center gap-2 shrink-0">
+      {% if can_manage %}
       <button onclick="openAddQAModal()" class="px-3.5 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs">
         <i class="ph ph-plus-circle text-sm font-bold"></i>
         <span>Thêm Q&A Mẫu</span>
       </button>
+      {% endif %}
     </div>
   </div>
 
   <!-- 4 Business Navigation Tabs -->
   <div class="bg-white border-b border-neutral-200 px-6 shrink-0 flex gap-6 text-sm font-medium">
+    {% if can_manage %}
     <button onclick="switchTab('qa')" id="tab-btn-qa" class="py-3 border-b-2 text-primary border-primary font-bold flex items-center gap-2 cursor-pointer transition-colors">
       <i class="ph ph-book-open-text text-base"></i>
       <span>Tri Thức Mẫu</span>
@@ -51,11 +54,19 @@
       <span>Thư Viện Tài Liệu OEM & Hệ Thống</span>
       <span class="px-2 py-0.5 bg-neutral-100 text-neutral-600 text-xs rounded-full font-semibold">{{ technical_docs|length }}</span>
     </button>
+    {% endif %}
+    {% if can_configure_safety %}
+    <button onclick="switchTab('safety')" id="tab-btn-safety" class="py-3 border-b-2 text-neutral-500 border-transparent hover:text-neutral-700 flex items-center gap-2 cursor-pointer transition-colors">
+      <i class="ph ph-shield-check text-base"></i>
+      <span>Rào Chắn An Toàn & Tiếng Lóng</span>
+    </button>
+    {% endif %}
   </div>
 
   <!-- Tab Contents Area -->
   <div class="flex-1 overflow-y-auto p-6">
 
+    {% if can_manage %}
     <!-- TAB 1: CURATED Q&A -->
     <div id="tab-content-qa" class="space-y-4">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-3.5 rounded-xl border border-neutral-200">
@@ -285,6 +296,84 @@
         </div>
       </div>
     </div>
+    {% endif %}
+
+    {% if can_configure_safety %}
+    <!-- TAB 4: SAFETY CONFIG & SLANG DICTIONARY -->
+    <div id="tab-content-safety" class="hidden space-y-6">
+      <!-- Section 1: Emergency Hazards -->
+      <div class="bg-white p-5 rounded-xl border border-neutral-200 shadow-xs space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-neutral-100 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-neutral-900 flex items-center gap-2">
+              <i class="ph-fill ph-warning-octagon text-rose-500 text-lg"></i>
+              <span>Giao Thức Rào Chắn An Toàn Sinh Mạng (Life-Safety Hazards)</span>
+            </h2>
+            <p class="text-xs text-neutral-500">Các tình huống khẩn cấp tuyệt đối ngắt quy trình RAG thông thường để hiển thị giao thức an toàn tức thì.</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {% for code, hazard in emergency_hazards.items %}
+          <div class="p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 hover:border-neutral-300 transition-all">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-neutral-900">{{ hazard.name }}</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-bold border border-rose-200">{{ code }}</span>
+            </div>
+            <p class="text-xs text-rose-600 font-semibold mb-2">⚡ Hành động: {{ hazard.action_summary }}</p>
+            <div class="text-[11px] text-neutral-600 bg-white p-2.5 rounded-lg border border-neutral-200">
+              <span class="font-bold text-neutral-700">Từ khóa kích hoạt:</span>
+              <div class="flex flex-wrap gap-1 mt-1">
+                {% for kw in hazard.keywords %}
+                <span class="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 text-[10px]">{{ kw }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Section 2: Industrial Slang Dictionary -->
+      <div class="bg-white p-5 rounded-xl border border-neutral-200 shadow-xs space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-neutral-100 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-neutral-900 flex items-center gap-2">
+              <i class="ph-fill ph-translate text-primary text-lg"></i>
+              <span>Từ Điển Tiếng Lóng & Từ Tượng Thanh Bảo Trì (Slang Dictionary)</span>
+            </h2>
+            <p class="text-xs text-neutral-500">Ánh xạ ngôn ngữ hiện trường của kỹ thuật viên sang thuật ngữ kỹ thuật tiếng Anh để đối chiếu tài liệu hãng.</p>
+          </div>
+        </div>
+        <!-- Form to add new slang -->
+        <form id="add-slang-form" onsubmit="submitCustomSlang(event)" class="flex flex-col sm:flex-row gap-3 bg-neutral-50 p-3.5 rounded-xl border border-neutral-200">
+          <input type="text" id="new-slang-term" placeholder="Từ lóng (ví dụ: 'kêu rột rột', 'bó bạc')" class="flex-1 px-3 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary" required>
+          <input type="text" id="new-slang-meaning" placeholder="Thuật ngữ kỹ thuật (ví dụ: 'bearing race spalling mechanical abrasion')" class="flex-1 px-3 py-1.5 text-xs rounded-lg border border-neutral-300 focus:outline-none focus:ring-1 focus:ring-primary" required>
+          <button type="submit" class="px-4 py-1.5 bg-primary hover:bg-primary-600 text-white text-xs font-semibold rounded-lg shrink-0 transition-colors cursor-pointer">
+            <i class="ph ph-plus-circle mr-1"></i> Lưu Từ Điển
+          </button>
+        </form>
+
+        <div class="overflow-x-auto border border-neutral-200 rounded-xl">
+          <table class="w-full text-left text-xs text-neutral-700">
+            <thead class="bg-neutral-50 text-[11px] font-bold text-neutral-500 uppercase tracking-wider border-b border-neutral-200">
+              <tr>
+                <th class="px-4 py-2.5 w-60">Tiếng Lóng / Từ Tượng Thanh</th>
+                <th class="px-4 py-2.5">Ánh Xạ Thuật Ngữ Kỹ Thuật (Domain Expansion)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-200">
+              {% for slang, meaning in slang_dict.items %}
+              <tr class="hover:bg-neutral-50/80 transition-colors">
+                <td class="px-4 py-2 font-bold text-neutral-900 whitespace-nowrap">{{ slang }}</td>
+                <td class="px-4 py-2 font-mono text-[11px] text-neutral-600">{{ meaning }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
   </div>
 </div>
@@ -483,18 +572,65 @@
 <script>
 // Tab Switching
 function switchTab(tabName) {
-  const tabs = ['qa', 'queue', 'docs'];
+  const tabs = ['qa', 'queue', 'docs', 'safety'];
   tabs.forEach(t => {
     const btn = document.getElementById(`tab-btn-${t}`);
     const content = document.getElementById(`tab-content-${t}`);
-    if (t === tabName) {
-      btn.className = 'py-3 border-b-2 text-primary border-primary font-bold flex items-center gap-2 cursor-pointer transition-colors';
-      content.classList.remove('hidden');
-    } else {
-      btn.className = 'py-3 border-b-2 text-neutral-500 border-transparent hover:text-neutral-700 flex items-center gap-2 cursor-pointer transition-colors';
-      content.classList.add('hidden');
+    if (btn && content) {
+      if (t === tabName) {
+        btn.className = 'py-3 border-b-2 text-primary border-primary font-bold flex items-center gap-2 cursor-pointer transition-colors';
+        content.classList.remove('hidden');
+      } else {
+        btn.className = 'py-3 border-b-2 text-neutral-500 border-transparent hover:text-neutral-700 flex items-center gap-2 cursor-pointer transition-colors';
+        content.classList.add('hidden');
+      }
     }
   });
+}
+
+async function submitCustomSlang(e) {
+  e.preventDefault();
+  const term = document.getElementById('new-slang-term').value.trim();
+  const meaning = document.getElementById('new-slang-meaning').value.trim();
+  if (!term || !meaning) return;
+
+  try {
+    const csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+    const csrfToken = csrfMatch ? csrfMatch[1] : '';
+    const res = await fetch('/api/v1/assistant/admin/safety-config/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
+      body: JSON.stringify({
+        custom_slang: { [term]: meaning }
+      })
+    });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) {}
+
+    if (res.ok && data.success) {
+      alert("Đã lưu từ lóng thành công!");
+      window.location.reload();
+    } else {
+      let errMsg = "Không thể lưu";
+      if (res.status === 403) {
+        errMsg = "Bạn không có quyền cấu hình an toàn (Yêu cầu quyền: assistant:configure_safety).";
+      } else if (data && data.detail) {
+        errMsg = data.detail;
+      } else if (data && data.error) {
+        errMsg = data.error;
+      } else if (data && data.message) {
+        errMsg = data.message;
+      }
+      alert("Lỗi: " + errMsg);
+    }
+  } catch (err) {
+    alert("Lỗi kết nối: " + err);
+  }
 }
 
 // Modal open/close
@@ -1017,8 +1153,11 @@ function changeDocsPage(page) {
 
 // Initial Run
 document.addEventListener('DOMContentLoaded', function() {
+  {% if can_manage %}
   renderQAPagination();
   renderDocsPagination();
+  {% endif %}
+  switchTab('{{ active_tab }}');
 });
 </script>
 {% endblock %}

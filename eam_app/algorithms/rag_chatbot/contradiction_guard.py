@@ -87,8 +87,7 @@ def check_negation_contradiction(generated_reply: str, source_content: str) -> D
         raw_verbatim_quote = f"> ⚠️ **CẢNH BÁO AN TOÀN QUAN TRỌNG (TRÍCH DẪN NGUYÊN VĂN TÀI LIỆU GỐC):**\n> \"{failing_prohibition}\""
         safe_reply = (
             f"{raw_verbatim_quote}\n\n"
-            f"*(Hệ thống đã tự động khóa câu trả lời tóm tắt do phát hiện nguy cơ lược bỏ chỉ dẫn cấm đoán an toàn)*\n\n"
-            f"{generated_reply}"
+            f"*(Hệ thống đã tự động loại bỏ câu trả lời tóm tắt do phát hiện nguy cơ lược bỏ/đảo ngược chỉ dẫn cấm đoán an toàn. Vui lòng tuyệt đối tuân thủ chỉ dẫn an toàn gốc ở trên.)*"
         )
         return {
             'contradiction_detected': True,

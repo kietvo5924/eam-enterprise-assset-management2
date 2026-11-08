@@ -13,19 +13,28 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
 
-def generate_offline_package(asset_id: str, tenant_id: Optional[str] = None) -> Dict[str, Any]:
+def generate_offline_package(asset_id: str, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Builds the offline manifest and dataset for a specific asset.
+    Strictly verifies tenant ownership; returns None if asset does not belong to tenant.
     """
+    import os
     from assets.models import Asset
+    from django.conf import settings
 
     try:
-        asset = Asset.all_objects.filter(id=asset_id).first()
+        qs = Asset.all_objects.filter(id=asset_id)
+        if tenant_id:
+            qs = qs.filter(tenant_id=tenant_id)
+        asset = qs.first()
     except Exception:
         asset = None
 
-    model_name = asset.model if asset and asset.model else "PUMP-X100"
-    asset_name = asset.name if asset else "Thiết bị công nghiệp"
+    if not asset:
+        return None
+
+    model_name = asset.model if asset.model else "PUMP-X100"
+    asset_name = asset.name
 
     top_fault_codes = [
         {
@@ -68,18 +77,29 @@ def generate_offline_package(asset_id: str, tenant_id: Optional[str] = None) -> 
         "Bước 5: Báo cáo Trưởng ca trực và ghi nhận nhật ký vận hành"
     ]
 
+    # Diagram anchors verification - fallback to standard schematic if specific file does not exist
+    base_media = getattr(settings, 'MEDIA_ROOT', '') or os.path.join(settings.BASE_DIR, 'media')
+    
+    fig1_rel = f"schematics/{model_name.lower()}_fig1_1.png"
+    fig2_rel = f"schematics/{model_name.lower()}_fig2_4.png"
+    
+    if not os.path.exists(os.path.join(base_media, fig1_rel)):
+        fig1_rel = "schematics/equipment-standard_fig1_1.png" if os.path.exists(os.path.join(base_media, "schematics/equipment-standard_fig1_1.png")) else "schematics/fig_1_1.png"
+    if not os.path.exists(os.path.join(base_media, fig2_rel)):
+        fig2_rel = "schematics/equipment-standard_fig2_4.png" if os.path.exists(os.path.join(base_media, "schematics/equipment-standard_fig2_4.png")) else "schematics/fig_2_4.png"
+
     diagram_anchors = [
         {
             "figureId": "Fig 1.1",
             "title": f"Sơ đồ tổng thể hệ thống {model_name}",
             "pageNumber": 5,
-            "imageUrl": f"/media/schematics/{model_name.lower()}_fig1_1.png"
+            "imageUrl": f"/media/{fig1_rel}"
         },
         {
             "figureId": "Fig 2.4",
             "title": f"Sơ đồ mặt cắt buồng áp suất {model_name}",
             "pageNumber": 28,
-            "imageUrl": f"/media/schematics/{model_name.lower()}_fig2_4.png"
+            "imageUrl": f"/media/{fig2_rel}"
         }
     ]
 
