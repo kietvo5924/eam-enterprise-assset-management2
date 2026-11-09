@@ -302,6 +302,7 @@ class AssistantAdminQACreateUpdateView(APIView):
             return Response({"success": False, "error": "Tri thức thiết bị bắt buộc phải thuộc một Tenant cụ thể."}, status=status.HTTP_400_BAD_REQUEST)
 
         old_question = None
+        old_answer = None
         if qa_id:
             try:
                 qs = CuratedQAKnowledge.all_objects.filter(id=qa_id)
@@ -311,6 +312,7 @@ class AssistantAdminQACreateUpdateView(APIView):
                 if not qa:
                     return Response({"success": False, "error": "Không tìm thấy bản ghi Q&A hoặc bạn không có quyền sửa."}, status=status.HTTP_404_NOT_FOUND)
                 old_question = qa.question_pattern
+                old_answer = qa.gold_answer
                 tenant_id = qa.tenant_id
                 is_system_guide = qa.is_system_guide
                 qa.question_pattern = question
@@ -319,6 +321,7 @@ class AssistantAdminQACreateUpdateView(APIView):
                 qa.applicable_model = applicable_model
                 qa.applicable_year_start = app_year_start
                 qa.applicable_year_end = app_year_end
+                qa.approved_by = request.user
                 qa.save()
             except Exception:
                 return Response({"success": False, "error": "Không tìm thấy bản ghi Q&A."}, status=404)
@@ -335,7 +338,7 @@ class AssistantAdminQACreateUpdateView(APIView):
                 approved_by=request.user
             )
 
-        # Remove existing/old chunk to prevent duplicates with strict tenant boundary
+        # Remove existing/old chunk to prevent duplicates with strict tenant boundary and exact QA provenance
         chunk_del_qs = DocumentChunk.all_objects.filter(source_type='CURATED_QA')
         if tenant_id:
             chunk_del_qs = chunk_del_qs.filter(tenant_id=tenant_id)
@@ -347,15 +350,18 @@ class AssistantAdminQACreateUpdateView(APIView):
             else:
                 chunk_del_qs = chunk_del_qs.none()
 
-        if old_question:
-            chunk_del_qs.filter(content=old_question).delete()
-        chunk_del_qs.filter(content=question).delete()
+        deleted_by_marker = chunk_del_qs.filter(section_title__startswith=f"Curated QA [{qa.id}]").delete()[0]
+        if deleted_by_marker == 0:
+            if old_question and old_answer:
+                chunk_del_qs.filter(content=old_question, parent_content=old_answer).delete()
+            elif old_question:
+                chunk_del_qs.filter(content=old_question, parent_content=answer).delete()
 
         # Vectorize and save as DocumentChunk for immediate PGVector search
         vec = embed_text(f"{question} {answer}")
         anchors = extract_diagram_anchors(answer)
 
-        # Create corresponding DocumentChunk
+        # Create corresponding DocumentChunk with precise QA ID ownership tag
         DocumentChunk.objects.create(
             tenant_id=tenant_id,
             is_system_guide=is_system_guide,
@@ -363,7 +369,7 @@ class AssistantAdminQACreateUpdateView(APIView):
             content=question,
             parent_content=answer,
             embedding=vec,
-            section_title=f"Curated QA: {question[:50]}",
+            section_title=f"Curated QA [{qa.id}]: {question[:40]}",
             image_anchors=anchors,
             is_active=True
         )
@@ -391,8 +397,8 @@ class AssistantAdminQADeleteView(APIView):
         if not qa:
             return Response({"success": False, "error": "Không tìm thấy bản ghi hoặc bạn không có quyền xóa."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Clean up vector chunk so it is no longer retrieved
-        chunk_qs = DocumentChunk.all_objects.filter(source_type='CURATED_QA', content=qa.question_pattern)
+        # Clean up vector chunk belonging specifically to this QA
+        chunk_qs = DocumentChunk.all_objects.filter(source_type='CURATED_QA')
         if qa.tenant_id:
             chunk_qs = chunk_qs.filter(tenant_id=qa.tenant_id)
         elif qa.is_system_guide:
@@ -402,7 +408,11 @@ class AssistantAdminQADeleteView(APIView):
                 chunk_qs = chunk_qs.filter(tenant_id=user_tenant_id)
             else:
                 chunk_qs = chunk_qs.none()
-        chunk_qs.delete()
+
+        deleted_by_marker = chunk_qs.filter(section_title__startswith=f"Curated QA [{qa.id}]").delete()[0]
+        if deleted_by_marker == 0:
+            chunk_qs.filter(content=qa.question_pattern, parent_content=qa.gold_answer).delete()
+
         qa.delete()
         return Response({"success": True, "message": "Xóa câu hỏi thành công."}, status=status.HTTP_200_OK)
 
@@ -484,7 +494,7 @@ class AssistantAdminCurationApproveView(APIView):
             content=item.user_query,
             parent_content=curated_answer,
             embedding=vec,
-            section_title=f"Gold QA: {item.user_query[:50]}",
+            section_title=f"Curated QA [{qa.id}]: {item.user_query[:40]}",
             image_anchors=anchors,
             is_active=True
         )
@@ -781,6 +791,8 @@ from algorithms.rag_chatbot.safety_config import (
     load_persisted_safety_config,
     save_persisted_safety_config,
     ensure_safety_config_loaded,
+    validate_hazard_payload,
+    validate_slang_payload,
     CONFIG_STORAGE_PATH,
 )
 
@@ -809,20 +821,22 @@ class AssistantAdminSafetyConfigView(APIView):
         custom_hazards = request.data.get('custom_hazards') or request.data.get('emergencyHazards')
 
         cleaned_slang = {}
-        if custom_slang and isinstance(custom_slang, dict):
-            for k, v in custom_slang.items():
-                clean_k = str(k).lower().strip()
-                clean_v = str(v).strip()
-                if clean_k and clean_v:
-                    SLANG_TECHNICAL_DICTIONARY[clean_k] = clean_v
-                    cleaned_slang[clean_k] = clean_v
+        if custom_slang is not None:
+            valid_slang, err_slang, cleaned_slang = validate_slang_payload(custom_slang)
+            if not valid_slang:
+                return Response(
+                    {"success": False, "error": err_slang},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         cleaned_hazards = {}
-        if custom_hazards and isinstance(custom_hazards, dict):
-            for h_code, h_body in custom_hazards.items():
-                if isinstance(h_body, dict) and 'keywords' in h_body:
-                    EMERGENCY_HAZARDS[h_code] = h_body
-                    cleaned_hazards[h_code] = h_body
+        if custom_hazards is not None:
+            valid_h, err_h, cleaned_hazards = validate_hazard_payload(custom_hazards)
+            if not valid_h:
+                return Response(
+                    {"success": False, "error": err_h},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         save_persisted_safety_config(cleaned_slang, cleaned_hazards)
 

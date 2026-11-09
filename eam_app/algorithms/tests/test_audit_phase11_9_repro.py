@@ -863,3 +863,344 @@ class AuditPhase119ReproductionTests(TestCase):
         sys_ids = [r['id'] for r in results]
         self.assertIn(str(chunk_sys.id), sys_ids, "Tenant A must be able to retrieve Global System Guide chunks!")
 
+    # =========================================================================
+    # PHASE 11.9 FINAL VERIFIED TARGETED TESTS (A - F)
+    # =========================================================================
+
+    def test_issue_a_safety_classifier_fine_grained_negation_and_active_markers(self):
+        """A. Phân biệt phủ định và sự cố đang diễn ra chính xác theo ngữ cảnh."""
+        # 1. 'Không bị xì khí gas nhưng đang vận hành bình thường' -> Không khẩn cấp
+        res1 = classify_safety_context("Không bị xì khí gas nhưng đang vận hành bình thường")
+        self.assertFalse(res1['is_emergency'], "'Không bị xì khí gas nhưng đang vận hành bình thường' must NOT be classified as emergency!")
+        self.assertTrue(res1['is_theoretical_or_negated'])
+
+        # 2. 'Không bị cháy tủ điện' -> Không khẩn cấp
+        res2 = classify_safety_context("Không bị cháy tủ điện")
+        self.assertFalse(res2['is_emergency'], "'Không bị cháy tủ điện' must NOT be classified as emergency!")
+        self.assertTrue(res2['is_theoretical_or_negated'])
+
+        # 3. 'Đang xì khí gas, không có mặt nạ phòng độc thì làm sao?' -> Khẩn cấp
+        res3 = classify_safety_context("Đang xì khí gas, không có mặt nạ phòng độc thì làm sao?")
+        self.assertTrue(res3['is_emergency'], "'Đang xì khí gas, không có mặt nạ phòng độc...' MUST be classified as emergency!")
+        self.assertEqual(res3['hazard_type'], 'GAS_LEAK')
+
+        # 4. 'Cháy tủ điện khẩn cấp, làm sao tránh lửa lan?' -> Khẩn cấp
+        res4 = classify_safety_context("Cháy tủ điện khẩn cấp, làm sao tránh lửa lan?")
+        self.assertTrue(res4['is_emergency'], "'Cháy tủ điện khẩn cấp, làm sao tránh lửa lan?' MUST be classified as emergency!")
+        self.assertEqual(res4['hazard_type'], 'ELECTRICAL_FIRE')
+
+        # 5. 'Nguyên nhân gây cháy tủ điện là gì?' -> Câu hỏi lý thuyết, không khẩn cấp
+        res5 = classify_safety_context("Nguyên nhân gây cháy tủ điện là gì?")
+        self.assertFalse(res5['is_emergency'], "Theoretical cause query must NOT trigger emergency!")
+        self.assertTrue(res5['is_theoretical_or_negated'])
+
+        # 6. 'Nguyên nhân gây cháy tủ điện khi đang vận hành?' -> 'đang vận hành' must NOT trigger emergency!
+        res6 = classify_safety_context("Nguyên nhân gây cháy tủ điện khi đang vận hành?")
+        self.assertFalse(res6['is_emergency'], "'đang vận hành' in theoretical inquiry must NOT trigger emergency!")
+        self.assertTrue(res6['is_theoretical_or_negated'])
+
+        # 7. Multiple hazards: 'Không xì gas, nhưng tủ điện đang bốc khói khẩn cấp' -> Emergency for electrical fire!
+        res7 = classify_safety_context("Không xì gas, nhưng tủ điện đang bốc khói khẩn cấp")
+        self.assertTrue(res7['is_emergency'], "Query with negated gas leak but active electrical fire MUST be an emergency!")
+        self.assertEqual(res7['hazard_type'], 'ELECTRICAL_FIRE')
+
+        # 8. Negation in preceding clause ('Không có [noun]') MUST NOT falsely negate active emergency in subsequent clause
+        res8 = classify_safety_context("Không có người, đang cháy tủ điện!")
+        self.assertTrue(res8['is_emergency'], "'Không có người, đang cháy tủ điện!' MUST be classified as emergency!")
+        self.assertEqual(res8['hazard_type'], 'ELECTRICAL_FIRE')
+
+        res9 = classify_safety_context("Không có bình, cháy tủ điện khẩn cấp!")
+        self.assertTrue(res9['is_emergency'], "'Không có bình, cháy tủ điện khẩn cấp!' MUST be classified as emergency!")
+
+        res10 = classify_safety_context("Chưa có thợ, đang xì khí gas!")
+        self.assertTrue(res10['is_emergency'], "'Chưa có thợ, đang xì khí gas!' MUST be classified as emergency!")
+        self.assertEqual(res10['hazard_type'], 'GAS_LEAK')
+
+        res11 = classify_safety_context("Không có đồ bảo hộ, axit văng vào người!")
+        self.assertTrue(res11['is_emergency'], "'Không có đồ bảo hộ, axit văng vào người!' MUST be classified as emergency!")
+        self.assertEqual(res11['hazard_type'], 'CHEMICAL_ACID_SPILL')
+
+        # 9. Extended direct negation of hazards
+        res12 = classify_safety_context("Không phát hiện xì khí gas")
+        self.assertFalse(res12['is_emergency'], "'Không phát hiện xì khí gas' must NOT be classified as emergency!")
+
+        res13 = classify_safety_context("Không hề có xì khí gas")
+        self.assertFalse(res13['is_emergency'], "'Không hề có xì khí gas' must NOT be classified as emergency!")
+
+        res14 = classify_safety_context("Chưa hề bị chập điện")
+        self.assertFalse(res14['is_emergency'], "'Chưa hề bị chập điện' must NOT be classified as emergency!")
+
+    def test_issue_b_safety_config_validation_and_atomicity(self):
+        """B. Kiểm tra dữ liệu Hazard trước khi lưu, từ chối payload hỏng bằng 400 Bad Request."""
+        self.client.force_authenticate(user=self.user_safety)
+
+        # Incomplete hazard: missing instruction and name
+        res_bad1 = self.client.post('/api/v1/assistant/admin/safety-config/', {
+            'custom_hazards': {
+                'INVALID_HAZARD': {
+                    'keywords': ['nguy hiểm giả']
+                }
+            }
+        }, format='json')
+        self.assertEqual(res_bad1.status_code, 400, "Incomplete hazard missing required fields must return 400!")
+        self.assertIn("error", res_bad1.data)
+
+        # Invalid keywords: empty list
+        res_bad2 = self.client.post('/api/v1/assistant/admin/safety-config/', {
+            'custom_hazards': {
+                'EMPTY_KW_HAZARD': {
+                    'name': 'Nguy cơ rỗng',
+                    'instruction': 'Chỉ dẫn',
+                    'action_summary': 'Hành động',
+                    'keywords': []
+                }
+            }
+        }, format='json')
+        self.assertEqual(res_bad2.status_code, 400, "Hazard with empty keywords list must return 400!")
+
+        # Valid hazard: should succeed and persist
+        h_code = f"TEST_HAZARD_{uuid.uuid4().hex[:6]}"
+        res_valid = self.client.post('/api/v1/assistant/admin/safety-config/', {
+            'custom_hazards': {
+                h_code: {
+                    'name': 'Nguy cơ thử nghiệm hợp lệ',
+                    'instruction': 'Quy trình xử lý nguy cơ thử nghiệm',
+                    'action_summary': 'HÀNH ĐỘNG THỬ NGHIỆM',
+                    'keywords': ['từ khóa test nguy cơ 1', 'từ khóa test nguy cơ 2']
+                }
+            }
+        }, format='json')
+        self.assertEqual(res_valid.status_code, 200)
+
+        from algorithms.rag_chatbot.constants import EMERGENCY_HAZARDS
+        self.assertIn(h_code, EMERGENCY_HAZARDS)
+        self.assertEqual(EMERGENCY_HAZARDS[h_code]['name'], 'Nguy cơ thử nghiệm hợp lệ')
+
+        # Clean up
+        if h_code in EMERGENCY_HAZARDS:
+            del EMERGENCY_HAZARDS[h_code]
+
+    def test_issue_c_curated_qa_sibling_chunks_preservation(self):
+        """C. Xóa hoặc sửa QA không làm mất chunk của QA khác cùng Tenant có cùng câu hỏi."""
+        shared_q = f"Quy trình kiểm tra áp suất bưởng bơm {uuid.uuid4().hex[:6]}"
+        self.client.force_authenticate(user=self.user_a)
+
+        # 1. Create QA 1
+        res1 = self.client.post('/api/v1/assistant/admin/qa/', {
+            'questionPattern': shared_q,
+            'goldAnswer': 'Đáp án 1: Đo áp suất bưởng số 1.'
+        }, format='json')
+        self.assertEqual(res1.status_code, 200)
+        qa1_id = res1.data['data']['id']
+
+        # 2. Create QA 2 with IDENTICAL question but different answer
+        res2 = self.client.post('/api/v1/assistant/admin/qa/', {
+            'questionPattern': shared_q,
+            'goldAnswer': 'Đáp án 2: Đo áp suất bưởng số 2.'
+        }, format='json')
+        self.assertEqual(res2.status_code, 200)
+        qa2_id = res2.data['data']['id']
+        self.assertNotEqual(qa1_id, qa2_id)
+
+        # Both DocumentChunks must exist
+        chunk1 = DocumentChunk.all_objects.filter(section_title__startswith=f"Curated QA [{qa1_id}]").first()
+        chunk2 = DocumentChunk.all_objects.filter(section_title__startswith=f"Curated QA [{qa2_id}]").first()
+        self.assertIsNotNone(chunk1, "Chunk for QA 1 must be created!")
+        self.assertIsNotNone(chunk2, "Chunk for QA 2 must be created!")
+
+        # 3. Delete QA 1
+        res_del = self.client.delete(f'/api/v1/assistant/admin/qa/{qa1_id}/')
+        self.assertEqual(res_del.status_code, 200)
+
+        # QA 1 chunk must be deleted
+        self.assertFalse(DocumentChunk.all_objects.filter(id=chunk1.id).exists())
+
+        # CRITICAL: QA 2 chunk MUST STILL EXIST!
+        self.assertTrue(
+            DocumentChunk.all_objects.filter(id=chunk2.id).exists(),
+            "Deleting QA 1 must NEVER delete the chunk of sibling QA 2 having the same question!"
+        )
+        self.assertTrue(CuratedQAKnowledge.all_objects.filter(id=qa2_id).exists())
+
+        # Clean up QA 2
+        self.client.delete(f'/api/v1/assistant/admin/qa/{qa2_id}/')
+
+    def test_issue_d_system_scanner_preserves_superuser_manual_global_qa(self):
+        """D. Scanner không xóa hoặc ghi đè QA Toàn cục do Superuser tạo thủ công."""
+        manual_pattern = "cách xuất báo cáo bảo trì định kỳ"
+        custom_gold_answer = "Quy trình độc quyền do Giám đốc ký duyệt: Xuất báo cáo tại Menu Báo cáo > Tab Định kỳ."
+
+        # Superuser creates manual Global QA
+        self.client.force_authenticate(user=self.superuser)
+        res = self.client.post('/api/v1/assistant/admin/qa/', {
+            'questionPattern': manual_pattern,
+            'goldAnswer': custom_gold_answer,
+            'isSystemGuide': True,
+            'category': 'SYSTEM_FEATURE_GUIDE'
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        qa_id = res.data['data']['id']
+        manual_qa = CuratedQAKnowledge.objects.get(id=qa_id)
+        self.assertIsNotNone(manual_qa.approved_by, "Manual QA must have approved_by set to superuser!")
+
+        # Run scanner
+        scan_and_index_system_knowledge()
+
+        # The superuser's manual QA must still exist with its original gold answer!
+        manual_qa.refresh_from_db()
+        self.assertEqual(
+            manual_qa.gold_answer,
+            custom_gold_answer,
+            "Scanner must NOT overwrite or delete Superuser-curated Global QA!"
+        )
+
+        # 2. Existing scanner-generated QA edited by Superuser must update approved_by and be preserved
+        scan_qa = CuratedQAKnowledge.objects.create(
+            tenant_id=None,
+            is_system_guide=True,
+            category='SYSTEM_FEATURE_GUIDE',
+            question_pattern=f"cách đăng nhập hệ thống {uuid.uuid4().hex[:4]}",
+            gold_answer="Câu trả lời mặc định từ scanner",
+            approved_by=None
+        )
+        # Superuser edits this QA
+        updated_gold_answer = "Câu trả lời đã được Kỹ sư trưởng tùy biến lại"
+        res_update = self.client.post('/api/v1/assistant/admin/qa/', {
+            'id': str(scan_qa.id),
+            'questionPattern': scan_qa.question_pattern,
+            'goldAnswer': updated_gold_answer,
+            'isSystemGuide': True,
+            'category': 'SYSTEM_FEATURE_GUIDE'
+        }, format='json')
+        self.assertEqual(res_update.status_code, 200)
+
+        scan_qa.refresh_from_db()
+        self.assertIsNotNone(scan_qa.approved_by, "Updating a scanner QA by human must set approved_by!")
+        self.assertEqual(scan_qa.gold_answer, updated_gold_answer)
+
+        # Clean up
+        manual_qa.delete()
+        scan_qa.delete()
+
+    def test_issue_e_tool_calibration_all_matrix_cases(self):
+        """E. Kiểm định dụng cụ: đầy đủ các tình huống ngày kiểm định, quá hạn, bảo trì và logging."""
+        # E.1 Tool instance with calibration_date but NO calibration_due_date
+        tool_incomplete = Tool.objects.create(
+            tenant=self.tenant_a,
+            code=f"TOOL-MICROMETER-{uuid.uuid4().hex[:4]}",
+            name="Panme đo ngoài thiếu due date",
+            available_quantity=1
+        )
+        ToolInstance.objects.create(
+            tenant=self.tenant_a,
+            tool=tool_incomplete,
+            serial_number="SN-INCOMPLETE-01",
+            calibration_date=date.today() - timedelta(days=60),
+            calibration_due_date=None,
+            inspection_status='PASSED' # Stale DB value
+        )
+        matches1 = check_live_inventory(f"cần {tool_incomplete.code}", tenant_id=str(self.tenant_a.id))
+        self.assertTrue(len(matches1) >= 1)
+        item1 = [m for m in matches1 if m['partNumber'] == tool_incomplete.code][0]
+        self.assertEqual(item1['inspectionStatus'], "NO_CALIBRATION_DATA", "Tool missing calibration_due_date must report NO_CALIBRATION_DATA!")
+
+        # E.2 Tool instance with calibration_due_date in the past -> EXPIRED
+        tool_past = Tool.objects.create(
+            tenant=self.tenant_a,
+            code=f"TOOL-TEMP-{uuid.uuid4().hex[:4]}",
+            name="Súng đo nhiệt độ hồng ngoại quá hạn",
+            available_quantity=1
+        )
+        ToolInstance.objects.create(
+            tenant=self.tenant_a,
+            tool=tool_past,
+            serial_number="SN-TEMP-01",
+            calibration_date=date.today() - timedelta(days=400),
+            calibration_due_date=date.today() - timedelta(days=35),
+            inspection_status='PASSED'
+        )
+        matches2 = check_live_inventory(f"dùng {tool_past.code}", tenant_id=str(self.tenant_a.id))
+        self.assertTrue(len(matches2) >= 1)
+        item2 = [m for m in matches2 if m['partNumber'] == tool_past.code][0]
+        self.assertEqual(item2['inspectionStatus'], "EXPIRED", "Overdue calibration due date must report EXPIRED!")
+
+        # E.3 Tool with all instances in MAINTENANCE
+        tool_maint = Tool.objects.create(
+            tenant=self.tenant_a,
+            code=f"TOOL-ALIGN-{uuid.uuid4().hex[:4]}",
+            name="Bộ cân tâm trục đang bảo trì",
+            available_quantity=0
+        )
+        ToolInstance.objects.create(
+            tenant=self.tenant_a,
+            tool=tool_maint,
+            serial_number="SN-ALIGN-01",
+            calibration_date=date.today() - timedelta(days=30),
+            calibration_due_date=date.today() + timedelta(days=300),
+            inspection_status='PASSED',
+            status='MAINTENANCE'
+        )
+        matches3 = check_live_inventory(f"dùng {tool_maint.code}", tenant_id=str(self.tenant_a.id))
+        self.assertTrue(len(matches3) >= 1)
+        item3 = [m for m in matches3 if m['partNumber'] == tool_maint.code][0]
+        self.assertEqual(item3['inspectionStatus'], "MAINTENANCE")
+
+        # E.4 Tool with valid calibration
+        tool_valid = Tool.objects.create(
+            tenant=self.tenant_a,
+            code=f"TOOL-VALID-{uuid.uuid4().hex[:4]}",
+            name="Thước kẹp kiểm định hợp lệ",
+            available_quantity=1
+        )
+        ToolInstance.objects.create(
+            tenant=self.tenant_a,
+            tool=tool_valid,
+            serial_number="SN-VALID-01",
+            calibration_date=date.today() - timedelta(days=30),
+            calibration_due_date=date.today() + timedelta(days=180),
+            inspection_status='PASSED',
+            status='AVAILABLE'
+        )
+        matches4 = check_live_inventory(f"dùng {tool_valid.code}", tenant_id=str(self.tenant_a.id))
+        self.assertTrue(len(matches4) >= 1)
+        item4 = [m for m in matches4 if m['partNumber'] == tool_valid.code][0]
+        self.assertEqual(item4['inspectionStatus'], "PASSED")
+
+        # E.5 DB Query Exception during tool check -> Logs error and returns UNVERIFIED without crashing
+        from unittest.mock import patch
+        with patch('assets.models.Tool.objects.select_related') as mock_qs:
+            mock_qs.side_effect = Exception("Simulated DB connection error on Tool query")
+            matches5 = check_live_inventory("cần dùng thước kẹp đo kiểm", tenant_id=str(self.tenant_a.id))
+            self.assertTrue(len(matches5) >= 1)
+            err_item = [m for m in matches5 if m.get('isTool')][0]
+            self.assertEqual(err_item['inspectionStatus'], "UNVERIFIED")
+
+    def test_issue_f_multi_worker_safety_config_true_synchronization(self):
+        """F. Worker đang chạy tự nhận cấu hình mới mà không cần restart hay xóa mtime thủ công."""
+        import time
+        import algorithms.rag_chatbot.safety_config as sc
+
+        # Ensure initial state is loaded
+        ensure_safety_config_loaded()
+        initial_mtime = sc._last_loaded_mtime
+
+        # Give a small pause to ensure filesystem mtime difference
+        time.sleep(0.05)
+
+        # Worker B updates config
+        test_slang_k = f"slang_true_sync_{uuid.uuid4().hex[:6]}"
+        test_slang_v = "bearing vibration abnormal displacement"
+        save_persisted_safety_config(custom_slang={test_slang_k: test_slang_v})
+
+        # Worker A (simulated by existing module with its previous mtime) calls ensure_safety_config_loaded
+        sc._last_loaded_mtime = initial_mtime
+        ensure_safety_config_loaded()
+
+        # Check that Worker A reloaded the new configuration
+        expansion = expand_slang_query(f"máy có tiếng {test_slang_k}")
+        self.assertIn(test_slang_k, expansion['detected_slangs'])
+
+        # Clean up
+        if test_slang_k in SLANG_TECHNICAL_DICTIONARY:
+            del SLANG_TECHNICAL_DICTIONARY[test_slang_k]
+

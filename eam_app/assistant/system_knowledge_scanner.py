@@ -1704,22 +1704,34 @@ def scan_and_index_system_knowledge() -> Dict[str, Any]:
         indexed_count = len(chunk_objs)
 
         # Register Curated Gold Q&As (strictly scoped to system guides)
+        # Distinguishes scanner-generated QAs (approved_by=None) from Superuser manual QAs (approved_by is not None)
         for qa_item in qa_to_create:
-            CuratedQAKnowledge.all_objects.filter(
+            existing_qa = CuratedQAKnowledge.all_objects.filter(
                 is_system_guide=True,
                 tenant_id__isnull=True,
                 category='SYSTEM_FEATURE_GUIDE',
                 question_pattern__iexact=qa_item['question_pattern']
-            ).delete()
+            ).first()
 
-            CuratedQAKnowledge.objects.create(
-                tenant_id=None,
-                is_system_guide=True,
-                category='SYSTEM_FEATURE_GUIDE',
-                question_pattern=qa_item['question_pattern'],
-                gold_answer=qa_item['gold_answer'],
-                applicable_model=None
-            )
+            if existing_qa:
+                # If approved_by is set, this QA was manually created/customized by a Superuser/Admin.
+                # Do NOT overwrite or delete manual human knowledge!
+                if existing_qa.approved_by is not None:
+                    continue
+                # Otherwise, it was scanner-generated: update answer idempotently
+                if existing_qa.gold_answer != qa_item['gold_answer']:
+                    existing_qa.gold_answer = qa_item['gold_answer']
+                    existing_qa.save()
+            else:
+                CuratedQAKnowledge.objects.create(
+                    tenant_id=None,
+                    is_system_guide=True,
+                    category='SYSTEM_FEATURE_GUIDE',
+                    question_pattern=qa_item['question_pattern'],
+                    gold_answer=qa_item['gold_answer'],
+                    applicable_model=None,
+                    approved_by=None
+                )
             curated_count += 1
 
     logger.info("Successfully indexed %d chunks across %d modules with %d Curated Q&As.", 
