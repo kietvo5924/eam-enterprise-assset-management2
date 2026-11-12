@@ -49,3 +49,8 @@ eam_app/media/
 # IoT Firmware with local WiFi credentials
 scripts/firmware/esp32_asset_beacon/
 
+# Thesis temporary folders and working markdown docs
+*THESIS*/
+*THESIS*.md
+
+
