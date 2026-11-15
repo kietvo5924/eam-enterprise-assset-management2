@@ -209,6 +209,24 @@ class WorkOrderTransitionService:
         elif wo.severity_level == 'CRITICAL_OVERHAUL':
             wo.maintenance_action = 'CORE_REPLACEMENT'
 
+        # Auto-extract post-repair telemetry from Stage 4 checklist items if not directly provided in payload
+        if not post_repair_data or not isinstance(post_repair_data, dict):
+            post_repair_data = {}
+        if 'vibration' not in post_repair_data or post_repair_data['vibration'] is None:
+            chk_vib = wo.checklists.filter(input_type='NUMBER', item_name__icontains='rung').first()
+            if chk_vib and chk_vib.actual_value:
+                try:
+                    post_repair_data['vibration'] = float(str(chk_vib.actual_value).strip().replace(',', '.'))
+                except Exception:
+                    pass
+        if 'temperature' not in post_repair_data or post_repair_data['temperature'] is None:
+            chk_temp = wo.checklists.filter(input_type='NUMBER', item_name__icontains='nhiệt').first()
+            if chk_temp and chk_temp.actual_value:
+                try:
+                    post_repair_data['temperature'] = float(str(chk_temp.actual_value).strip().replace(',', '.'))
+                except Exception:
+                    pass
+
         # Set post repair telemetry if supplied
         if post_repair_data and isinstance(post_repair_data, dict):
             if 'vibration' in post_repair_data and post_repair_data['vibration'] is not None:

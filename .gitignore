@@ -53,4 +53,8 @@ scripts/firmware/esp32_asset_beacon/
 *THESIS*/
 *THESIS*.md
 
+# Demo rehearsal artifacts and recordings
+demo_results/
+
+
 

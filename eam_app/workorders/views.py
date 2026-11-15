@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
+from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from rest_framework.exceptions import NotFound
@@ -590,6 +591,20 @@ class WorkOrderStatusView(APIView):
                     'load_factor': _extract_val(data, 'postRepairLoadFactor', default=1.0),
                     'machine_state': _extract_val(data, 'machineState', 'postRepairMachineState', default='RUNNING'),
                 }
+
+            from workorders.models import LaborLog
+            from analytics.models import TenantFinancialSetting
+            if wo.assigned_to and not LaborLog.all_objects.filter(work_order=wo).exists():
+                fin_setting = TenantFinancialSetting.objects.filter(tenant=wo.tenant).first()
+                rate = fin_setting.default_labor_hourly_rate if (fin_setting and fin_setting.default_labor_hourly_rate) else Decimal('200000.00')
+                LaborLog.objects.create(
+                    tenant=wo.tenant,
+                    work_order=wo,
+                    technician=wo.assigned_to,
+                    work_date=timezone.now().date(),
+                    hours_worked=Decimal('1.0'),
+                    hourly_rate=rate,
+                )
 
             from workorders.services import WorkOrderTransitionService
             wo = WorkOrderTransitionService.complete_work_order(

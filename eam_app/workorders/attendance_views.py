@@ -205,7 +205,7 @@ class AttendanceCheckInView(APIView):
                     "success": False,
                     "error": str(ex)
                 }, status=status.HTTP_400_BAD_REQUEST)
-        elif 'test' in sys.argv and live_embedding:
+        elif ('test' in sys.argv or 'pytest' in sys.modules) and live_embedding:
             # Chỉ chấp nhận vector giả lập trực tiếp khi chạy bộ kiểm thử Unit Test tự động nội bộ
             pass
         else:

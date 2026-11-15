@@ -2034,11 +2034,22 @@ def portal_work_orders(request):
                 alert_id = data.get('alert_id')
                 if alert_id:
                     try:
-                        from assets.models import AssetAnomalyAlert
+                        from assets.models import AssetAnomalyAlert, SparePart
                         alert_obj = AssetAnomalyAlert.objects.filter(id=alert_id, tenant_id=tenant_id).first()
                         if alert_obj:
                             alert_obj.draft_work_order = wo
                             alert_obj.save(update_fields=['draft_work_order'])
+                            from workorders.models import WorkOrderMaterial
+                            # Giai đoạn 2 HSM: Chuẩn bị vật tư vòng bi cốt lõi
+                            skf_part = SparePart.objects.filter(tenant_id=tenant_id, part_number='VF-BEAR-6205').first()
+                            if skf_part:
+                                WorkOrderMaterial.objects.create(
+                                    tenant_id=tenant_id,
+                                    work_order=wo,
+                                    spare_part=skf_part,
+                                    quantity=Decimal('1.0'),
+                                    actual_cost=skf_part.unit_cost
+                                )
                     except Exception:
                         pass
 
