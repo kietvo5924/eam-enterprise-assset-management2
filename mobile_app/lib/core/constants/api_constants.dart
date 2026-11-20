@@ -1,6 +1,9 @@
 class ApiConstants {
-  // Django Backend Server URL (http://10.0.2.2:8000 for Android Emulator, http://127.0.0.1:8000 for Desktop)
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  // Django Backend Server URL:
+  // - Cáp USB kèm adb reverse: 'http://127.0.0.1:8000' (Khuyên dùng, siêu ổn định)
+  // - Mạng Wi-Fi nội bộ: 'http://192.168.1.7:8000'
+  // - Máy ảo Android Emulator: 'http://10.0.2.2:8000'
+  static const String baseUrl = 'http://127.0.0.1:8000';
 
   // Standard Network Timeouts
   static const Duration connectTimeout = Duration(seconds: 15);

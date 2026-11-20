@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.neutral50,
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 72.0),
+        padding: const EdgeInsets.only(bottom: 116.0),
         child: FloatingActionButton.extended(
           heroTag: 'home_assistant_fab',
           onPressed: () => context.push('/assistant'),
