@@ -2971,6 +2971,14 @@
       
       filterTable();
 
+      const toastSuccess = sessionStorage.getItem('toast_success');
+      if (toastSuccess) {
+          sessionStorage.removeItem('toast_success');
+          if (typeof showToast === 'function') {
+              setTimeout(() => showToast(toastSuccess, 'success'), 300);
+          }
+      }
+
       // Re-open work order detail if previously open before checklist update / action
       const autoOpenWoId = sessionStorage.getItem('open_wo_id');
       if (autoOpenWoId && !urlParams.has('create_pm')) {
@@ -3650,7 +3658,8 @@
       .then(res => res.json())
       .then(resData => {
           if(resData.success) {
-              if (resData.id) {
+              sessionStorage.setItem('toast_success', id ? 'Cập nhật phiếu bảo trì thành công!' : 'Khởi tạo phiếu bảo trì thành công!');
+              if (id && resData.id) {
                   sessionStorage.setItem('open_wo_id', resData.id);
               }
               if (window.location.search) {

@@ -916,6 +916,13 @@
   }
 
   window.addEventListener('DOMContentLoaded', () => {
+    const toastSuccess = sessionStorage.getItem('toast_success');
+    if (toastSuccess) {
+      sessionStorage.removeItem('toast_success');
+      if (typeof showToast === 'function') {
+        setTimeout(() => showToast(toastSuccess, 'success'), 300);
+      }
+    }
     if (!expandedNodes || expandedNodes.length === 0) {
       // Auto expand root factory nodes so user sees zones immediately
       document.querySelectorAll('#left-pane-content > div.overflow-y-auto > .tree-node').forEach(node => {
@@ -1343,6 +1350,7 @@
     .then(res => res.json())
     .then(resData => {
         if (resData.success) {
+            sessionStorage.setItem('toast_success', id ? 'Cập nhật thông tin tài sản thành công!' : 'Khởi tạo tài sản mới thành công!');
             window.location.reload();
         } else {
             msg.innerText = resData.error || 'An error occurred';

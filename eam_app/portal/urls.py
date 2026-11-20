@@ -1,8 +1,9 @@
-from django.urls import path
+from django.urls import path, re_path
 from . import views
 
 urlpatterns = [
     path('', views.portal_dashboard, name='portal_dashboard'),
+    re_path(r'^(?:/+)?$', views.portal_dashboard, name='portal_dashboard_slash'),
     path('login/', views.portal_login, name='portal_login'),
     path('logout/', views.portal_logout, name='portal_logout'),
     path('change-password/', views.portal_change_password, name='portal_change_password'),

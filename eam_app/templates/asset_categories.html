@@ -86,7 +86,7 @@
     <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-300 via-primary-500 to-primary-600"></div>
     
     <!-- Search Bar (Compact) -->
-    <div class="p-3 sm:p-4 border-b border-neutral-100/80 bg-white/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 relative z-10">
+    <div class="p-3 sm:p-4 border-b border-neutral-100/80 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 relative z-10">
       <div class="relative w-full sm:max-w-md">
         <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-base"></i>
         <input type="text" id="search-input" onkeyup="filterItems()" placeholder="Tìm kiếm phân loại, mẫu cây phân cấp..." class="w-full h-10 pl-10 pr-4 rounded-xl border border-neutral-200/80 hover:border-primary focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,160,226,0.15)] bg-neutral-50/50 hover:bg-white focus:bg-white transition-all text-xs font-medium text-neutral-900 outline-none shadow-sm" />
@@ -479,7 +479,7 @@
                 <div class="flex-1 flex overflow-hidden min-h-[580px] relative">
                     
                     <!-- LEFT: DRAW.IO SHAPE PALETTE / STENCIL LIBRARY -->
-                    <div id="studio-left-sidebar" class="w-80 md:w-84 max-w-full bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl backdrop-blur-md overflow-hidden transition-all duration-200">
+                    <div id="studio-left-sidebar" class="w-80 md:w-84 max-w-full bg-slate-900/95 border-r border-slate-800 flex flex-col shrink-0 z-20 shadow-xl overflow-hidden transition-all duration-200">
                         <!-- Palette Tabs (2 Categories: Khu vực | Không gian) & Close Button -->
                         <div class="flex items-center p-1 gap-1 bg-slate-950/80 border-b border-slate-800 shrink-0">
                             <div class="grid grid-cols-2 gap-1 flex-1 min-w-0">
@@ -580,7 +580,7 @@
                                 </button>
                                 
                                 <!-- Floating Status & Coordinate HUD -->
-                                <div class="absolute top-3 left-3 z-30 flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded text-xs backdrop-blur-md text-slate-200 font-mono shadow-xl pointer-events-none">
+                                <div class="absolute top-3 left-3 z-30 flex items-center gap-2 bg-slate-900/95 border border-slate-700/80 px-3 py-1.5 rounded text-xs text-slate-200 font-mono shadow-xl pointer-events-none">
                                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                     <span id="studio-hud-status" class="pointer-events-auto">Sẵn sàng kéo thả tài sản</span>
                                     <span class="text-slate-600">|</span>
@@ -614,9 +614,9 @@
 
                                         <!-- TÒA NHÀ LỚN NHẤT (Nơi chứa các đường lưới - Cắt chính xác bên trong khung viền) -->
                                         <g id="studio-building-interior-group" clip-path="url(#studio-building-clippath)">
-                                            <rect id="svg-canvas-bg" width="10000" height="10000" fill="#090d16" />
-                                            <rect id="svg-grid-minor-layer" width="10000" height="10000" fill="url(#studio-grid-minor)" />
-                                            <rect id="svg-grid-major-layer" width="10000" height="10000" fill="url(#studio-grid-major)" />
+                                            <rect id="svg-canvas-bg" width="3000" height="2000" fill="#090d16" />
+                                            <rect id="svg-grid-minor-layer" width="3000" height="2000" fill="url(#studio-grid-minor)" />
+                                            <rect id="svg-grid-major-layer" width="3000" height="2000" fill="url(#studio-grid-major)" />
                                             <image id="studio-svg-underlay-image" href="" x="0" y="0" width="1000" height="700" preserveAspectRatio="none" opacity="0.5" class="transition-opacity duration-200" />
                                         </g>
 
@@ -653,7 +653,7 @@
                                     </div>
 
                                     <!-- 4. Active Dragging Float Indicator Tooltip -->
-                                    <div id="studio-drag-tooltip" class="hidden absolute z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 bg-slate-900 border border-sky-400 text-sky-200 px-2.5 py-1 rounded-lg text-xs font-mono font-bold shadow-2xl backdrop-blur-md flex items-center gap-1.5 whitespace-nowrap">
+                                    <div id="studio-drag-tooltip" class="hidden absolute z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 bg-slate-900 border border-sky-400 text-sky-200 px-2.5 py-1 rounded-lg text-xs font-mono font-bold shadow-2xl flex items-center gap-1.5 whitespace-nowrap">
                                         <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
                                         <span id="studio-drag-tooltip-text">X: 0m, Y: 0m</span>
                                     </div>
@@ -663,7 +663,7 @@
                     </div>
 
                     <!-- RIGHT: DRAW.IO FORMAT / PROPERTY INSPECTOR -->
-                    <div class="w-80 md:w-88 bg-slate-900/95 border-l border-slate-800 flex flex-col shrink-0 z-20 p-4 studio-stealth-scroll shadow-2xl backdrop-blur-md relative transition-all duration-200" id="studio-inspector">
+                    <div class="w-80 md:w-88 bg-slate-900/95 border-l border-slate-800 flex flex-col shrink-0 z-20 p-4 studio-stealth-scroll shadow-2xl relative transition-all duration-200" id="studio-inspector">
                         <!-- Top Inspector Close Row -->
                         <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800 text-slate-400 shrink-0">
                             <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
@@ -716,7 +716,7 @@
 </div>
 
 <!-- Unified Modal -->
-<div id="unified-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
+<div id="unified-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-4">
   <div class="bg-white rounded-[24px] shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col fancy-modal">
     <div class="px-5 sm:px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-white shrink-0">
       <div class="flex items-center gap-3">
@@ -847,7 +847,7 @@
 </div>
 
 <!-- Create Floorplan Modal -->
-<div id="modal-create-floorplan" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4">
+<div id="modal-create-floorplan" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4">
   <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col border border-neutral-200">
     <div class="px-5 sm:px-6 py-4 sm:py-5 border-b border-neutral-100 flex justify-between items-center bg-gradient-to-r from-sky-50 to-white shrink-0">
       <div class="flex items-center gap-3">
@@ -1932,8 +1932,8 @@
         if (svg) {
             svg.setAttribute('viewBox', `0 0 ${CANVAS_WIDTH_PX} ${CANVAS_HEIGHT_PX}`);
         }
-        const gridW = Math.max(CANVAS_WIDTH_PX, 10000);
-        const gridH = Math.max(CANVAS_HEIGHT_PX, 10000);
+        const gridW = Math.max(CANVAS_WIDTH_PX, 3000);
+        const gridH = Math.max(CANVAS_HEIGHT_PX, 2000);
         if (bg) {
             bg.setAttribute('width', gridW);
             bg.setAttribute('height', gridH);
@@ -5177,7 +5177,7 @@
                      style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px; height: ${heightPx}px; z-index: ${zoneZIndex};">
 
                     <!-- Zone Name Tag Tab: Gắn ngay mép ngoài viền khu vực, hiển thị tên + diện tích thực -->
-                    <div class="absolute -top-[23px] left-2 px-2.5 py-0.5 rounded-none bg-slate-950/95 border ${isSelected ? 'border-sky-400 text-sky-200 ring-1 ring-sky-400/40 shadow-lg' : (hasWarning ? 'border-rose-500 text-rose-200 bg-rose-950/70 animate-pulse' : 'border-slate-700/90 text-slate-100')} flex items-center gap-1.5 pointer-events-auto cursor-move shadow-md z-30 max-w-[calc(100%-10px)] backdrop-blur-sm"
+                    <div class="absolute -top-[23px] left-2 px-2.5 py-0.5 rounded-none bg-slate-950/95 border ${isSelected ? 'border-sky-400 text-sky-200 ring-1 ring-sky-400/40 shadow-lg' : (hasWarning ? 'border-rose-500 text-rose-200 bg-rose-950/70 animate-pulse' : 'border-slate-700/90 text-slate-100')} flex items-center gap-1.5 pointer-events-auto cursor-move shadow-md z-30 max-w-[calc(100%-10px)]"
                          onmousedown="handleZoneMouseDown(event, '${loc.id}')"
                          title="${loc.name} (${getZoneShapeName(pts)} - ${area.toFixed(1)} m²)${isBoundaryViolated ? ' - ⚠️ NẰM NGOÀI/ĐÈ LÊN VIỀN TÒA NHÀ' : (isOverlap ? ' - ⚠️ TRÙNG ĐÈ KHU VỰC KHÁC' : '')}">
                         <span class="w-1.5 h-1.5 rounded-none ${isSelected ? 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]' : (hasWarning ? 'bg-rose-500' : 'bg-sky-400')} flex-shrink-0"></span>
@@ -5266,7 +5266,7 @@
                  style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px; height: ${heightPx}px;">
                 
                 <!-- Asset Body: Compact, Sleek, Square, No rounded corners -->
-                <div class="w-full h-full rounded-none bg-slate-900/90 border-2 ${isSelected ? 'border-sky-400 ring-4 ring-sky-500/40 shadow-lg shadow-sky-500/30' : (activeWo ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-700 hover:border-sky-400')} backdrop-blur-sm shadow flex items-center justify-center p-1 relative overflow-hidden transition-all">
+                <div class="w-full h-full rounded-none bg-slate-900/90 border-2 ${isSelected ? 'border-sky-400 ring-4 ring-sky-500/40 shadow-lg shadow-sky-500/30' : (activeWo ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-700 hover:border-sky-400')} shadow flex items-center justify-center p-1 relative overflow-hidden transition-all">
                     <span class="w-2 h-2 rounded-none absolute top-1.5 left-1.5 ${st.dot} shadow-sm" title="${st.label}"></span>
                     ${activeWo ? `
                         <span class="w-2 h-2 rounded-none absolute top-1.5 right-1.5 bg-amber-400 animate-ping" title="Có phiếu bảo trì"></span>
@@ -5388,7 +5388,7 @@
                          class="canvas-interactive-cluster absolute pointer-events-auto cursor-pointer select-none group/cluster z-20"
                          style="left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px; height: ${heightPx}px;"
                          title="Nhấn để mở danh sách chi tiết ${zoneAssets.length} máy trong khu vực ${loc.name}">
-                        <div class="w-full h-full rounded-none bg-slate-900/95 border-2 border-dashed border-sky-400/80 hover:border-sky-300 hover:bg-sky-950/50 hover:shadow-lg hover:shadow-sky-500/20 backdrop-blur-md flex flex-col items-center justify-center text-center px-1 py-0.5 transition-all overflow-hidden">
+                        <div class="w-full h-full rounded-none bg-slate-900/95 border-2 border-dashed border-sky-400/80 hover:border-sky-300 hover:bg-sky-950/50 hover:shadow-lg hover:shadow-sky-500/20 flex flex-col items-center justify-center text-center px-1 py-0.5 transition-all overflow-hidden">
                             <div class="text-sky-400 font-extrabold text-[12px] leading-tight whitespace-nowrap">
                                 +${overflowAssets.length}
                             </div>
