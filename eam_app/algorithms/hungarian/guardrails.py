@@ -108,21 +108,38 @@ def detect_shared_tool_conflicts(assigned_slots: List[Tuple[Any, WorkOrderSlot]]
 
     tool_to_wos = defaultdict(list)
     tool_to_techs = defaultdict(list)
+    tool_req_qty = defaultdict(int)
+    seen_wo_tool = set()
     for tech_profile, slot in assigned_slots:
         if not slot or not slot.required_tools:
             continue
         tech_user = getattr(tech_profile, 'user', None)
         tech_name = getattr(tech_user, 'full_name', '') or getattr(tech_user, 'username', 'KTV') if tech_user else 'KTV'
-        for tool_code in slot.required_tools:
-            tool_to_wos[tool_code].append(slot.display_name)
-            tool_to_techs[tool_code].append(tech_name)
+        for tool_item in slot.required_tools:
+            if isinstance(tool_item, dict):
+                tool_code = tool_item.get('code') or tool_item.get('tool_code')
+                req_qty = int(tool_item.get('quantity', 1) or 1)
+            else:
+                tool_code = str(tool_item)
+                req_qty = 1
+            if not tool_code:
+                continue
+            # Deduplicate per (WorkOrder, Tool) so crew slots (LEAD + ASSIST) do not double-count WO tool demand
+            wo_tool_key = (slot.original_id, tool_code)
+            if wo_tool_key not in seen_wo_tool:
+                seen_wo_tool.add(wo_tool_key)
+                tool_to_wos[tool_code].append(slot.display_name)
+                tool_req_qty[tool_code] += max(1, req_qty)
+            if tech_name not in tool_to_techs[tool_code]:
+                tool_to_techs[tool_code].append(tech_name)
 
     conflicts = []
     for tool_code, wo_names in tool_to_wos.items():
-        if len(wo_names) > 1:
+        total_req = tool_req_qty[tool_code]
+        if len(wo_names) > 1 or total_req > 1:
             tool = Tool.objects.filter(tenant=tenant, code=tool_code, is_active=True).first()
             avail_qty = tool.available_quantity if tool else 1
-            if avail_qty < len(wo_names):
+            if avail_qty < total_req:
                 tool_name = tool.name if tool else tool_code
                 tech_names = tool_to_techs[tool_code]
                 conflicts.append({
@@ -132,14 +149,14 @@ def detect_shared_tool_conflicts(assigned_slots: List[Tuple[Any, WorkOrderSlot]]
                     "tool_name": tool_name,
                     "availableQuantity": avail_qty,
                     "total_available": avail_qty,
-                    "requiredQuantity": len(wo_names),
-                    "required_count": len(wo_names),
+                    "requiredQuantity": total_req,
+                    "required_count": total_req,
                     "conflictingWorkOrders": wo_names,
                     "assigned_technicians": tech_names,
                     "assignedTechnicians": tech_names,
                     "warningMessage": (
                         f"Xung đột công cụ '{tool_name}' ({tool_code}): "
-                        f"Có {len(wo_names)} phiếu yêu cầu đồng thời nhưng chỉ có {avail_qty} chiếc khả dụng. "
+                        f"Yêu cầu {total_req} đơn vị cho {len(wo_names)} phiếu nhưng chỉ có {avail_qty} chiếc khả dụng. "
                         f"Đề xuất Quản lý lùi giờ hoặc điều phối thủ công."
                     )
                 })

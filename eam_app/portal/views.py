@@ -864,16 +864,23 @@ def portal_user_face_photo(request, user_id):
     Trả về ảnh chân dung khuôn mặt đã giải mã từ lưu trữ sinh trắc học AES-256 an toàn.
     """
     from users.models import User
+    from users.permissions import HasPermission
     from algorithms.biometric.enrollment import decrypt_image_snapshot
     from pathlib import Path
     import os
     from django.conf import settings
-    from django.http import HttpResponse, Http404
+    from django.http import HttpResponse, HttpResponseForbidden, Http404
 
     try:
         target_user = User.all_objects.get(id=user_id)
     except User.DoesNotExist:
         raise Http404("User not found")
+
+    if not request.user.is_superuser:
+        if str(target_user.tenant_id) != str(request.user.tenant_id):
+            return HttpResponseForbidden("Không có quyền truy cập ảnh sinh trắc học của đơn vị khác.")
+        if str(target_user.id) != str(request.user.id) and not HasPermission('user:read')().has_permission(request, None):
+            return HttpResponseForbidden("Không có quyền xem ảnh sinh trắc học của người dùng khác.")
 
     audit_dir = os.path.join(settings.MEDIA_ROOT, 'biometric_audits')
     files = sorted(

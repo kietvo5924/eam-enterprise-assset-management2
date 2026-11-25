@@ -199,15 +199,24 @@ class LocationFloorplanDetailView(APIView):
                 location = location.first()
 
         if not location:
-            # Fallback search by asset's location
+            # Fallback search by asset's location (tenant-scoped unless superuser)
             asset_id = request.query_params.get('focusAssetId') or request.query_params.get('asset_id') or request.query_params.get('assetId')
             if asset_id and str(asset_id).strip():
+                is_super = getattr(request.user, 'is_superuser', False)
+                tenant = getattr(request.user, 'tenant', None)
                 try:
-                    asset = Asset.all_objects.filter(id=str(asset_id).strip()).first()
-                    if asset and asset.location:
-                        location = asset.location
+                    if is_super:
+                        asset = Asset.all_objects.filter(id=str(asset_id).strip()).first()
+                    elif tenant is not None:
+                        asset = Asset.all_objects.filter(id=str(asset_id).strip(), tenant=tenant).first()
+                    else:
+                        asset = Asset.objects.filter(id=str(asset_id).strip()).first()
                 except Exception:
-                    pass
+                    asset = None
+                if not asset:
+                    raise NotFound("Asset not found")
+                if asset.location:
+                    location = asset.location
 
         if not location:
             # Fallback to tenant primary active location
@@ -215,7 +224,7 @@ class LocationFloorplanDetailView(APIView):
             if tenant:
                 location = Location.objects.filter(tenant=tenant, is_active=True).first() or Location.all_objects.filter(tenant=tenant).first()
 
-        if not location:
+        if not location and (getattr(request.user, 'is_superuser', False) or getattr(request.user, 'tenant', None) is None):
             location = Location.objects.filter(is_active=True).first()
 
         if not location:
@@ -1553,8 +1562,8 @@ class IoTSensorAlertView(APIView):
                 models.Q(name__icontains=asset_code)
             ).first()
 
-        if not asset:
-            # Tìm kiếm toàn cục nếu mã thiết bị có tiền tố hoặc khác biệt
+        if not asset and not target_tenant:
+            # Chỉ tìm kiếm toàn cục khi tenant_code chưa định danh được Tenant cụ thể
             asset = Asset.all_objects.filter(
                 models.Q(qr_code__iexact=asset_code) |
                 models.Q(serial_number__iexact=asset_code) |

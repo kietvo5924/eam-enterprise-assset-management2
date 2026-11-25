@@ -780,3 +780,100 @@ class BiometricGeofencingTestSuite(TestCase):
         is_v, d = verify_ble_proximity(None)
         self.assertFalse(is_v)
         self.assertEqual(d, 999.0)
+
+    def test_tc_bio_edge_07_cross_tenant_attendance_idor_forbidden(self):
+        """
+        EDGE-07: Chống truy cập chéo Tenant (IDOR) trên API điểm danh & sinh trắc học.
+        Admin/KTV của Tenant B không được phép check-in, verify-presence trên WorkOrder của Tenant A,
+        hoặc enroll khuôn mặt cho user của Tenant A.
+        """
+        tenant_b = Tenant.objects.create(name="Other Corp", tenant_code="OTHER_CORP")
+        admin_role_b = Role.all_objects.create(name="ADMIN", tenant=tenant_b)
+        admin_b = User.all_objects.create(
+            username="admin_tenant_b",
+            email="admin@othercorp.vn",
+            tenant=tenant_b,
+        )
+        admin_b.roles.add(admin_role_b)
+
+        self.client.force_authenticate(user=admin_b)
+
+        res_checkin = self.client.post(
+            "/api/v1/attendance/check-in/",
+            data={"workOrderId": str(self.wo_robot.id), "bleBeaconId": "EAM-BEACON", "rssi": -60},
+            HTTP_X_TENANT_ID=str(tenant_b.id),
+            format="json",
+        )
+        self.assertEqual(res_checkin.status_code, 403)
+
+        res_verify = self.client.post(
+            "/api/v1/attendance/verify-presence/",
+            data={"workOrderId": str(self.wo_robot.id), "bleBeaconId": "EAM-BEACON", "rssi": -60},
+            HTTP_X_TENANT_ID=str(tenant_b.id),
+            format="json",
+        )
+        self.assertEqual(res_verify.status_code, 403)
+
+        res_enroll = self.client.post(
+            "/api/v1/biometric/enroll/",
+            data={
+                "userId": str(self.technician.id),
+                "liveEmbedding": json.dumps(self.baseline_embedding),
+            },
+            HTTP_X_TENANT_ID=str(tenant_b.id),
+            format="json",
+        )
+        self.assertIn(res_enroll.status_code, (403, 404))
+
+    def test_tc_bio_edge_08_cross_tenant_face_photo_and_iot_isolation(self):
+        """
+        EDGE-08:
+        1) portal_user_face_photo chặn truy cập chéo tenant và chặn KTV xem ảnh người khác.
+        2) IoTSensorAlertView không rơi sang asset của tenant khác khi tenant_code đã định danh được target_tenant.
+        """
+        from django.test import RequestFactory
+        from portal.views import portal_user_face_photo
+        from assets.models import MeterReading
+
+        tenant_b = Tenant.objects.create(name="Beta Corp", tenant_code="BETA_CORP")
+        admin_role_b = Role.all_objects.create(name="ADMIN", tenant=tenant_b)
+        admin_b = User.all_objects.create(
+            username="admin_beta",
+            email="admin@beta.vn",
+            tenant=tenant_b,
+        )
+        admin_b.roles.add(admin_role_b)
+
+        rf = RequestFactory()
+        req_cross = rf.get(f"/portal/users/{self.technician.id}/face-photo/")
+        req_cross.user = admin_b
+        res_photo = portal_user_face_photo(req_cross, self.technician.id)
+        self.assertEqual(res_photo.status_code, 403)
+
+        # Same-tenant technician without user:read cannot view another user's photo
+        other_tech = User.objects.create(
+            username="tech_peer",
+            email="peer@vinfast.vn",
+            tenant=self.tenant,
+        )
+        other_tech.roles.add(self.role_tech)
+        req_peer = rf.get(f"/portal/users/{self.technician.id}/face-photo/")
+        req_peer.user = other_tech
+        res_peer = portal_user_face_photo(req_peer, self.technician.id)
+        self.assertEqual(res_peer.status_code, 403)
+
+        # IoTSensorAlertView must not cross into Tenant A's asset when tenant_code resolves to Tenant B
+        before_count = MeterReading.all_objects.filter(asset=self.robot_asset).count()
+        res_iot = self.client.post(
+            "/api/v1/iot/sensor-alert/",
+            data={
+                "tenant_code": "BETA_CORP",
+                "asset_code": self.robot_asset.qr_code or self.robot_asset.name,
+                "temperature": 78.5,
+                "vibration": 0.95,
+            },
+            format="json",
+        )
+        self.assertEqual(res_iot.status_code, 404)
+        after_count = MeterReading.all_objects.filter(asset=self.robot_asset).count()
+        self.assertEqual(before_count, after_count)

@@ -426,8 +426,8 @@ class HungarianAssignmentService:
                 tech = techs[tech_id_str]
 
                 if role == 'ASSIST' and wo.assigned_to:
-                    # Add crew assist info to notes
-                    wo.notes = f"{wo.notes or ''}\n[Crew Assist]: {get_user_display_name(tech.user)}".strip()
+                    # Add crew assist info to description
+                    wo.description = f"{wo.description or ''}\n[Crew Assist]: {get_user_display_name(tech.user)}".strip()
                 else:
                     wo.assigned_to = tech.user
 
@@ -438,42 +438,6 @@ class HungarianAssignmentService:
                 # Mark technician as BUSY
                 tech.availability_status = 'BUSY'
                 tech.save()
-
-                # Tool Reservation Concurrency Handling (Atomic stock reservation)
-                if wo.required_tools and isinstance(wo.required_tools, list):
-                    from assets.models import Tool, ToolReservation, ToolInstance
-                    for tool_item in wo.required_tools:
-                        if isinstance(tool_item, dict):
-                            t_code = tool_item.get('code')
-                            req_qty = int(tool_item.get('quantity', 1))
-                        else:
-                            t_code = str(tool_item)
-                            req_qty = 1
-
-                        if not t_code:
-                            continue
-
-                        tool_obj = Tool.objects.select_for_update().filter(tenant=tenant, code=t_code, is_active=True).first()
-                        if tool_obj:
-                            if tool_obj.available_quantity < req_qty:
-                                raise ValidationError(
-                                    f"Dụng cụ '{tool_obj.name}' ({t_code}) không đủ số lượng khả dụng (yêu cầu: {req_qty}, hiện có: {tool_obj.available_quantity})."
-                                )
-                            inst_list = list(ToolInstance.objects.filter(tool=tool_obj, tenant=tenant, status='AVAILABLE')[:req_qty])
-                            first_inst = inst_list[0] if inst_list else None
-                            ToolReservation.objects.create(
-                                tenant=tenant,
-                                tool=tool_obj,
-                                tool_instance=first_inst,
-                                work_order=wo,
-                                reserved_quantity=req_qty,
-                                status='RESERVED'
-                            )
-                            tool_obj.available_quantity -= req_qty
-                            tool_obj.save()
-                            for inst in inst_list:
-                                inst.status = 'IN_USE'
-                                inst.save()
 
                 # Dispatch notification
                 try:
@@ -489,6 +453,62 @@ class HungarianAssignmentService:
                     "slotRole": role,
                     "status": wo.status
                 })
+
+            # Tool Reservation Concurrency Handling (Once per WorkOrder, even for crew tasks)
+            if wo.required_tools and isinstance(wo.required_tools, list):
+                from django.db.models import Q
+                from assets.models import Tool, ToolReservation, ToolInstance
+                for tool_item in wo.required_tools:
+                    if isinstance(tool_item, dict):
+                        t_code = tool_item.get('code')
+                        req_qty = int(tool_item.get('quantity', 1))
+                    else:
+                        t_code = str(tool_item)
+                        req_qty = 1
+
+                    if not t_code or req_qty <= 0:
+                        continue
+
+                    tool_obj = Tool.objects.select_for_update().filter(tenant=tenant, code=t_code, is_active=True).first()
+                    if tool_obj:
+                        if tool_obj.available_quantity < req_qty:
+                            raise ValidationError(
+                                f"Dụng cụ '{tool_obj.name}' ({t_code}) không đủ số lượng khả dụng (yêu cầu: {req_qty}, hiện có: {tool_obj.available_quantity})."
+                            )
+                        has_tracked_instances = ToolInstance.objects.filter(tool=tool_obj, tenant=tenant).exists()
+                        if has_tracked_instances:
+                            inst_list = list(
+                                ToolInstance.objects.select_for_update()
+                                .filter(tool=tool_obj, tenant=tenant, status='AVAILABLE')
+                                .exclude(inspection_status='EXPIRED')
+                                .filter(Q(calibration_due_date__isnull=True) | Q(calibration_due_date__gte=now.date()))[:req_qty]
+                            )
+                            if len(inst_list) < req_qty:
+                                raise ValidationError(
+                                    f"Dụng cụ '{tool_obj.name}' ({t_code}) không đủ thiết bị đạt chuẩn hiệu chuẩn khả dụng (yêu cầu: {req_qty}, đạt chuẩn khả dụng: {len(inst_list)})."
+                                )
+                            for inst in inst_list:
+                                ToolReservation.objects.create(
+                                    tenant=tenant,
+                                    tool=tool_obj,
+                                    tool_instance=inst,
+                                    work_order=wo,
+                                    reserved_quantity=1,
+                                    status='RESERVED'
+                                )
+                                inst.status = 'IN_USE'
+                                inst.save(update_fields=['status', 'updated_at'])
+                        else:
+                            ToolReservation.objects.create(
+                                tenant=tenant,
+                                tool=tool_obj,
+                                tool_instance=None,
+                                work_order=wo,
+                                reserved_quantity=req_qty,
+                                status='RESERVED'
+                            )
+                        tool_obj.available_quantity -= req_qty
+                        tool_obj.save(update_fields=['available_quantity', 'updated_at'])
 
         return {
             "appliedCount": len(applied_list),

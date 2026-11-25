@@ -492,3 +492,115 @@ class HungarianAssignmentTestCase(TestCase):
         cost_a_to_b = matrix[idx_a][0]
         self.assertGreaterEqual(cost_a_to_b, 1000000.0)
 
+    def test_crew_task_reserves_tools_once_and_rejects_expired_calibration(self):
+        """
+        Regression test:
+        1. Crew task (LEAD + ASSIST) chỉ đặt chỗ dụng cụ 1 lần cho WorkOrder, không bị nhân đôi.
+        2. ToolInstance hết hạn hiệu chuẩn (EXPIRED hoặc calibration_due_date < today) không được phân công.
+        3. Nhiều ToolInstance được đặt chỗ sẽ được tạo ToolReservation riêng biệt và giải phóng đầy đủ khi hủy.
+        """
+        from assets.models import Tool, ToolInstance, ToolReservation
+        from workorders.services import WorkOrderTransitionService
+        from django.core.exceptions import ValidationError
+        from datetime import timedelta
+
+        u_lead, _ = self._create_tech("tech_crew_lead", skill_level=5)
+        u_asst, _ = self._create_tech("tech_crew_asst", skill_level=3)
+
+        tool = Tool.objects.create(
+            tenant=self.tenant_a,
+            code="TORQUE-01",
+            name="Cờ lê lực",
+            available_quantity=2,
+            is_active=True,
+        )
+        inst_valid = ToolInstance.objects.create(
+            tenant=self.tenant_a,
+            tool=tool,
+            serial_number="SN-VALID-1",
+            inspection_status="PASSED",
+            calibration_due_date=timezone.now().date() + timedelta(days=30),
+            status="AVAILABLE",
+        )
+        inst_expired = ToolInstance.objects.create(
+            tenant=self.tenant_a,
+            tool=tool,
+            serial_number="SN-EXPIRED-1",
+            inspection_status="EXPIRED",
+            calibration_due_date=timezone.now().date() - timedelta(days=1),
+            status="AVAILABLE",
+        )
+
+        wo_crew = self._create_wo(
+            "Crew Overhaul Task",
+            is_crew=True,
+            min_level=4,
+            tools=[{"code": "TORQUE-01", "quantity": 1}],
+        )
+
+        res = HungarianAssignmentService.apply(
+            tenant=self.tenant_a,
+            assignments_data=[
+                {"workOrderId": str(wo_crew.id), "technicianId": str(u_lead.id), "slotRole": "LEAD"},
+                {"workOrderId": str(wo_crew.id), "technicianId": str(u_asst.id), "slotRole": "ASSIST"},
+            ],
+        )
+        self.assertEqual(res["appliedCount"], 2)
+
+        tool.refresh_from_db()
+        inst_valid.refresh_from_db()
+        inst_expired.refresh_from_db()
+        self.assertEqual(tool.available_quantity, 1)
+        self.assertEqual(ToolReservation.objects.filter(work_order=wo_crew, status="RESERVED").count(), 1)
+        self.assertEqual(inst_valid.status, "IN_USE")
+        self.assertEqual(inst_expired.status, "AVAILABLE")
+
+        # Second WO requiring TORQUE-01 must fail because only expired instance remains
+        wo_next = self._create_wo(
+            "Second Task Needs Torque",
+            min_level=2,
+            tools=[{"code": "TORQUE-01", "quantity": 1}],
+        )
+        u_solo, _ = self._create_tech("tech_solo_torque", skill_level=3)
+        with self.assertRaises(ValidationError):
+            HungarianAssignmentService.apply(
+                tenant=self.tenant_a,
+                assignments_data=[
+                    {"workOrderId": str(wo_next.id), "technicianId": str(u_solo.id), "slotRole": "SOLO"},
+                ],
+            )
+
+        # Cancel crew WO -> releases valid instance & restores quantity
+        WorkOrderTransitionService.cancel_work_order_reservations(wo_crew)
+        tool.refresh_from_db()
+        inst_valid.refresh_from_db()
+        self.assertEqual(tool.available_quantity, 2)
+        self.assertEqual(inst_valid.status, "AVAILABLE")
+
+    def test_preview_crew_dict_tools_no_500_and_no_double_conflict(self):
+        """
+        Regression test for Portal live E2E catch:
+        detect_shared_tool_conflicts must handle dict items ({"code": ..., "quantity": 1})
+        and must not double-count LEAD + ASSIST crew slots on the same WorkOrder.
+        """
+        u_lead, _ = self._create_tech("tech_prev_lead", skill_level=5)
+        u_asst, _ = self._create_tech("tech_prev_asst", skill_level=3)
+        Tool.objects.create(
+            tenant=self.tenant_a,
+            code="TORQUE-DICT-01",
+            name="Precision Torque",
+            available_quantity=1,
+            is_active=True,
+        )
+        wo_crew = self._create_wo(
+            "Crew Preview Dict Tool",
+            is_crew=True,
+            min_level=4,
+            tools=[{"code": "TORQUE-DICT-01", "quantity": 1}],
+        )
+
+        preview = HungarianAssignmentService.preview(tenant=self.tenant_a, work_order_ids=[wo_crew.id])
+        self.assertEqual(preview["assignmentsCount"], 2)
+        self.assertEqual(preview["sharedToolConflicts"], [])
+
+

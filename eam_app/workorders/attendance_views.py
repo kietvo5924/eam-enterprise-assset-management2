@@ -59,6 +59,12 @@ class BiometricEnrollView(APIView):
                     "error": "Không tìm thấy người dùng được chỉ định."
                 }, status=status.HTTP_404_NOT_FOUND)
 
+            if not request.user.is_superuser and str(target_user.tenant_id) != str(request.user.tenant_id):
+                return Response({
+                    "success": False,
+                    "error": "Không có quyền đăng ký sinh trắc học cho nhân viên thuộc đơn vị khác."
+                }, status=status.HTTP_403_FORBIDDEN)
+
             # Phân quyền: Chỉ Quản đốc/Quản trị viên hoặc chính chủ mới được đăng ký hồ sơ khuôn mặt
             if target_user.id != request.user.id:
                 is_admin_or_mgr = (
@@ -148,6 +154,12 @@ class AttendanceCheckInView(APIView):
                 "success": False,
                 "error": "Không tìm thấy Work Order."
             }, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.is_superuser and str(wo.tenant_id) != str(request.user.tenant_id):
+            return Response({
+                "success": False,
+                "error": "Không có quyền truy cập phiếu công việc của đơn vị khác."
+            }, status=status.HTTP_403_FORBIDDEN)
 
         technician = request.user
 
@@ -410,6 +422,12 @@ class AttendanceVerifyPresenceView(APIView):
                 "success": False,
                 "error": "Không tìm thấy Work Order."
             }, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.is_superuser and str(wo.tenant_id) != str(request.user.tenant_id):
+            return Response({
+                "success": False,
+                "error": "Không có quyền truy cập phiếu công việc của đơn vị khác."
+            }, status=status.HTTP_403_FORBIDDEN)
 
         # Phân quyền: Chỉ kỹ thuật viên được giao việc mới có quyền xác thực hiện diện cho phiếu
         if wo.assigned_to_id and wo.assigned_to_id != request.user.id:

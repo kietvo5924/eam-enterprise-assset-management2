@@ -73,6 +73,16 @@ def evaluate_triggers():
                     continue
                     
             with transaction.atomic():
+                assignment = PmPlanAssignment.all_objects.select_for_update().filter(id=assignment.id, status='ACTIVE').first()
+                if not assignment:
+                    continue
+                if pm_plan.suppress_if_pending:
+                    has_pending = WorkOrder.objects.filter(
+                        source_reference=source_reference
+                    ).exclude(status__in=['COMPLETED', 'CANCELLED']).exists()
+                    if has_pending:
+                        continue
+
                 # Update assignment
                 assignment.last_triggered_at = next_due_date
                 if pm_plan.trigger_type in ['METER', 'USAGE']:
@@ -133,49 +143,54 @@ def evaluate_triggers():
                     )
                     
                 # Create Materials
+                from decimal import Decimal
+                from assets.models import StockTransaction
                 for pm in pm_plan.materials.all():
-                    part = pm.spare_part
-                    req_qty = pm.quantity
-                    
+                    part = SparePart.all_objects.select_for_update().filter(id=pm.spare_part_id).first()
+                    if not part:
+                        continue
+                    req_qty = Decimal(str(pm.quantity))
+                    if req_qty <= Decimal('0'):
+                        continue
+
+                    deducted_qty = Decimal('0')
                     if part.quantity_in_stock is not None:
-                        # Prevent negative stock, but still create material requirement
+                        # Prevent negative stock: only deduct when sufficient stock is available
                         if part.quantity_in_stock >= req_qty:
                             part.quantity_in_stock -= req_qty
-                            part.save()
+                            part.save(update_fields=['quantity_in_stock'])
+                            deducted_qty = req_qty
                         else:
-                            logger.warning(f"Not enough stock for {part.name} in PM {pm_plan.name}")
-                            # In a real system, you might create a purchase request or backorder here
-                            # We'll just deduct what we can or leave it. We'll leave it as is to simulate deducting
-                            part.quantity_in_stock -= req_qty
-                            part.save()
-                            
+                            logger.warning(f"Not enough stock for {part.name} in PM {pm_plan.name} (available={part.quantity_in_stock}, required={req_qty})")
+
                         # Check low-stock warning
                         notify_spare_part_low_stock(part)
-                            
-                    from decimal import Decimal
-                    from assets.models import StockTransaction
-                    unit_c = part.unit_cost or Decimal('0.00')
-                    pm_mat_cost = (Decimal(str(req_qty)) * unit_c).quantize(Decimal('0.01'))
+                    else:
+                        deducted_qty = req_qty
 
-                    WorkOrderMaterial.objects.create(
-                        tenant_id=assignment.tenant_id,
-                        work_order=wo,
-                        spare_part=part,
-                        quantity=req_qty,
-                        actual_cost=pm_mat_cost
-                    )
-                    cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
-                    StockTransaction.all_objects.create(
-                        tenant=wo.tenant,
-                        spare_part=part,
-                        work_order=wo,
-                        transaction_type='ISSUE',
-                        quantity=req_qty,
-                        unit_price=unit_c,
-                        total_amount=pm_mat_cost,
-                        cost_center_snapshot=cost_center_str,
-                        issue_date=timezone.now(),
-                        is_variance_adjustment=False
-                    )
+                    if deducted_qty > Decimal('0'):
+                        unit_c = part.unit_cost or Decimal('0.00')
+                        pm_mat_cost = (deducted_qty * unit_c).quantize(Decimal('0.01'))
+
+                        WorkOrderMaterial.objects.create(
+                            tenant_id=assignment.tenant_id,
+                            work_order=wo,
+                            spare_part=part,
+                            quantity=deducted_qty,
+                            actual_cost=pm_mat_cost
+                        )
+                        cost_center_str = wo.incident_location.name if wo.incident_location else (wo.asset.location.name if wo.asset and wo.asset.location else '')
+                        StockTransaction.all_objects.create(
+                            tenant=wo.tenant,
+                            spare_part=part,
+                            work_order=wo,
+                            transaction_type='ISSUE',
+                            quantity=deducted_qty,
+                            unit_price=unit_c,
+                            total_amount=pm_mat_cost,
+                            cost_center_snapshot=cost_center_str,
+                            issue_date=timezone.now(),
+                            is_variance_adjustment=False
+                        )
                 
                 logger.info(f"Created PM Work Order {wo.id} from Plan {pm_plan.id}")
