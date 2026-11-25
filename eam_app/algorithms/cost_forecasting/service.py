@@ -4,6 +4,7 @@ Tích hợp ORM, đóng băng chi phí bất biến, liên kết cảnh báo b�
 """
 import calendar
 import datetime
+import uuid
 from decimal import Decimal
 from typing import Dict, List, Optional, Any
 
@@ -395,7 +396,11 @@ class CostForecastingService:
         )
         lemon_assets_list = lemon_data.get("lemonAssets", [])
 
-        budget_forecast = BudgetForecast.all_objects.create(
+        # Chỉ khởi tạo đối tượng tính toán tức thời in-memory cho GET request,
+        # tuyệt đối KHÔNG ghi (create) vào database để đảm bảo tính an toàn / idempotency của HTTP GET
+        # và ngăn chặn Baseline Data Drift khi người dùng xem trang dự báo.
+        budget_forecast = BudgetForecast(
+            id=uuid.uuid4(),
             tenant=tenant,
             cost_center_snapshot=cost_center,
             forecast_period=period,
@@ -419,7 +424,9 @@ class CostForecastingService:
             evaluation_metrics=forecast_result.get("evaluationMetrics", {}),
             is_ai_fallback=forecast_result["isAiFallback"],
             fallback_reason=forecast_result.get("fallbackReason"),
-            is_manually_approved=forecast_result.get("isManuallyApproved", False)
+            is_manually_approved=forecast_result.get("isManuallyApproved", False),
+            created_at=timezone.now(),
+            updated_at=timezone.now()
         )
         return budget_forecast
 

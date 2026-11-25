@@ -3186,6 +3186,14 @@ def portal_cost_forecasting(request):
     return render(request, 'cost_forecasting.html', context)
 
 
+def portal_work_order_redirect(request, wo_id):
+    return redirect(f"/portal/work-orders/?id={wo_id}")
+
+
+def portal_asset_redirect(request, asset_id):
+    return redirect(f"/portal/assets/?assetId={asset_id}")
+
+
 def portal_notifications(request):
     if not request.user.is_authenticated:
         return redirect('portal_login')

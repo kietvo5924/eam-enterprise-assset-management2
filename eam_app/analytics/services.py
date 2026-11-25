@@ -180,16 +180,20 @@ class ReliabilityMetricsService:
     FAILURE_TYPES = ['CORRECTIVE', 'EMERGENCY', 'BREAKDOWN']
 
     @classmethod
-    def calculate_reliability(cls, tenant, total_active_assets: int, period_days: int = 30) -> dict:
+    def calculate_reliability(cls, tenant, total_active_assets: int, period_days: int = 30, start_date=None, end_date=None) -> dict:
         now = timezone.now()
-        start_date = now - timedelta(days=period_days)
+        if start_date is None:
+            start_date = now - timedelta(days=period_days)
+        if end_date is None:
+            end_date = now
 
         # Rule 2: Strictly EXCLUDE Preventive Maintenance ('PREVENTIVE')
         # Only technical failure work orders in period
         failure_wos = WorkOrder.all_objects.filter(
             tenant=tenant,
             type__in=cls.FAILURE_TYPES,
-            created_at__gte=start_date
+            created_at__gte=start_date,
+            created_at__lte=end_date
         )
         n_failures = failure_wos.count()
 
@@ -197,7 +201,8 @@ class ReliabilityMetricsService:
         ongoing_wos_count = WorkOrder.all_objects.filter(
             tenant=tenant,
             type__in=cls.FAILURE_TYPES,
-            status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS']
+            status__in=['CREATED', 'ASSIGNED', 'IN_PROGRESS'],
+            created_at__lte=end_date
         ).count()
         down_assets_count = Asset.all_objects.filter(
             tenant=tenant,
@@ -211,7 +216,8 @@ class ReliabilityMetricsService:
             tenant=tenant,
             type__in=cls.FAILURE_TYPES,
             status='COMPLETED',
-            completed_at__gte=start_date
+            completed_at__gte=start_date,
+            completed_at__lte=end_date
         )
 
         valid_durations = []
@@ -271,17 +277,20 @@ class PMComplianceService:
     """
 
     @classmethod
-    def calculate_compliance(cls, tenant, period_days: int = 30) -> dict:
+    def calculate_compliance(cls, tenant, period_days: int = 30, start_date=None, end_date=None) -> dict:
         now = timezone.now()
-        start_date = now - timedelta(days=period_days)
+        if start_date is None:
+            start_date = now - timedelta(days=period_days)
+        if end_date is None:
+            end_date = now
 
         pm_due_qs = WorkOrder.all_objects.filter(
             tenant=tenant,
             type='PREVENTIVE'
         ).filter(
-            Q(deadline__gte=start_date, deadline__lte=now) |
-            Q(completed_at__gte=start_date, completed_at__lte=now) |
-            Q(created_at__gte=start_date, deadline__isnull=True)
+            Q(deadline__gte=start_date, deadline__lte=end_date) |
+            Q(completed_at__gte=start_date, completed_at__lte=end_date) |
+            Q(created_at__gte=start_date, created_at__lte=end_date, deadline__isnull=True)
         )
         total_due = pm_due_qs.count()
 
@@ -461,7 +470,7 @@ class ActivityFeedService:
             }
             title = TITLES.get(action, action.replace('_', ' ').title())
             desc = f"Ghi nhận biến động vận hành trên {entity} #{entity_id[:8]}."
-            link = f"/portal/work-orders/{entity_id}/" if 'WO' in action else f"/portal/assets/{entity_id}/"
+            link = f"/portal/work-orders/?id={entity_id}" if 'WO' in action else f"/portal/assets/?assetId={entity_id}"
             return {
                 "id": str(log.id),
                 "eventType": action,
@@ -482,7 +491,7 @@ class ActivityFeedService:
                     "description": f"Phiếu công việc mới đã được khởi tạo trên hệ thống.",
                     "timeAgo": cls._format_relative_time(ts, now),
                     "timestamp": ts.isoformat(),
-                    "link": f"/portal/work-orders/{entity_id}/"
+                    "link": f"/portal/work-orders/?id={entity_id}"
                 }
             elif action == 'UPDATE':
                 return {
@@ -492,7 +501,7 @@ class ActivityFeedService:
                     "description": f"Tiến độ công việc đã được ghi nhận.",
                     "timeAgo": cls._format_relative_time(ts, now),
                     "timestamp": ts.isoformat(),
-                    "link": f"/portal/work-orders/{entity_id}/"
+                    "link": f"/portal/work-orders/?id={entity_id}"
                 }
 
         if entity == 'Asset' and action == 'UPDATE':
@@ -503,7 +512,7 @@ class ActivityFeedService:
                 "description": f"Biến động trạng thái vận hành thiết bị được ghi nhận.",
                 "timeAgo": cls._format_relative_time(ts, now),
                 "timestamp": ts.isoformat(),
-                "link": f"/portal/assets/{entity_id}/"
+                "link": f"/portal/assets/?assetId={entity_id}"
             }
 
         # Ignore noise: user, role, permission, password, session
@@ -535,7 +544,7 @@ class ActivityFeedService:
                 "description": desc,
                 "timeAgo": cls._format_relative_time(wo.updated_at or wo.created_at, now),
                 "timestamp": (wo.updated_at or wo.created_at).isoformat(),
-                "link": f"/portal/work-orders/{wo.id}/"
+                "link": f"/portal/work-orders/?id={wo.id}"
             })
         return acts
 
@@ -676,7 +685,10 @@ class DashboardCacheService:
 
         # 4. Reliability (MTBF, MTTR, Plant Availability)
         reliability = ReliabilityMetricsService.calculate_reliability(
-            tenant, total_active_assets, period_days=30
+            tenant, total_active_assets, period_days=30, start_date=start_30d, end_date=now
+        )
+        prev_reliability = ReliabilityMetricsService.calculate_reliability(
+            tenant, prev_assets_count or total_active_assets, period_days=30, start_date=start_60d, end_date=start_30d
         )
 
         # Availability delta
@@ -686,14 +698,27 @@ class DashboardCacheService:
                 avail_num = float(reliability["plantAvailability"].replace('%', ''))
             except ValueError:
                 avail_num = 100.0
+
+        prev_avail_num = 100.0
+        if prev_reliability["plantAvailability"]:
+            try:
+                prev_avail_num = float(prev_reliability["plantAvailability"].replace('%', ''))
+            except ValueError:
+                prev_avail_num = 100.0
+
         avail_delta = calculate_safe_delta(
-            avail_num, 98.0, is_percentage=True, higher_is_better=True, default_label="so với tháng trước"
+            avail_num, prev_avail_num, is_percentage=True, higher_is_better=True, default_label="so với tháng trước"
         )
 
         # 5. PM Compliance Rate
-        pm_compliance = PMComplianceService.calculate_compliance(tenant, period_days=30)
+        pm_compliance = PMComplianceService.calculate_compliance(
+            tenant, period_days=30, start_date=start_30d, end_date=now
+        )
+        prev_pm_compliance = PMComplianceService.calculate_compliance(
+            tenant, period_days=30, start_date=start_60d, end_date=start_30d
+        )
         pm_delta = calculate_safe_delta(
-            pm_compliance["rate"], 90.0, is_percentage=True, higher_is_better=True, default_label="so với tháng trước"
+            pm_compliance["rate"], prev_pm_compliance["rate"], is_percentage=True, higher_is_better=True, default_label="so với tháng trước"
         )
 
         return {

@@ -31,7 +31,7 @@
                 <option value="">Tất cả trạng thái</option>
                 <option value="OPERATIONAL">Đang hoạt động</option>
                 <option value="MAINTENANCE">Bảo trì</option>
-                <option value="BROKEN">Hỏng hóc</option>
+                <option value="DOWN">Hỏng hóc</option>
                 <option value="DECOMMISSIONED">Thanh lý</option>
                 <option value="RESERVED">Dự trữ</option>
               </select>
@@ -750,7 +750,7 @@
           <option value="">Tất cả trạng thái</option>
           <option value="OPERATIONAL">Đang hoạt động</option>
           <option value="MAINTENANCE">Bảo trì</option>
-          <option value="BROKEN">Hỏng hóc</option>
+          <option value="DOWN">Hỏng hóc</option>
           <option value="DECOMMISSIONED">Thanh lý</option>
           <option value="RESERVED">Dự trữ</option>
         </select>
@@ -1606,8 +1606,8 @@
           matchingAssets.add(el);
           el.style.display = 'flex';
           
-          // If searching, auto-expand ancestors
-          if (search) {
+          // If searching or filtering, auto-expand ancestors
+          if (search || status || category) {
             let parentNode = el.closest('.tree-node');
             while (parentNode) {
               const nodeId = parentNode.getAttribute('data-node-id') || 'unassigned';
@@ -1629,7 +1629,7 @@
       }
     });
     
-    if (search) {
+    if (search || status || category) {
        localStorage.setItem('assetTreeExpandedNodes', JSON.stringify(expandedNodes));
     }
 
@@ -1874,9 +1874,13 @@
     .then(resData => {
       if (resData.success) {
         currentHistoryData = resData.data
-          .filter(e => e.eventType === 'WORK_ORDER' && (e.status === 'COMPLETED' || e.status === 'CANCELLED'))
+          .filter(e => e.eventType === 'WORK_ORDER')
           .map(e => e.originalData)
-          .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
+          .sort((a, b) => {
+            const dateA = new Date(a.completedAt || a.completed_at || a.actualStartTime || a.actual_start_time || a.deadline || a.created_at || a.updated_at).getTime();
+            const dateB = new Date(b.completedAt || b.completed_at || b.actualStartTime || b.actual_start_time || b.deadline || b.created_at || b.updated_at).getTime();
+            return dateB - dateA;
+          });
         renderHistory();
       }
     })
@@ -1888,7 +1892,8 @@
     const filtered = currentHistoryData.filter(wo => {
       const matchTitle = wo.title && wo.title.toLowerCase().includes(term);
       const matchId = wo.id && String(wo.id).toLowerCase().includes(term);
-      return matchTitle || matchId;
+      const matchCode = wo.code && String(wo.code).toLowerCase().includes(term);
+      return matchTitle || matchId || matchCode;
     });
 
     const empty = document.getElementById('history-empty-state');
@@ -1903,37 +1908,96 @@
       
       let html = '';
       filtered.forEach(wo => {
-        const date = new Date(wo.updated_at || wo.created_at);
+        const rawDate = wo.completedAt || wo.completed_at || wo.actualStartTime || wo.actual_start_time || wo.deadline || wo.created_at;
+        const date = rawDate ? new Date(rawDate) : new Date();
         const dateStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' ' + date.toLocaleDateString('en-GB');
-        const shortId = wo.id.split('-')[0].toUpperCase();
-        const isCompleted = wo.status === 'COMPLETED';
-        const color = isCompleted ? 'green' : 'red';
-        const icon = isCompleted ? 'ph-check-circle' : 'ph-x-circle';
+        const woCode = wo.code || (wo.id ? `#${wo.id.split('-')[0].toUpperCase()}` : '#WO');
         
+        const isCompleted = wo.status === 'COMPLETED';
+        const isCancelled = wo.status === 'CANCELLED';
+        const isInProgress = wo.status === 'IN_PROGRESS';
+        const isOnHold = wo.status === 'ON_HOLD';
+        const isAssigned = wo.status === 'ASSIGNED';
+
+        let color = 'emerald';
+        let icon = 'ph-check-circle';
+        let statusBadge = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+        if (isCompleted) {
+          color = 'emerald';
+          icon = 'ph-check-circle';
+          statusBadge = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+        } else if (isCancelled) {
+          color = 'rose';
+          icon = 'ph-x-circle';
+          statusBadge = 'bg-rose-100 text-rose-800 border-rose-200';
+        } else if (isInProgress) {
+          color = 'blue';
+          icon = 'ph-gear';
+          statusBadge = 'bg-blue-100 text-blue-800 border-blue-200';
+        } else if (isOnHold) {
+          color = 'amber';
+          icon = 'ph-pause-circle';
+          statusBadge = 'bg-amber-100 text-amber-800 border-amber-200';
+        } else if (isAssigned) {
+          color = 'cyan';
+          icon = 'ph-user-check';
+          statusBadge = 'bg-cyan-100 text-cyan-800 border-cyan-200';
+        } else {
+          color = 'purple';
+          icon = 'ph-clock';
+          statusBadge = 'bg-purple-100 text-purple-800 border-purple-200';
+        }
+
+        const typeBadge = wo.type === 'PREVENTIVE' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                          wo.type === 'EMERGENCY' ? 'bg-red-50 text-red-700 border-red-200' :
+                          'bg-amber-50 text-amber-700 border-amber-200';
+
+        const priorityBadge = wo.priority === 'URGENT' ? 'text-red-600' :
+                              wo.priority === 'HIGH' ? 'text-orange-600' :
+                              'text-neutral-500';
+
+        const assigneeText = wo.assigneeName || (wo.assignee ? wo.assignee.username : null) || (wo.assignedTo ? 'KTV #' + wo.assignedTo.split('-')[0].toUpperCase() : 'Chưa giao');
+        const resNotes = wo.resolutionNotes || wo.resolution_notes;
+        const checklistsCount = wo.checklists && wo.checklists.length ? wo.checklists.length : 0;
+        const completedChecklistsCount = wo.checklists ? wo.checklists.filter(c => c.is_completed).length : 0;
+
         html += `
           <div class="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-primary/40 hover:shadow-md transition-all group">
-            <div class="flex items-center gap-4 flex-1 min-w-0">
-              <div class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 bg-${color}-50 text-${color}-600">
+            <div class="flex items-start gap-4 flex-1 min-w-0">
+              <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-${color}-50 text-${color}-600 border border-${color}-100 shadow-sm mt-0.5">
                 <i class="ph-fill ${icon} text-2xl"></i>
               </div>
               <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="font-black text-neutral-900 text-sm">#${shortId}</span>
-                  <span class="rounded font-bold border-0 text-[10px] tracking-widest px-1.5 py-0.5 bg-${color}-100 text-${color}-700 uppercase">${wo.status}</span>
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <a href="/portal/work-orders/?id=${wo.id}&q=${encodeURIComponent(woCode)}" target="_blank" class="font-black text-neutral-900 text-sm hover:text-primary transition-colors flex items-center gap-1 group-hover:text-primary">
+                    ${woCode}
+                    <i class="ph ph-arrow-up-right text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                  </a>
+                  <span class="rounded font-bold border text-[10px] tracking-wider px-2 py-0.5 ${statusBadge} uppercase">${wo.status}</span>
+                  <span class="rounded font-bold border text-[10px] px-2 py-0.5 ${typeBadge} uppercase">${wo.type || 'CORRECTIVE'}</span>
+                  <span class="text-[11px] font-bold ${priorityBadge} flex items-center gap-0.5">
+                    <i class="ph-fill ph-flag"></i> ${wo.priority || 'MEDIUM'}
+                  </span>
                 </div>
-                <p class="font-bold text-neutral-800 text-base truncate" title="${wo.title}">${wo.title}</p>
+                <p class="font-bold text-neutral-800 text-base leading-snug truncate" title="${wo.title}">${wo.title}</p>
+                ${resNotes ? `<p class="text-xs text-neutral-500 mt-1 line-clamp-2 italic bg-neutral-50 p-2 rounded-lg border border-neutral-100"><i class="ph-bold ph-note-pencil text-primary"></i> ${resNotes}</p>` : ''}
+                ${checklistsCount > 0 ? `<div class="flex items-center gap-2 mt-2 text-[11px] font-semibold text-neutral-500"><i class="ph-fill ph-check-square text-emerald-600"></i> Checklist: ${completedChecklistsCount}/${checklistsCount} tiêu chuẩn hoàn thành</div>` : ''}
               </div>
             </div>
             <div class="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-neutral-100 pt-3 sm:pt-0 sm:pl-4">
               <div class="flex items-center gap-1.5 text-xs text-neutral-500 font-medium">
                 <i class="ph ph-calendar-blank text-neutral-400"></i> ${dateStr}
               </div>
-              <div class="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 bg-neutral-50 px-2.5 py-1.5 rounded-lg border border-neutral-100 shadow-sm">
-                <span class="w-5 h-5 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-500 overflow-hidden">
+              <div class="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 bg-neutral-50 px-2.5 py-1.5 rounded-lg border border-neutral-100 shadow-sm">
+                <span class="w-5 h-5 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600 overflow-hidden">
                   <i class="ph-fill ph-user text-[10px]"></i>
                 </span>
-                ${wo.assignedTo ? 'Đã giao (ID: ' + wo.assignedTo.split('-')[0].toUpperCase() + ')' : 'Chưa gán'}
+                ${assigneeText}
               </div>
+              <a href="/portal/work-orders/?q=${encodeURIComponent(woCode)}" target="_blank" class="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline mt-1">
+                Xem phiếu <i class="ph-bold ph-arrow-right text-[10px]"></i>
+              </a>
             </div>
           </div>
         `;
@@ -2795,6 +2859,17 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
+    const statusParam = params.get('status');
+    if (statusParam) {
+      const selectEl = document.getElementById('filter-status');
+      if (selectEl) {
+        const mappedStatus = statusParam.includes('OPERAT') ? 'OPERATIONAL' :
+                             statusParam.includes('MAINT') ? 'MAINTENANCE' :
+                             statusParam.includes('DOWN') ? 'DOWN' : statusParam;
+        selectEl.value = mappedStatus;
+        if (typeof applyFilters === 'function') applyFilters();
+      }
+    }
     let targetAssetId = params.get('assetId');
     if (!targetAssetId) {
       // If no assetId in URL, auto select on desktop screens only (keep tree view on mobile/tablet)

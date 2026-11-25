@@ -56,5 +56,12 @@ scripts/firmware/esp32_asset_beacon/
 # Demo rehearsal artifacts and recordings
 demo_results/
 
+# Backups and Demo Dumps
+backups/
+*.dump
+
+# QA comparison artifacts
+docs/QA_COMPARISON/
+
 
 

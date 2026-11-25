@@ -7,6 +7,8 @@ from assets.models import MeterReading
 
 @receiver(post_save, sender=WorkOrder)
 def on_work_order_completed(sender, instance, **kwargs):
+    if kwargs.get('raw'):
+        return
     """
     Post-Repair Window Reset Guardrail.
     Chỉ khi WorkOrder hoàn thành là loại CORE_REPLACEMENT (đại tu / thay thế cụm cốt lõi)

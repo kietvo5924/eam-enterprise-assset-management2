@@ -166,7 +166,7 @@
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="IN_PROGRESS" checked onchange="filterTable()"> Đang xử lý</label>
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="ON_HOLD" checked onchange="filterTable()"> Tạm dừng (On Hold)</label>
                     <label class="flex items-center gap-2 mb-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="COMPLETED" checked onchange="filterTable()"> Hoàn tất</label>
-                    <label class="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CANCELED" checked onchange="filterTable()"> Đã hủy</label>
+                    <label class="flex items-center gap-2 text-xs font-medium text-neutral-700 cursor-pointer"><input type="checkbox" class="status-cb" value="CANCELLED" checked onchange="filterTable()"> Đã hủy</label>
                 </div>
             </th>
             <th class="px-4 py-3 font-semibold">Người thực hiện</th>
@@ -179,7 +179,7 @@
           <tbody class="divide-y divide-neutral-100" id="wo-tbody">
             {% for item in work_orders_data %}
             {% with wo=item.wo checklists_json=item.checklists_json follow_ups_count=item.follow_ups_count %}
-            <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-id="{{ wo.id }}" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
+            <tr class="hover:bg-neutral-50/50 transition-colors group wo-row" data-id="{{ wo.id }}" data-code="{{ wo.code|default:''|lower }}" data-title="{{ wo.title|lower }}" data-asset="{{ wo.asset.name|lower|default:'' }}" data-status="{{ wo.status }}" data-priority="{{ wo.priority }}">
               <td class="px-3 py-3 text-center">
                 <input type="checkbox" class="wo-select-cb rounded text-primary focus:ring-primary cursor-pointer" value="{{ wo.id }}" data-status="{{ wo.status }}" data-title="{{ wo.title|escapejs }}" {% if 'work_order:reassign' in user_permissions and wo.status != 'CREATED' %}disabled title="Chỉ phiếu CREATED mới có thể phân công tự động"{% endif %}>
               </td>
@@ -2953,6 +2953,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       if(urlParams.has('page')) currentPage = parseInt(urlParams.get('page')) || 1;
       if(urlParams.has('q')) document.getElementById('searchInput').value = urlParams.get('q');
+      else if(urlParams.has('id')) document.getElementById('searchInput').value = urlParams.get('id');
       
       const statusParam = urlParams.get('status');
       if (statusParam) {
@@ -2979,14 +2980,29 @@
           }
       }
 
-      // Re-open work order detail if previously open before checklist update / action
-      const autoOpenWoId = sessionStorage.getItem('open_wo_id');
+      // Re-open work order detail if previously open before checklist update / action or passed via URL id
+      const autoOpenWoId = sessionStorage.getItem('open_wo_id') || urlParams.get('id');
       if (autoOpenWoId && !urlParams.has('create_pm')) {
           sessionStorage.removeItem('open_wo_id');
+          // If autoOpenWoId is passed, ensure target status is active so it's not filtered out
+          const targetRow = allWoRows.find(r => (r.dataset.id || '').toLowerCase() === autoOpenWoId.toLowerCase());
+          if (targetRow) {
+              const targetStatus = targetRow.dataset.status;
+              const cb = document.querySelector(`.status-cb[value="${targetStatus}"]`);
+              if (cb && !cb.checked) {
+                  cb.checked = true;
+                  filterTable();
+              }
+          }
           setTimeout(() => {
               const el = document.querySelector(`strong[onclick*="${autoOpenWoId}"]`) || document.querySelector(`tr[data-id="${autoOpenWoId}"] strong`) || document.querySelector(`button[onclick*="${autoOpenWoId}"]`);
-              if (el) el.click();
-          }, 150);
+              if (el) {
+                  el.click();
+              } else if (targetRow) {
+                  const strongEl = targetRow.querySelector('strong');
+                  if (strongEl) strongEl.click();
+              }
+          }, 200);
       }
 
       // Handle create_pm parameter from Condition Monitoring Anomaly Notification
@@ -3150,10 +3166,12 @@
     let filtered = allWoRows.filter(row => {
         const title = row.dataset.title || '';
         const asset = row.dataset.asset || '';
+        const rowId = (row.dataset.id || '').toLowerCase();
+        const rowCode = (row.dataset.code || '').toLowerCase();
         const rowStatus = row.dataset.status || '';
         const rowPriority = row.dataset.priority || '';
         
-        const matchSearch = title.includes(filter) || asset.includes(filter);
+        const matchSearch = title.includes(filter) || asset.includes(filter) || rowId.includes(filter) || rowCode.includes(filter);
         const matchStatus = activeStatuses.includes(rowStatus);
         const matchPriority = activePriorities.includes(rowPriority);
         
@@ -4207,6 +4225,7 @@
                      status === 'IN_PROGRESS' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
                      status === 'ON_HOLD' ? 'bg-amber-50 text-amber-700 border-amber-300' :
                      status === 'ASSIGNED' ? 'bg-cyan-50 text-cyan-600 border-cyan-200' :
+                     (status === 'CANCELLED' || status === 'CANCELED') ? 'bg-rose-50 text-rose-600 border-rose-200' :
                      'bg-blue-50 text-blue-600 border-blue-200';
       document.getElementById('detail-status').className = `px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap flex-shrink-0 ${sColor}`;
       

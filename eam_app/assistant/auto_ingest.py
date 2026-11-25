@@ -71,6 +71,8 @@ def sync_work_order_tacit_chunk(wo):
 
 @receiver(post_save, sender='workorders.WorkOrder')
 def work_order_post_save_sync(sender, instance, **kwargs):
+    if kwargs.get('raw'):
+        return
     sync_work_order_tacit_chunk(instance)
 
 

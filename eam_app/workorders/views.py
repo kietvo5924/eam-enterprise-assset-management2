@@ -1123,10 +1123,28 @@ class MaintenanceCalendarView(APIView):
         category_id = request.query_params.get('categoryId')
         status = request.query_params.get('status')
 
-        from django.utils.dateparse import parse_datetime
+        from django.utils.dateparse import parse_date, parse_datetime
+        from datetime import datetime as dt_cls
         
-        start_date = parse_datetime(start_date_str) if start_date_str else timezone.now().replace(day=1)
-        end_date = parse_datetime(end_date_str) if end_date_str else timezone.now()
+        if start_date_str:
+            parsed_dt = parse_datetime(start_date_str)
+            if not parsed_dt:
+                parsed_d = parse_date(start_date_str)
+                if parsed_d:
+                    parsed_dt = timezone.make_aware(dt_cls.combine(parsed_d, dt_cls.min.time()))
+            start_date = parsed_dt if parsed_dt else timezone.now().replace(day=1)
+        else:
+            start_date = timezone.now().replace(day=1)
+
+        if end_date_str:
+            parsed_dt = parse_datetime(end_date_str)
+            if not parsed_dt:
+                parsed_d = parse_date(end_date_str)
+                if parsed_d:
+                    parsed_dt = timezone.make_aware(dt_cls.combine(parsed_d, dt_cls.max.time()))
+            end_date = parsed_dt if parsed_dt else timezone.now()
+        else:
+            end_date = timezone.now()
 
         events = []
 
@@ -1141,11 +1159,13 @@ class MaintenanceCalendarView(APIView):
             
         wo_qs = wo_qs.filter(
             models.Q(deadline__range=(start_date, end_date)) | 
-            models.Q(deadline__isnull=True, created_at__range=(start_date, end_date))
+            models.Q(completed_at__range=(start_date, end_date)) |
+            models.Q(actual_start_time__range=(start_date, end_date)) |
+            models.Q(created_at__range=(start_date, end_date))
         )
 
         for wo in wo_qs:
-            event_date = wo.deadline if wo.deadline else wo.created_at
+            event_date = wo.completed_at or wo.actual_start_time or wo.deadline or wo.created_at
             events.append({
                 "id": str(wo.id),
                 "title": wo.title,
