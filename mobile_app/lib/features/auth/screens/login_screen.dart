@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../services/auth_service.dart';
@@ -276,8 +276,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscurePassword
-                                      ? PhosphorIcons.eyeSlash()
-                                      : PhosphorIcons.eye(),
+                                      ? PhosphorIconsRegular.eyeSlash
+                                      : PhosphorIconsRegular.eye,
                                   color: AppTheme.neutral400,
                                   size: 20,
                                 ),

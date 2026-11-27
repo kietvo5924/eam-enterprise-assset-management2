@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/assistant_message.dart';
 
@@ -35,7 +35,7 @@ class InventoryInterlockCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  PhosphorIcons.package(PhosphorIconsStyle.fill),
+                  PhosphorIconsFill.package,
                   size: 16,
                   color: AppTheme.primaryColor,
                 ),

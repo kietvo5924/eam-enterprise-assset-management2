@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -101,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: const Color(0xFF0F172A),
           elevation: 4,
           icon: Icon(
-            PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+            PhosphorIconsFill.sparkle,
             color: const Color(0xFF38BDF8),
             size: 18,
           ),
@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: IconButton(
                       icon: Icon(
-                        PhosphorIcons.bell(),
+                        PhosphorIconsRegular.bell,
                         color: AppTheme.neutral700,
                         size: 19,
                       ),
@@ -467,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         child: Icon(
-                          PhosphorIcons.navigationArrow(PhosphorIconsStyle.fill),
+                          PhosphorIconsFill.navigationArrow,
                           color: Colors.white,
                           size: 22,
                         ),
@@ -578,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 2),
                         Icon(
-                          PhosphorIcons.arrowRight(),
+                          PhosphorIconsRegular.arrowRight,
                           size: 13,
                           color: AppTheme.primaryColor,
                         ),
@@ -737,7 +737,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Row(
                   children: [
                     Icon(
-                      PhosphorIcons.mapPin(),
+                      PhosphorIconsRegular.mapPin,
                       size: 14,
                       color: AppTheme.neutral500,
                     ),

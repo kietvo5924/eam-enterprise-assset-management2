@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:go_router/go_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../work_orders/services/work_order_service.dart';
 
@@ -121,7 +121,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                     color: Colors.white.withValues(alpha: 0.5),
                   ),
                 ),
-                child: Icon(PhosphorIcons.x(), color: Colors.white, size: 24),
+                child: Icon(PhosphorIconsRegular.x, color: Colors.white, size: 24),
               ),
               onPressed: () => context.pop(),
             ),
@@ -157,12 +157,12 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                   switch (state.torchState) {
                     case TorchState.off:
                       return _buildFlashButton(
-                        icon: PhosphorIcons.flashlight(),
+                        icon: PhosphorIconsRegular.flashlight,
                         onPressed: () => controller.toggleTorch(),
                       );
                     case TorchState.on:
                       return _buildFlashButton(
-                        icon: PhosphorIcons.flashlight(PhosphorIconsStyle.fill),
+                        icon: PhosphorIconsFill.flashlight,
                         isActive: true,
                         onPressed: () => controller.toggleTorch(),
                       );

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -243,7 +243,7 @@ class _FloorplanViewerScreenState extends State<FloorplanViewerScreen>
                     ),
                     child: Center(
                       child: Icon(
-                        PhosphorIcons.cube(PhosphorIconsStyle.fill),
+                        PhosphorIconsFill.cube,
                         color: statusColor,
                         size: 28,
                       ),
@@ -297,10 +297,10 @@ class _FloorplanViewerScreenState extends State<FloorplanViewerScreen>
                     Row(
                       children: [
                         Expanded(
-                          child: _buildInfoItem('Phân xưởng', eq['zoneName'] ?? eq['zoneCode'] ?? 'Chung', PhosphorIcons.factory(PhosphorIconsStyle.regular)),
+                          child: _buildInfoItem('Phân xưởng', eq['zoneName'] ?? eq['zoneCode'] ?? 'Chung', PhosphorIconsRegular.factory),
                         ),
                         Expanded(
-                          child: _buildInfoItem('Tọa độ xưởng', 'X=${eq['coordsX'] ?? 0}m, Y=${eq['coordsY'] ?? 0}m', PhosphorIcons.navigationArrow(PhosphorIconsStyle.regular)),
+                          child: _buildInfoItem('Tọa độ xưởng', 'X=${eq['coordsX'] ?? 0}m, Y=${eq['coordsY'] ?? 0}m', PhosphorIconsRegular.navigationArrow),
                         ),
                       ],
                     ),
@@ -625,7 +625,7 @@ class _FloorplanViewerScreenState extends State<FloorplanViewerScreen>
                           ),
                           child: Row(
                             children: [
-                              Icon(PhosphorIcons.wifiSlash(PhosphorIconsStyle.bold), color: Colors.white, size: 18),
+                              Icon(PhosphorIconsBold.wifiSlash, color: Colors.white, size: 18),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(

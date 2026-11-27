@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -119,7 +119,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
         elevation: 0,
         titleSpacing: 0,
         leading: IconButton(
-          icon: Icon(PhosphorIcons.arrowLeft(), color: AppTheme.neutral900),
+          icon: Icon(PhosphorIconsRegular.arrowLeft, color: AppTheme.neutral900),
           onPressed: () => context.pop(),
         ),
         title: Row(
@@ -137,7 +137,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
               ),
               child: Center(
                 child: Icon(
-                  PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+                  PhosphorIconsFill.sparkle,
                   color: const Color(0xFF38BDF8),
                   size: 20,
                 ),
@@ -192,7 +192,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
         actions: [
           IconButton(
             tooltip: 'Xóa hội thoại',
-            icon: Icon(PhosphorIcons.trash(), color: AppTheme.neutral600, size: 20),
+            icon: Icon(PhosphorIconsRegular.trash, color: AppTheme.neutral600, size: 20),
             onPressed: () => _showClearConfirmation(context),
           ),
         ],
@@ -292,7 +292,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
             avatar: Icon(
-              PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+              PhosphorIconsFill.sparkle,
               size: 12,
               color: AppTheme.primaryColor,
             ),

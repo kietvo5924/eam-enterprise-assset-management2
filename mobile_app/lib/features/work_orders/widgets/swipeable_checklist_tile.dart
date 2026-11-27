@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 
 class SwipeableChecklistTile extends StatefulWidget {
@@ -94,7 +94,7 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                 },
                 backgroundColor: AppTheme.dangerColor,
                 foregroundColor: Colors.white,
-                icon: PhosphorIcons.trash(PhosphorIconsStyle.fill),
+                icon: PhosphorIconsFill.trash,
                 label: 'Xóa',
                 borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
               ),
@@ -141,7 +141,7 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                       ),
                     ),
                     child: _isCompleted
-                        ? Icon(PhosphorIcons.check(PhosphorIconsStyle.bold), color: Colors.white, size: 14)
+                        ? Icon(PhosphorIconsBold.check, color: Colors.white, size: 14)
                         : null,
                   ),
                 ),
@@ -301,7 +301,7 @@ class _SwipeableChecklistTileState extends State<SwipeableChecklistTile> {
                   if (_isCompleted)
                     Row(
                       children: [
-                        Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill), color: AppTheme.successColor, size: 16),
+                        Icon(PhosphorIconsFill.checkCircle, color: AppTheme.successColor, size: 16),
                         const SizedBox(width: 4),
                         const Text(
                           'ĐÃ XONG',

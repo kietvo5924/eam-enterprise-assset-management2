@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Tọa độ 2D của trạm dừng trên sơ đồ mặt bằng
 class RouteCoordinate {

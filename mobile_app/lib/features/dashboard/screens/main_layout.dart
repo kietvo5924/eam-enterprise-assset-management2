@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -68,7 +68,7 @@ class _MainLayoutState extends State<MainLayout> {
           },
           child: Center(
             child: Icon(
-              PhosphorIcons.qrCode(PhosphorIconsStyle.bold),
+              PhosphorIconsBold.qrCode,
               color: Colors.white,
               size: 28,
             ),
@@ -102,13 +102,13 @@ class _MainLayoutState extends State<MainLayout> {
             children: [
               _buildNavItem(
                 0,
-                PhosphorIcons.clipboardText(PhosphorIconsStyle.fill),
+                PhosphorIconsFill.clipboardText,
                 'Việc',
               ),
-              _buildNavItem(1, PhosphorIcons.calendar(PhosphorIconsStyle.fill), 'Lịch'),
+              _buildNavItem(1, PhosphorIconsFill.calendar, 'Lịch'),
               const SizedBox(width: 48), // Spacer for FAB
-              _buildNavItem(3, PhosphorIcons.cube(PhosphorIconsStyle.fill), 'Thiết bị'),
-              _buildNavItem(4, PhosphorIcons.user(PhosphorIconsStyle.fill), 'Tôi'),
+              _buildNavItem(3, PhosphorIconsFill.cube, 'Thiết bị'),
+              _buildNavItem(4, PhosphorIconsFill.user, 'Tôi'),
             ],
           ),
         ),
@@ -256,9 +256,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
                       child: Row(
                         children: [
                           Icon(
-                            PhosphorIcons.warningCircle(
-                              PhosphorIconsStyle.fill,
-                            ),
+                            PhosphorIconsFill.warningCircle,
                             color: AppTheme.dangerColor,
                             size: 20,
                           ),
@@ -627,13 +625,13 @@ class _ProfileScreenState extends State<_ProfileScreen> {
               child: Column(
                 children: [
                   _buildActionTile(
-                    icon: PhosphorIcons.lockKey(PhosphorIconsStyle.fill),
+                    icon: PhosphorIconsFill.lockKey,
                     title: 'Thay đổi mật khẩu',
                     onTap: _showChangePasswordDialog,
                   ),
                   const SizedBox(height: 12),
                   _buildActionTile(
-                    icon: PhosphorIcons.info(PhosphorIconsStyle.fill),
+                    icon: PhosphorIconsFill.info,
                     title: 'Thông tin phiên bản',
                     subtitle: 'EAM Mobile v1.0.0',
                     onTap: () {},
@@ -652,7 +650,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            PhosphorIcons.signOut(PhosphorIconsStyle.bold),
+                            PhosphorIconsBold.signOut,
                             color: AppTheme.dangerColor,
                             size: 20,
                           ),
@@ -738,7 +736,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
               ),
             ),
             Icon(
-              PhosphorIcons.caretRight(PhosphorIconsStyle.bold),
+              PhosphorIconsBold.caretRight,
               color: AppTheme.neutral400,
               size: 16,
             ),
@@ -906,7 +904,7 @@ class _ProfileScreenState extends State<_ProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(PhosphorIcons.certificate(PhosphorIconsStyle.fill), color: const Color(0xFF0284c7), size: 20),
+                      Icon(PhosphorIconsFill.certificate, color: const Color(0xFF0284c7), size: 20),
                       const SizedBox(width: 8),
                       const Text(
                         'CHỨNG CHỈ HÀNH NGHỀ',

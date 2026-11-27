@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/assistant_message.dart';
 
@@ -17,17 +17,17 @@ class LifeSafetyBanner extends StatelessWidget {
     final emergencyName = message.emergencyName ?? 'Sự Cố Nguy Cấp Hiện Trường';
     final actionSummary = message.actionSummary ?? 'NGỪNG THAO TÁC NGAY LẬP TỨC';
 
-    IconData hazardIcon = PhosphorIcons.siren(PhosphorIconsStyle.fill);
+    IconData hazardIcon = PhosphorIconsFill.siren;
     if (hazard.contains('ELECTRICAL') || hazard.contains('DIEN')) {
-      hazardIcon = PhosphorIcons.lightning(PhosphorIconsStyle.fill);
+      hazardIcon = PhosphorIconsFill.lightning;
     } else if (hazard.contains('GAS') || hazard.contains('TOXIC') || hazard.contains('KHI')) {
-      hazardIcon = PhosphorIcons.biohazard(PhosphorIconsStyle.fill);
+      hazardIcon = PhosphorIconsFill.biohazard;
     } else if (hazard.contains('MECHANICAL') || hazard.contains('CRUSH') || hazard.contains('KET')) {
-      hazardIcon = PhosphorIcons.handPalm(PhosphorIconsStyle.fill);
+      hazardIcon = PhosphorIconsFill.handPalm;
     } else if (hazard.contains('CHEMICAL') || hazard.contains('ACID') || hazard.contains('HOA_CHAT')) {
-      hazardIcon = PhosphorIcons.flask(PhosphorIconsStyle.fill);
+      hazardIcon = PhosphorIconsFill.flask;
     } else if (hazard.contains('FIRE') || hazard.contains('CHAY')) {
-      hazardIcon = PhosphorIcons.fire(PhosphorIconsStyle.fill);
+      hazardIcon = PhosphorIconsFill.fire;
     }
 
     return Container(
@@ -89,7 +89,7 @@ class LifeSafetyBanner extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
-                        PhosphorIcons.warningCircle(PhosphorIconsStyle.bold),
+                        PhosphorIconsBold.warningCircle,
                         color: AppTheme.dangerColor,
                         size: 20,
                       ),

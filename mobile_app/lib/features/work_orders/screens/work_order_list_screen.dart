@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
@@ -80,7 +80,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
         iconTheme: const IconThemeData(color: AppTheme.neutral900),
         actions: [
           IconButton(
-            icon: Icon(PhosphorIcons.navigationArrow(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+            icon: Icon(PhosphorIconsFill.navigationArrow, color: AppTheme.primaryColor),
             tooltip: 'Sơ đồ lộ trình KTV',
             onPressed: () => context.push('/technician-route'),
           ),
@@ -95,7 +95,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
                 }
               },
               backgroundColor: AppTheme.primaryColor,
-              child: Icon(PhosphorIcons.plus(), color: Colors.white),
+              child: Icon(PhosphorIconsRegular.plus, color: Colors.white),
             )
           : null,
       body: isLoading  
@@ -124,7 +124,7 @@ class _WorkOrderListScreenState extends State<WorkOrderListScreen> {
                         decoration: InputDecoration(
                           hintText: 'Tìm kiếm công việc, thiết bị...',
                           hintStyle: const TextStyle(color: AppTheme.neutral400, fontSize: 14),
-                          prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppTheme.neutral400),
+                          prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppTheme.neutral400),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),

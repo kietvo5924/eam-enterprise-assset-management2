@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 
 class OemTacitContentCard extends StatelessWidget {
@@ -69,7 +69,7 @@ class OemTacitContentCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(PhosphorIcons.bookOpen(PhosphorIconsStyle.fill), size: 16, color: const Color(0xFF0F172A)),
+                      Icon(PhosphorIconsFill.bookOpen, size: 16, color: const Color(0xFF0F172A)),
                       const SizedBox(width: 8),
                       const Text(
                         '1. HƯỚNG DẪN CHUẨN TỪ HÃNG (OEM MANUAL)',
@@ -112,7 +112,7 @@ class OemTacitContentCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(PhosphorIcons.lightbulb(PhosphorIconsStyle.fill), size: 16, color: const Color(0xFFB45309)),
+                      Icon(PhosphorIconsFill.lightbulb, size: 16, color: const Color(0xFFB45309)),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
@@ -160,7 +160,7 @@ class OemTacitContentCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(PhosphorIcons.appWindow(PhosphorIconsStyle.fill), size: 16, color: const Color(0xFF166534)),
+                Icon(PhosphorIconsFill.appWindow, size: 16, color: const Color(0xFF166534)),
                 const SizedBox(width: 8),
                 const Text(
                   'HƯỚNG DẪN TÍNH NĂNG HỆ THỐNG EAM',

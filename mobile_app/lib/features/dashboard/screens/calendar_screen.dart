@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
@@ -94,7 +94,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(PhosphorIcons.arrowsClockwise(), color: AppTheme.neutral700),
+            icon: Icon(PhosphorIconsRegular.arrowsClockwise, color: AppTheme.neutral700),
             tooltip: 'Làm mới',
             onPressed: () {
               setState(() => _isLoading = true);
@@ -137,7 +137,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   _selectedDate = _selectedDate.subtract(const Duration(days: 7));
                                 });
                               },
-                              child: Icon(PhosphorIcons.caretLeft(PhosphorIconsStyle.bold), size: 16, color: AppTheme.neutral400),
+                              child: Icon(PhosphorIconsBold.caretLeft, size: 16, color: AppTheme.neutral400),
                             ),
                             const SizedBox(width: 16),
                             GestureDetector(
@@ -146,7 +146,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   _selectedDate = _selectedDate.add(const Duration(days: 7));
                                 });
                               },
-                              child: Icon(PhosphorIcons.caretRight(PhosphorIconsStyle.bold), size: 16, color: AppTheme.neutral400),
+                              child: Icon(PhosphorIconsBold.caretRight, size: 16, color: AppTheme.neutral400),
                             ),
                           ],
                         ),
@@ -260,7 +260,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
-                                      PhosphorIcons.calendarX(PhosphorIconsStyle.fill),
+                                      PhosphorIconsFill.calendarX,
                                       size: 48,
                                       color: AppTheme.neutral400,
                                     ),
@@ -362,7 +362,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 16, color: AppTheme.neutral500),
+                    Icon(PhosphorIconsBold.clock, size: 16, color: AppTheme.neutral500),
                     const SizedBox(width: 6),
                     Text(
                       '${shift?['startTime'] ?? '--:--'} — ${shift?['endTime'] ?? '--:--'}',

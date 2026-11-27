@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/assistant_message.dart';
@@ -112,7 +112,7 @@ class ChatBubble extends StatelessWidget {
             ),
             child: Center(
               child: Icon(
-                PhosphorIcons.robot(PhosphorIconsStyle.fill),
+                PhosphorIconsFill.robot,
                 color: Colors.white,
                 size: 18,
               ),
@@ -321,7 +321,7 @@ class ChatBubble extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(4.0),
             child: Icon(
-              PhosphorIcons.thumbsUp(voted == 'UPVOTE' ? PhosphorIconsStyle.fill : PhosphorIconsStyle.regular),
+              voted == 'UPVOTE' ? PhosphorIconsFill.thumbsUp : PhosphorIconsRegular.thumbsUp,
               size: 16,
               color: voted == 'UPVOTE' ? AppTheme.successColor : AppTheme.neutral400,
             ),
@@ -336,7 +336,7 @@ class ChatBubble extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(4.0),
             child: Icon(
-              PhosphorIcons.thumbsDown(voted == 'DOWNVOTE' ? PhosphorIconsStyle.fill : PhosphorIconsStyle.regular),
+              voted == 'DOWNVOTE' ? PhosphorIconsFill.thumbsDown : PhosphorIconsRegular.thumbsDown,
               size: 16,
               color: voted == 'DOWNVOTE' ? AppTheme.dangerColor : AppTheme.neutral400,
             ),

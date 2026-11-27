@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -49,7 +49,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(PhosphorIcons.qrCode(), color: AppTheme.neutral700),
+            icon: Icon(PhosphorIconsRegular.qrCode, color: AppTheme.neutral700),
             onPressed: () => context.push('/qr-scanner'),
           ),
         ],
@@ -79,7 +79,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm thiết bị...',
                       hintStyle: const TextStyle(color: AppTheme.neutral400, fontSize: 14),
-                      prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppTheme.neutral400),
+                      prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppTheme.neutral400),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
@@ -170,7 +170,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                       padding: const EdgeInsets.only(top: 24, bottom: 12, left: 4),
                       child: Row(
                         children: [
-                          Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill), color: AppTheme.primaryColor, size: 20),
+                          Icon(PhosphorIconsFill.mapPin, color: AppTheme.primaryColor, size: 20),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -245,7 +245,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                   child: Icon(
-                                    PhosphorIcons.engine(PhosphorIconsStyle.fill),
+                                    PhosphorIconsFill.engine,
                                     size: 32,
                                     color: AppTheme.primaryColor,
                                   ),
@@ -302,7 +302,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
-                                          Icon(PhosphorIcons.tag(PhosphorIconsStyle.fill), size: 14, color: AppTheme.neutral400),
+                                          Icon(PhosphorIconsFill.tag, size: 14, color: AppTheme.neutral400),
                                           const SizedBox(width: 4),
                                           Expanded(
                                             child: Text(

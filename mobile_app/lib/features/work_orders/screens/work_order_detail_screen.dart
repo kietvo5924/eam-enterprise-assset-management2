@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -305,7 +305,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                 children: [
                   if (_workOrder!.status != 'COMPLETED') ...[
                     _buildBottomSheetAction(
-                      icon: PhosphorIcons.pause(PhosphorIconsStyle.fill),
+                      icon: PhosphorIconsFill.pause,
                       iconColor: AppTheme.primaryColor,
                       iconBgColor: const Color(0xFFe0f2fe),
                       title: 'Tạm dừng',
@@ -379,7 +379,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     ),
                   ],
                   _buildBottomSheetAction(
-                    icon: PhosphorIcons.flag(PhosphorIconsStyle.fill),
+                    icon: PhosphorIconsFill.flag,
                     iconColor: AppTheme.warningColor,
                     iconBgColor: const Color(0xFFffedd5),
                     title: 'Báo cáo sự cố',
@@ -391,9 +391,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   ),
                   if (_workOrder!.status != 'COMPLETED') ...[
                     _buildBottomSheetAction(
-                      icon: PhosphorIcons.arrowsClockwise(
-                        PhosphorIconsStyle.fill,
-                      ),
+                      icon: PhosphorIconsFill.arrowsClockwise,
                       iconColor: AppTheme.neutral600,
                       iconBgColor: AppTheme.neutral100,
                       title: 'Yêu cầu phân công lại',
@@ -406,7 +404,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                   ],
                   if (_workOrder!.status != 'COMPLETED') ...[
                     _buildBottomSheetAction(
-                      icon: PhosphorIcons.x(PhosphorIconsStyle.fill),
+                      icon: PhosphorIconsFill.x,
                       iconColor: AppTheme.dangerColor,
                       iconBgColor: const Color(0xFFfee2e2),
                       title: 'Hủy thao tác',
@@ -561,9 +559,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            PhosphorIcons.warningOctagon(
-                              PhosphorIconsStyle.bold,
-                            ),
+                            PhosphorIconsBold.warningOctagon,
                             color: const Color(0xFFd97706),
                             size: 22,
                           ),
@@ -803,9 +799,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                                 ),
                               )
                             : Icon(
-                                PhosphorIcons.paperPlaneTilt(
-                                  PhosphorIconsStyle.bold,
-                                ),
+                                PhosphorIconsBold.paperPlaneTilt,
                                 color: Colors.white,
                                 size: 18,
                               ),
@@ -883,9 +877,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            PhosphorIcons.arrowsClockwise(
-                              PhosphorIconsStyle.bold,
-                            ),
+                            PhosphorIconsBold.arrowsClockwise,
                             color: AppTheme.primaryColor,
                             size: 22,
                           ),
@@ -1056,9 +1048,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                                 ),
                               )
                             : Icon(
-                                PhosphorIcons.paperPlaneTilt(
-                                  PhosphorIconsStyle.bold,
-                                ),
+                                PhosphorIconsBold.paperPlaneTilt,
                                 color: Colors.white,
                                 size: 18,
                               ),
@@ -1320,14 +1310,14 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
         backgroundColor: AppTheme.neutral100,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(PhosphorIcons.arrowLeft(), color: AppTheme.neutral900),
+          icon: Icon(PhosphorIconsRegular.arrowLeft, color: AppTheme.neutral900),
           onPressed: () => context.pop(true),
         ),
         actions: [
           IconButton(
             tooltip: 'Hỏi Trợ lý AI về sự cố này',
             icon: Icon(
-              PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+              PhosphorIconsFill.sparkle,
               color: AppTheme.primaryColor,
               size: 20,
             ),
@@ -1486,13 +1476,13 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     const Divider(color: AppTheme.neutral200),
                     const SizedBox(height: 12),
                     _buildInfoRow(
-                      PhosphorIcons.mapPin(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.mapPin,
                       'Thiết bị',
                       '${_workOrder!.assetName ?? 'Không có thiết bị'} - ${_workOrder!.assetLocation ?? 'Không rõ vị trí'}',
                     ),
                     const SizedBox(height: 12),
                     _buildInfoRow(
-                      PhosphorIcons.wrench(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.wrench,
                       'Cấp độ can thiệp',
                       _workOrder!.getMaintenanceActionLabel(),
                     ),
@@ -1601,13 +1591,13 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     ],
                     const SizedBox(height: 8),
                     _buildInfoRow(
-                      PhosphorIcons.calendar(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.calendar,
                       'Hạn chót',
                       _workOrder!.getFormattedTime(),
                     ),
                     const SizedBox(height: 8),
                     _buildInfoRow(
-                      PhosphorIcons.user(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.user,
                       'Người phụ trách',
                       _workOrder!.assigneeUsername ?? 'Chưa phân công',
                     ),
@@ -1629,9 +1619,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      PhosphorIcons.checkSquareOffset(
-                        PhosphorIconsStyle.fill,
-                      ),
+                      PhosphorIconsFill.checkSquareOffset,
                       color: AppTheme.primaryColor,
                       size: 14,
                     ),
@@ -1738,7 +1726,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      PhosphorIcons.camera(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.camera,
                       color: AppTheme.primaryColor,
                       size: 14,
                     ),
@@ -1786,7 +1774,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                                 errorBuilder: (context, error, stackTrace) =>
                                     Center(
                                       child: Icon(
-                                        PhosphorIcons.imageBroken(),
+                                        PhosphorIconsRegular.imageBroken,
                                         color: AppTheme.neutral400,
                                       ),
                                     ),
@@ -1805,7 +1793,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                                 ),
                                 errorWidget: (context, url, error) => Center(
                                   child: Icon(
-                                    PhosphorIcons.imageBroken(),
+                                    PhosphorIconsRegular.imageBroken,
                                     color: AppTheme.neutral400,
                                   ),
                                 ),
@@ -1831,7 +1819,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              PhosphorIcons.plus(PhosphorIconsStyle.bold),
+                              PhosphorIconsBold.plus,
                               color: AppTheme.primaryColor,
                               size: 20,
                             ),
@@ -2108,7 +2096,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          PhosphorIcons.note(PhosphorIconsStyle.fill),
+                          PhosphorIconsFill.note,
                           color: AppTheme.warningColor,
                           size: 14,
                         ),
@@ -2128,7 +2116,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                     IconButton(
                       onPressed: _editResolutionNotes,
                       icon: Icon(
-                        PhosphorIcons.pencilSimple(PhosphorIconsStyle.fill),
+                        PhosphorIconsFill.pencilSimple,
                         color: AppTheme.primaryColor,
                       ),
                       padding: EdgeInsets.zero,
@@ -2188,7 +2176,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      PhosphorIcons.dotsThreeVertical(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.dotsThreeVertical,
                       color: AppTheme.primaryColor,
                       size: 14,
                     ),
@@ -2228,7 +2216,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                       Row(
                         children: [
                           Icon(
-                            PhosphorIcons.listDashes(PhosphorIconsStyle.fill),
+                            PhosphorIconsFill.listDashes,
                             color: AppTheme.primaryColor,
                             size: 20,
                           ),
@@ -2244,7 +2232,7 @@ class _WorkOrderDetailScreenState extends State<WorkOrderDetailScreen> {
                         ],
                       ),
                       Icon(
-                        PhosphorIcons.caretUp(),
+                        PhosphorIconsRegular.caretUp,
                         color: AppTheme.neutral400,
                         size: 16,
                       ),
@@ -2349,9 +2337,7 @@ class _SlideToCompleteState extends State<_SlideToComplete> {
                             if (!_isCompleted) ...[
                               const SizedBox(width: 8),
                               Icon(
-                                PhosphorIcons.arrowRight(
-                                  PhosphorIconsStyle.bold,
-                                ),
+                                PhosphorIconsBold.arrowRight,
                                 size: 16,
                                 color: AppTheme.neutral500,
                               ),
@@ -2420,8 +2406,8 @@ class _SlideToCompleteState extends State<_SlideToComplete> {
                     ),
                     child: Icon(
                       _isCompleted
-                          ? PhosphorIcons.check(PhosphorIconsStyle.bold)
-                          : PhosphorIcons.arrowRight(PhosphorIconsStyle.bold),
+                          ? PhosphorIconsBold.check
+                          : PhosphorIconsBold.arrowRight,
                       color: Colors.white,
                     ),
                   ),

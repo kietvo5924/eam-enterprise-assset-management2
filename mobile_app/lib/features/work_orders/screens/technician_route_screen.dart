@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/technician_route_model.dart';
@@ -263,7 +263,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
         content: Row(
           children: [
             Icon(
-              success ? PhosphorIcons.checkCircle(PhosphorIconsStyle.fill) : PhosphorIcons.warningCircle(PhosphorIconsStyle.fill),
+              success ? PhosphorIconsFill.checkCircle : PhosphorIconsFill.warningCircle,
               color: Colors.white,
               size: 20,
             ),
@@ -469,13 +469,13 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
         actions: [
           // Nút Lưu đệm ngoại tuyến
           IconButton(
-            icon: Icon(PhosphorIcons.cloudArrowDown(PhosphorIconsStyle.bold), color: Colors.white),
+            icon: Icon(PhosphorIconsBold.cloudArrowDown, color: Colors.white),
             tooltip: 'Lưu đệm ngoại tuyến',
             onPressed: _saveOfflineCache,
           ),
           // Nút Reset Zoom
           IconButton(
-            icon: Icon(PhosphorIcons.arrowsCounterClockwise(PhosphorIconsStyle.bold), color: Colors.white),
+            icon: Icon(PhosphorIconsBold.arrowsCounterClockwise, color: Colors.white),
             tooltip: 'Căn giữa bản đồ',
             onPressed: _resetZoom,
           ),
@@ -603,7 +603,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                       ),
                       child: Row(
                         children: [
-                          Icon(PhosphorIcons.wifiSlash(PhosphorIconsStyle.bold), color: Colors.white, size: 18),
+                          Icon(PhosphorIconsBold.wifiSlash, color: Colors.white, size: 18),
                           const SizedBox(width: 8),
                           const Expanded(
                             child: Text(
@@ -731,7 +731,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  PhosphorIcons.cpu(PhosphorIconsStyle.bold),
+                  PhosphorIconsBold.cpu,
                   color: _showMachines ? const Color(0xFF38bdf8) : Colors.white60,
                   size: 14,
                 ),
@@ -760,7 +760,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
           child: Column(
             children: [
               IconButton(
-                icon: Icon(PhosphorIcons.plus(PhosphorIconsStyle.bold), color: Colors.white, size: 16),
+                icon: Icon(PhosphorIconsBold.plus, color: Colors.white, size: 16),
                 tooltip: 'Phóng to',
                 onPressed: () => _adjustZoom(1.2),
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -768,7 +768,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
               ),
               const Divider(color: Color(0xFF334155), height: 1),
               IconButton(
-                icon: Icon(PhosphorIcons.minus(PhosphorIconsStyle.bold), color: Colors.white, size: 16),
+                icon: Icon(PhosphorIconsBold.minus, color: Colors.white, size: 16),
                 tooltip: 'Thu nhỏ',
                 onPressed: () => _adjustZoom(0.8),
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
@@ -801,7 +801,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
         children: [
           // Nút Lùi
           IconButton(
-            icon: Icon(PhosphorIcons.caretLeft(PhosphorIconsStyle.bold), color: Colors.white, size: 16),
+            icon: Icon(PhosphorIconsBold.caretLeft, color: Colors.white, size: 16),
             tooltip: 'Trạm trước',
             onPressed: () {
               final prev = (_selectedStopIndex - 1 + totalStops) % totalStops;
@@ -827,7 +827,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
 
           // Nút Tiến
           IconButton(
-            icon: Icon(PhosphorIcons.caretRight(PhosphorIconsStyle.bold), color: Colors.white, size: 16),
+            icon: Icon(PhosphorIconsBold.caretRight, color: Colors.white, size: 16),
             tooltip: 'Trạm kế tiếp',
             onPressed: () {
               final next = (_selectedStopIndex + 1) % totalStops;
@@ -850,7 +850,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
               child: Row(
                 children: [
                   Icon(
-                    _isPlaying ? PhosphorIcons.pause(PhosphorIconsStyle.fill) : PhosphorIcons.play(PhosphorIconsStyle.fill),
+                    _isPlaying ? PhosphorIconsFill.pause : PhosphorIconsFill.play,
                     color: Colors.white,
                     size: 13,
                   ),
@@ -1040,7 +1040,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                 title: 'Tổng thời gian',
                 value: '${data.totalEstimatedMinutes} ph',
                 subValue: '~$hours giờ làm việc',
-                icon: PhosphorIcons.clock(PhosphorIconsStyle.bold),
+                icon: PhosphorIconsBold.clock,
                 color: const Color(0xFF0284c7),
                 bgColor: const Color(0xFFe0f2fe),
               ),
@@ -1049,7 +1049,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                 title: 'Tổng quãng đường',
                 value: '$distanceMeters m',
                 subValue: 'Đi bộ trong xưởng',
-                icon: PhosphorIcons.path(PhosphorIconsStyle.bold),
+                icon: PhosphorIconsBold.path,
                 color: const Color(0xFF10b981),
                 bgColor: const Color(0xFFd1fae5),
               ),
@@ -1058,7 +1058,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                 title: 'Số trạm dừng',
                 value: '$stopsCount trạm',
                 subValue: 'Bao gồm trạm kho',
-                icon: PhosphorIcons.mapPin(PhosphorIconsStyle.bold),
+                icon: PhosphorIconsBold.mapPin,
                 color: const Color(0xFFf59e0b),
                 bgColor: const Color(0xFFfef3c7),
               ),
@@ -1067,7 +1067,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                 title: 'Mô hình định tuyến',
                 value: modeLabel,
                 subValue: 'Trực giao hành lang',
-                icon: PhosphorIcons.gitBranch(PhosphorIconsStyle.bold),
+                icon: PhosphorIconsBold.gitBranch,
                 color: const Color(0xFF8b5cf6),
                 bgColor: const Color(0xFFede9fe),
               ),
@@ -1149,7 +1149,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                   ),
                   child: Row(
                     children: [
-                      Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), color: AppTheme.neutral700, size: 14),
+                      Icon(PhosphorIconsBold.clock, color: AppTheme.neutral700, size: 14),
                       const SizedBox(width: 6),
                       Text(
                         'Xuất phát: ${_formatTimeOfDay(_startTime)}',
@@ -1235,7 +1235,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  icon: Icon(PhosphorIcons.package(PhosphorIconsStyle.bold), size: 14),
+                  icon: Icon(PhosphorIconsBold.package, size: 14),
                   label: const Text('Về lấy vật tư', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -1252,7 +1252,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  icon: Icon(PhosphorIcons.arrowsClockwise(PhosphorIconsStyle.bold), size: 14),
+                  icon: Icon(PhosphorIconsBold.arrowsClockwise, size: 14),
                   label: const Text('Tái định tuyến', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -1268,7 +1268,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: Icon(PhosphorIcons.lightning(PhosphorIconsStyle.bold), size: 16),
+                child: Icon(PhosphorIconsBold.lightning, size: 16),
               ),
             ],
           ),
@@ -1313,7 +1313,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                       color: AppTheme.neutral300,
                     ),
                     const SizedBox(width: 14),
-                    Icon(PhosphorIcons.arrowDown(PhosphorIconsStyle.bold), size: 12, color: AppTheme.neutral500),
+                    Icon(PhosphorIconsBold.arrowDown, size: 12, color: AppTheme.neutral500),
                     const SizedBox(width: 6),
                     Text(
                       'Di chuyển ${stop.travelDistanceMeters.toStringAsFixed(0)}m (~${stop.travelTimeMinutes.toStringAsFixed(1)} ph)',
@@ -1452,7 +1452,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                           // Vị trí & Tầng
                           Row(
                             children: [
-                              Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.bold), size: 12, color: AppTheme.neutral500),
+                              Icon(PhosphorIconsBold.mapPin, size: 12, color: AppTheme.neutral500),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
@@ -1468,7 +1468,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                           // Giờ đến dự kiến & Khung giờ máy
                           Row(
                             children: [
-                              Icon(PhosphorIcons.clock(PhosphorIconsStyle.bold), size: 12, color: const Color(0xFF10b981)),
+                              Icon(PhosphorIconsBold.clock, size: 12, color: const Color(0xFF10b981)),
                               const SizedBox(width: 4),
                               Text(
                                 'Dự kiến: ${stop.estimatedArrival}',
@@ -1515,7 +1515,7 @@ class _TechnicianRouteScreenState extends State<TechnicianRouteScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(PhosphorIcons.arrowSquareOut(PhosphorIconsStyle.bold), size: 13, color: const Color(0xFF0284c7)),
+                                    Icon(PhosphorIconsBold.arrowSquareOut, size: 13, color: const Color(0xFF0284c7)),
                                     const SizedBox(width: 5),
                                     const Text(
                                       'Mở chi tiết phiếu việc',

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
@@ -87,14 +87,14 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(PhosphorIcons.arrowLeft(), color: AppTheme.neutral900),
+          icon: Icon(PhosphorIconsRegular.arrowLeft, color: AppTheme.neutral900),
           onPressed: () => context.pop(),
         ),
         actions: [
           IconButton(
             tooltip: 'Hỏi Trợ lý AI về thiết bị này',
             icon: Icon(
-              PhosphorIcons.sparkle(PhosphorIconsStyle.fill),
+              PhosphorIconsFill.sparkle,
               color: AppTheme.primaryColor,
               size: 22,
             ),
@@ -133,7 +133,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      PhosphorIcons.engine(PhosphorIconsStyle.fill),
+                      PhosphorIconsFill.engine,
                       size: 48,
                       color: AppTheme.primaryColor,
                     ),
@@ -198,27 +198,27 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                   const SizedBox(height: 16),
                   _buildInfoCard([
                     _buildInfoRow(
-                      PhosphorIcons.mapPin(),
+                      PhosphorIconsRegular.mapPin,
                       'Vị trí',
                       widget.equipment['locationName'] ?? 'Chưa cấu hình',
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.tag(),
+                      PhosphorIconsRegular.tag,
                       'Phân loại',
                       widget.equipment['categoryName'] ?? 'Chưa cấu hình',
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.barcode(),
+                      PhosphorIconsRegular.barcode,
                       'Model',
                       widget.equipment['model'] ?? 'N/A',
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.factory(),
+                      PhosphorIconsRegular.factory,
                       'Nhà sản xuất',
                       widget.equipment['manufacturer'] ?? 'N/A',
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.clock(),
+                      PhosphorIconsRegular.clock,
                       'Chu kỳ vận hành / Ca kíp',
                       _formatDutyCycle(widget.equipment['dutyCycleRatio']),
                     ),
@@ -236,12 +236,12 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                   const SizedBox(height: 16),
                   _buildInfoCard([
                     _buildInfoRow(
-                      PhosphorIcons.calendar(),
+                      PhosphorIconsRegular.calendar,
                       'Ngày mua',
                       _formatDate(widget.equipment['purchaseDate']),
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.currencyCircleDollar(),
+                      PhosphorIconsRegular.currencyCircleDollar,
                       'Giá trị hiện tại',
                       _formatCurrency(widget.equipment['value']),
                     ),
@@ -259,19 +259,19 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                   const SizedBox(height: 16),
                   _buildInfoCard([
                     _buildInfoRow(
-                      PhosphorIcons.treeStructure(),
+                      PhosphorIconsRegular.treeStructure,
                       'Thuộc cụm tài sản',
                       widget.equipment['parentId'] != null
                           ? 'Có (ID: ${widget.equipment['parentId']})'
                           : 'Tài sản độc lập',
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.qrCode(),
+                      PhosphorIconsRegular.qrCode,
                       'Mã QR Gắn kết',
                       widget.equipment['qrCode'] ?? 'Chưa tạo mã',
                     ),
                     _buildInfoRow(
-                      PhosphorIcons.clock(),
+                      PhosphorIconsRegular.clock,
                       'Cập nhật lần cuối',
                       _formatDate(widget.equipment['updatedAt']),
                     ),
@@ -288,7 +288,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
         onPressed: _showLogMeterDialog,
         backgroundColor: AppTheme.primaryColor,
         icon: Icon(
-          PhosphorIcons.gauge(PhosphorIconsStyle.fill),
+          PhosphorIconsFill.gauge,
           color: Colors.white,
         ),
         label: const Text(

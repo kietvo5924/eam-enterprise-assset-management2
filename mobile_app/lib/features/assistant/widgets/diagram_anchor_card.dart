@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import '../models/assistant_message.dart';
 
 class DiagramAnchorCard extends StatelessWidget {
@@ -33,7 +33,7 @@ class DiagramAnchorCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  PhosphorIcons.blueprint(PhosphorIconsStyle.fill),
+                  PhosphorIconsFill.blueprint,
                   size: 16,
                   color: const Color(0xFF1E40AF),
                 ),

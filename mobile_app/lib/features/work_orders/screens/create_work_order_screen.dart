@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:phosphoricons_flutter/phosphoricons_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../services/work_order_service.dart';
@@ -306,7 +306,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                         decoration: InputDecoration(
                           hintText: 'Tìm kiếm tài sản...',
                           hintStyle: const TextStyle(color: AppTheme.neutral400),
-                          prefixIcon: Icon(PhosphorIcons.magnifyingGlass(), color: AppTheme.neutral500),
+                          prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, color: AppTheme.neutral500),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
@@ -330,7 +330,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Icon(
-                              PhosphorIcons.cube(PhosphorIconsStyle.fill), 
+                              PhosphorIconsFill.cube, 
                               color: isSelected ? AppTheme.primaryColor : AppTheme.neutral500,
                             ),
                           ),
@@ -386,7 +386,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
               _buildTextField(
                 label: 'Tên công việc (*)',
                 hint: 'VD: Bảo trì định kỳ máy bơm',
-                icon: PhosphorIcons.textT(PhosphorIconsStyle.fill),
+                icon: PhosphorIconsFill.textT,
                 validator: (val) => val == null || val.isEmpty ? 'Vui lòng nhập tên công việc' : null,
                 onSaved: (val) => _title = val ?? '',
               ),
@@ -395,7 +395,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
               _buildTextField(
                 label: 'Mô tả chi tiết',
                 hint: 'Nhập mô tả các việc cần làm...',
-                icon: PhosphorIcons.textAlignLeft(PhosphorIconsStyle.fill),
+                icon: PhosphorIconsFill.textAlignLeft,
                 maxLines: 4,
                 onSaved: (val) => _description = val ?? '',
               ),
@@ -422,7 +422,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                     isExpanded: true,
                     initialValue: _priority,
                     decoration: InputDecoration(
-                      icon: Icon(PhosphorIcons.flag(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+                      icon: Icon(PhosphorIconsFill.flag, color: AppTheme.primaryColor),
                       border: InputBorder.none,
                       labelText: 'Mức độ ưu tiên',
                       labelStyle: const TextStyle(color: AppTheme.neutral500),
@@ -462,7 +462,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                     isExpanded: true,
                     initialValue: _maintenanceAction,
                     decoration: InputDecoration(
-                      icon: Icon(PhosphorIcons.wrench(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+                      icon: Icon(PhosphorIconsFill.wrench, color: AppTheme.primaryColor),
                       border: InputBorder.none,
                       labelText: 'Cấp độ can thiệp bảo trì',
                       labelStyle: const TextStyle(color: AppTheme.neutral500),
@@ -509,7 +509,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(PhosphorIcons.calendar(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+                      Icon(PhosphorIconsFill.calendar, color: AppTheme.primaryColor),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -556,7 +556,7 @@ class _CreateWorkOrderScreenState extends State<CreateWorkOrderScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(PhosphorIcons.cube(PhosphorIconsStyle.fill), color: AppTheme.primaryColor),
+                      Icon(PhosphorIconsFill.cube, color: AppTheme.primaryColor),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
