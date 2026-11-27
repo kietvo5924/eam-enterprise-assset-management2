@@ -2,8 +2,10 @@ from django.urls import path, re_path
 from . import views
 
 urlpatterns = [
-    path('', views.portal_dashboard, name='portal_dashboard'),
-    re_path(r'^(?:/+)?$', views.portal_dashboard, name='portal_dashboard_slash'),
+    path('', views.portal_root, name='portal_dashboard'),
+    re_path(r'^(?:/+)?$', views.portal_root, name='portal_dashboard_slash'),
+    path('landing/', views.portal_landing, name='portal_landing'),
+    path('contact/', views.portal_contact, name='portal_contact'),
     path('login/', views.portal_login, name='portal_login'),
     path('logout/', views.portal_logout, name='portal_logout'),
     path('change-password/', views.portal_change_password, name='portal_change_password'),

@@ -16,6 +16,9 @@ class TenantMiddleware:
             re.compile(r'^/admin.*'),
             re.compile(r'^/login/?$'),
             re.compile(r'^/logout/?$'),
+            re.compile(r'^/landing/?$'),
+            re.compile(r'^/contact/?$'),
+            re.compile(r'^/portal/contact/?$'),
         ]
 
     def __call__(self, request):

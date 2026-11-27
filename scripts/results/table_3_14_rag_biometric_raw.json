@@ -1,0 +1,59 @@
+{
+  "safety_classifier": {
+    "cases": 20,
+    "TP": 9,
+    "TN": 10,
+    "FP": 0,
+    "FN": 1,
+    "precision_pct": 100.0,
+    "recall_pct": 90.0,
+    "f1_pct": 94.7,
+    "median_ms": 0.0257
+  },
+  "rag_pgvector": {
+    "total_chunks_db": 5897,
+    "index_def": "CREATE INDEX idx_chunk_embedding_hnsw ON public.document_chunks USING hnsw (embedding vector_cosine_ops) WITH (m='16', ef_construction='64')",
+    "queries_count": 10,
+    "repeats": 3,
+    "embed_median_ms": 12.66,
+    "embed_p95_ms": 14.94,
+    "hnsw_sql_median_ms": 2.31,
+    "hnsw_sql_p95_ms": 3.75,
+    "retrieve_e2e_median_ms": 15.99,
+    "retrieve_e2e_p95_ms": 17.64,
+    "top1_sim_mean": 0.741,
+    "top1_sim_min": 0.484,
+    "top1_sim_max": 0.984,
+    "inventory_median_ms": 10.97,
+    "inventory_matched_items": 5,
+    "inventory_zero_deduction": true
+  },
+  "biometric_extract": {
+    "image_bytes": 118923,
+    "embedding_dim": 128,
+    "l2_norm": 1.0,
+    "extract_median_ms": 77.56,
+    "extract_p95_ms": 84.03,
+    "aes256_roundtrip_ok": true,
+    "aes256_roundtrip_ms": 24.77
+  },
+  "biometric_math_ble": {
+    "cosine_100x_median_ms": 12.544,
+    "cosine_100x_p95_ms": 13.913,
+    "cosine_vs_numpy_abs_err": 4e-05,
+    "nan_inf_safe_rejected": true,
+    "ble_60_rssi_median_ms": 0.094,
+    "ble_rssi_neg68": {
+      "passed": true,
+      "dist_m": 2.1
+    },
+    "ble_rssi_neg96": {
+      "passed": false,
+      "dist_m": 20.96
+    },
+    "ble_rssi_neg108": {
+      "passed": false,
+      "dist_m": 56.23
+    }
+  }
+}

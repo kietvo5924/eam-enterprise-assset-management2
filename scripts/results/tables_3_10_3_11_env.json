@@ -1,0 +1,11 @@
+{
+  "env": {
+    "os": "Windows-11-10.0.22631-SP0",
+    "processor": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+    "python": "3.14.4",
+    "numpy": "2.5.3",
+    "pandas": "3.1.0"
+  },
+  "ga_repeats": 5,
+  "tsp_scenarios_per_stop": 30
+}

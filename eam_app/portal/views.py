@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
 from users.decorators import permission_required
 from django.contrib import messages
 import json
@@ -64,6 +65,78 @@ def portal_logout(request):
     resp.delete_cookie('googtrans', path='/')
     resp.delete_cookie('googtrans', domain=host, path='/')
     return resp
+
+def portal_landing(request):
+    """Public landing page with EAM overview and System Super Admin contact form."""
+    return render(request, 'landing.html')
+
+
+def portal_root(request):
+    """
+    Serve the public landing page for unauthenticated visitors at `/`,
+    while keeping `/portal/` protected and showing the dashboard for signed-in users.
+    """
+    if request.user.is_authenticated:
+        return portal_dashboard(request)
+    if request.path_info.startswith('/portal'):
+        return redirect('portal_login')
+    return portal_landing(request)
+
+
+@require_http_methods(['POST'])
+def portal_contact(request):
+    """Handle public contact form submissions and forward email to System Super Admin."""
+    from django.http import JsonResponse
+    from portal.contact_service import (
+        ContactConfigurationError,
+        ContactDeliveryError,
+        ContactValidationError,
+        check_and_increment_contact_rate_limit,
+        get_client_ip,
+        send_super_admin_contact_email,
+        validate_contact_payload,
+    )
+
+    client_ip = get_client_ip(request)
+    allowed, _ = check_and_increment_contact_rate_limit(client_ip)
+    if not allowed:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Bạn đã gửi quá nhiều yêu cầu liên hệ. Vui lòng thử lại sau ít phút.',
+            },
+            status=429,
+        )
+
+    content_type = (request.content_type or '').lower()
+    if 'application/json' in content_type:
+        try:
+            raw_data = json.loads(request.body.decode('utf-8') or '{}')
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return JsonResponse(
+                {'success': False, 'error': 'Định dạng dữ liệu JSON không hợp lệ.'},
+                status=400,
+            )
+    else:
+        raw_data = request.POST.dict()
+
+    try:
+        cleaned_data = validate_contact_payload(raw_data)
+        send_super_admin_contact_email(cleaned_data)
+    except ContactValidationError as exc:
+        return JsonResponse({'success': False, 'error': exc.message}, status=exc.status_code)
+    except ContactConfigurationError as exc:
+        return JsonResponse({'success': False, 'error': str(exc)}, status=503)
+    except ContactDeliveryError as exc:
+        return JsonResponse({'success': False, 'error': str(exc)}, status=502)
+
+    return JsonResponse(
+        {
+            'success': True,
+            'message': 'Yêu cầu liên hệ của bạn đã được gửi thành công tới Quản trị viên hệ thống.',
+        }
+    )
+
 
 @login_required(login_url='portal_login')
 def portal_dashboard(request):

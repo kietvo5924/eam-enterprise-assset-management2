@@ -1,0 +1,75 @@
+{
+  "env": {
+    "os": "Windows-11-10.0.22631-SP0",
+    "processor": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+    "python": "3.14.4",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "pandas": "3.1.0",
+    "ga_constants": {
+      "DEFAULT_POPULATION_SIZE": 100,
+      "DEFAULT_MAX_GENERATIONS": 150,
+      "DEFAULT_CROSSOVER_RATE": 0.85,
+      "DEFAULT_MUTATION_RATE": 0.08,
+      "CATACLYSMIC_MUTATION_RATE": 0.3,
+      "STAGNATION_THRESHOLD": 15,
+      "ELITISM_RATIO": 0.05,
+      "TOURNAMENT_SIZE": 3,
+      "WEIGHTS_BALANCED": {
+        "skill": 0.35,
+        "workload": 0.35,
+        "travel": 0.3
+      },
+      "WEIGHTS_SKILL_FOCUSED": {
+        "skill": 0.6,
+        "workload": 0.2,
+        "travel": 0.2
+      },
+      "WEIGHTS_MIN_TRAVEL": {
+        "skill": 0.2,
+        "workload": 0.2,
+        "travel": 0.6
+      }
+    }
+  },
+  "elapsed_ms_150gen": 19220.9,
+  "elitism_monotonic": true,
+  "strategies": [
+    {
+      "strategy": "BALANCED",
+      "label": "Phương án Cân Bằng (Khuyến nghị)",
+      "fitnessScore": 87.2,
+      "skillScore": 89.8,
+      "workloadScore": 92.3,
+      "travelScore": 78.5,
+      "backlogCount": 0,
+      "totalLatenessMin": 0,
+      "workloadStdHours": 0.317,
+      "totalDistanceMeters": 1077.3
+    },
+    {
+      "strategy": "SKILL_FOCUSED",
+      "label": "Phương án Tối Đa Tay Nghề",
+      "fitnessScore": 63.4,
+      "skillScore": 91.0,
+      "workloadScore": 70.8,
+      "travelScore": 75.1,
+      "backlogCount": 1,
+      "totalLatenessMin": 39,
+      "workloadStdHours": 1.171,
+      "totalDistanceMeters": 1244.9
+    },
+    {
+      "strategy": "MIN_TRAVEL",
+      "label": "Phương án Quãng Đường Ngắn Nhất",
+      "fitnessScore": 65.8,
+      "skillScore": 90.0,
+      "workloadScore": 85.8,
+      "travelScore": 82.0,
+      "backlogCount": 2,
+      "totalLatenessMin": 0,
+      "workloadStdHours": 0.536,
+      "totalDistanceMeters": 902.3
+    }
+  ]
+}

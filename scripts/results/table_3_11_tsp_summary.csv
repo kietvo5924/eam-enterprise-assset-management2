@@ -1,0 +1,5 @@
+﻿Số điểm dừng,"Ngẫu nhiên (m, MP)","Pure Business (m, MP)","Nearest Neighbor (m, MP)","Tiered ATSP + Or-opt (m, MP)",Rút ngắn đường vs Rule 11 (%),Rút ngắn đường vs Ngẫu nhiên (%),Phạt TSPTW NN TB,Phạt TSPTW Or-opt TB,Giảm phạt TSPTW vs NN (%),Pure Spatial (No-TW) NN -> Or-opt (m),Thời gian Median (ms)
+5 điểm dừng,1322.2,1359.0,1051.0,1023.9,24.7,22.6,0.0,0.0,0.0,1033.9 -> 1020.1,0.27
+10 điểm dừng,2451.9,2585.9,1490.0,1560.0,39.7,36.4,69094.6,510.2,99.3,1450.6 -> 1418.4,3.49
+15 điểm dừng,3592.9,3675.7,2168.0,2416.7,34.3,32.7,591790.5,33535.5,94.3,1761.9 -> 1729.7,32.03
+20 điểm dừng,4699.3,4701.2,2477.8,3018.9,35.8,35.8,1150743.9,126062.0,89.0,1967.9 -> 1930.6,95.29

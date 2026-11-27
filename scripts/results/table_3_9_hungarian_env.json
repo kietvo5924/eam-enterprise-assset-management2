@@ -1,0 +1,19 @@
+{
+  "env": {
+    "os": "Windows-11-10.0.22631-SP0",
+    "processor": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+    "python": "3.14.4",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "BIG_M": 10000000.0,
+    "PRIORITY_MULTIPLIERS": {
+      "URGENT": 2.5,
+      "HIGH": 1.8,
+      "MEDIUM": 1.2,
+      "LOW": 1.0
+    }
+  },
+  "warmup_runs": 5,
+  "repeats_per_scale": 30,
+  "seed_base": 42
+}

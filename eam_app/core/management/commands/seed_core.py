@@ -97,13 +97,19 @@ class Command(BaseCommand):
             
             # 4. Seed Super Admin User
             super_admin_user_id = '00000000-0000-0000-0000-000000000000'
+            super_admin_email = 'kietcun100@gmail.com'
             try:
                 user = User.all_objects.get(id=super_admin_user_id)
+                if user.email != super_admin_email:
+                    user.email = super_admin_email
+                    user.save(update_fields=['email', 'updated_at'])
+                    self.stdout.write(f'Updated Super Admin email to {super_admin_email}.')
             except User.DoesNotExist:
                 user = User.all_objects.create_user(
                     id=super_admin_user_id,
                     tenant_id=system_tenant_id,
                     username='superadmin@eam.local',
+                    email=super_admin_email,
                     password='admin123',
                     status='ACTIVE'
                 )

@@ -70,7 +70,7 @@
         >
           Đăng Nhập <span class="sr-only">Sign In</span>
         </button>
-        <div class="text-center mt-3">
+        <div class="text-center mt-3 space-y-2">
           <button
             type="button"
             onclick="document.getElementById('forgot-password-modal').classList.remove('hidden')"
@@ -78,6 +78,11 @@
           >
             Quên mật khẩu? <span class="sr-only">Forgot Password?</span>
           </button>
+          <div>
+            <a href="{% url 'portal_landing' %}" class="text-neutral-500 hover:text-primary text-xs font-medium transition-colors">
+              Trang giới thiệu &amp; Liên hệ Quản trị viên
+            </a>
+          </div>
         </div>
       </form>
     </div>
