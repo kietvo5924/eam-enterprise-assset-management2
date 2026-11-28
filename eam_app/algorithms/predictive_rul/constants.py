@@ -43,7 +43,9 @@ MIN_CRITICAL_THRESHOLD_DAYS = 14
 # Model Architecture Dimensions
 LSTM_HIDDEN_DIM_1 = 64
 LSTM_HIDDEN_DIM_2 = 32
-MODEL_VERSION = 'v1.0.0-cpu'
+MODEL_VERSION = 'v1.0.0-untrained-prototype'
+IS_MODEL_TRAINED = False
+MODEL_TRAINING_STATUS = 'UNTRAINED_PROTOTYPE'
 
 # Default Normalization Ranges for Scaling (Min-Max Scaling to [0, 1])
 # Dựa trên giới hạn vật lý và tập dữ liệu FEMTO PHM 2012 / UCI AI4I

@@ -15,6 +15,29 @@ DEFAULT_INFLATION_RATE = 0.045               # 4.5% lạm phát vật tư hàng 
 DEFAULT_CONTINGENCY_BUFFER_RATE = 0.05       # 5.0% quỹ dự phòng khẩn cấp
 DEFAULT_LABOR_HOURLY_RATE = Decimal('150000.00') # 150,000 VNĐ / giờ công chuẩn
 
+# Work Order Category Separation (AUD-05: No PM/CM Double Counting)
+PM_WORK_ORDER_TYPES = ('PREVENTIVE', 'PREDICTIVE_PM')
+CM_WORK_ORDER_TYPES = ('CORRECTIVE', 'EMERGENCY', 'BREAKDOWN')
+
+
+def normalize_rate_coefficient(value, default: float) -> float:
+    """
+    Chuẩn hóa hệ số tỷ lệ phần trăm lưu trong DB về dạng hệ số thập phân [0.0, 1.0].
+    Nếu bản ghi seed cũ lưu nhầm ở thang phần trăm (> 1.0, ví dụ 4.5 cho 4.5% hoặc 10.0 cho 10%),
+    tự động quy đổi về 0.045 / 0.10 mà không ảnh hưởng các giá trị hợp lệ <= 1.0 (kể cả 1.0 = 100%).
+    """
+    if value is None:
+        return float(default)
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if val < 0.0:
+        return float(default)
+    if val > 1.0:
+        return val / 100.0
+    return val
+
 # Budget Overrun Thresholds (Rule 11)
 WARNING_BUDGET_USAGE_RATIO = 85.0            # >= 85% -> Trạng thái WARNING
 CRITICAL_BUDGET_USAGE_RATIO = 100.0          # >= 100% -> Trạng thái CRITICAL_OVERRUN

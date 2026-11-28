@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from assets.models import Asset, Location
 from analytics.models import TenantFinancialSetting
 from algorithms.cost_forecasting import CostForecastingService
+from algorithms.cost_forecasting.constants import normalize_rate_coefficient
 
 
 def has_cost_forecasting_read_permission(user) -> bool:
@@ -185,7 +186,7 @@ class CurrentForecastView(APIView):
                 "deferredMaintenanceHours": forecast.deferred_maintenance_hours,
                 "postDeferralSurgeRisk": surge_risk,
                 "rulCriticalLiabilityAmount": float(forecast.rul_critical_liability),
-                "inflationRateAppliedPercent": round(forecast.inflation_rate_applied * 100.0, 1),
+                "inflationRateAppliedPercent": round(normalize_rate_coefficient(forecast.inflation_rate_applied, 0.045) * 100.0, 1),
                 "fleetRavCostRatioPercent": rav_ratio
             },
             "lemonAssetsAlert": {
@@ -222,8 +223,8 @@ class RunForecastView(APIView):
 
         # Nạp cài đặt tài chính mặc định của Tenant để tránh bị ghi đè bởi hằng số gán cứng
         setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
-        default_inf = setting.default_inflation_rate if setting else 0.045
-        default_ctg = setting.default_contingency_rate if setting else 0.05
+        default_inf = normalize_rate_coefficient(setting.default_inflation_rate if setting else None, 0.045)
+        default_ctg = normalize_rate_coefficient(setting.default_contingency_rate if setting else None, 0.05)
 
         approved_budget_raw = payload.get('approvedBudget') or payload.get('approved_budget')
         approved_budget = parse_numeric_input(approved_budget_raw)
@@ -395,8 +396,8 @@ class FinancialSettingsView(APIView):
         # Tự động tính toán lại dự báo nếu có period
         if period:
             setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
-            inf_r = setting.default_inflation_rate if setting else 0.045
-            ctg_r = setting.default_contingency_rate if setting else 0.05
+            inf_r = normalize_rate_coefficient(setting.default_inflation_rate if setting else None, 0.045)
+            ctg_r = normalize_rate_coefficient(setting.default_contingency_rate if setting else None, 0.05)
             app_b = parse_numeric_input(payload.get('approvedBudget'))
 
             CostForecastingService.run_forecast(

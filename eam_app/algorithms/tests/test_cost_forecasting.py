@@ -1607,3 +1607,340 @@ class MaintenanceCostForecastingTests(TestCase):
         self.assertEqual(cost_both, Decimal('15000000.00'))
 
 
+class AUD05CostForecastingNoDoubleCountTests(TestCase):
+    """Kiểm thử toàn diện AUD-05: Tách bạch PM vs CM, chống cộng trùng trên đủ 9 kịch bản."""
+
+    def setUp(self):
+        clear_current_tenant()
+        self.tenant = Tenant.objects.create(
+            name="AUD05 Manufacturing Co.",
+            tenant_code=f"T-AUD05-{uuid.uuid4().hex[:6]}",
+            enable_ai_cost_forecasting=True,
+        )
+        self.loc = Location.objects.create(name="Xưởng Cơ Khí AUD05", code="Z-AUD05", tenant=self.tenant)
+        self.cat = AssetCategory.objects.create(name="CNC", tenant=self.tenant)
+        self.asset = Asset.objects.create(
+            tenant=self.tenant,
+            name="Máy CNC AUD05",
+            qr_code=f"QR-AUD05-{uuid.uuid4().hex[:6]}",
+            category=self.cat,
+            location=self.loc,
+            status='OPERATIONAL',
+            asset_type='MACHINERY',
+            purchase_cost=Decimal('500000000.00'),
+        )
+        self.spare_part = SparePart.objects.create(
+            tenant=self.tenant,
+            name="Vòng bi trục chính",
+            part_number=f"SP-AUD05-{uuid.uuid4().hex[:6]}",
+            quantity_in_stock=Decimal('20.00'),
+            unit_cost=Decimal('2000000.00'),
+        )
+        self.user = User.objects.create_user(
+            username=f"aud05_fin_{uuid.uuid4().hex[:6]}",
+            email="aud05@test.com",
+            password="Password123!",
+            tenant=self.tenant,
+        )
+
+    def tearDown(self):
+        clear_current_tenant()
+
+    def _create_completed_wo(self, wo_type, completed_dt, net_cost, maintenance_action='GENERAL'):
+        wo = WorkOrder.objects.create(
+            tenant=self.tenant,
+            asset=self.asset,
+            title=f"{wo_type} {completed_dt.strftime('%Y-%m')}",
+            type=wo_type,
+            status='COMPLETED',
+            maintenance_action=maintenance_action,
+            completed_at=completed_dt,
+            created_at=completed_dt - datetime.timedelta(days=2),
+        )
+        WorkOrder.objects.filter(id=wo.id).update(created_at=completed_dt - datetime.timedelta(days=2))
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            material_cost=net_cost,
+            labor_cost=Decimal('0.00'),
+            gross_cost=net_cost,
+            net_cost=net_cost,
+            is_cost_frozen=True,
+            cost_frozen_at=completed_dt,
+        )
+        return wo
+
+    def _create_future_pm_plan(self, interval_days=30, duration_minutes=120, mat_qty=Decimal('1.0')):
+        plan = PmPlan.objects.create(
+            tenant=self.tenant,
+            name=f"PM Plan {uuid.uuid4().hex[:5]}",
+            trigger_type='TIME',
+            interval_value=Decimal(str(interval_days)),
+            interval_unit='DAYS',
+            is_active=True,
+            estimated_duration_minutes=duration_minutes,
+        )
+        PmPlanMaterial.objects.create(
+            tenant=self.tenant,
+            pm_plan=plan,
+            spare_part=self.spare_part,
+            quantity=mat_qty,
+        )
+        PmPlanAssignment.objects.create(
+            tenant=self.tenant,
+            pm_plan=plan,
+            asset=self.asset,
+            last_triggered_at=timezone.make_aware(datetime.datetime(2026, 10, 15, 0, 0)),
+            status='ACTIVE',
+        )
+        return plan
+
+    def test_aud05_01_04_06_pm_only_never_double_counted_into_cm(self):
+        """Kịch bản 1, 4, 6: Chỉ có PM đã hoàn thành + PM dự kiến tương lai -> PM hoàn thành KHÔNG đội chi phí CM."""
+        from algorithms.cost_forecasting.feature_pipeline import get_cm_consumption_net_cost, get_pm_consumption_net_cost
+
+        self._create_future_pm_plan(interval_days=30, duration_minutes=120, mat_qty=Decimal('1.0'))
+        # Đã có nhiều phiếu PM hoàn thành lớn ở các tháng trước
+        for m in [8, 9, 10]:
+            dt = timezone.make_aware(datetime.datetime(2026, m, 15, 10, 0))
+            self._create_completed_wo('PREVENTIVE', dt, Decimal('50000000.00'))
+            self._create_completed_wo('PREDICTIVE_PM', dt, Decimal('10000000.00'))
+
+        self.assertEqual(
+            get_pm_consumption_net_cost(self.tenant, datetime.date(2026, 8, 1), datetime.date(2026, 8, 31)),
+            Decimal('60000000.00'),
+        )
+        self.assertEqual(
+            get_cm_consumption_net_cost(self.tenant, datetime.date(2026, 8, 1), datetime.date(2026, 8, 31)),
+            Decimal('0.00'),
+        )
+
+        # Kiểm tra bất biến: kết quả dự báo khi có 180M PM quá khứ phải khớp với khi có 0M PM quá khứ
+        res_with_hist_pm = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-11')
+        self.assertTrue(res_with_hist_pm['isAiFallback'])
+        self.assertEqual(res_with_hist_pm['plannedPmBudget'], Decimal('2300000'))  # 2M part + 2h * 150k
+
+        feat = CostFeaturePipeline.extract_features(self.tenant, target_date=datetime.date(2026, 11, 28), cost_scope='CM_ONLY')
+        self.assertEqual(feat['feature_dict']['sma_3_cost'], 0.0)
+
+    def test_aud05_02_05_07_cm_only_sma3_fallback_exact_math(self):
+        """Kịch bản 2, 5, 7: Chỉ có CM hoàn thành (< 12 kỳ -> SMA3 CM fallback), tính khớp đồng."""
+        for m, amt in [(8, 6000000), (9, 9000000), (10, 12000000)]:
+            dt = timezone.make_aware(datetime.datetime(2026, m, 10, 9, 0))
+            w_type = 'CORRECTIVE' if m == 8 else ('EMERGENCY' if m == 9 else 'BREAKDOWN')
+            self._create_completed_wo(w_type, dt, Decimal(str(amt)))
+
+        # Khi 3 tháng gần nhất CM = (6M, 9M, 12M) -> SMA3 CM = 9M/tháng
+        res = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-11')
+        self.assertTrue(res['isAiFallback'])
+        self.assertEqual(res['plannedPmBudget'], Decimal('0'))
+        # 9,000,000 * (0.65 * 1.045 + 0.35 * 1.0) = 9,000,000 * 1.02925 = 9,263,250
+        self.assertEqual(res['predictedCmMedian'], Decimal('9263250'))
+        # Contingency 5%: round(9,263,250 * 0.05) = 463,163 (ROUND_HALF_UP)
+        self.assertEqual(res['contingencyBuffer'], Decimal('463163'))
+        self.assertEqual(
+            res['totalForecastMedian'],
+            res['plannedPmBudget'] + res['predictedCmMedian'] + res['contingencyBuffer'],
+        )
+
+    def test_aud05_03_pm_and_cm_invariant_no_double_counting(self):
+        """Kịch bản 3: Thêm hàng trăm triệu PM lịch sử KHÔNG làm tăng predictedCm hay totalForecast ở chế độ SMA3."""
+        self._create_future_pm_plan(interval_days=30, duration_minutes=120, mat_qty=Decimal('1.0'))
+        for m, amt in [(8, 6000000), (9, 9000000), (10, 12000000)]:
+            dt = timezone.make_aware(datetime.datetime(2026, m, 10, 9, 0))
+            self._create_completed_wo('CORRECTIVE', dt, Decimal(str(amt)))
+
+        res_before_hist_pm = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-11')
+
+        # Thêm 300 triệu PM hoàn thành vào tháng 8, 9, 10
+        for m in [8, 9, 10]:
+            dt = timezone.make_aware(datetime.datetime(2026, m, 20, 14, 0))
+            self._create_completed_wo('PREVENTIVE', dt, Decimal('100000000.00'))
+
+        res_after_hist_pm = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-11')
+        self.assertEqual(res_before_hist_pm['plannedPmBudget'], res_after_hist_pm['plannedPmBudget'])
+        self.assertEqual(res_before_hist_pm['predictedCmMedian'], res_after_hist_pm['predictedCmMedian'])
+        self.assertEqual(res_before_hist_pm['predictedCmLowerP10'], res_after_hist_pm['predictedCmLowerP10'])
+        self.assertEqual(res_before_hist_pm['predictedCmUpperP90'], res_after_hist_pm['predictedCmUpperP90'])
+        self.assertEqual(res_before_hist_pm['totalForecastMedian'], res_after_hist_pm['totalForecastMedian'])
+
+    def test_aud05_08_sufficient_history_qrf_trains_on_cm_only_never_pm(self):
+        """Kịch bản 8: Đủ >= 12 kỳ QRF: y_real và X_real chỉ chứa CM, dù mỗi tháng có PM lớn gấp 10 lần."""
+        self._create_future_pm_plan(interval_days=30, duration_minutes=120, mat_qty=Decimal('1.0'))
+        Asset.objects.filter(id=self.asset.id).update(purchase_date=datetime.date(2024, 1, 1))
+
+        ref_date = datetime.date(2026, 12, 1)
+        for months_ago in range(15, 0, -1):
+            y = 2026
+            m = 12 - months_ago
+            while m <= 0:
+                m += 12
+                y -= 1
+            dt = timezone.make_aware(datetime.datetime(y, m, 15, 10, 0))
+            cm_amt = Decimal(str(4000000 + (months_ago % 4) * 500000))
+            pm_amt = Decimal('80000000.00')  # PM lớn gấp ~15x CM nhưng tuyệt đối không được vào QRF target
+            self._create_completed_wo('CORRECTIVE', dt, cm_amt)
+            self._create_completed_wo('PREVENTIVE', dt, pm_amt)
+
+        X_real, y_real, meta = CostFeaturePipeline.build_historical_training_dataset(
+            tenant=self.tenant,
+            reference_date=ref_date,
+            months_back=18,
+        )
+        self.assertGreaterEqual(len(y_real), 12)
+        # Mọi target y_t cho QRF phải <= 6M (chỉ CM), không bao giờ chứa 80M PM
+        self.assertTrue(all(val <= 6000000.0 for val in y_real))
+        self.assertTrue(all(item['pm_reference_cost'] == 80000000.0 for item in meta[-12:]))
+
+        res = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-12')
+        self.assertFalse(res['isAiFallback'])
+        self.assertEqual(res['forecastMethod'], 'HYBRID_QRF')
+        # Dự báo CM không được bị đội lên ~85M theo PM lịch sử
+        self.assertLess(res['predictedCmMedian'], Decimal('10000000'))
+        self.assertGreater(res['evaluationMetrics'].get('test_samples_count', 0), 0)
+        self.assertEqual(
+            res['totalForecastMedian'],
+            res['plannedPmBudget'] + res['predictedCmMedian'] + res['contingencyBuffer'],
+        )
+
+    def test_aud05_09_return_and_adjustment_isolation_plus_legacy_rate_normalization(self):
+        """Kịch bản 9 & chuẩn hóa tỷ lệ VANLAM: RETURN/ADJUSTMENT đúng phạm vi PM vs CM, API historical-trends khớp PM+CM."""
+        from analytics.models import TenantFinancialSetting
+        from algorithms.cost_forecasting.feature_pipeline import get_cm_consumption_net_cost, get_pm_consumption_net_cost
+
+        aug_dt = timezone.make_aware(datetime.datetime(2026, 8, 10, 10, 0))
+        cm_wo = self._create_completed_wo('CORRECTIVE', aug_dt, Decimal('10000000.00'))
+        pm_wo = self._create_completed_wo('PREVENTIVE', aug_dt, Decimal('20000000.00'))
+
+        # Tháng 9: CM phát sinh RETURN 2M và ADJUSTMENT +500k -> CM tháng 9 biến động dồn tích = 0?
+        # Thêm 1 CM tháng 9 trị giá 8M và 1 PM tháng 9 trị giá 15M có RETURN 4M của chính PM tháng 8
+        sep_dt = timezone.make_aware(datetime.datetime(2026, 9, 12, 10, 0))
+        self._create_completed_wo('CORRECTIVE', sep_dt, Decimal('8000000.00'))
+        self._create_completed_wo('PREVENTIVE', sep_dt, Decimal('15000000.00'))
+
+        StockTransaction.all_objects.create(
+            tenant=self.tenant, work_order=cm_wo, spare_part=self.spare_part,
+            transaction_type='RETURN', quantity=Decimal('-1.00'), unit_price=Decimal('2000000.00'),
+            total_amount=Decimal('2000000.00'), issue_date=sep_dt,
+        )
+        StockTransaction.all_objects.create(
+            tenant=self.tenant, work_order=cm_wo, spare_part=self.spare_part,
+            transaction_type='ADJUSTMENT', quantity=Decimal('1.00'), unit_price=Decimal('500000.00'),
+            total_amount=Decimal('500000.00'), issue_date=sep_dt,
+        )
+        # RETURN 4M gắn với PM WO không được phép trừ nhầm vào CM tháng 9!
+        StockTransaction.all_objects.create(
+            tenant=self.tenant, work_order=pm_wo, spare_part=self.spare_part,
+            transaction_type='RETURN', quantity=Decimal('-2.00'), unit_price=Decimal('2000000.00'),
+            total_amount=Decimal('4000000.00'), issue_date=sep_dt,
+        )
+
+        sep_start, sep_end = datetime.date(2026, 9, 1), datetime.date(2026, 9, 30)
+        cm_sep = get_cm_consumption_net_cost(self.tenant, sep_start, sep_end)
+        pm_sep = get_pm_consumption_net_cost(self.tenant, sep_start, sep_end)
+        total_sep = get_actual_consumption_net_cost(self.tenant, sep_start, sep_end)
+
+        self.assertEqual(cm_sep, Decimal('6500000.00'))   # 8M - 2M + 0.5M
+        self.assertEqual(pm_sep, Decimal('11000000.00'))  # 15M - 4M
+        self.assertEqual(total_sep, cm_sep + pm_sep)
+
+        trends = CostForecastingService.get_historical_trends(self.tenant, period='2026-10', months=3)
+        self.assertEqual(trends['actualSeries'][-1], float(total_sep))
+        self.assertEqual(trends['actualCmSeries'][-1], float(cm_sep))
+        self.assertEqual(trends['actualPmSeries'][-1], float(pm_sep))
+
+        # Kiểm chứng chuẩn hóa tỷ lệ seed cũ dạng >1.0 (như VANLAM 4.5% & 10.0%) không nhân 5.5x/10x
+        TenantFinancialSetting.all_objects.create(
+            tenant=self.tenant,
+            default_labor_hourly_rate=Decimal('150000.00'),
+            default_inflation_rate=4.5,
+            default_contingency_rate=10.0,
+            critical_spare_part_ratio=1.25,
+        )
+        fin = CostForecastingService.get_financial_settings(self.tenant)
+        self.assertAlmostEqual(fin['defaultInflationRatePercent'], 4.5, places=2)
+        self.assertAlmostEqual(fin['defaultContingencyRatePercent'], 10.0, places=2)
+        res_norm = HybridBudgetingEngine.execute_forecast(self.tenant, period_str='2026-10')
+        self.assertAlmostEqual(res_norm['inflationRateApplied'], 0.045, places=4)
+        self.assertEqual(
+            res_norm['contingencyBuffer'],
+            ((res_norm['plannedPmBudget'] + res_norm['predictedCmMedian']) * Decimal('0.10')).quantize(Decimal('1')),
+        )
+
+    def test_tc_cost_aud05_prior_frozen_wo_pre_freeze_tx_not_double_counted_and_cost_center_respected(self):
+        """AUD-05: WO hoàn tất kỳ trước nhưng freeze ở đầu kỳ sau không cộng trùng giao dịch pre-freeze và tôn trọng cost_center_snapshot."""
+        from algorithms.cost_forecasting.feature_pipeline import get_cm_consumption_net_cost
+
+        loc_a = Location.all_objects.create(name="Phân xưởng Cơ khí", code="LOC_CK", tenant=self.tenant)
+        loc_b = Location.all_objects.create(name="Phân xưởng Hàn", code="LOC_HAN", tenant=self.tenant)
+        cat = AssetCategory.all_objects.create(name="Máy tiện", tenant=self.tenant)
+        asset = Asset.all_objects.create(
+            tenant=self.tenant, name="Máy tiện CNC-01", category=cat, location=loc_a, status="OPERATIONAL"
+        )
+
+        aug_dt = timezone.make_aware(datetime.datetime(2026, 8, 30, 10, 0, 0))
+        sep02_dt = timezone.make_aware(datetime.datetime(2026, 9, 2, 10, 0, 0))
+        sep03_freeze = timezone.make_aware(datetime.datetime(2026, 9, 3, 12, 0, 0))
+        sep10_dt = timezone.make_aware(datetime.datetime(2026, 9, 10, 14, 0, 0))
+
+        wo = WorkOrder.all_objects.create(
+            tenant=self.tenant,
+            title="Sửa trục chính tháng 8",
+            asset=asset,
+            incident_location=loc_a,
+            type="CORRECTIVE",
+            status="COMPLETED",
+            completed_at=aug_dt,
+        )
+        # Giao dịch trước freeze: 3M ngày 30/08 + 0.5M ngày 02/09 -> Đã chốt vào snapshot 3.5M ngày 03/09
+        tx_aug = StockTransaction.all_objects.create(
+            tenant=self.tenant, work_order=wo, spare_part=self.spare_part,
+            transaction_type='ISSUE', quantity=Decimal('1.00'), unit_price=Decimal('3000000.00'),
+            total_amount=Decimal('3000000.00'), issue_date=aug_dt,
+        )
+        StockTransaction.all_objects.filter(id=tx_aug.id).update(created_at=aug_dt)
+        tx_pre_freeze = StockTransaction.all_objects.create(
+            tenant=self.tenant, work_order=wo, spare_part=self.spare_part,
+            transaction_type='ISSUE', quantity=Decimal('1.00'), unit_price=Decimal('500000.00'),
+            total_amount=Decimal('500000.00'), issue_date=sep02_dt,
+        )
+        StockTransaction.all_objects.filter(id=tx_pre_freeze.id).update(created_at=sep02_dt)
+
+        WorkOrderCost.all_objects.create(
+            tenant=self.tenant,
+            work_order=wo,
+            material_cost=Decimal('3500000.00'),
+            labor_cost=Decimal('0.00'),
+            net_cost=Decimal('3500000.00'),
+            is_cost_frozen=True,
+            cost_frozen_at=sep03_freeze,
+            cost_center_snapshot="Phân xưởng Cơ khí",
+        )
+
+        # Giao dịch thật sự phát sinh SAU mốc freeze (10/09) và điều chuyển tài sản sang xưởng Hàn
+        tx_post_freeze = StockTransaction.all_objects.create(
+            tenant=self.tenant, work_order=wo, spare_part=self.spare_part,
+            transaction_type='ADJUSTMENT', quantity=Decimal('1.00'), unit_price=Decimal('400000.00'),
+            total_amount=Decimal('400000.00'), issue_date=sep10_dt,
+        )
+        StockTransaction.all_objects.filter(id=tx_post_freeze.id).update(created_at=sep10_dt)
+        asset.location = loc_b
+        asset.save()
+
+        aug_cost = get_cm_consumption_net_cost(self.tenant, datetime.date(2026, 8, 1), datetime.date(2026, 8, 31))
+        sep_cost = get_cm_consumption_net_cost(self.tenant, datetime.date(2026, 9, 1), datetime.date(2026, 9, 30))
+        sep_ck = get_cm_consumption_net_cost(
+            self.tenant, datetime.date(2026, 9, 1), datetime.date(2026, 9, 30), cost_center="Phân xưởng Cơ khí"
+        )
+        sep_han = get_cm_consumption_net_cost(
+            self.tenant, datetime.date(2026, 9, 1), datetime.date(2026, 9, 30), cost_center="Phân xưởng Hàn"
+        )
+
+        self.assertEqual(aug_cost, Decimal('3500000.00'))
+        self.assertEqual(sep_cost, Decimal('400000.00'))  # Không được cộng trùng 500,000 của ngày 02/09
+        self.assertEqual(sep_ck, Decimal('400000.00'))
+        self.assertEqual(sep_han, Decimal('0.00'))
+
+
+
+

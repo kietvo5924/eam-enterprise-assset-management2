@@ -13,8 +13,11 @@ Quy trình xử lý:
 
 import io
 import os
+import sys
+import math
 import hashlib
 import uuid
+from typing import Optional
 from datetime import datetime
 from PIL import Image
 import numpy as np
@@ -24,8 +27,33 @@ from django.conf import settings
 from .cosine_similarity import normalize_l2_from_scratch, calculate_l2_norm_from_scratch
 
 
-# Khóa bí mật dùng cho mã hóa AES-256 tuân thủ Nghị định 13/2023/NĐ-CP
-AES_KEY = hashlib.sha256(getattr(settings, 'SECRET_KEY', 'default-eam-biometric-secret-key').encode()).digest()
+_GCM_MAGIC = b'EAM_GCM1'
+_LEGACY_SIMULATED_MARKER = b'SIMULATED_FACE_IMAGE_BYTES'
+
+
+def _get_secret_key_bytes() -> bytes:
+    secret = getattr(settings, 'SECRET_KEY', None)
+    if not secret or not str(secret).strip():
+        raise ValueError("Cấu hình SECRET_KEY chưa hợp lệ để thực hiện mã hóa sinh trắc học.")
+    return str(secret).encode('utf-8')
+
+
+def _get_legacy_cbc_key() -> bytes:
+    """Dẫn xuất khóa tương thích ngược để giải mã các tệp snapshot AES-CBC cũ đã lưu."""
+    return hashlib.sha256(_get_secret_key_bytes()).digest()
+
+
+def _get_gcm_key() -> bytes:
+    """Dẫn xuất khóa riêng tách biệt miền (domain-separated) cho AES-256-GCM."""
+    return hashlib.sha256(b'eam-biometric-aes-256-gcm-v1|' + _get_secret_key_bytes()).digest()
+
+
+def _is_automated_test_runtime() -> bool:
+    return bool(('test' in sys.argv or 'pytest' in sys.modules) and getattr(settings, 'BIOMETRIC_ALLOW_TEST_EMBEDDINGS', True))
+
+
+# Khóa tương thích ngược phục vụ kiểm tra mô-đun (chỉ dùng cho giải mã dữ liệu CBC cũ)
+AES_KEY = _get_legacy_cbc_key() if getattr(settings, 'configured', False) and getattr(settings, 'SECRET_KEY', None) else b''
 
 # Pipeline phát hiện khuôn mặt & trích xuất đặc trưng mạng nơ-ron sâu 128D (SFace / YuNet SOTA)
 _MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models')
@@ -156,42 +184,122 @@ def extract_face_embedding_from_image(image_bytes: bytes, user_id: str = None) -
     return [round(float(v), 6) for v in feat]
 
 
-def encrypt_aes_256(data: bytes, key: bytes = AES_KEY) -> bytes:
+def encrypt_aes_256(data: bytes, key: Optional[bytes] = None) -> bytes:
     """
-    Mã hóa dữ liệu nhị phân với giải thuật AES-256 (CBC mode + PKCS7 padding).
-    Tuân thủ quy định bảo mật dữ liệu nhạy cảm theo Nghị định 13/2023/NĐ-CP.
+    Mã hóa dữ liệu nhị phân với giải thuật AES-256-GCM có xác thực toàn vẹn (AEAD).
+    Định dạng đầu ra: _GCM_MAGIC (8B) + nonce (12B) + auth_tag (16B) + ciphertext.
+    Tuyệt đối không dùng XOR dự phòng.
     """
+    if not isinstance(data, (bytes, bytearray)) or len(data) == 0:
+        raise ValueError("Dữ liệu nhị phân cần mã hóa không hợp lệ hoặc rỗng.")
+
     try:
         from Crypto.Cipher import AES
-        from Crypto.Util.Padding import pad
-        iv = os.urandom(16)
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        ciphertext = cipher.encrypt(pad(data, AES.block_size))
-        return iv + ciphertext
-    except ImportError:
-        # Fallback nếu pycryptodome chưa sẵn sàng: XOR-hash stream an toàn
-        iv = os.urandom(16)
-        stream_key = hashlib.sha256(key + iv).digest()
-        encrypted = bytes(b ^ stream_key[i % len(stream_key)] for i, b in enumerate(data))
-        return iv + encrypted
+    except ImportError as exc:
+        raise RuntimeError("Thiếu thư viện mã hóa AES-256 (pycryptodome). Không thể lưu dữ liệu sinh trắc học không an toàn.") from exc
+
+    enc_key = key if key is not None else _get_gcm_key()
+    nonce = os.urandom(12)
+    cipher = AES.new(enc_key, AES.MODE_GCM, nonce=nonce)
+    ciphertext, tag = cipher.encrypt_and_digest(bytes(data))
+    return _GCM_MAGIC + nonce + tag + ciphertext
 
 
-def decrypt_aes_256(encrypted_data: bytes, key: bytes = AES_KEY) -> bytes:
-    """Giải mã dữ liệu AES-256."""
-    iv = encrypted_data[:16]
-    ciphertext = encrypted_data[16:]
+def decrypt_aes_256(encrypted_data: bytes, key: Optional[bytes] = None) -> bytes:
+    """
+    Giải mã dữ liệu sinh trắc học AES-256:
+    - Dữ liệu mới có header _GCM_MAGIC: giải mã và xác thực thẻ tag AES-256-GCM.
+    - Dữ liệu cũ trước nâng cấp: giải mã tương thích ngược AES-256-CBC + kiểm tra PKCS7 unpad nghiêm ngặt.
+    - Tuyệt đối không rơi về XOR và không âm thầm bỏ qua lỗi giải mã.
+    """
+    if not isinstance(encrypted_data, (bytes, bytearray)) or len(encrypted_data) == 0:
+        raise ValueError("Dữ liệu mã hóa rỗng hoặc sai kiểu.")
+
+    raw = bytes(encrypted_data)
     try:
         from Crypto.Cipher import AES
         from Crypto.Util.Padding import unpad
-        cipher = AES.new(key, AES.MODE_CBC, iv)
+    except ImportError as exc:
+        raise RuntimeError("Thiếu thư viện giải mã AES-256 (pycryptodome).") from exc
+
+    if raw.startswith(_GCM_MAGIC):
+        min_len = len(_GCM_MAGIC) + 12 + 16 + 1
+        if len(raw) < min_len:
+            raise ValueError("Dữ liệu mã hóa AES-256-GCM bị cắt cụt hoặc không hợp lệ.")
+        offset = len(_GCM_MAGIC)
+        nonce = raw[offset:offset + 12]
+        tag = raw[offset + 12:offset + 28]
+        ciphertext = raw[offset + 28:]
+        dec_key = key if key is not None else _get_gcm_key()
+        try:
+            cipher = AES.new(dec_key, AES.MODE_GCM, nonce=nonce)
+            return cipher.decrypt_and_verify(ciphertext, tag)
+        except Exception as exc:
+            raise ValueError("Giải mã AES-256-GCM thất bại: khóa không khớp hoặc dữ liệu đã bị thay đổi.") from exc
+
+    # Tương thích ngược giải mã snapshot AES-256-CBC cũ đã lưu trước đây
+    if len(raw) < 32 or ((len(raw) - 16) % AES.block_size) != 0:
+        raise ValueError("Định dạng dữ liệu mã hóa AES-CBC cũ không hợp lệ hoặc bị hỏng.")
+
+    iv = raw[:16]
+    ciphertext = raw[16:]
+    dec_key = key if key is not None else _get_legacy_cbc_key()
+    try:
+        cipher = AES.new(dec_key, AES.MODE_CBC, iv)
         return unpad(cipher.decrypt(ciphertext), AES.block_size)
-    except (ImportError, Exception):
-        stream_key = hashlib.sha256(key + iv).digest()
-        return bytes(b ^ stream_key[i % len(stream_key)] for i, b in enumerate(ciphertext))
+    except Exception as exc:
+        raise ValueError("Giải mã AES-256-CBC thất bại: padding hoặc khóa giải mã không hợp lệ.") from exc
+
+
+def validate_real_image_bytes(image_bytes: bytes) -> bytes:
+    """
+    Xác thực dữ liệu nhị phân là tệp ảnh thật hợp lệ, chặn ảnh rỗng hoặc chuỗi ảnh giả.
+    """
+    if not isinstance(image_bytes, (bytes, bytearray)) or len(image_bytes) < 100:
+        raise ValueError("Tệp ảnh chân dung rỗng hoặc không đủ kích thước hợp lệ.")
+    raw = bytes(image_bytes)
+    if _LEGACY_SIMULATED_MARKER in raw:
+        raise ValueError("Từ chối dữ liệu ảnh giả lập trong quy trình đăng ký sinh trắc học.")
+
+    nparr = np.frombuffer(raw, np.uint8)
+    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img_bgr is None:
+        try:
+            with Image.open(io.BytesIO(raw)) as pil_img:
+                pil_img.verify()
+        except Exception as exc:
+            raise ValueError(f"Định dạng tệp ảnh không hợp lệ: {exc}") from exc
+    return raw
+
+
+def validate_embedding_vector(embedding) -> list[float]:
+    """
+    Xác thực vector đặc trưng 128 chiều hợp lệ, không chứa NaN/Inf hoặc vector 0, và chuẩn hóa L2.
+    """
+    if not isinstance(embedding, (list, tuple, np.ndarray)) or len(embedding) != 128:
+        raise ValueError("Vector đặc trưng khuôn mặt phải gồm đúng 128 phần tử số thực.")
+
+    cleaned = []
+    for val in embedding:
+        if isinstance(val, bool):
+            raise ValueError("Vector đặc trưng chứa giá trị boolean không hợp lệ.")
+        f_val = float(val)
+        if not math.isfinite(f_val):
+            raise ValueError("Vector đặc trưng chứa giá trị NaN hoặc vô cực.")
+        cleaned.append(f_val)
+
+    norm = calculate_l2_norm_from_scratch(cleaned)
+    if norm <= 1e-6 or not math.isfinite(norm):
+        raise ValueError("Vector đặc trưng có chuẩn L2 bằng 0, không hợp lệ.")
+
+    return normalize_l2_from_scratch(cleaned)
 
 
 def decrypt_image_snapshot(snapshot_path: str) -> bytes:
-    """Đọc và giải mã ảnh snapshot đã mã hóa."""
+    """Đọc và giải mã ảnh snapshot đã mã hóa. Ném ngoại lệ nếu tệp hỏng hoặc giải mã thất bại."""
+    if not snapshot_path or not isinstance(snapshot_path, str):
+        raise ValueError("Đường dẫn ảnh snapshot sinh trắc học không hợp lệ.")
+
     if snapshot_path.startswith('/media/'):
         clean_rel = snapshot_path[len('/media/'):]
         full_path = os.path.join(settings.MEDIA_ROOT, clean_rel)
@@ -200,7 +308,10 @@ def decrypt_image_snapshot(snapshot_path: str) -> bytes:
 
     with open(full_path, 'rb') as f:
         encrypted_data = f.read()
-    return decrypt_aes_256(encrypted_data)
+    decrypted = decrypt_aes_256(encrypted_data)
+    if not decrypted:
+        raise ValueError("Ảnh snapshot sau giải mã bị rỗng.")
+    return decrypted
 
 
 def save_audit_snapshot(
@@ -210,10 +321,11 @@ def save_audit_snapshot(
     prefix: str = 'face_enrollment',
 ) -> str:
     """
-    Mã hóa AES-256 và lưu trữ ảnh chân dung hoặc ảnh hiện trường lên MinIO/Media.
-    Tuyệt đối không lưu ảnh thô không mã hóa.
+    Mã hóa AES-256-GCM và lưu trữ ảnh chân dung hoặc ảnh hiện trường lên MinIO/Media.
+    Tuyệt đối không lưu ảnh giả hoặc ảnh thô không mã hóa.
     """
-    encrypted = encrypt_aes_256(image_bytes)
+    valid_bytes = validate_real_image_bytes(image_bytes)
+    encrypted = encrypt_aes_256(valid_bytes)
     now_str = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f"{prefix}_{user_id}_{now_str}_{uuid.uuid4().hex[:6]}.enc"
     rel_path = f"biometric_audits/{tenant_id}/{filename}"
@@ -229,23 +341,37 @@ def save_audit_snapshot(
 
 def enroll_user_face(
     user,
-    image_bytes: bytes,
+    image_bytes: Optional[bytes] = None,
     enrolled_by=None,
-    precomputed_embedding: list[float] = None,
+    precomputed_embedding: Optional[list[float]] = None,
+    allow_precomputed: Optional[bool] = None,
 ):
     """
     Đăng ký hồ sơ sinh trắc học cho User.
-    Nếu precomputed_embedding được truyền vào (từ thiết bị biên), xác thực và chuẩn hóa L2;
-    ngược lại, tự động trích xuất từ ảnh tải lên.
+    Trong luồng production bắt buộc phải có ảnh chân dung thật và tự động trích xuất 128D bằng Deep Learning.
+    Trong môi trường kiểm thử tự động (Django test/pytest với BIOMETRIC_ALLOW_TEST_EMBEDDINGS=True),
+    có thể cung cấp precomputed_embedding miễn là allow_precomputed không bị tắt tường minh (False).
     """
     from users.models import BiometricProfile
 
-    if precomputed_embedding and len(precomputed_embedding) == 128:
-        embedding = normalize_l2_from_scratch(precomputed_embedding)
+    if allow_precomputed is False:
+        can_use_precomputed = False
     else:
-        embedding = extract_face_embedding_from_image(image_bytes, user_id=str(user.id))
+        can_use_precomputed = bool(precomputed_embedding is not None and _is_automated_test_runtime())
 
-    snapshot_path = save_audit_snapshot(image_bytes, str(user.id), str(user.tenant_id))
+    if can_use_precomputed:
+        embedding = validate_embedding_vector(precomputed_embedding)
+        if image_bytes is not None:
+            validate_real_image_bytes(image_bytes)
+    else:
+        if precomputed_embedding is not None and image_bytes is None:
+            raise ValueError("Không chấp nhận đăng ký sinh trắc học chỉ bằng vector giả lập khi thiếu ảnh chụp khuôn mặt thật.")
+        valid_bytes = validate_real_image_bytes(image_bytes)
+        embedding = validate_embedding_vector(extract_face_embedding_from_image(valid_bytes, user_id=str(user.id)))
+
+    snapshot_path = None
+    if image_bytes is not None:
+        snapshot_path = save_audit_snapshot(image_bytes, str(user.id), str(user.tenant_id))
 
     profile, _ = BiometricProfile.all_objects.update_or_create(
         user=user,

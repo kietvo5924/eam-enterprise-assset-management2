@@ -151,8 +151,12 @@
           <tr class="hover:bg-neutral-50/50 transition-colors user-row" data-status="{{ u.status }}" data-roles="{% for role in u.roles.all %}{{ role.id }},{% endfor %}">
             <td class="px-4 py-3 font-semibold text-gray-800 user-username">
               <div class="flex items-center gap-2.5">
-                {% if u.has_biometric %}
+                {% if u.has_face_photo %}
                 <img src="{% url 'portal_user_face_photo' u.id %}" alt="{{ u.username }}" class="w-7 h-7 rounded-full object-cover border border-emerald-300 shadow-xs" title="Đã có ảnh chân dung">
+                {% elif u.has_biometric %}
+                <div class="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-300 flex items-center justify-center text-emerald-700 font-bold text-[11px]" title="Đã đăng ký vector sinh trắc học (chưa có tệp ảnh)">
+                  {{ u.username|slice:":1"|upper }}
+                </div>
                 {% else %}
                 <div class="w-7 h-7 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-500 font-bold text-[11px]" title="Chưa có ảnh">
                   {{ u.username|slice:":1"|upper }}
@@ -749,6 +753,8 @@
         // Biometric Face Status & Live Photo Display
         const profBio = (id && window.USER_PROFILES && window.USER_PROFILES[id]) ? window.USER_PROFILES[id] : null;
         window.CURRENT_USER_HAS_BIOMETRIC = !!(profBio && profBio.has_biometric);
+        window.CURRENT_USER_HAS_FACE_PHOTO = !!(profBio && profBio.has_face_photo);
+        const hasFacePhoto = window.CURRENT_USER_HAS_FACE_PHOTO;
 
         const previewImg = document.getElementById('face-preview-img');
         const phIcon = document.getElementById('face-placeholder-icon');
@@ -757,7 +763,7 @@
         const faceInput = document.getElementById('user-face-file');
         if (faceInput) faceInput.value = '';
 
-        if (id && window.CURRENT_USER_HAS_BIOMETRIC) {
+        if (id && hasFacePhoto) {
             if (previewImg) {
                 previewImg.src = `/portal/users/${id}/face-photo/?t=${Date.now()}`;
                 previewImg.classList.remove('hidden');
@@ -775,8 +781,13 @@
             }
             if (phIcon) phIcon.classList.remove('hidden');
             if (badge) {
-                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600';
-                badge.textContent = 'Chưa có ảnh';
+                if (id && window.CURRENT_USER_HAS_BIOMETRIC) {
+                    badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700';
+                    badge.textContent = 'Đã đăng ký (chưa có ảnh)';
+                } else {
+                    badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600';
+                    badge.textContent = 'Chưa có ảnh';
+                }
             }
             if (rmBtn) rmBtn.classList.add('hidden');
         }
@@ -963,7 +974,7 @@
         const rmBtn = document.getElementById('btn-remove-face');
         const userId = document.getElementById('user-id').value;
 
-        if (window.CURRENT_USER_HAS_BIOMETRIC && userId) {
+        if (window.CURRENT_USER_HAS_FACE_PHOTO && userId) {
             if (previewImg) {
                 previewImg.src = `/portal/users/${userId}/face-photo/?t=${Date.now()}`;
                 previewImg.classList.remove('hidden');
@@ -981,8 +992,13 @@
             }
             if (phIcon) phIcon.classList.remove('hidden');
             if (badge) {
-                badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600';
-                badge.textContent = 'Chưa có ảnh';
+                if (userId && window.CURRENT_USER_HAS_BIOMETRIC) {
+                    badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700';
+                    badge.textContent = 'Đã đăng ký (chưa có ảnh)';
+                } else {
+                    badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-neutral-600';
+                    badge.textContent = 'Chưa có ảnh';
+                }
             }
             if (rmBtn) rmBtn.classList.add('hidden');
         }

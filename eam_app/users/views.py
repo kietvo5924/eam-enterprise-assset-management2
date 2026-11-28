@@ -638,7 +638,8 @@ class UserMeProfileView(APIView):
                 else:
                     avatar_b64 = base64.b64encode(decrypted).decode('utf-8')
         except Exception as ex:
-            print('AVATAR ERROR:', repr(ex))
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to decrypt biometric profile avatar for user={user.id}: {ex}")
             avatar_b64 = None
 
         res_data = {

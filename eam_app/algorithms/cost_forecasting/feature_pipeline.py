@@ -18,17 +18,27 @@ from workorders.models import WorkOrder, WorkOrderCost, LaborLog
 from algorithms.cost_forecasting.constants import (
     FEATURE_NAMES,
     MIN_MONTHS_TRAINING_DATA,
-    DEFAULT_LABOR_HOURLY_RATE
+    DEFAULT_LABOR_HOURLY_RATE,
+    PM_WORK_ORDER_TYPES,
+    CM_WORK_ORDER_TYPES,
+    normalize_rate_coefficient,
 )
 
 
-def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date: datetime.date, cost_center: Optional[str] = None) -> Decimal:
+def get_actual_consumption_net_cost(
+    tenant,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    cost_center: Optional[str] = None,
+    wo_types: Optional[Tuple[str, ...]] = None,
+    exclude_pm: bool = False,
+) -> Decimal:
     """
     Quy tắc 5 & 6: Tính chi phí tiêu hao thực tế (loại bỏ 100% nhập kho lưu trữ RECEIPT).
     Chỉ lấy phụ tùng đã xuất vào WorkOrder completed trừ đi nhập trả thừa,
     cộng giờ công thợ theo kế toán dồn tích, bóc tách CapEx và khấu trừ tài sản đã thanh lý.
-    Tổng hợp cả Work Order đã chốt snapshot lẫn chưa chốt snapshot trong kỳ mà không cộng trùng,
-    bảo toàn chi phí ròng net_cost = 0 khi được bảo hành/bảo hiểm 100%.
+    Hỗ trợ lọc tách biệt theo loại Work Order (wo_types / exclude_pm) trên CẢ completed_wos
+    và prior_completed_wos để tách bạch PM vs CM, tuyệt đối không cộng trùng hoặc trừ chéo RETURN/ADJUSTMENT.
     """
     # 1. Danh sách ID tài sản đã thanh lý cần cắt tỉa (Rule 7)
     disposed_asset_ids = set(Asset.all_objects.filter(
@@ -52,11 +62,22 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
         completed_at__date__lt=start_date
     ).exclude(asset_id__in=disposed_asset_ids)
 
+    if wo_types:
+        completed_wos = completed_wos.filter(type__in=list(wo_types))
+        prior_completed_wos = prior_completed_wos.filter(type__in=list(wo_types))
+    elif exclude_pm:
+        completed_wos = completed_wos.exclude(type__in=list(PM_WORK_ORDER_TYPES))
+        prior_completed_wos = prior_completed_wos.exclude(type__in=list(PM_WORK_ORDER_TYPES))
+
     if cost_center:
         prior_completed_wos = prior_completed_wos.filter(
-            Q(cost_breakdown__cost_center_snapshot=cost_center) |
-            Q(incident_location__name=cost_center) |
-            Q(asset__location__name=cost_center)
+            (Q(cost_breakdown__is_cost_frozen=True) & Q(cost_breakdown__cost_center_snapshot=cost_center)) |
+            (
+                (Q(cost_breakdown__isnull=True) | Q(cost_breakdown__is_cost_frozen=False)) & (
+                    Q(incident_location__name=cost_center) |
+                    (Q(incident_location__isnull=True) & Q(asset__location__name=cost_center))
+                )
+            )
         )
 
     prior_completed_wos = prior_completed_wos.exclude(
@@ -71,6 +92,12 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
         transaction_type__in=['ISSUE', 'ADJUSTMENT', 'RETURN'],
         issue_date__date__gte=start_date,
         issue_date__date__lte=end_date
+    ).filter(
+        Q(work_order__cost_breakdown__isnull=True) |
+        Q(work_order__cost_breakdown__is_cost_frozen=False) |
+        Q(work_order__cost_breakdown__cost_frozen_at__isnull=True) |
+        Q(issue_date__gt=F('work_order__cost_breakdown__cost_frozen_at')) |
+        Q(created_at__gt=F('work_order__cost_breakdown__cost_frozen_at'))
     )
 
     if not completed_wos.exists() and not prior_post_txs.exists():
@@ -171,15 +198,39 @@ def get_actual_consumption_net_cost(tenant, start_date: datetime.date, end_date:
 
             total_net += net
 
-    # Cộng dồn các giao dịch điều chỉnh phát sinh trong kỳ đối với các Work Order hoàn thành trước đó
+    # Cộng dồn biến động điều chỉnh phát sinh trong kỳ đối với các WO hoàn thành trước đó (không phụ thuộc thứ tự bản ghi)
+    prior_delta = Decimal('0.00')
     for ptx in prior_post_txs:
         p_amt = ptx.total_amount or Decimal('0.00')
         if ptx.transaction_type == 'RETURN':
-            total_net = max(Decimal('0.00'), total_net - p_amt)
+            prior_delta -= p_amt
         else:
-            total_net += p_amt
+            prior_delta += p_amt
 
+    total_net = max(Decimal('0.00'), total_net + prior_delta)
     return total_net.quantize(Decimal('0.01'))
+
+
+def get_cm_consumption_net_cost(tenant, start_date: datetime.date, end_date: datetime.date, cost_center: Optional[str] = None) -> Decimal:
+    """Chi phí tiêu hao thực tế CHỈ tính các phiếu sửa chữa/sự cố (CM: CORRECTIVE, EMERGENCY, BREAKDOWN)."""
+    return get_actual_consumption_net_cost(
+        tenant=tenant,
+        start_date=start_date,
+        end_date=end_date,
+        cost_center=cost_center,
+        wo_types=CM_WORK_ORDER_TYPES,
+    )
+
+
+def get_pm_consumption_net_cost(tenant, start_date: datetime.date, end_date: datetime.date, cost_center: Optional[str] = None) -> Decimal:
+    """Chi phí tiêu hao thực tế CHỈ tính các phiếu bảo trì định kỳ/dự đoán (PM: PREVENTIVE, PREDICTIVE_PM)."""
+    return get_actual_consumption_net_cost(
+        tenant=tenant,
+        start_date=start_date,
+        end_date=end_date,
+        cost_center=cost_center,
+        wo_types=PM_WORK_ORDER_TYPES,
+    )
 
 
 def count_working_days(year: int, month: int) -> int:
@@ -204,11 +255,22 @@ class CostFeaturePipeline:
         tenant,
         reference_date: datetime.date,
         months_back: int = 12,
-        cost_center: Optional[str] = None
+        cost_center: Optional[str] = None,
+        cost_scope: str = 'ALL'
     ) -> List[Tuple[str, Decimal]]:
         """
         Lấy danh sách (chuỗi thời gian) chi phí ròng OpEx thực tế theo từng tháng trong quá khứ.
+        cost_scope:
+        - 'CM_ONLY': Chỉ lấy chi phí sự cố CM (CORRECTIVE, EMERGENCY, BREAKDOWN) cho mục tiêu huấn luyện QRF và SMA3 CM.
+        - 'PM_ONLY': Chỉ lấy chi phí bảo trì định kỳ/dự đoán đã hoàn tất.
+        - 'ALL': Tổng OpEx (PM + CM) phục vụ biểu đồ đối soát tổng chi phí.
         """
+        wo_types = None
+        if cost_scope == 'CM_ONLY':
+            wo_types = CM_WORK_ORDER_TYPES
+        elif cost_scope == 'PM_ONLY':
+            wo_types = PM_WORK_ORDER_TYPES
+
         results = []
         cur_year = reference_date.year
         cur_month = reference_date.month
@@ -226,7 +288,7 @@ class CostFeaturePipeline:
             end_d = datetime.date(y, m, last_day)
 
             period_label = f"{y}-{m:02d}"
-            cost = get_actual_consumption_net_cost(tenant, start_d, end_d, cost_center)
+            cost = get_actual_consumption_net_cost(tenant, start_d, end_d, cost_center, wo_types=wo_types)
             results.append((period_label, cost))
 
         return results
@@ -236,17 +298,19 @@ class CostFeaturePipeline:
         cls,
         tenant,
         target_date: Optional[datetime.date] = None,
-        cost_center: Optional[str] = None
+        cost_center: Optional[str] = None,
+        cost_scope: str = 'CM_ONLY'
     ) -> Dict[str, Any]:
         """
-        Trích xuất đầy đủ 16 đặc trưng cho kỳ dự báo tiếp theo.
+        Trích xuất đầy đủ 16 đặc trưng cho kỳ dự báo sự cố (CM) tiếp theo.
+        Các đặc trưng trễ và trung bình trượt dùng đúng chuỗi CM để không cộng trùng PM vào dự báo CM.
         """
         if not target_date:
             target_date = timezone.now().date()
 
-        # 1. Lấy chuỗi lịch sử 6 tháng gần nhất để tính độ trễ và trung bình trượt
+        # 1. Lấy chuỗi lịch sử 6 tháng gần nhất (CHỈ CM khi cost_scope='CM_ONLY') để tính độ trễ và trung bình trượt
         monthly_costs = cls.get_monthly_historical_costs(
-            tenant, reference_date=target_date, months_back=6, cost_center=cost_center
+            tenant, reference_date=target_date, months_back=6, cost_center=cost_center, cost_scope=cost_scope
         )
         costs_float = [float(cost) for _, cost in monthly_costs]
         while len(costs_float) < 6:
@@ -345,7 +409,7 @@ class CostFeaturePipeline:
         # Sử dụng lịch sử dự đoán RUL tại thời điểm target_date để chống rò rỉ tương lai
         from analytics.models import TenantFinancialSetting
         fin_setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
-        spare_ratio = fin_setting.critical_spare_part_ratio if fin_setting else 0.05
+        spare_ratio = normalize_rate_coefficient(fin_setting.critical_spare_part_ratio if fin_setting else None, 0.05)
 
         today = timezone.now().date()
         is_current_or_future = (target_date >= today.replace(day=1))
@@ -532,14 +596,16 @@ class CostFeaturePipeline:
             if not assets_existed:
                 continue
 
-            # Target y_t: Chi phí thực tế tháng t
-            target_cost = get_actual_consumption_net_cost(tenant, start_t, end_t, cost_center)
+            # Target y_t: Chi phí sự cố CM thực tế tháng t (tuyệt đối loại trừ PM để chống cộng trùng)
+            target_cost = get_cm_consumption_net_cost(tenant, start_t, end_t, cost_center)
+            pm_reference_cost = get_pm_consumption_net_cost(tenant, start_t, end_t, cost_center)
 
-            # Feature vector X_t trích xuất tại ngày đầu tháng t (start_t)
+            # Feature vector X_t trích xuất tại ngày đầu tháng t (start_t) trên chuỗi CM
             feat_data = cls.extract_features(
                 tenant=tenant,
                 target_date=start_t,
-                cost_center=cost_center
+                cost_center=cost_center,
+                cost_scope='CM_ONLY'
             )
             vec = feat_data["feature_vector"]
 
@@ -548,6 +614,9 @@ class CostFeaturePipeline:
             metadata.append({
                 "period": f"{y}-{m:02d}",
                 "target_cost": float(target_cost),
+                "target_cm_cost": float(target_cost),
+                "pm_reference_cost": float(pm_reference_cost),
+                "total_actual_opex": float(target_cost + pm_reference_cost),
                 "features": feat_data["feature_dict"]
             })
 

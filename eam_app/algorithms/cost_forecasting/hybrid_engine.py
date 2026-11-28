@@ -22,7 +22,8 @@ from algorithms.cost_forecasting.constants import (
     WARNING_BUDGET_USAGE_RATIO,
     CRITICAL_BUDGET_USAGE_RATIO,
     MIN_MONTHS_TRAINING_DATA,
-    MIN_HISTORICAL_PERIODS_FOR_ML
+    MIN_HISTORICAL_PERIODS_FOR_ML,
+    normalize_rate_coefficient,
 )
 from algorithms.cost_forecasting.feature_pipeline import CostFeaturePipeline
 from algorithms.cost_forecasting.qrf_model import QuantileRegressionForestEngine
@@ -168,9 +169,19 @@ class HybridBudgetingEngine:
         if hourly_rate is None:
             hourly_rate = setting.default_labor_hourly_rate if setting else DEFAULT_LABOR_HOURLY_RATE
         if inflation_rate is None:
-            inflation_rate = setting.default_inflation_rate if setting else DEFAULT_INFLATION_RATE
+            inflation_rate = normalize_rate_coefficient(
+                setting.default_inflation_rate if setting else None,
+                DEFAULT_INFLATION_RATE
+            )
+        else:
+            inflation_rate = normalize_rate_coefficient(inflation_rate, DEFAULT_INFLATION_RATE)
         if contingency_rate is None:
-            contingency_rate = setting.default_contingency_rate if setting else DEFAULT_CONTINGENCY_BUFFER_RATE
+            contingency_rate = normalize_rate_coefficient(
+                setting.default_contingency_rate if setting else None,
+                DEFAULT_CONTINGENCY_BUFFER_RATE
+            )
+        else:
+            contingency_rate = normalize_rate_coefficient(contingency_rate, DEFAULT_CONTINGENCY_BUFFER_RATE)
 
         # 1. Xác định khung thời gian start_date, end_date của kỳ dự báo
         if '-Q' in period_str:
@@ -200,10 +211,10 @@ class HybridBudgetingEngine:
             tenant, start_date=start_date, end_date=end_date, cost_center=cost_center, hourly_rate=hourly_rate
         )
 
-        # 3. Trích xuất đặc trưng chuỗi thời gian đa biến (nếu kỳ hiện tại, lấy mốc thời gian cập nhật nhất)
+        # 3. Trích xuất đặc trưng chuỗi thời gian CM đa biến (chỉ tính lịch sử CM để không cộng trùng PM)
         target_feature_date = max(today, start_date)
         feature_data = CostFeaturePipeline.extract_features(
-            tenant, target_date=target_feature_date, cost_center=cost_center
+            tenant, target_date=target_feature_date, cost_center=cost_center, cost_scope='CM_ONLY'
         )
         feature_vector = feature_data["feature_vector"]
         historical_costs = feature_data["historical_costs"]
@@ -313,18 +324,27 @@ class HybridBudgetingEngine:
             # Xác định số tháng trong kỳ dự báo để quy đổi chính xác
             period_months = 3.0 if '-Q' in period_str else 1.0
 
-            # Lấy trung bình trượt SMA3 quy đổi theo độ dài kỳ, hoặc định mức kinh nghiệm 3.5% RAV / năm
+            # Lấy trung bình trượt SMA3 CM quy đổi theo độ dài kỳ, hoặc định mức kinh nghiệm 3.5% RAV / năm
+            # Tuyệt đối không lấy tỷ lệ theo planned_pm_cost hay lịch sử PM để tránh cộng trùng PM vào CM
             base_cm = Decimal('0')
+            cm_source_driver = {
+                "feature": "Định mức sự cố CM theo giá trị thay thế (3.5% RAV)",
+                "raw_key": "total_fleet_rav",
+                "importance": 0.40
+            }
             if feature_vector[3] > 0:
                 base_cm = Decimal(str(feature_vector[3])) * Decimal(str(period_months))
+                cm_source_driver = {
+                    "feature": "Trung bình trượt chi phí sự cố CM 3 tháng (SMA3 CM)",
+                    "raw_key": "sma_3_cost",
+                    "importance": 0.45
+                }
             elif total_rav > Decimal('0'):
                 base_cm = round_vnd((total_rav * Decimal('0.035') * Decimal(str(period_months))) / Decimal('12.0'))
             else:
-                if planned_pm_cost > Decimal('0'):
-                    base_cm = round_vnd(planned_pm_cost * Decimal('0.60'))
-                else:
-                    active_count = max(1, int(feature_vector[8]))
-                    base_cm = Decimal(str(active_count * 2000000 * int(period_months)))
+                # Fallback tối thiểu theo quy mô thiết bị (không phụ thuộc PM lịch sử hay planned_pm_cost)
+                active_count = max(1, int(feature_vector[8]))
+                base_cm = Decimal(str(active_count * 2000000 * int(period_months)))
 
             inflation_factor = Decimal(str(1.0 + float(inflation_rate)))
             labor_rate_ratio = Decimal(str(hourly_rate / DEFAULT_LABOR_HOURLY_RATE)) if DEFAULT_LABOR_HOURLY_RATE > 0 else Decimal('1.0')
@@ -344,8 +364,8 @@ class HybridBudgetingEngine:
                 cm_p90 += rul_liability_float
 
             top_cost_drivers = [
-                {"feature": "Kế hoạch bảo trì định kỳ xác định (Deterministic PM)", "raw_key": "planned_pm", "importance": 0.45},
-                {"feature": "Định mức bảo trì theo giá trị thay thế (RAV Benchmark)", "raw_key": "total_fleet_rav", "importance": 0.35},
+                {"feature": "Kế hoạch bảo trì định kỳ xác định (Deterministic PM)", "raw_key": "planned_pm", "importance": 0.35},
+                cm_source_driver,
                 {"feature": "Chỉ số trượt giá lạm phát kỳ vọng", "raw_key": "inflation", "importance": 0.20}
             ]
 

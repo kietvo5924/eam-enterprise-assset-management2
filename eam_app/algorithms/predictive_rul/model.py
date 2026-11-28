@@ -8,7 +8,8 @@ import numpy as np
 from typing import List, Dict, Any, Tuple, Optional
 from .constants import (
     FEATURE_DIM, LSTM_HIDDEN_DIM_1, LSTM_HIDDEN_DIM_2,
-    MC_DROPOUT_RATE, MC_DROPOUT_PASSES, RUL_MAX_CLIP_DAYS
+    MC_DROPOUT_RATE, MC_DROPOUT_PASSES, RUL_MAX_CLIP_DAYS,
+    MODEL_VERSION, IS_MODEL_TRAINED, MODEL_TRAINING_STATUS
 )
 
 # Thử nghiệm import PyTorch nếu có sẵn
@@ -56,17 +57,29 @@ if HAS_TORCH:
 
 class NumpyLSTMRULPredictor:
     """
-    Động cơ suy diễn thuần NumPy (Pure NumPy Inference Engine).
-    Đảm bảo 100% tính khả chuyển và chạy mượt mà ngay cả khi môi trường không có PyTorch.
-    Mô phỏng chính xác phương trình tế bào LSTM:
-    - Forget gate: f_t = sigma(W_f x_t + U_f h_{t-1} + b_f)
-    - Input gate:  i_t = sigma(W_i x_t + U_i h_{t-1} + b_i)
-    - Candidate:   c~_t = tanh(W_c x_t + U_c h_{t-1} + b_c)
-    - Cell state:  c_t = f_t * c_{t-1} + i_t * c~_t
-    - Output gate: o_t = sigma(W_o x_t + U_o h_{t-1} + b_o)
-    - Hidden:      h_t = o_t * tanh(c_t)
-    - MC-Dropout: Inverted Dropout với p = 0.20
+    Động cơ suy diễn thuần NumPy (Pure NumPy Inference Engine) ở trạng thái NGUYÊN MẪU CHƯA HUẤN LUYỆN.
+    Trọng số được khởi tạo xác định (Xavier/He seed=42, b_fc=45.0) kết hợp công thức hiệu chỉnh heuristic,
+    chưa được huấn luyện trên tập dữ liệu hỏng hóc thực tế có nhãn tại nhà máy.
     """
+    is_trained_on_real_data = IS_MODEL_TRAINED
+    training_status = MODEL_TRAINING_STATUS
+    model_version = MODEL_VERSION
+
+    @classmethod
+    def get_model_metadata(cls) -> Dict[str, Any]:
+        return {
+            "modelName": "NumpyLSTMRULPredictor",
+            "modelVersion": cls.model_version,
+            "isTrainedOnRealData": cls.is_trained_on_real_data,
+            "trainingStatus": cls.training_status,
+            "isPrototype": not cls.is_trained_on_real_data,
+            "calibrationNote": (
+                "Nguyên mẫu thử nghiệm dùng NumpyLSTMRULPredictor với trọng số khởi tạo "
+                "và công thức hiệu chỉnh theo độ rung/chênh lệch nhiệt; chưa được huấn luyện "
+                "trên dữ liệu hỏng hóc thực tế có nhãn và chưa công bố chỉ số MAE/RMSE."
+            ),
+        }
+
     def __init__(self, seed: int = 42):
         self.input_dim = FEATURE_DIM
         self.hidden_1 = LSTM_HIDDEN_DIM_1

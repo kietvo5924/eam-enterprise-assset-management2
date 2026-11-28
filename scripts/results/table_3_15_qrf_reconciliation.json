@@ -1,0 +1,121 @@
+{
+  "vanlam_real_db": {
+    "monthly_rows": [
+      {
+        "Tháng": "2026-08",
+        "PM thực tế (VNĐ)": 15950000.0,
+        "CM thực tế (VNĐ)": 8250000.0,
+        "Tổng OpEx thực tế (VNĐ)": 24200000.0,
+        "Khớp PM+CM": true
+      },
+      {
+        "Tháng": "2026-09",
+        "PM thực tế (VNĐ)": 6470000.0,
+        "CM thực tế (VNĐ)": 7500000.0,
+        "Tổng OpEx thực tế (VNĐ)": 13970000.0,
+        "Khớp PM+CM": true
+      },
+      {
+        "Tháng": "2026-10",
+        "PM thực tế (VNĐ)": 15250000.0,
+        "CM thực tế (VNĐ)": 9080000.0,
+        "Tổng OpEx thực tế (VNĐ)": 24330000.0,
+        "Khớp PM+CM": true
+      },
+      {
+        "Tháng": "2026-11",
+        "PM thực tế (VNĐ)": 6200000.0,
+        "CM thực tế (VNĐ)": 11290000.0,
+        "Tổng OpEx thực tế (VNĐ)": 17490000.0,
+        "Khớp PM+CM": true
+      }
+    ],
+    "readiness": {
+      "aiEnabled": true,
+      "monthsWithData": 3,
+      "monthsWithCmData": 3,
+      "usableHistoricalPeriods": 0,
+      "positiveCmPeriods": 0,
+      "minMonthsRequired": 12,
+      "isReadyForAiQrf": false,
+      "fallbackReason": "INSUFFICIENT_HISTORICAL_DATA",
+      "activeAssetsCount": 48,
+      "activePmPlansCount": 13,
+      "statusLabel": "Chế độ SMA3 CM Fallback (Cần tối thiểu 12 kỳ lịch sử có nhãn CM; hiện có 0 kỳ, 0 kỳ có phát sinh CM)"
+    },
+    "forecast_q4": {
+      "forecastMethod": "DETERMINISTIC_FALLBACK",
+      "isAiFallback": true,
+      "fallbackReason": "INSUFFICIENT_HISTORICAL_DATA",
+      "inflationRateApplied": 0.045,
+      "hourlyRateApplied": 250000.0,
+      "plannedPmBudget": 6780000.0,
+      "predictedCmLowerP10": 28577453.0,
+      "predictedCmMedian": 33279944.0,
+      "predictedCmUpperP90": 41117430.0,
+      "contingencyBuffer": 4005994.0,
+      "totalForecastP10": 39363447.0,
+      "totalForecastMedian": 44065938.0,
+      "totalForecastP90": 51903424.0,
+      "reconciledExact": true
+    },
+    "trends_tail_check": {
+      "labels": [
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09"
+      ],
+      "actualSeries": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        24200000.0,
+        13970000.0
+      ],
+      "actualPmSeries": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        15950000.0,
+        6470000.0
+      ],
+      "actualCmSeries": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        8250000.0,
+        7500000.0
+      ]
+    }
+  },
+  "controlled_qrf_simulation": {
+    "note": "Synthetic 18-period controlled simulation matching 16-feature schema",
+    "planned_pm": 12000000.0,
+    "qrf_cm_only_p10": 7317137.68,
+    "qrf_cm_only_p50": 8262270.41,
+    "qrf_cm_only_p90": 9194435.35,
+    "total_reconciled_p50": 20262270.41,
+    "legacy_double_count_total_p50": 32310184.73,
+    "double_count_inflation_vnd": 12047914.32,
+    "backtest_cm_only": {
+      "is_evaluated": true,
+      "test_samples_count": 4,
+      "sampleCount": 4,
+      "mae": 507259.1,
+      "wape": 5.48,
+      "wapePercent": 5.48,
+      "rmse": 618426.99,
+      "coverage_p10_p90": 100.0,
+      "coverageP10P90Percent": 100.0,
+      "baselineSmaMae": 1132205.78,
+      "improvement_vs_sma_percent": 55.2,
+      "improvementOverBaselinePercent": 55.2
+    }
+  }
+}

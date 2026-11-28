@@ -1349,6 +1349,8 @@ class AssetImportTemplateView(APIView):
 
 
 from algorithms.predictive_rul import RULPredictiveService, PredictiveRULGuardrails
+from algorithms.predictive_rul.model import NumpyLSTMRULPredictor
+from algorithms.predictive_rul.constants import COLD_START_MIN_SAMPLES
 from assets.serializers import AssetRulPredictionSerializer
 
 class AssetRulPredictionDetailView(APIView):
@@ -1372,6 +1374,9 @@ class AssetRulPredictionDetailView(APIView):
                 "calendarRulDays": None,
                 "riskLevel": "DISABLED",
                 "message": "Thuật toán AI Dự đoán Tuổi thọ Còn lại (RUL) đang tạm tắt theo cài đặt tổ chức. Hệ thống áp dụng quy trình bảo trì định kỳ truyền thống.",
+                "recommendedAction": "Thuật toán AI Dự đoán Tuổi thọ Còn lại (RUL) đang tạm tắt theo cài đặt tổ chức. Hệ thống áp dụng quy trình bảo trì định kỳ truyền thống.",
+                "modelMetadata": NumpyLSTMRULPredictor.get_model_metadata(),
+                "sensorDiagnostics": None,
                 "history": []
             })
 
@@ -1391,6 +1396,23 @@ class AssetRulPredictionDetailView(APIView):
             except Exception:
                 pass
 
+        # Thống kê chuẩn xác chu kỳ đo đa kênh RUNNING hiện có trên thiết bị
+        readings_qs = MeterReading.objects.filter(asset=asset, is_suppressed=False).order_by('reading_date')
+        raw_readings_list = list(readings_qs)
+        raw_running_count = sum(
+            1 for r in raw_readings_list
+            if str(getattr(r, 'machine_state', 'RUNNING') or 'RUNNING').upper().strip() == 'RUNNING'
+            and not getattr(r, 'is_pre_repair', False)
+            and not getattr(r, 'is_suppressed', False)
+        )
+        grouped_cycles = PredictiveRULGuardrails.filter_running_meter_readings(raw_readings_list)
+        running_count = len(grouped_cycles)
+        sensor_diagnostics = PredictiveRULGuardrails.analyze_grouped_channel_completeness(
+            grouped_cycles,
+            raw_running_count=raw_running_count
+        )
+        model_metadata = NumpyLSTMRULPredictor.get_model_metadata()
+
         # Lấy lịch sử 10 lần dự đoán gần nhất để vẽ biểu đồ suy thoái
         history = list(AssetRulPrediction.objects.filter(asset=asset).order_by('-created_at')[:10])
         history.reverse()
@@ -1400,24 +1422,52 @@ class AssetRulPredictionDetailView(APIView):
         crit_threshold = PredictiveRULGuardrails.calculate_dynamic_critical_threshold(lead_time)
         stock_qty = float(spare_part.quantity_in_stock) if spare_part else 0.0
 
+        is_cold_start, cold_msg = PredictiveRULGuardrails.check_cold_start_bypass(running_count)
+        if is_cold_start:
+            rec_message = cold_msg
+        elif asset.rul_risk_level == 'CALIBRATING':
+            rec_message = (
+                "Đã đủ chu kỳ đo RUNNING tối thiểu. Nhấn 'Chạy AI RUL' để kích hoạt đánh giá tham khảo "
+                "từ nguyên mẫu NumpyLSTMRULPredictor."
+            )
+        else:
+            rec_message = (
+                "Kết quả tham khảo từ nguyên mẫu NumpyLSTMRULPredictor (trọng số khởi tạo + hiệu chỉnh heuristic theo rung/nhiệt). "
+                "Cần đối chiếu với ngưỡng ISO 10816 và tình trạng kiểm định hiện trường."
+            )
+
+        effective_op_rul = None if is_cold_start else asset.current_rul_days
+        effective_cal_rul = None if is_cold_start else asset.current_rul_calendar_days
+        effective_conf_lower = None if is_cold_start else asset.rul_confidence_lower
+        effective_conf_upper = None if is_cold_start else asset.rul_confidence_upper
+        effective_std_dev = 0.0 if is_cold_start else (latest_pred.std_deviation if latest_pred else 0.0)
+        effective_high_uncertainty = False if is_cold_start else (bool(latest_pred.std_deviation > 10.0) if latest_pred else False)
+        effective_risk_level = 'CALIBRATING' if is_cold_start else asset.rul_risk_level
+        effective_phantom = False if is_cold_start else asset.is_phantom_recovery
+        effective_rapid = False if is_cold_start else asset.rapid_degradation_alert
+        effective_rapid_rate = None if is_cold_start else (latest_pred.rapid_degradation_rate if latest_pred else None)
+
         data = {
             "assetId": str(asset.id),
             "assetName": asset.name,
             "currentStatus": asset.status,
             "aiEnabled": True,
-            "operatingRulDays": asset.current_rul_days,
-            "calendarRulDays": asset.current_rul_calendar_days,
+            "operatingRulDays": effective_op_rul,
+            "calendarRulDays": effective_cal_rul,
             "dutyCycleRatio": asset.duty_cycle_ratio,
+            "validRunningSamples": running_count,
+            "rawRunningReadingsCount": raw_running_count,
+            "requiredSamplesThreshold": COLD_START_MIN_SAMPLES,
             "confidenceInterval": {
-                "lower": asset.rul_confidence_lower,
-                "upper": asset.rul_confidence_upper,
-                "stdDeviation": latest_pred.std_deviation if latest_pred else 0.0,
-                "isHighUncertainty": bool(latest_pred.std_deviation > 10.0) if latest_pred else False
+                "lower": effective_conf_lower,
+                "upper": effective_conf_upper,
+                "stdDeviation": effective_std_dev,
+                "isHighUncertainty": effective_high_uncertainty,
             },
-            "riskLevel": asset.rul_risk_level,
-            "isPhantomRecovery": asset.is_phantom_recovery,
-            "rapidDegradationAlert": asset.rapid_degradation_alert,
-            "rapidDegradationRate": latest_pred.rapid_degradation_rate if latest_pred else None,
+            "riskLevel": effective_risk_level,
+            "isPhantomRecovery": effective_phantom,
+            "rapidDegradationAlert": effective_rapid,
+            "rapidDegradationRate": effective_rapid_rate,
             "lastEvaluatedAt": asset.last_rul_predicted_at.isoformat() if asset.last_rul_predicted_at else None,
             "sparePartStatus": {
                 "partId": str(spare_part.id) if spare_part else None,
@@ -1429,7 +1479,10 @@ class AssetRulPredictionDetailView(APIView):
             },
             "history": AssetRulPredictionSerializer(history, many=True).data,
             "activeWorkOrderId": str(latest_pred.work_order_id) if latest_pred and latest_pred.work_order_id else None,
-            "activeWorkOrderCode": latest_pred.work_order.code if latest_pred and latest_pred.work_order else None
+            "activeWorkOrderCode": latest_pred.work_order.code if latest_pred and latest_pred.work_order else None,
+            "recommendedAction": rec_message,
+            "modelMetadata": model_metadata,
+            "sensorDiagnostics": sensor_diagnostics,
         }
         return success_response(data)
 

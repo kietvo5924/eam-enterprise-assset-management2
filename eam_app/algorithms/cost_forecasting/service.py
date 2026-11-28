@@ -22,7 +22,8 @@ from algorithms.cost_forecasting.constants import (
     DEFAULT_INFLATION_RATE,
     DEFAULT_CONTINGENCY_BUFFER_RATE,
     MIN_MONTHS_TRAINING_DATA,
-    MIN_HISTORICAL_PERIODS_FOR_ML
+    MIN_HISTORICAL_PERIODS_FOR_ML,
+    normalize_rate_coefficient,
 )
 from algorithms.cost_forecasting.feature_pipeline import CostFeaturePipeline, get_actual_consumption_net_cost
 from algorithms.cost_forecasting.lemon_detector import LemonAssetDetector
@@ -467,12 +468,17 @@ class CostForecastingService:
                 except Exception:
                     reference_date = today
 
-        hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
-            tenant, reference_date=reference_date, months_back=months, cost_center=cost_center
+        hist_pm = CostFeaturePipeline.get_monthly_historical_costs(
+            tenant, reference_date=reference_date, months_back=months, cost_center=cost_center, cost_scope='PM_ONLY'
+        )
+        hist_cm = CostFeaturePipeline.get_monthly_historical_costs(
+            tenant, reference_date=reference_date, months_back=months, cost_center=cost_center, cost_scope='CM_ONLY'
         )
 
-        labels = [item[0] for item in hist_costs]
-        actual_values = [float(item[1]) for item in hist_costs]
+        labels = [item[0] for item in hist_cm]
+        actual_pm_values = [float(item[1]) for item in hist_pm]
+        actual_cm_values = [float(item[1]) for item in hist_cm]
+        actual_values = [pm + cm for pm, cm in zip(actual_pm_values, actual_cm_values)]
 
         # Lấy dự báo đúng kỳ được yêu cầu
         cur_forecast = cls.get_current_forecast(tenant, period=period, cost_center=cost_center)
@@ -483,6 +489,15 @@ class CostForecastingService:
         return {
             "labels": labels,
             "actualSeries": actual_values,
+            "actualPmSeries": actual_pm_values,
+            "actualCmSeries": actual_cm_values,
+            "forecastBreakdown": {
+                "plannedPmBudget": float(cur_forecast.planned_pm_budget),
+                "predictedCmLowerP10": float(cur_forecast.predicted_cm_lower_p10),
+                "predictedCmMedianP50": float(cur_forecast.predicted_cm_median),
+                "predictedCmUpperP90": float(cur_forecast.predicted_cm_upper_p90),
+                "contingencyBuffer": float(cur_forecast.contingency_buffer),
+            },
             "forecastProjections": {
                 "period": cur_forecast.forecast_period,
                 "p10": p10_val,
@@ -500,10 +515,15 @@ class CostForecastingService:
         ai_enabled = getattr(tenant, 'enable_ai_cost_forecasting', True)
         today = timezone.now().date()
 
-        hist_costs = CostFeaturePipeline.get_monthly_historical_costs(
-            tenant, reference_date=today, months_back=12
+        hist_total = CostFeaturePipeline.get_monthly_historical_costs(
+            tenant, reference_date=today, months_back=12, cost_scope='ALL'
         )
-        months_with_data = sum(1 for _, cost in hist_costs if cost > Decimal('0'))
+        months_with_data = sum(1 for _, cost in hist_total if cost > Decimal('0'))
+
+        hist_cm = CostFeaturePipeline.get_monthly_historical_costs(
+            tenant, reference_date=today, months_back=12, cost_scope='CM_ONLY'
+        )
+        months_with_cm_data = sum(1 for _, cost in hist_cm if cost > Decimal('0'))
 
         X_real, y_real, _ = CostFeaturePipeline.build_historical_training_dataset(
             tenant=tenant,
@@ -523,16 +543,18 @@ class CostForecastingService:
             status_label = "AI Tắt theo cấu hình Quản trị viên"
             fallback_reason = "AI_DISABLED"
         elif not is_ready:
-            status_label = f"Chế độ Fallback Heuristic (Cần tối thiểu {MIN_HISTORICAL_PERIODS_FOR_ML} kỳ lịch sử có nhãn để học 16 đặc trưng; hiện có {usable_samples} kỳ)"
+            status_label = f"Chế độ SMA3 CM Fallback (Cần tối thiểu {MIN_HISTORICAL_PERIODS_FOR_ML} kỳ lịch sử có nhãn CM; hiện có {usable_samples} kỳ, {positive_samples} kỳ có phát sinh CM)"
             fallback_reason = "INSUFFICIENT_HISTORICAL_DATA"
         else:
-            status_label = "Sẵn sàng chạy Rừng hồi quy phân vị (QRF) trên dữ liệu thực tế"
+            status_label = "Sẵn sàng chạy Rừng hồi quy phân vị (QRF) dự báo chi phí sự cố CM"
             fallback_reason = None
 
         return {
             "aiEnabled": ai_enabled,
             "monthsWithData": months_with_data,
+            "monthsWithCmData": months_with_cm_data,
             "usableHistoricalPeriods": usable_samples,
+            "positiveCmPeriods": positive_samples,
             "minMonthsRequired": MIN_HISTORICAL_PERIODS_FOR_ML,
             "isReadyForAiQrf": is_ready,
             "fallbackReason": fallback_reason,
@@ -550,9 +572,9 @@ class CostForecastingService:
         setting = TenantFinancialSetting.all_objects.filter(tenant=tenant).first()
 
         default_rate = float(setting.default_labor_hourly_rate) if setting else 150000.0
-        default_inflation = setting.default_inflation_rate if setting else 0.045
-        default_contingency = setting.default_contingency_rate if setting else 0.05
-        spare_ratio = setting.critical_spare_part_ratio if setting else 0.05
+        default_inflation = normalize_rate_coefficient(setting.default_inflation_rate if setting else None, 0.045)
+        default_contingency = normalize_rate_coefficient(setting.default_contingency_rate if setting else None, 0.05)
+        spare_ratio = normalize_rate_coefficient(setting.critical_spare_part_ratio if setting else None, 0.05)
 
         pab_val = None
         is_manual = False

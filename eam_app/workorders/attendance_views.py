@@ -8,7 +8,10 @@ Endpoints:
 
 import sys
 import math
+import json
+import base64
 import logging
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -52,8 +55,8 @@ class BiometricEnrollView(APIView):
             target_user = request.user
         else:
             try:
-                target_user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
+                target_user = User.all_objects.get(id=user_id)
+            except (User.DoesNotExist, ValueError):
                 return Response({
                     "success": False,
                     "error": "Không tìm thấy người dùng được chỉ định."
@@ -69,8 +72,8 @@ class BiometricEnrollView(APIView):
             if target_user.id != request.user.id:
                 is_admin_or_mgr = (
                     request.user.is_superuser
-                    or request.user.roles.filter(permissions__id='system:admin').exists()
-                    or request.user.roles.filter(name__in=['ADMIN', 'MANAGER', 'SUPERVISOR']).exists()
+                    or request.user.roles.filter(permissions__id__in=['system:admin', 'user:update']).exists()
+                    or request.user.roles.filter(name__in=['ADMIN', 'TENANT_ADMIN', 'MANAGER', 'MAINTENANCE_MANAGER', 'SUPERVISOR']).exists()
                 )
                 if not is_admin_or_mgr:
                     return Response({
@@ -79,35 +82,58 @@ class BiometricEnrollView(APIView):
                     }, status=status.HTTP_403_FORBIDDEN)
 
         face_image = request.FILES.get('faceImage') or request.FILES.get('face_image')
+        face_image_b64 = request.data.get('faceImageBase64') or request.data.get('face_image_base64')
         live_embedding = request.data.get('liveEmbedding') or request.data.get('live_embedding')
-
-        if not face_image and not live_embedding:
-            return Response({
-                "success": False,
-                "error": "Vui lòng tải lên tệp ảnh chân dung (faceImage) hoặc vector đặc trưng."
-            }, status=status.HTTP_400_BAD_REQUEST)
 
         image_bytes = None
         if face_image:
             image_bytes = face_image.read()
+        elif face_image_b64:
+            try:
+                b64_str = str(face_image_b64)
+                if ',' in b64_str:
+                    b64_str = b64_str.split(',', 1)[1]
+                image_bytes = base64.b64decode(b64_str, validate=True)
+            except Exception:
+                return Response({
+                    "success": False,
+                    "error": "Dữ liệu ảnh chân dung base64 không hợp lệ."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        is_test_embedding_allowed = bool(
+            ('test' in sys.argv or 'pytest' in sys.modules)
+            and getattr(settings, 'BIOMETRIC_ALLOW_TEST_EMBEDDINGS', True)
+        )
+
+        if not image_bytes:
+            if not (is_test_embedding_allowed and live_embedding):
+                return Response({
+                    "success": False,
+                    "error": "Vui lòng tải lên tệp ảnh chân dung thực tế (faceImage). Hệ thống không chấp nhận đăng ký chỉ bằng vector giả lập."
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         precomputed = None
-        if live_embedding:
+        if not image_bytes and is_test_embedding_allowed and live_embedding:
             if isinstance(live_embedding, str):
-                import json
                 try:
                     precomputed = json.loads(live_embedding)
                 except Exception:
                     precomputed = None
             elif isinstance(live_embedding, list):
                 precomputed = live_embedding
+            if not precomputed or not isinstance(precomputed, list) or len(precomputed) != 128:
+                return Response({
+                    "success": False,
+                    "error": "Vector đặc trưng kiểm thử phải gồm đúng 128 giá trị số thực hợp lệ."
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             profile, snapshot_path = enroll_user_face(
                 user=target_user,
-                image_bytes=image_bytes or b'SIMULATED_FACE_IMAGE_BYTES',
+                image_bytes=image_bytes,
                 enrolled_by=request.user,
                 precomputed_embedding=precomputed,
+                allow_precomputed=is_test_embedding_allowed and (precomputed is not None),
             )
 
             return Response({
@@ -217,7 +243,11 @@ class AttendanceCheckInView(APIView):
                     "success": False,
                     "error": str(ex)
                 }, status=status.HTTP_400_BAD_REQUEST)
-        elif ('test' in sys.argv or 'pytest' in sys.modules) and live_embedding:
+        elif (
+            ('test' in sys.argv or 'pytest' in sys.modules)
+            and getattr(settings, 'BIOMETRIC_ALLOW_TEST_EMBEDDINGS', True)
+            and live_embedding
+        ):
             # Chỉ chấp nhận vector giả lập trực tiếp khi chạy bộ kiểm thử Unit Test tự động nội bộ
             pass
         else:

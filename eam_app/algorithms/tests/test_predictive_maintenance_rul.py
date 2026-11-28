@@ -315,3 +315,248 @@ class PredictiveMaintenanceRULTests(TestCase):
             self.assertEqual(wo.asset_id, self.asset.id)
             self.assertIn('VIB_METER', wo.required_tools)
             self.assertIn(str(self.spare_part.id), wo.required_spare_parts)
+
+
+    def test_tc_aud04_multichannel_grouping_and_cold_start_cycle_count(self):
+        """AUD-04: Gom nhóm đúng nhiều kênh theo round_id/timestamp, không bơm vibration=0 cho dòng TEMPERATURE."""
+        now = timezone.now()
+        # Tạo 10 cặp đo đồng thời (TEMPERATURE + VIBRATION) từ IoT (round_id=None) -> chỉ tính 10 chu kỳ!
+        for i in range(10):
+            ts = now - timedelta(hours=(24 - i))
+            MeterReading.objects.create(
+                tenant=self.asset.tenant,
+                asset=self.asset,
+                metric_code='TEMPERATURE',
+                reading_value=Decimal('52.50'),
+                reading_date=ts,
+                unit='°C',
+                ambient_temperature=31.0,
+                machine_state='RUNNING',
+                recorded_by=self.user,
+            )
+            MeterReading.objects.create(
+                tenant=self.asset.tenant,
+                asset=self.asset,
+                metric_code='VIBRATION',
+                reading_value=Decimal('3.20'),
+                reading_date=ts + timedelta(milliseconds=50),
+                unit='mm/s',
+                machine_state='RUNNING',
+                recorded_by=self.user,
+            )
+
+        readings_qs = MeterReading.objects.filter(asset=self.asset).order_by('reading_date')
+        grouped_10 = PredictiveRULGuardrails.filter_running_meter_readings(readings_qs)
+        self.assertEqual(len(grouped_10), 10)
+        self.assertAlmostEqual(grouped_10[0]['vibration'], 3.20, places=2)
+        self.assertAlmostEqual(grouped_10[0]['temperature'], 52.50, places=2)
+        self.assertAlmostEqual(grouped_10[0]['ambient_temperature'], 31.0, places=2)
+
+        # Với chỉ 10 chu kỳ (dù có 20 bản ghi DB), bắt buộc vẫn giữ CALIBRATING (N < 15)!
+        res_cold = RULPredictiveService.predict_asset_rul(asset=self.asset, current_user=self.user)
+        self.assertEqual(res_cold['data']['riskLevel'], 'CALIBRATING')
+        self.assertEqual(res_cold['data']['validRunningSamples'], 10)
+        self.assertEqual(res_cold['data']['rawRunningReadingsCount'], 20)
+
+        # Thêm 6 vòng đo nữa (dùng round_id) -> 16 chu kỳ hợp lệ, đủ vượt ngưỡng 15
+        for i in range(6):
+            rid = uuid.uuid4()
+            ts = now - timedelta(hours=(10 - i))
+            MeterReading.objects.create(
+                tenant=self.asset.tenant,
+                asset=self.asset,
+                round_id=rid,
+                metric_code='VIBRATION',
+                reading_value=Decimal('3.60'),
+                reading_date=ts,
+                unit='mm/s',
+                machine_state='RUNNING',
+                recorded_by=self.user,
+            )
+            MeterReading.objects.create(
+                tenant=self.asset.tenant,
+                asset=self.asset,
+                round_id=rid,
+                metric_code='TEMPERATURE',
+                reading_value=Decimal('56.00'),
+                reading_date=ts + timedelta(seconds=10),
+                unit='°C',
+                ambient_temperature=30.0,
+                machine_state='RUNNING',
+                recorded_by=self.user,
+            )
+            MeterReading.objects.create(
+                tenant=self.asset.tenant,
+                asset=self.asset,
+                round_id=rid,
+                metric_code='PRESSURE',
+                reading_value=Decimal('12.50'),
+                reading_date=ts + timedelta(seconds=12),
+                unit='bar',
+                machine_state='RUNNING',
+                recorded_by=self.user,
+            )
+
+        # Một dòng chỉ có TEMPERATURE (không có vibration) -> không được gán giả vibration=0.0 trong grouped item!
+        single_temp_rid = uuid.uuid4()
+        MeterReading.objects.create(
+            tenant=self.asset.tenant,
+            asset=self.asset,
+            round_id=single_temp_rid,
+            metric_code='TEMPERATURE',
+            reading_value=Decimal('57.00'),
+            reading_date=now,
+            unit='°C',
+            machine_state='RUNNING',
+            recorded_by=self.user,
+        )
+        grouped_all = PredictiveRULGuardrails.filter_running_meter_readings(
+            MeterReading.objects.filter(asset=self.asset).order_by('reading_date')
+        )
+        self.assertEqual(len(grouped_all), 17)
+        self.assertIsNone(grouped_all[-1]['vibration'])
+        self.assertAlmostEqual(grouped_all[-1]['temperature'], 57.00, places=2)
+
+    def test_tc_aud04_missing_channel_diagnostics_and_prototype_transparency(self):
+        """AUD-04: Kênh thiếu không bị suy diễn quá nhiệt 45°C và API công khai rõ trạng thái nguyên mẫu chưa huấn luyện."""
+        from rest_framework.test import APIClient
+
+        # Chỉ nạp VIBRATION, thiếu TEMPERATURE & PRESSURE
+        self._seed_running_readings(self.asset, count=20, base_vib=2.2)
+
+        vec_missing_temp = DegradationFeaturePipeline.extract_4_feature_vector(
+            vibration_rms=2.2,
+            bearing_temp=None,
+            ambient_temp=30.0,
+            pressure=None,
+            load_factor=1.0,
+        )
+        # Delta T và Pressure khi không có cảm biến phải ở mức trung tính 0.0 (không tự bịa 45°C hay 10 bar)
+        self.assertEqual(float(vec_missing_temp[1]), 0.0)
+        self.assertEqual(float(vec_missing_temp[2]), 0.0)
+
+        res = RULPredictiveService.predict_asset_rul(asset=self.asset, current_user=self.user)
+        data = res['data']
+        self.assertFalse(data['modelMetadata']['isTrainedOnRealData'])
+        self.assertEqual(data['modelMetadata']['trainingStatus'], 'UNTRAINED_PROTOTYPE')
+        self.assertEqual(data['modelMetadata']['modelVersion'], 'v1.0.0-untrained-prototype')
+        self.assertIn('TEMPERATURE', data['sensorDiagnostics']['missingChannels'])
+        self.assertIn('PRESSURE', data['sensorDiagnostics']['missingChannels'])
+        self.assertEqual(data['sensorDiagnostics']['groupedCyclesCount'], 20)
+
+        # Kiểm tra endpoint GET /api/v1/assets/<id>/rul-prediction/
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        from users.models import Permission, Role
+        perm_read, _ = Permission.objects.get_or_create(id='asset:read', defaults={'name': 'Read Asset'})
+        role = Role.all_objects.create(name='AUD04_VIEWER', tenant=self.tenant)
+        role.permissions.add(perm_read)
+        self.user.roles.add(role)
+
+        resp = client.get(f"/api/v1/assets/{self.asset.id}/rul-prediction/")
+        self.assertEqual(resp.status_code, 200)
+        api_data = resp.json()['data']
+        self.assertFalse(api_data['modelMetadata']['isTrainedOnRealData'])
+        self.assertEqual(api_data['sensorDiagnostics']['groupedCyclesCount'], 20)
+
+    def test_tc_aud04_get_endpoint_cold_start_parity_with_stale_asset_rul(self):
+        """AUD-04: Asset thiếu chu kỳ RUNNING (<15) nhưng có RUL cũ trên Asset vẫn trả về CALIBRATING & None trên GET."""
+        from rest_framework.test import APIClient
+        from users.models import Permission, Role
+
+        self.asset.current_rul_days = 90.0
+        self.asset.current_rul_calendar_days = 90.0
+        self.asset.rul_risk_level = 'CRITICAL'
+        self.asset.rul_confidence_lower = 75.0
+        self.asset.rul_confidence_upper = 105.0
+        self.asset.save()
+
+        perm_read, _ = Permission.objects.get_or_create(id='asset:read', defaults={'name': 'Read Asset'})
+        role = Role.all_objects.create(name=f'AUD04_COLD_{uuid.uuid4().hex[:6]}', tenant=self.tenant)
+        role.permissions.add(perm_read)
+        self.user.roles.add(role)
+
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        resp = client.get(f"/api/v1/assets/{self.asset.id}/rul-prediction/")
+        self.assertEqual(resp.status_code, 200)
+        api_data = resp.json()['data']
+        self.assertEqual(api_data['riskLevel'], 'CALIBRATING')
+        self.assertIsNone(api_data['operatingRulDays'])
+        self.assertIsNone(api_data['calendarRulDays'])
+        self.assertIsNone(api_data['confidenceInterval']['lower'])
+        self.assertIsNone(api_data['confidenceInterval']['upper'])
+        self.assertEqual(api_data['validRunningSamples'], 0)
+        # Bảo toàn cột Asset gốc trong DB (không tự ý xóa dữ liệu kế toán/seed)
+        self.asset.refresh_from_db()
+        self.assertEqual(self.asset.current_rul_days, 90.0)
+
+    def test_tc_aud04_get_endpoint_disabled_includes_model_metadata(self):
+        """AUD-04: Khi tắt enable_ai_rul trên Tenant, GET trả DISABLED kèm modelMetadata rõ ràng."""
+        from rest_framework.test import APIClient
+        from users.models import Permission, Role
+
+        self.tenant.enable_ai_rul = False
+        self.tenant.save()
+        perm_read, _ = Permission.objects.get_or_create(id='asset:read', defaults={'name': 'Read Asset'})
+        role = Role.all_objects.create(name=f'AUD04_DIS_{uuid.uuid4().hex[:6]}', tenant=self.tenant)
+        role.permissions.add(perm_read)
+        self.user.roles.add(role)
+
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+        resp = client.get(f"/api/v1/assets/{self.asset.id}/rul-prediction/")
+        self.assertEqual(resp.status_code, 200)
+        api_data = resp.json()['data']
+        self.assertEqual(api_data['riskLevel'], 'DISABLED')
+        self.assertFalse(api_data['aiEnabled'])
+        self.assertIn('modelMetadata', api_data)
+        self.assertEqual(api_data['modelMetadata']['trainingStatus'], 'UNTRAINED_PROTOTYPE')
+
+    def test_tc_aud04_session_readings_multi_channel_grouped_correctly(self):
+        """AUD-04: session_readings gửi tách TEMPERATURE + VIBRATION cùng chu kỳ phải được gom 1 chu kỳ, không thổi phồng thành 2."""
+        base_time = timezone.now() - timedelta(hours=20)
+        for i in range(13):
+            ts = base_time + timedelta(hours=i)
+            rid = uuid.uuid4()
+            MeterReading.objects.create(
+                asset=self.asset, metric_code='TEMPERATURE', reading_value=45.0,
+                reading_date=ts, round_id=rid, machine_state='RUNNING', tenant=self.tenant
+            )
+            MeterReading.objects.create(
+                asset=self.asset, metric_code='VIBRATION', reading_value=1.8,
+                reading_date=ts, round_id=rid, machine_state='RUNNING', tenant=self.tenant
+            )
+
+        session_ts = timezone.now()
+        session_payload = [
+            {'metric_code': 'TEMPERATURE', 'reading_value': 55.0, 'reading_date': session_ts, 'machine_state': 'RUNNING'},
+            {'metric_code': 'VIBRATION', 'reading_value': 2.2, 'reading_date': session_ts, 'machine_state': 'RUNNING'},
+        ]
+        # 13 chu kỳ DB + 1 chu kỳ phiên (2 kênh) = 14 chu kỳ -> Vẫn kích hoạt Cold Start (<15)!
+        res_14 = RULPredictiveService.predict_asset_rul(
+            asset=self.asset, current_user=self.user, session_readings=session_payload
+        )
+        self.assertEqual(res_14['data']['riskLevel'], 'CALIBRATING')
+        self.assertEqual(res_14['data']['validRunningSamples'], 14)
+        self.assertEqual(res_14['data']['rawRunningReadingsCount'], 28)
+
+        # Thêm chu kỳ DB thứ 14 + 1 chu kỳ phiên = 15 chu kỳ -> Đủ ngưỡng chạy LSTM!
+        rid14 = uuid.uuid4()
+        ts14 = base_time + timedelta(hours=13)
+        MeterReading.objects.create(
+            asset=self.asset, metric_code='TEMPERATURE', reading_value=46.0,
+            reading_date=ts14, round_id=rid14, machine_state='RUNNING', tenant=self.tenant
+        )
+        MeterReading.objects.create(
+            asset=self.asset, metric_code='VIBRATION', reading_value=1.9,
+            reading_date=ts14, round_id=rid14, machine_state='RUNNING', tenant=self.tenant
+        )
+        res_15 = RULPredictiveService.predict_asset_rul(
+            asset=self.asset, current_user=self.user, session_readings=session_payload
+        )
+        self.assertNotEqual(res_15['data']['riskLevel'], 'CALIBRATING')
+        self.assertEqual(res_15['data']['validRunningSamples'], 15)
+        self.assertEqual(res_15['data']['rawRunningReadingsCount'], 30)
+
+

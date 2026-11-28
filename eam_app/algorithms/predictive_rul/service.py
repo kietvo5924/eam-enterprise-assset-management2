@@ -7,9 +7,11 @@ kiểm tra tồn kho SparePart, tự động sinh bản thảo Work Order đón 
 import uuid
 import logging
 import numpy as np
+from types import SimpleNamespace
 from datetime import timedelta
 from typing import List, Dict, Any, Optional
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
@@ -20,7 +22,7 @@ from notifications.services import dispatch_event_notification, NotificationRout
 from .constants import (
     WINDOW_SIZE, FEATURE_DIM, MC_DROPOUT_PASSES, MODEL_VERSION
 )
-from .model import get_rul_model
+from .model import get_rul_model, NumpyLSTMRULPredictor
 from .dataset_pipeline import DegradationFeaturePipeline
 from .guardrails import PredictiveRULGuardrails
 
@@ -61,17 +63,58 @@ class RULPredictiveService:
             is_suppressed=False
         ).order_by('reading_date')
 
-        # Lọc trạng thái RUNNING và loại bỏ số đo trước đại tu cũ (is_pre_repair == False)
-        valid_readings = PredictiveRULGuardrails.filter_running_meter_readings(readings_qs)
+        # Lọc trạng thái RUNNING, loại bỏ số đo trước đại tu cũ và gom nhóm đa kênh theo chu kỳ đo
+        raw_readings_list = list(readings_qs)
+        raw_session_items = []
+        pregrouped_session_items = []
 
-        # Nếu có số đo gửi kèm trong phiên hiện tại
         if session_readings:
-            for s in session_readings:
-                state = str(s.get('machine_state', 'RUNNING') or 'RUNNING').upper()
-                if state == 'RUNNING':
-                    valid_readings.append(s)
+            for idx, s in enumerate(session_readings):
+                if not isinstance(s, dict):
+                    continue
+                if s.get('is_pre_repair') or s.get('is_suppressed'):
+                    continue
+                state = str(s.get('machine_state', 'RUNNING') or 'RUNNING').upper().strip()
+                if state != 'RUNNING':
+                    continue
+                if any(k in s for k in ('metric_code', 'metricCode', 'reading_value', 'readingValue')):
+                    r_date = s.get('reading_date') or s.get('readingDate') or now
+                    if isinstance(r_date, str):
+                        r_date = parse_datetime(r_date) or now
+                    r_val = s.get('reading_value') if 'reading_value' in s else s.get('readingValue')
+                    raw_session_items.append(SimpleNamespace(
+                        id=s.get('id') or f"session-{idx}",
+                        metric_code=s.get('metric_code') if 'metric_code' in s else s.get('metricCode', ''),
+                        reading_value=r_val,
+                        reading_date=r_date,
+                        round_id=s.get('round_id') or s.get('roundId'),
+                        ambient_temperature=s.get('ambient_temperature') if 'ambient_temperature' in s else s.get('ambientTemperature'),
+                        load_factor=s.get('load_factor') if 'load_factor' in s else s.get('loadFactor'),
+                        machine_state='RUNNING',
+                        is_pre_repair=False,
+                        is_suppressed=False,
+                    ))
+                else:
+                    pregrouped_session_items.append(s)
+
+        combined_raw_list = raw_readings_list + raw_session_items
+        raw_running_count = sum(
+            1 for r in combined_raw_list
+            if str(getattr(r, 'machine_state', 'RUNNING') or 'RUNNING').upper().strip() == 'RUNNING'
+            and not getattr(r, 'is_pre_repair', False)
+            and not getattr(r, 'is_suppressed', False)
+        )
+        valid_readings = PredictiveRULGuardrails.filter_running_meter_readings(combined_raw_list)
+        if pregrouped_session_items:
+            valid_readings.extend(pregrouped_session_items)
+            raw_running_count += len(pregrouped_session_items)
 
         running_count = len(valid_readings)
+        model_metadata = NumpyLSTMRULPredictor.get_model_metadata()
+        sensor_diagnostics = PredictiveRULGuardrails.analyze_grouped_channel_completeness(
+            valid_readings,
+            raw_running_count=raw_running_count
+        )
 
         # -------------------------------------------------------------
         # Bước 3: Quy Tắc 2 - Ngưỡng Khởi Động Nguội (Bypass Threshold N < 15)
@@ -98,10 +141,13 @@ class RULPredictiveService:
                     "assetName": asset.name,
                     "currentStatus": "CALIBRATING",
                     "validRunningSamples": running_count,
+                    "rawRunningReadingsCount": raw_running_count,
                     "requiredSamplesThreshold": 15,
                     "operatingRulDays": None,
                     "calendarRulDays": None,
                     "riskLevel": "CALIBRATING",
+                    "modelMetadata": model_metadata,
+                    "sensorDiagnostics": sensor_diagnostics,
                     "message": cold_msg
                 }
             }
@@ -377,7 +423,12 @@ class RULPredictiveService:
                 "draftWorkOrderId": str(created_wo.id) if created_wo else None,
                 "draftWorkOrderCode": created_wo.code if created_wo else None,
                 "recommendedAction": rec_action,
-                "predictionRecordId": str(prediction_record.id)
+                "predictionRecordId": str(prediction_record.id),
+                "validRunningSamples": running_count,
+                "rawRunningReadingsCount": raw_running_count,
+                "requiredSamplesThreshold": 15,
+                "modelMetadata": model_metadata,
+                "sensorDiagnostics": sensor_diagnostics,
             }
         }
 
@@ -394,8 +445,9 @@ class RULPredictiveService:
             title = f"{alert_prefix} {asset.name} - RUL còn {rul_op} ngày vận hành"
             
             message = (
-                f"Mô hình LSTM dự báo RUL thiết bị '{asset.name}' chỉ còn {rul_op} ngày "
-                f"(Khoảng tin cậy 90%: {uncertainty['confidence_lower']} - {uncertainty['confidence_upper']} ngày)."
+                f"Nguyên mẫu dự báo RUL (NumpyLSTMRULPredictor chưa huấn luyện thực tế + hiệu chỉnh heuristic) "
+                f"ước tính thiết bị '{asset.name}' còn {rul_op} ngày vận hành "
+                f"(Khoảng phân tán 90%: {uncertainty['confidence_lower']} - {uncertainty['confidence_upper']} ngày)."
             )
             if work_order:
                 message += f" Đã tự động tạo bản thảo phiếu {work_order.code}."

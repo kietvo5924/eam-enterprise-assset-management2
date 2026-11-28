@@ -150,6 +150,7 @@
       </div>
       <div>
         <div id="valTotalForecast" class="text-2xl font-black text-slate-900 tracking-tight">0 VNĐ</div>
+        <div id="valTotalFormulaBreakdown" class="text-[10px] text-slate-500 font-medium mt-0.5">= PM (0) + CM P50 (0) + Dự phòng (0)</div>
         <div class="text-[11px] text-slate-500 mt-1">Kịch bản phòng thủ P90: <span id="valTotalForecastP90" class="font-bold text-slate-700">0 VNĐ</span></div>
         <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
           <div id="barBudgetUsage" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
@@ -780,12 +781,12 @@ function renderForecastView(data) {
         aiBadge.innerHTML = '<i class="ph-bold ph-power text-slate-500"></i><span id="aiGovernanceText">Hệ Thống AI Đang Tắt</span>';
       } else {
         aiBadge.className = 'text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-        const reasonText = 'Chế Độ Quy Chuẩn Doanh Nghiệp (Đang tích lũy chu kỳ dữ liệu lịch sử)';
+        const reasonText = 'Chế Độ Dự Phòng SMA3 CM (Cần >= 12 kỳ CM cho QRF)';
         aiBadge.innerHTML = `<i class="ph-bold ph-shield-warning"></i><span id="aiGovernanceText">${reasonText}</span>`;
       }
     } else {
       aiBadge.className = 'text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1';
-      aiBadge.innerHTML = '<i class="ph-bold ph-sparkle"></i><span id="aiGovernanceText">Mô Hình AI Học Máy Đang Hoạt Động (QRF)</span>';
+      aiBadge.innerHTML = '<i class="ph-bold ph-sparkle"></i><span id="aiGovernanceText">Mô Hình AI QRF Dự Báo Sự Cố (CM)</span>';
     }
   }
 
@@ -806,6 +807,10 @@ function renderForecastView(data) {
   document.getElementById('valPredictedCmP50').textContent = formatVND(b.predictedCmMedianP50);
   document.getElementById('valPredictedCmP90').textContent = formatVND(b.predictedCmRiskP90);
   document.getElementById('valTotalForecast').textContent = formatVND(b.totalForecastMedian);
+  const formulaEl = document.getElementById('valTotalFormulaBreakdown');
+  if (formulaEl) {
+    formulaEl.textContent = `= PM (${formatVND(b.plannedPmDeterministic)}) + CM (${formatVND(b.predictedCmMedianP50)}) + Dự phòng (${formatVND(b.contingencyBuffer || 0)})`;
+  }
   const p90El = document.getElementById('valTotalForecastP90');
   if (p90El) p90El.textContent = formatVND(b.totalForecastP90);
 
@@ -943,7 +948,9 @@ function renderChart(trendData) {
   const forecastPeriod = proj.period || "Kỳ tới";
 
   const labels = [...trendData.labels, forecastPeriod];
-  const actuals = [...trendData.actualSeries, null];
+  const actuals = [...(trendData.actualSeries || []), null];
+  const actualPm = [...(trendData.actualPmSeries || []), null];
+  const actualCm = [...(trendData.actualCmSeries || []), null];
 
   const p10Series = new Array(trendData.labels.length).fill(null);
   p10Series.push(proj.p10 || null);
@@ -960,13 +967,33 @@ function renderChart(trendData) {
       labels: labels,
       datasets: [
         {
-          label: 'Thực tế (VND)',
+          label: 'Thực tế Tổng (PM + CM)',
           data: actuals,
           borderColor: '#334155',
           backgroundColor: 'rgba(51, 65, 85, 0.05)',
           borderWidth: 2.5,
           tension: 0.25,
           fill: true
+        },
+        {
+          label: 'Thực tế Định kỳ (PM)',
+          data: actualPm,
+          borderColor: '#3b82f6',
+          borderDash: [4, 4],
+          borderWidth: 1.5,
+          pointRadius: 2,
+          tension: 0.2,
+          fill: false
+        },
+        {
+          label: 'Thực tế Sự cố (CM)',
+          data: actualCm,
+          borderColor: '#ea580c',
+          borderDash: [2, 2],
+          borderWidth: 1.5,
+          pointRadius: 2,
+          tension: 0.2,
+          fill: false
         },
         {
           label: 'Dự báo P10 (Kịch bản thuận lợi)',

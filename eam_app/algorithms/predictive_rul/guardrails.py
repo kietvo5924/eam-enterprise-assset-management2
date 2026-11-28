@@ -43,30 +43,194 @@ class PredictiveRULGuardrails:
     @staticmethod
     def filter_running_meter_readings(readings_qs) -> List[Dict[str, Any]]:
         """
-        Quy Tắc 3: Lọc Bỏ Trạng Thái Nghỉ (IDLE / STANDBY / WARM_UP).
-        Chuỗi dữ liệu nạp vào LSTM bắt buộc là các lần đo khi thiết bị đang chạy (RUNNING)
-        và không bị loại bỏ do nghiệm thu sửa chữa cũ (is_pre_repair == False).
+        Quy Tắc 3: Lọc Bỏ Trạng Thái Nghỉ (IDLE / STANDBY / WARM_UP) và gom nhóm đa kênh theo từng chu kỳ đo.
+        - Nếu các bản ghi có cùng round_id: gộp thành một chu kỳ đo đa kênh duy nhất.
+        - Nếu round_id trống (ví dụ IoTSensorAlertView lưu TEMPERATURE và VIBRATION cùng mốc thời gian):
+          gộp các bản ghi liên tiếp trong cửa sổ <= 2 giây nếu không trùng kênh cảm biến đã có.
+        - Tuyệt đối không gán cứng vibration=0.0 cho dòng nhiệt độ đơn lẻ làm phồng số mẫu và sai lệch dữ liệu.
         """
-        valid_records = []
+        def _canonical_channel(metric_code: str) -> Optional[str]:
+            mc = str(metric_code or '').upper().strip()
+            if mc == 'VIBRATION':
+                return 'vibration'
+            if mc in ('TEMPERATURE', 'BEARING_TEMP'):
+                return 'temperature'
+            if mc == 'PRESSURE':
+                return 'pressure'
+            if mc == 'LOAD_FACTOR':
+                return 'load_factor'
+            return None
+
+        eligible_rows = []
         for r in readings_qs:
             state = str(getattr(r, 'machine_state', 'RUNNING') or 'RUNNING').upper().strip()
             is_pre = getattr(r, 'is_pre_repair', False)
             is_supp = getattr(r, 'is_suppressed', False)
-
-            # Lọc bỏ trạng thái nghỉ và các số đo bị triệt tiêu
             if state == 'RUNNING' and not is_pre and not is_supp:
-                valid_records.append({
+                eligible_rows.append(r)
+
+        # Đảm bảo thứ tự thời gian trước khi gom nhóm
+        eligible_rows.sort(key=lambda x: (getattr(x, 'reading_date', None), str(getattr(x, 'id', ''))))
+
+        grouped_by_key: Dict[str, Dict[str, Any]] = {}
+        ordered_keys: List[str] = []
+        open_nonround_key: Optional[str] = None
+        open_nonround_ts = None
+        anon_seq = 0
+
+        for r in eligible_rows:
+            channel = _canonical_channel(getattr(r, 'metric_code', ''))
+            r_date = getattr(r, 'reading_date', None)
+            round_id = getattr(r, 'round_id', None)
+
+            if round_id:
+                group_key = f"round:{round_id}"
+            else:
+                can_merge = False
+                if (
+                    open_nonround_key is not None
+                    and open_nonround_ts is not None
+                    and r_date is not None
+                    and channel is not None
+                    and channel not in grouped_by_key[open_nonround_key]['channels_observed']
+                ):
+                    delta_sec = abs((r_date - open_nonround_ts).total_seconds())
+                    if delta_sec <= 2.0:
+                        can_merge = True
+
+                if can_merge:
+                    group_key = open_nonround_key
+                else:
+                    anon_seq += 1
+                    group_key = f"ts:{anon_seq}"
+                    open_nonround_key = group_key
+                    open_nonround_ts = r_date
+
+            if group_key not in grouped_by_key:
+                grouped_by_key[group_key] = {
                     'id': str(r.id),
-                    'reading_date': r.reading_date,
-                    'metric_code': r.metric_code,
-                    'vibration': float(r.reading_value) if r.metric_code == 'VIBRATION' else 0.0,
-                    'temperature': getattr(r, 'reading_value', None) if r.metric_code in ('TEMPERATURE', 'BEARING_TEMP') else None,
-                    'ambient_temperature': getattr(r, 'ambient_temperature', None),
-                    'pressure': getattr(r, 'reading_value', None) if r.metric_code == 'PRESSURE' else None,
-                    'load_factor': getattr(r, 'load_factor', 1.0) or 1.0,
-                    'machine_state': state
-                })
-        return valid_records
+                    'reading_ids': [],
+                    'round_id': str(round_id) if round_id else None,
+                    'reading_date': r_date,
+                    'vibration': None,
+                    'temperature': None,
+                    'ambient_temperature': None,
+                    'pressure': None,
+                    'load_factor': None,
+                    'machine_state': 'RUNNING',
+                    'channels_observed': [],
+                }
+                ordered_keys.append(group_key)
+
+            bucket = grouped_by_key[group_key]
+            bucket['reading_ids'].append(str(r.id))
+            val_f = float(r.reading_value) if getattr(r, 'reading_value', None) is not None else None
+
+            if channel == 'vibration' and val_f is not None:
+                bucket['vibration'] = val_f
+                if 'vibration' not in bucket['channels_observed']:
+                    bucket['channels_observed'].append('vibration')
+            elif channel == 'temperature' and val_f is not None:
+                bucket['temperature'] = val_f
+                if 'temperature' not in bucket['channels_observed']:
+                    bucket['channels_observed'].append('temperature')
+            elif channel == 'pressure' and val_f is not None:
+                bucket['pressure'] = val_f
+                if 'pressure' not in bucket['channels_observed']:
+                    bucket['channels_observed'].append('pressure')
+            elif channel == 'load_factor' and val_f is not None:
+                bucket['load_factor'] = val_f
+                if 'load_factor' not in bucket['channels_observed']:
+                    bucket['channels_observed'].append('load_factor')
+
+            amb = getattr(r, 'ambient_temperature', None)
+            if amb is not None and bucket['ambient_temperature'] is None:
+                bucket['ambient_temperature'] = float(amb)
+
+            lf = getattr(r, 'load_factor', None)
+            if lf is not None and bucket['load_factor'] is None:
+                bucket['load_factor'] = float(lf)
+
+        valid_cycles = []
+        for k in ordered_keys:
+            b = grouped_by_key[k]
+            if b['load_factor'] is None:
+                b['load_factor'] = 1.0
+            # Chỉ tính chu kỳ có ít nhất 1 kênh đo cảm biến chính
+            if (b['vibration'] is not None) or (b['temperature'] is not None) or (b['pressure'] is not None):
+                b['metric_code'] = '+'.join(c.upper() for c in b['channels_observed']) if b['channels_observed'] else 'UNKNOWN'
+                valid_cycles.append(b)
+        return valid_cycles
+
+    @staticmethod
+    def analyze_grouped_channel_completeness(
+        grouped_cycles: List[Dict[str, Any]],
+        raw_running_count: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Thống kê độ đầy đủ đa kênh thực tế trên các chu kỳ đo đã gom nhóm."""
+        n_cycles = len(grouped_cycles)
+        vib_cnt = sum(1 for c in grouped_cycles if c.get('vibration') is not None)
+        temp_cnt = sum(1 for c in grouped_cycles if (c.get('temperature') is not None or c.get('bearing_temperature') is not None))
+        amb_cnt = sum(1 for c in grouped_cycles if c.get('ambient_temperature') is not None)
+        press_cnt = sum(1 for c in grouped_cycles if c.get('pressure') is not None)
+        load_cnt = sum(1 for c in grouped_cycles if c.get('load_factor') is not None)
+
+        observed_channels = []
+        missing_channels = []
+        if vib_cnt > 0:
+            observed_channels.append('VIBRATION')
+        else:
+            missing_channels.append('VIBRATION')
+
+        if temp_cnt > 0:
+            observed_channels.append('TEMPERATURE')
+        else:
+            missing_channels.append('TEMPERATURE')
+
+        if amb_cnt > 0:
+            observed_channels.append('AMBIENT_TEMPERATURE')
+        else:
+            missing_channels.append('AMBIENT_TEMPERATURE')
+
+        if press_cnt > 0:
+            observed_channels.append('PRESSURE')
+        else:
+            missing_channels.append('PRESSURE')
+
+        core_slots = n_cycles * 3  # vibration, temperature, pressure
+        core_filled = vib_cnt + temp_cnt + press_cnt
+        completeness_ratio = round(float(core_filled) / core_slots, 3) if core_slots > 0 else 0.0
+
+        channel_labels_vi = {
+            'VIBRATION': 'Độ rung RMS',
+            'TEMPERATURE': 'Nhiệt độ ổ trục/máy',
+            'AMBIENT_TEMPERATURE': 'Nhiệt độ môi trường',
+            'PRESSURE': 'Áp suất',
+        }
+        obs_vi = [channel_labels_vi[c] for c in observed_channels]
+        miss_vi = [channel_labels_vi[c] for c in missing_channels]
+        summary = f"Gom {n_cycles} chu kỳ đo RUNNING"
+        if raw_running_count is not None:
+            summary += f" (từ {raw_running_count} bản ghi cảm biến)"
+        if obs_vi:
+            summary += f". Kênh có dữ liệu: {', '.join(obs_vi)}"
+        if miss_vi:
+            summary += f". Kênh chưa có dữ liệu: {', '.join(miss_vi)} (áp dụng giá trị trung tính, không suy đoán quá nhiệt)"
+
+        return {
+            'groupedCyclesCount': n_cycles,
+            'rawReadingsCount': raw_running_count if raw_running_count is not None else n_cycles,
+            'cyclesWithVibration': vib_cnt,
+            'cyclesWithTemperature': temp_cnt,
+            'cyclesWithAmbientTemperature': amb_cnt,
+            'cyclesWithPressure': press_cnt,
+            'cyclesWithLoadFactor': load_cnt,
+            'observedChannels': observed_channels,
+            'missingChannels': missing_channels,
+            'completenessRatio': completeness_ratio,
+            'isMultiChannelComplete': len(missing_channels) == 0,
+            'diagnosticsSummary': summary,
+        }
 
     @staticmethod
     def check_cold_start_bypass(running_samples_count: int) -> Tuple[bool, Optional[str]]:

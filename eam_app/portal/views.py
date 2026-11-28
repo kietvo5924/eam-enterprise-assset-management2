@@ -224,22 +224,6 @@ def portal_tenants(request):
             t.service_plan = data.get('service_plan', 'FREE')
             t.status = data.get('status', 'ACTIVE')
             t.save()
-            # Cập nhật hồ sơ sinh trắc học khuôn mặt nếu có ảnh đính kèm
-            face_img = data.get('faceImage') or data.get('faceImageBase64')
-            if face_img:
-                import base64
-                from algorithms.biometric.enrollment import enroll_user_face
-                try:
-                    b64_str = str(face_img)
-                    if ',' in b64_str:
-                        b64_str = b64_str.split(',', 1)[1]
-                    raw_bytes = base64.b64decode(b64_str)
-                    enroll_user_face(u, raw_bytes, enrolled_by=request.user)
-                except ValueError as ve:
-                    return JsonResponse({'success': False, 'error': f"Lỗi sinh trắc học: {str(ve)}"}, status=400)
-                except Exception as ex:
-                    import logging
-                    logging.getLogger(__name__).warning(f"Lỗi đăng ký khuôn mặt: {ex}")
 
             return JsonResponse({'success': True})
         except Exception as e:
@@ -584,101 +568,102 @@ def portal_users(request):
             if email and User.all_objects.filter(tenant_id=tenant_id, email=email).exists():
                 return JsonResponse({'success': False, 'error': 'Email already exists in this organization'}, status=400)
 
-            u = User.all_objects.create(
-                username=username,
-                email=email,
-                status=data.get('status', 'ACTIVE'),
-                tenant_id=tenant_id
-            )
-            if data.get('password'):
-                u.set_password(data.get('password'))
-                u.save()
-
-            is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
-            role_ids = data.get('roles', [])
-            roles = []
-            if role_ids:
-                if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
-                    roles = list(Role.all_objects.filter(id__in=role_ids).prefetch_related('permissions'))
-                else:
-                    roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
-                for r in roles:
-                    if r.name == 'SUPER_ADMIN' and not is_super:
-                        return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
-                u.roles.set(roles)
-            else:
-                u.roles.clear()
-
-            # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
-            # Expanded: Check for field workforce permissions (execute, update, reassign, workforce:read) or technical roles
-            has_exec_perm = any(is_field_workforce_role(r) for r in roles)
-            tech_payload = data.get('technicianProfile')
-            if has_exec_perm or tech_payload:
-                from users.models import TechnicianProfile
-                from assets.models import Location
-                from datetime import timedelta
-                from django.utils import timezone
-
-                tech_data = tech_payload or {}
-                shift_code = tech_data.get('shift_code', 'SHIFT_1')
-                now = timezone.now()
-                if shift_code == 'SHIFT_1':
-                    shift_end = now.replace(hour=14, minute=0, second=0, microsecond=0)
-                    if shift_end < now:
-                        shift_end += timedelta(days=1)
-                elif shift_code == 'SHIFT_2':
-                    shift_end = now.replace(hour=22, minute=0, second=0, microsecond=0)
-                    if shift_end < now:
-                        shift_end += timedelta(days=1)
-                elif shift_code == 'SHIFT_3':
-                    shift_end = now.replace(hour=6, minute=0, second=0, microsecond=0) + timedelta(days=1)
-                else:
-                    shift_end = now + timedelta(hours=8)
-
-                floorplan_id = tech_data.get('floorplan_id') or None
-                fp_obj = None
-                if floorplan_id:
-                    fp_obj = Location.objects.filter(id=floorplan_id, tenant_id=tenant_id).first()
-
-                effective_zone = tech_data.get('zone_id', '') or (fp_obj.code if fp_obj else '')
-                coords_x = float(fp_obj.center_x if (fp_obj and fp_obj.center_x is not None) else tech_data.get('coords_x', 20.0))
-                coords_y = float(fp_obj.center_y if (fp_obj and fp_obj.center_y is not None) else tech_data.get('coords_y', 20.0))
-                floor_level = int(fp_obj.floor_level if fp_obj else tech_data.get('floor_level', 1))
-
-                TechnicianProfile.objects.update_or_create(
-                    user=u,
-                    defaults={
-                        'tenant_id': tenant_id,
-                        'skill_level': int(tech_data.get('skill_level', 1)),
-                        'skills': tech_data.get('skills', ['GENERAL']),
-                        'certifications': tech_data.get('certifications', []),
-                        'floorplan': fp_obj,
-                        'zone_id': effective_zone,
-                        'floor_level': floor_level,
-                        'coords_x': coords_x,
-                        'coords_y': coords_y,
-                        'shift_end_time': shift_end,
-                        'is_on_duty': True,
-                        'availability_status': 'AVAILABLE'
-                    }
+            from django.db import transaction
+            with transaction.atomic():
+                u = User.all_objects.create(
+                    username=username,
+                    email=email,
+                    status=data.get('status', 'ACTIVE'),
+                    tenant_id=tenant_id
                 )
+                if data.get('password'):
+                    u.set_password(data.get('password'))
+                    u.save()
 
-            # Đăng ký hồ sơ sinh trắc học khuôn mặt nếu có ảnh đính kèm
-            face_img = data.get('faceImage') or data.get('faceImageBase64')
-            if face_img:
-                import base64
-                from algorithms.biometric.enrollment import enroll_user_face
-                try:
-                    b64_str = str(face_img)
-                    if ',' in b64_str:
-                        b64_str = b64_str.split(',', 1)[1]
-                    raw_bytes = base64.b64decode(b64_str)
-                    enroll_user_face(u, raw_bytes, enrolled_by=request.user)
-                except ValueError as ve:
-                    return JsonResponse({'success': False, 'error': f"Lỗi sinh trắc học: {str(ve)}"}, status=400)
-                except Exception as ex:
-                    import logging
-                    logging.getLogger(__name__).warning(f"Lỗi đăng ký khuôn mặt: {ex}")
+                is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+                role_ids = data.get('roles', [])
+                roles = []
+                if role_ids:
+                    if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
+                        roles = list(Role.all_objects.filter(id__in=role_ids).prefetch_related('permissions'))
+                    else:
+                        roles = list(Role.objects.filter(id__in=role_ids, tenant_id=tenant_id).prefetch_related('permissions'))
+                    for r in roles:
+                        if r.name == 'SUPER_ADMIN' and not is_super:
+                            transaction.set_rollback(True)
+                            return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
+                    u.roles.set(roles)
+                else:
+                    u.roles.clear()
+
+                # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
+                # Expanded: Check for field workforce permissions (execute, update, reassign, workforce:read) or technical roles
+                has_exec_perm = any(is_field_workforce_role(r) for r in roles)
+                tech_payload = data.get('technicianProfile')
+                if has_exec_perm or tech_payload:
+                    from users.models import TechnicianProfile
+                    from assets.models import Location
+                    from datetime import timedelta
+                    from django.utils import timezone
+
+                    tech_data = tech_payload or {}
+                    shift_code = tech_data.get('shift_code', 'SHIFT_1')
+                    now = timezone.now()
+                    if shift_code == 'SHIFT_1':
+                        shift_end = now.replace(hour=14, minute=0, second=0, microsecond=0)
+                        if shift_end < now:
+                            shift_end += timedelta(days=1)
+                    elif shift_code == 'SHIFT_2':
+                        shift_end = now.replace(hour=22, minute=0, second=0, microsecond=0)
+                        if shift_end < now:
+                            shift_end += timedelta(days=1)
+                    elif shift_code == 'SHIFT_3':
+                        shift_end = now.replace(hour=6, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                    else:
+                        shift_end = now + timedelta(hours=8)
+
+                    floorplan_id = tech_data.get('floorplan_id') or None
+                    fp_obj = None
+                    if floorplan_id:
+                        fp_obj = Location.objects.filter(id=floorplan_id, tenant_id=tenant_id).first()
+
+                    effective_zone = tech_data.get('zone_id', '') or (fp_obj.code if fp_obj else '')
+                    coords_x = float(fp_obj.center_x if (fp_obj and fp_obj.center_x is not None) else tech_data.get('coords_x', 20.0))
+                    coords_y = float(fp_obj.center_y if (fp_obj and fp_obj.center_y is not None) else tech_data.get('coords_y', 20.0))
+                    floor_level = int(fp_obj.floor_level if fp_obj else tech_data.get('floor_level', 1))
+
+                    TechnicianProfile.objects.update_or_create(
+                        user=u,
+                        defaults={
+                            'tenant_id': tenant_id,
+                            'skill_level': int(tech_data.get('skill_level', 1)),
+                            'skills': tech_data.get('skills', ['GENERAL']),
+                            'certifications': tech_data.get('certifications', []),
+                            'floorplan': fp_obj,
+                            'zone_id': effective_zone,
+                            'floor_level': floor_level,
+                            'coords_x': coords_x,
+                            'coords_y': coords_y,
+                            'shift_end_time': shift_end,
+                            'is_on_duty': True,
+                            'availability_status': 'AVAILABLE'
+                        }
+                    )
+
+                # Đăng ký hồ sơ sinh trắc học khuôn mặt nếu có ảnh đính kèm (bắt buộc ảnh thật)
+                face_img = data.get('faceImage') or data.get('faceImageBase64')
+                if face_img:
+                    import base64
+                    from algorithms.biometric.enrollment import enroll_user_face
+                    try:
+                        b64_str = str(face_img)
+                        if ',' in b64_str:
+                            b64_str = b64_str.split(',', 1)[1]
+                        raw_bytes = base64.b64decode(b64_str, validate=True)
+                        enroll_user_face(u, raw_bytes, enrolled_by=request.user, allow_precomputed=False)
+                    except Exception as ex:
+                        transaction.set_rollback(True)
+                        return JsonResponse({'success': False, 'error': f"Lỗi sinh trắc học: {str(ex)}"}, status=400)
 
             return JsonResponse({'success': True, 'id': str(u.id)})
         except Exception as e:
@@ -704,89 +689,107 @@ def portal_users(request):
                 return JsonResponse({'success': True})
 
             data = json.loads(request.body)
-            u = User.objects.get(id=data.get('id'), tenant_id=tenant_id)
+            from django.db import transaction
+            with transaction.atomic():
+                u = User.objects.get(id=data.get('id'), tenant_id=tenant_id)
 
-            new_username = data.get('username')
-            if new_username != u.username and User.objects.filter(username=new_username).exists():
-                return JsonResponse({'success': False, 'error': 'Username already exists'}, status=400)
+                new_username = data.get('username')
+                if new_username != u.username and User.objects.filter(username=new_username).exists():
+                    return JsonResponse({'success': False, 'error': 'Username already exists'}, status=400)
 
-            u.username = new_username
-            u.email = data.get('email')
-            if 'status' in data:
-                u.status = data.get('status')
+                u.username = new_username
+                u.email = data.get('email')
+                if 'status' in data:
+                    u.status = data.get('status')
 
-            if data.get('password'):
-                u.set_password(data.get('password'))
-            u.save()
+                if data.get('password'):
+                    u.set_password(data.get('password'))
+                u.save()
 
-            is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
-            role_ids = data.get('roles', [])
-            roles = []
-            if role_ids:
-                if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
-                    roles = list(Role.all_objects.filter(id__in=role_ids).prefetch_related('permissions'))
+                is_super = request.user.is_superuser or request.user.roles.filter(name='SUPER_ADMIN').exists()
+                role_ids = data.get('roles', [])
+                roles = []
+                if role_ids:
+                    if is_super or str(tenant_id) == '00000000-0000-0000-0000-000000000000':
+                        roles = list(Role.all_objects.filter(id__in=role_ids).prefetch_related('permissions'))
+                    else:
+                        roles = list(Role.objects.filter(id__in=role_ids, tenant_id=u.tenant_id).prefetch_related('permissions'))
+                    for r in roles:
+                        if r.name == 'SUPER_ADMIN' and not is_super:
+                            transaction.set_rollback(True)
+                            return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
+                    u.roles.set(roles)
                 else:
-                    roles = list(Role.objects.filter(id__in=role_ids, tenant_id=u.tenant_id).prefetch_related('permissions'))
-                for r in roles:
-                    if r.name == 'SUPER_ADMIN' and not is_super:
-                        return JsonResponse({'success': False, 'error': 'You do not have permission to assign the SUPER_ADMIN role'}, status=403)
-                u.roles.set(roles)
-            else:
-                u.roles.clear()
+                    u.roles.clear()
 
-            # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
-            # Expanded: Check for field workforce permissions (execute, update, reassign, workforce:read) or technical roles
-            has_exec_perm = any(is_field_workforce_role(r) for r in roles)
-            tech_payload = data.get('technicianProfile')
-            if has_exec_perm or tech_payload:
-                from users.models import TechnicianProfile
-                from assets.models import Location
-                from datetime import timedelta
-                from django.utils import timezone
+                # PERMISSION-BASED TECHNICIAN PROFILE (RBAC)
+                # Expanded: Check for field workforce permissions (execute, update, reassign, workforce:read) or technical roles
+                has_exec_perm = any(is_field_workforce_role(r) for r in roles)
+                tech_payload = data.get('technicianProfile')
+                if has_exec_perm or tech_payload:
+                    from users.models import TechnicianProfile
+                    from assets.models import Location
+                    from datetime import timedelta
+                    from django.utils import timezone
 
-                tech_data = tech_payload or {}
-                shift_code = tech_data.get('shift_code', 'SHIFT_1')
-                now = timezone.now()
-                if shift_code == 'SHIFT_1':
-                    shift_end = now.replace(hour=14, minute=0, second=0, microsecond=0)
-                    if shift_end < now:
-                        shift_end += timedelta(days=1)
-                elif shift_code == 'SHIFT_2':
-                    shift_end = now.replace(hour=22, minute=0, second=0, microsecond=0)
-                    if shift_end < now:
-                        shift_end += timedelta(days=1)
-                elif shift_code == 'SHIFT_3':
-                    shift_end = now.replace(hour=6, minute=0, second=0, microsecond=0) + timedelta(days=1)
-                else:
-                    shift_end = now + timedelta(hours=8)
+                    tech_data = tech_payload or {}
+                    shift_code = tech_data.get('shift_code', 'SHIFT_1')
+                    now = timezone.now()
+                    if shift_code == 'SHIFT_1':
+                        shift_end = now.replace(hour=14, minute=0, second=0, microsecond=0)
+                        if shift_end < now:
+                            shift_end += timedelta(days=1)
+                    elif shift_code == 'SHIFT_2':
+                        shift_end = now.replace(hour=22, minute=0, second=0, microsecond=0)
+                        if shift_end < now:
+                            shift_end += timedelta(days=1)
+                    elif shift_code == 'SHIFT_3':
+                        shift_end = now.replace(hour=6, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                    else:
+                        shift_end = now + timedelta(hours=8)
 
-                floorplan_id = tech_data.get('floorplan_id') or None
-                fp_obj = None
-                if floorplan_id:
-                    fp_obj = Location.objects.filter(id=floorplan_id, tenant_id=tenant_id).first()
+                    floorplan_id = tech_data.get('floorplan_id') or None
+                    fp_obj = None
+                    if floorplan_id:
+                        fp_obj = Location.objects.filter(id=floorplan_id, tenant_id=tenant_id).first()
 
-                effective_zone = tech_data.get('zone_id', '') or (fp_obj.code if fp_obj else '')
-                coords_x = float(fp_obj.center_x if (fp_obj and fp_obj.center_x is not None) else tech_data.get('coords_x', 20.0))
-                coords_y = float(fp_obj.center_y if (fp_obj and fp_obj.center_y is not None) else tech_data.get('coords_y', 20.0))
-                floor_level = int(fp_obj.floor_level if fp_obj else tech_data.get('floor_level', 1))
+                    effective_zone = tech_data.get('zone_id', '') or (fp_obj.code if fp_obj else '')
+                    coords_x = float(fp_obj.center_x if (fp_obj and fp_obj.center_x is not None) else tech_data.get('coords_x', 20.0))
+                    coords_y = float(fp_obj.center_y if (fp_obj and fp_obj.center_y is not None) else tech_data.get('coords_y', 20.0))
+                    floor_level = int(fp_obj.floor_level if fp_obj else tech_data.get('floor_level', 1))
 
-                TechnicianProfile.objects.update_or_create(
-                    user=u,
-                    defaults={
-                        'tenant_id': tenant_id,
-                        'skill_level': int(tech_data.get('skill_level', 1)),
-                        'skills': tech_data.get('skills', ['GENERAL']),
-                        'certifications': tech_data.get('certifications', []),
-                        'floorplan': fp_obj,
-                        'zone_id': effective_zone,
-                        'floor_level': floor_level,
-                        'coords_x': coords_x,
-                        'coords_y': coords_y,
-                        'shift_end_time': shift_end,
-                        'is_on_duty': True,
-                        'availability_status': 'AVAILABLE'
-                    }
-                )
+                    TechnicianProfile.objects.update_or_create(
+                        user=u,
+                        defaults={
+                            'tenant_id': tenant_id,
+                            'skill_level': int(tech_data.get('skill_level', 1)),
+                            'skills': tech_data.get('skills', ['GENERAL']),
+                            'certifications': tech_data.get('certifications', []),
+                            'floorplan': fp_obj,
+                            'zone_id': effective_zone,
+                            'floor_level': floor_level,
+                            'coords_x': coords_x,
+                            'coords_y': coords_y,
+                            'shift_end_time': shift_end,
+                            'is_on_duty': True,
+                            'availability_status': 'AVAILABLE'
+                        }
+                    )
+
+                # Cập nhật hồ sơ sinh trắc học khuôn mặt nếu người dùng tải ảnh mới khi chỉnh sửa
+                face_img = data.get('faceImage') or data.get('faceImageBase64')
+                if face_img:
+                    import base64
+                    from algorithms.biometric.enrollment import enroll_user_face
+                    try:
+                        b64_str = str(face_img)
+                        if ',' in b64_str:
+                            b64_str = b64_str.split(',', 1)[1]
+                        raw_bytes = base64.b64decode(b64_str, validate=True)
+                        enroll_user_face(u, raw_bytes, enrolled_by=request.user, allow_precomputed=False)
+                    except Exception as ex:
+                        transaction.set_rollback(True)
+                        return JsonResponse({'success': False, 'error': f"Lỗi sinh trắc học: {str(ex)}"}, status=400)
 
             return JsonResponse({'success': True})
         except Exception as e:
@@ -854,11 +857,19 @@ def portal_users(request):
     locations_list = list(Location.objects.filter(tenant_id=tenant_id, is_active=True).values('id', 'code', 'name', 'zone_type', 'floor_level', 'center_x', 'center_y', 'floorplan_image', 'parent_id'))
 
     from users.models import BiometricProfile
+    import os
+    from pathlib import Path
+    from django.conf import settings
+
     enrolled_uids = set(str(uid) for uid in BiometricProfile.all_objects.filter(is_active=True).values_list('user_id', flat=True))
+    audit_dir = os.path.join(settings.MEDIA_ROOT, 'biometric_audits')
+    enc_filenames = [p.name for p in Path(audit_dir).rglob('*.enc')] if os.path.isdir(audit_dir) else []
 
     user_profiles_dict = {}
     for u in users:
-        u.has_biometric = str(u.id) in enrolled_uids
+        uid_str = str(u.id)
+        u.has_biometric = uid_str in enrolled_uids
+        u.has_face_photo = any(uid_str in fname for fname in enc_filenames)
         tp = getattr(u, 'technician_profile', None)
         u.can_execute_wo = any(roles_can_execute_map.get(str(r.id), False) for r in u.roles.all()) or (tp is not None)
         fp_id_str = str(tp.floorplan_id) if (tp and tp.floorplan_id) else ''
@@ -870,7 +881,7 @@ def portal_users(request):
                 parent_fp = next((l for l in locations_list if str(l['id']) == fp_id_str), None)
                 if parent_fp:
                     fp_name_str = parent_fp['name']
-        user_profiles_dict[str(u.id)] = {
+        user_profiles_dict[uid_str] = {
             'skill_level': tp.skill_level if tp else 1,
             'skills': (tp.skills or []) if tp else [],
             'certifications': (tp.certifications or []) if tp else [],
@@ -880,8 +891,9 @@ def portal_users(request):
             'floor_level': (tp.floor_level or 1) if tp else 1,
             'coords_x': (tp.coords_x or 0.0) if tp else 0.0,
             'coords_y': (tp.coords_y or 0.0) if tp else 0.0,
-            'has_biometric': str(u.id) in enrolled_uids,
-            'photo_url': f'/portal/users/{u.id}/face-photo/' if (str(u.id) in enrolled_uids) else '',
+            'has_biometric': u.has_biometric,
+            'has_face_photo': u.has_face_photo,
+            'photo_url': f'/portal/users/{u.id}/face-photo/' if u.has_face_photo else '',
         }
 
     # Available Zones & Locations Master Data
@@ -966,11 +978,15 @@ def portal_user_face_photo(request, user_id):
 
     try:
         decrypted_bytes = decrypt_image_snapshot(str(files[0]))
+        if not decrypted_bytes:
+            raise ValueError("Ảnh giải mã rỗng")
         response = HttpResponse(decrypted_bytes, content_type='image/jpeg')
         response['Cache-Control'] = 'private, max-age=300'
         return response
-    except Exception as e:
-        return HttpResponse(status=500)
+    except Exception as ex:
+        import logging
+        logging.getLogger(__name__).error(f"Biometric snapshot decryption failed for user={target_user.id}: {ex}")
+        return HttpResponse("Không thể giải mã dữ liệu ảnh sinh trắc học an toàn.", status=500, content_type='text/plain; charset=utf-8')
 
 
 @login_required(login_url='portal_login')

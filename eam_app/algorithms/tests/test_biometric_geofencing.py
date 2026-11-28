@@ -21,6 +21,7 @@ import os
 import time
 import math
 import json
+import tempfile
 from decimal import Decimal
 from datetime import timedelta
 from django.conf import settings
@@ -58,6 +59,9 @@ from algorithms.biometric.gatekeeper import (
 class BiometricGeofencingTestSuite(TestCase):
     def setUp(self):
         import uuid
+        self._tmp_media_dir = tempfile.TemporaryDirectory()
+        self._media_override = self.settings(MEDIA_ROOT=self._tmp_media_dir.name)
+        self._media_override.enable()
         self.uid = uuid.uuid4().hex[:6]
         self.client = APIClient()
         self.tenant = Tenant.objects.create(
@@ -177,6 +181,8 @@ class BiometricGeofencingTestSuite(TestCase):
 
     def tearDown(self):
         clear_current_tenant()
+        self._media_override.disable()
+        self._tmp_media_dir.cleanup()
 
     def test_tc_bio_01_standard_checkin_esp32_universal_passed(self):
         """
@@ -877,3 +883,373 @@ class BiometricGeofencingTestSuite(TestCase):
         self.assertEqual(res_iot.status_code, 404)
         after_count = MeterReading.all_objects.filter(asset=self.robot_asset).count()
         self.assertEqual(before_count, after_count)
+
+
+class AUD03BiometricSecurityAndVANLAMIoTTests(TestCase):
+    """Kiểm thử chuyên sâu AUD-03 (sinh trắc học & AES-256-GCM) và định tuyến IoT sang VANLAM."""
+
+    def setUp(self):
+        import tempfile
+        clear_current_tenant()
+        self._real_media_root = settings.MEDIA_ROOT
+        self._tmp_media_dir = tempfile.TemporaryDirectory()
+        self._media_override = self.settings(MEDIA_ROOT=self._tmp_media_dir.name)
+        self._media_override.enable()
+        self.tenant = Tenant.objects.create(
+            name="Công Ty Công Nghiệp Kiểm Thử",
+            tenant_code="AUD03_CORP",
+            enable_geofencing=True,
+        )
+        self.other_tenant = Tenant.objects.create(
+            name="Đơn Vị Khác",
+            tenant_code="AUD03_OTHER",
+        )
+        self.role_admin = Role.all_objects.create(name="ADMIN", tenant=self.tenant)
+        self.role_tech = Role.all_objects.create(name="TECHNICIAN", tenant=self.tenant)
+        perm_user_update, _ = Permission.objects.get_or_create(id="user:update", defaults={"name": "Update User"})
+        perm_user_read, _ = Permission.objects.get_or_create(id="user:read", defaults={"name": "Read User"})
+        self.role_admin.permissions.add(perm_user_update, perm_user_read)
+
+        self.admin = User.all_objects.create(username="aud03_admin", email="admin@aud03.vn", tenant=self.tenant)
+        self.admin.set_password("TestPass123!")
+        self.admin.save()
+        self.admin.roles.add(self.role_admin)
+
+        self.tech = User.all_objects.create(username="aud03_tech", email="tech@aud03.vn", tenant=self.tenant)
+        self.tech.roles.add(self.role_tech)
+
+        self.peer_tech = User.all_objects.create(username="aud03_peer", email="peer@aud03.vn", tenant=self.tenant)
+        self.peer_tech.roles.add(self.role_tech)
+
+        self.other_admin = User.all_objects.create(username="aud03_other_admin", email="other@aud03.vn", tenant=self.other_tenant)
+        self.other_role = Role.all_objects.create(name="ADMIN", tenant=self.other_tenant)
+        self.other_admin.roles.add(self.other_role)
+
+        self.client = APIClient()
+
+    def tearDown(self):
+        clear_current_tenant()
+        if hasattr(self, '_media_override'):
+            self._media_override.disable()
+        if hasattr(self, '_tmp_media_dir'):
+            self._tmp_media_dir.cleanup()
+
+    def test_aud03_production_rejects_raw_embedding_and_fake_image(self):
+        """Production (BIOMETRIC_ALLOW_TEST_EMBEDDINGS=False) từ chối embedding giả và ảnh giả."""
+        from django.test import override_settings
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.client.force_authenticate(user=self.admin)
+        fake_vec = [0.05] * 128
+
+        with override_settings(BIOMETRIC_ALLOW_TEST_EMBEDDINGS=False):
+            # 1. Chỉ gửi liveEmbedding mà không có ảnh -> 400
+            r1 = self.client.post(
+                "/api/v1/biometric/enroll/",
+                data={"userId": str(self.tech.id), "liveEmbedding": json.dumps(fake_vec)},
+                format="json",
+            )
+            self.assertEqual(r1.status_code, 400)
+
+            # 2. Tải lên chuỗi bytes ảnh giả SIMULATED_FACE_IMAGE_BYTES -> 400
+            fake_file = SimpleUploadedFile("fake.jpg", b"SIMULATED_FACE_IMAGE_BYTES", content_type="image/jpeg")
+            r2 = self.client.post(
+                "/api/v1/biometric/enroll/",
+                data={"userId": str(self.tech.id), "faceImage": fake_file},
+                format="multipart",
+            )
+            self.assertEqual(r2.status_code, 400)
+
+            # 3. Chuỗi base64 hỏng -> 400
+            r3 = self.client.post(
+                "/api/v1/biometric/enroll/",
+                data={"userId": str(self.tech.id), "faceImageBase64": "not-valid-base64!!!"},
+                format="json",
+            )
+            self.assertEqual(r3.status_code, 400)
+
+            # 4. Ảnh thật có khuôn mặt (user_face.jpg nếu có) -> 200 & lưu AES-256-GCM
+            sample_face = os.path.join(self._real_media_root, "user_face.jpg")
+            if os.path.exists(sample_face):
+                with open(sample_face, "rb") as fh:
+                    real_bytes = fh.read()
+                real_file = SimpleUploadedFile("real_face.jpg", real_bytes, content_type="image/jpeg")
+                r4 = self.client.post(
+                    "/api/v1/biometric/enroll/",
+                    data={"userId": str(self.tech.id), "faceImage": real_file},
+                    format="multipart",
+                )
+                self.assertEqual(r4.status_code, 200)
+                snap_path = r4.json()["data"]["snapshotPath"]
+                rel = snap_path.replace("/media/", "").lstrip("/\\")
+                with open(os.path.join(settings.MEDIA_ROOT, rel), "rb") as sf:
+                    raw_enc = sf.read()
+                self.assertTrue(raw_enc.startswith(b"EAM_GCM1"))
+                self.assertEqual(decrypt_image_snapshot(snap_path), real_bytes)
+
+    def test_aud03_aes_gcm_tamper_resistance_legacy_cbc_compat_and_zero_vector_reject(self):
+        """Mã hóa mới dùng AES-256-GCM, từ chối giả mạo không rơi về XOR, giải mã tương thích CBC cũ."""
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import pad
+        from algorithms.biometric.enrollment import (
+            encrypt_aes_256,
+            decrypt_aes_256,
+            _get_legacy_cbc_key,
+            _GCM_MAGIC,
+        )
+
+        plaintext = b"\x89PNG\r\n\x1a\n" + os.urandom(256)
+        enc1 = encrypt_aes_256(plaintext)
+        enc2 = encrypt_aes_256(plaintext)
+        self.assertTrue(enc1.startswith(_GCM_MAGIC))
+        self.assertNotEqual(enc1, enc2)
+        self.assertEqual(decrypt_aes_256(enc1), plaintext)
+
+        # Sửa 1 byte trong tag/ciphertext AES-GCM -> Bắt buộc ném ValueError (không trả về XOR rác)
+        tampered_gcm = bytearray(enc1)
+        tampered_gcm[-1] ^= 0xFF
+        with self.assertRaises(ValueError):
+            decrypt_aes_256(bytes(tampered_gcm))
+
+        # Kiểm tra tương thích ngược giải mã snapshot AES-CBC cũ (tạo bằng khóa legacy)
+        iv = os.urandom(16)
+        legacy_cipher = AES.new(_get_legacy_cbc_key(), AES.MODE_CBC, iv)
+        legacy_blob = iv + legacy_cipher.encrypt(pad(plaintext, AES.block_size))
+        self.assertEqual(decrypt_aes_256(legacy_blob), plaintext)
+
+        # Dữ liệu CBC giả mạo / sai khóa -> Bắt buộc ném ValueError (loại bỏ XOR fallback)
+        tampered_cbc = bytearray(legacy_blob)
+        tampered_cbc[-2] ^= 0xFF
+        with self.assertRaises(ValueError):
+            decrypt_aes_256(bytes(tampered_cbc))
+
+        with self.assertRaises(ValueError):
+            decrypt_aes_256(b"TOO_SHORT")
+
+        # Chặn vector toàn 0 và NaN trong enroll_user_face
+        import io
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (112, 112), color="red").save(buf, format="PNG")
+        png_bytes = buf.getvalue()
+
+        with self.assertRaises(ValueError):
+            enroll_user_face(self.tech, image_bytes=png_bytes, precomputed_embedding=[0.0] * 128, allow_precomputed=True)
+        with self.assertRaises(ValueError):
+            enroll_user_face(self.tech, image_bytes=png_bytes, precomputed_embedding=[float("nan")] * 128, allow_precomputed=True)
+        with self.assertRaises(ValueError):
+            enroll_user_face(self.tech, image_bytes=b"SIMULATED_FACE_IMAGE_BYTES")
+
+    def test_aud03_rbac_tenant_portal_users_put_and_tenants_put(self):
+        """Kiểm tra phân quyền, cách ly tenant, portal_tenants PUT không lỗi biến u, portal_users PUT xử lý faceImage."""
+        import base64, io
+        from PIL import Image
+        from django.test import RequestFactory
+        from portal.views import portal_tenants, portal_users, portal_user_face_photo
+        from algorithms.biometric.enrollment import save_audit_snapshot
+
+        # 1. Cross-tenant & peer tech enroll bị chặn 403
+        sample_face = os.path.join(self._real_media_root, "user_face.jpg")
+        img_payload = None
+        if os.path.exists(sample_face):
+            with open(sample_face, "rb") as fh:
+                img_payload = fh.read()
+        if not img_payload:
+            buf = io.BytesIO()
+            Image.new("RGB", (120, 120), color="gray").save(buf, format="JPEG")
+            img_payload = buf.getvalue()
+
+        self.client.force_authenticate(user=self.other_admin)
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        r_cross = self.client.post(
+            "/api/v1/biometric/enroll/",
+            data={"userId": str(self.tech.id), "faceImage": SimpleUploadedFile("f.jpg", img_payload, content_type="image/jpeg")},
+            format="multipart",
+        )
+        self.assertEqual(r_cross.status_code, 403)
+
+        self.client.force_authenticate(user=self.peer_tech)
+        r_peer = self.client.post(
+            "/api/v1/biometric/enroll/",
+            data={"userId": str(self.tech.id), "faceImage": SimpleUploadedFile("f.jpg", img_payload, content_type="image/jpeg")},
+            format="multipart",
+        )
+        self.assertEqual(r_peer.status_code, 403)
+
+        # 2. portal_tenants PUT với superuser chạy bình thường, không dính lỗi biến u
+        super_u = User.all_objects.create(username="aud03_super", email="super@aud03.vn", tenant=self.tenant, is_superuser=True)
+        rf = RequestFactory()
+        req_ten = rf.put(
+            "/portal/tenants/",
+            data=json.dumps({
+                "id": str(self.tenant.id),
+                "name": "Công Ty Công Nghiệp Đã Cập Nhật",
+                "tenant_code": self.tenant.tenant_code,
+                "service_plan": "ENTERPRISE",
+                "status": "ACTIVE",
+                "faceImage": "dummy-should-be-ignored-on-tenant",
+            }),
+            content_type="application/json",
+        )
+        req_ten.user = super_u
+        req_ten.session = {"active_tenant_id": str(self.tenant.id)}
+        res_ten = portal_tenants(req_ten)
+        self.assertEqual(res_ten.status_code, 200)
+        self.assertTrue(json.loads(res_ten.content)["success"])
+
+        # 3. portal_users PUT với ảnh không có khuôn mặt -> trả về 400 (không nuốt lỗi)
+        blank_buf = io.BytesIO()
+        Image.new("RGB", (120, 120), color="white").save(blank_buf, format="JPEG")
+        blank_b64 = "data:image/jpeg;base64," + base64.b64encode(blank_buf.getvalue()).decode()
+        req_put_bad = rf.put(
+            "/portal/users/",
+            data=json.dumps({
+                "id": str(self.tech.id),
+                "username": self.tech.username,
+                "email": self.tech.email,
+                "roles": [str(self.role_tech.id)],
+                "faceImage": blank_b64,
+            }),
+            content_type="application/json",
+        )
+        req_put_bad.user = self.admin
+        req_put_bad.session = {"active_tenant_id": str(self.tenant.id)}
+        set_current_tenant(self.tenant.id)
+        res_put_bad = portal_users(req_put_bad)
+        self.assertEqual(res_put_bad.status_code, 400)
+        self.assertFalse(json.loads(res_put_bad.content)["success"])
+
+        # 4. portal_users PUT với ảnh chân dung thật -> cập nhật BiometricProfile
+        if os.path.exists(sample_face):
+            real_b64 = "data:image/jpeg;base64," + base64.b64encode(img_payload).decode()
+            req_put_ok = rf.put(
+                "/portal/users/",
+                data=json.dumps({
+                    "id": str(self.tech.id),
+                    "username": self.tech.username,
+                    "email": self.tech.email,
+                    "roles": [str(self.role_tech.id)],
+                    "faceImage": real_b64,
+                }),
+                content_type="application/json",
+            )
+            req_put_ok.user = self.admin
+            req_put_ok.session = {"active_tenant_id": str(self.tenant.id)}
+            res_put_ok = portal_users(req_put_ok)
+            self.assertEqual(res_put_ok.status_code, 200)
+            self.assertTrue(BiometricProfile.all_objects.filter(user=self.tech, is_active=True).exists())
+
+        # 5. portal_user_face_photo từ chối nếu tệp .enc bị hỏng (không trả về 200 XOR rác)
+        snap = save_audit_snapshot(img_payload, str(self.tech.id), str(self.tenant.id))
+        rel = snap.replace("/media/", "").lstrip("/\\")
+        full_enc = os.path.join(settings.MEDIA_ROOT, rel)
+        with open(full_enc, "wb") as ef:
+            ef.write(b"EAM_GCM1" + os.urandom(48))
+        req_photo = rf.get(f"/portal/users/{self.tech.id}/face-photo/")
+        req_photo.user = self.admin
+        res_photo = portal_user_face_photo(req_photo, self.tech.id)
+        self.assertEqual(res_photo.status_code, 500)
+
+    def test_iot_sensor_alert_routes_to_vanlam_target_asset(self):
+        """Kiểm chứng endpoint /api/v1/iot/sensor-alert/ tiếp nhận đúng tenant VANLAM_DEMO_2026 & QR-VL-CMP-001."""
+        from assets.models import MeterReading
+        vl_tenant = Tenant.objects.create(name="Nhà Máy Sản Xuất & Lắp Ráp Vân Lam", tenant_code="VANLAM_DEMO_2026")
+        vl_loc = Location.objects.create(name="Trạm Máy Nén Khí & Cấp Khí Trung Tâm", code="ZONE_COMPRESSOR", tenant=vl_tenant)
+        vl_cat = AssetCategory.objects.create(name="Máy nén khí", tenant=vl_tenant)
+        vl_asset = Asset.all_objects.create(
+            tenant=vl_tenant,
+            name="Máy Nén Khí Trục Vít Atlas Copco GA55+ VSD",
+            qr_code="QR-VL-CMP-001",
+            serial_number="SN-CMP-2026-33",
+            category=vl_cat,
+            location=vl_loc,
+            status="OPERATIONAL",
+            asset_type="MACHINERY",
+        )
+
+        res = self.client.post(
+            "/api/v1/iot/sensor-alert/",
+            data={
+                "tenant_code": "VANLAM_DEMO_2026",
+                "asset_code": "QR-VL-CMP-001",
+                "device_id": "ESP32-ASSET-BEACON-01",
+                "temperature": 46.8,
+                "vibration": 0.42,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        body = res.json()["data"]
+        self.assertEqual(body["tenantCode"], "VANLAM_DEMO_2026")
+        self.assertEqual(body["assetId"], str(vl_asset.id))
+        mrs = MeterReading.all_objects.filter(asset=vl_asset)
+        self.assertEqual(set(mrs.values_list("metric_code", flat=True)), {"TEMPERATURE", "VIBRATION"})
+
+    def test_aud03_enroll_explicit_allow_precomputed_false_rejected_even_in_test_runtime(self):
+        """allow_precomputed=False phải từ chối vector giả lập ngay cả khi chạy trong unit test."""
+        vec = normalize_l2_from_scratch([0.05] * 128)
+        with self.assertRaises(ValueError):
+            enroll_user_face(
+                user=self.tech,
+                image_bytes=None,
+                enrolled_by=self.admin,
+                precomputed_embedding=vec,
+                allow_precomputed=False,
+            )
+
+    def test_aud03_enroll_allow_precomputed_true_rejected_outside_test_runtime(self):
+        """Ngoài môi trường test tự động, kể cả truyền allow_precomputed=True vẫn phải bị chặn."""
+        from unittest.mock import patch
+        vec = normalize_l2_from_scratch([0.05] * 128)
+        with patch("algorithms.biometric.enrollment._is_automated_test_runtime", return_value=False):
+            with self.assertRaises(ValueError):
+                enroll_user_face(
+                    user=self.tech,
+                    image_bytes=None,
+                    enrolled_by=self.admin,
+                    precomputed_embedding=vec,
+                    allow_precomputed=True,
+                )
+
+    def test_aud03_attendance_checkin_rejects_live_embedding_when_test_embeddings_disabled(self):
+        """Khi BIOMETRIC_ALLOW_TEST_EMBEDDINGS=False, check-in chỉ gửi liveEmbedding mà thiếu ảnh thật bị chặn 400."""
+        vec = normalize_l2_from_scratch([0.05] * 128)
+        enroll_user_face(
+            user=self.tech,
+            image_bytes=None,
+            enrolled_by=self.admin,
+            precomputed_embedding=vec,
+        )
+        loc = Location.objects.create(name="Xưởng A", code="LOC_A_TEST", tenant=self.tenant)
+        cat = AssetCategory.objects.create(name="CNC", tenant=self.tenant)
+        asset = Asset.all_objects.create(
+            tenant=self.tenant,
+            name="CNC Test",
+            category=cat,
+            location=loc,
+            status="OPERATIONAL",
+            asset_type="MACHINERY",
+        )
+        wo = WorkOrder.all_objects.create(
+            tenant=self.tenant,
+            title="Checkin Gate Test",
+            asset=asset,
+            assigned_to=self.tech,
+            status="ASSIGNED",
+        )
+        self.client.force_authenticate(user=self.tech)
+        with self.settings(BIOMETRIC_ALLOW_TEST_EMBEDDINGS=False):
+            res = self.client.post(
+                "/api/v1/attendance/check-in/",
+                data={
+                    "workOrderId": str(wo.id),
+                    "bleBeaconId": "EAM-UNIVERSAL-BEACON",
+                    "rssi": -65,
+                    "liveEmbedding": vec,
+                },
+                format="json",
+            )
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(res.json()["success"])
+
+

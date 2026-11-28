@@ -42,7 +42,7 @@ class DegradationFeaturePipeline:
 
     @staticmethod
     def extract_4_feature_vector(
-        vibration_rms: float,
+        vibration_rms: Optional[float],
         bearing_temp: Optional[float] = None,
         ambient_temp: Optional[float] = None,
         pressure: Optional[float] = None,
@@ -50,22 +50,27 @@ class DegradationFeaturePipeline:
     ) -> np.ndarray:
         """
         Trích xuất vector 4 chiều chuẩn hóa tại một thời điểm t.
+        Khi thiếu kênh cảm biến (bearing_temp hoặc pressure), sử dụng mức nền trung tính
+        thay vì tự suy diễn nhiệt độ ổ trục 45°C gây báo quá nhiệt giả.
         """
         # 1. Độ rung RMS
-        norm_vib = DegradationFeaturePipeline.normalize_feature(vibration_rms, 'vibration_rms')
+        v_val = float(vibration_rms) if vibration_rms is not None else 0.0
+        norm_vib = DegradationFeaturePipeline.normalize_feature(v_val, 'vibration_rms')
 
-        # 2. Nhiệt độ ổ trục vi sai ΔT = T_bearing - T_ambient
-        b_temp = bearing_temp if bearing_temp is not None else 45.0
-        a_temp = ambient_temp if ambient_temp is not None else 30.0
-        delta_t = max(0.0, b_temp - a_temp)
+        # 2. Nhiệt độ ổ trục vi sai ΔT = T_bearing - T_ambient (chỉ tính khi có cảm biến nhiệt thực)
+        if bearing_temp is not None:
+            a_temp = float(ambient_temp) if ambient_temp is not None else 30.0
+            delta_t = max(0.0, float(bearing_temp) - a_temp)
+        else:
+            delta_t = 0.0
         norm_delta_t = DegradationFeaturePipeline.normalize_feature(delta_t, 'delta_temp')
 
         # 3. Áp suất thủy lực / áp suất dầu
-        p_val = pressure if pressure is not None else 10.0
+        p_val = float(pressure) if pressure is not None else 0.0
         norm_press = DegradationFeaturePipeline.normalize_feature(p_val, 'pressure')
 
         # 4. Hệ số phụ tải (Load Factor)
-        l_val = load_factor if load_factor is not None else 1.0
+        l_val = float(load_factor) if load_factor is not None else 1.0
         norm_load = DegradationFeaturePipeline.normalize_feature(l_val, 'load_factor')
 
         return np.array([norm_vib, norm_delta_t, norm_press, norm_load], dtype=np.float32)
@@ -78,24 +83,55 @@ class DegradationFeaturePipeline:
     ) -> Optional[np.ndarray]:
         """
         Xây dựng ma trận cửa sổ trượt shape (W=30, F=4).
-        Chỉ nhận chuỗi bản ghi đã lọc hợp lệ ở trạng thái RUNNING.
+        Chỉ nhận chuỗi chu kỳ đã gom nhóm hợp lệ ở trạng thái RUNNING.
+        Nếu một kênh chỉ bị thiếu gián đoạn ở vài chu kỳ, nội suy giữ giá trị gần nhất (forward/backward fill)
+        trong chính chuỗi đo của thiết bị đó trước khi suy diễn.
         """
         if len(raw_readings) < window_size:
             return None
 
-        # Lấy đúng W=30 bản ghi gần nhất theo thời gian
-        target_readings = raw_readings[-window_size:]
+        # Lấy đúng W=30 chu kỳ gần nhất theo thời gian (bản sao không làm biến đổi đầu vào)
+        target_readings = [dict(item) for item in raw_readings[-window_size:]]
+
+        # Nội suy ffill/bfill theo chuỗi thời gian đối với các kênh có ít nhất 1 giá trị đo thật
+        for ch_keys in (('vibration', 'vibration_rms'), ('temperature', 'bearing_temperature'), ('ambient_temperature',), ('pressure',), ('load_factor',)):
+            vals = []
+            for row in target_readings:
+                found = None
+                for k in ch_keys:
+                    if row.get(k) is not None:
+                        found = row.get(k)
+                        break
+                vals.append(found)
+            if any(v is not None for v in vals):
+                last_v = None
+                for idx in range(len(vals)):
+                    if vals[idx] is not None:
+                        last_v = vals[idx]
+                    elif last_v is not None:
+                        vals[idx] = last_v
+                next_v = None
+                for idx in range(len(vals) - 1, -1, -1):
+                    if vals[idx] is not None:
+                        next_v = vals[idx]
+                    elif next_v is not None:
+                        vals[idx] = next_v
+                primary_key = ch_keys[0]
+                for idx, row in enumerate(target_readings):
+                    if vals[idx] is not None and row.get(primary_key) is None:
+                        row[primary_key] = vals[idx]
+
         matrix = np.zeros((window_size, FEATURE_DIM), dtype=np.float32)
 
         for i, item in enumerate(target_readings):
-            vib = float(item.get('vibration', 0.0) or item.get('vibration_rms', 0.0))
-            b_temp = item.get('bearing_temperature') or item.get('temperature')
+            raw_vib = item.get('vibration') if item.get('vibration') is not None else item.get('vibration_rms')
+            b_temp = item.get('bearing_temperature') if item.get('bearing_temperature') is not None else item.get('temperature')
             a_temp = item.get('ambient_temperature')
             press = item.get('pressure')
-            load = item.get('load_factor', 1.0)
+            load = item.get('load_factor')
 
             vec = cls.extract_4_feature_vector(
-                vibration_rms=vib,
+                vibration_rms=float(raw_vib) if raw_vib is not None else None,
                 bearing_temp=float(b_temp) if b_temp is not None else None,
                 ambient_temp=float(a_temp) if a_temp is not None else None,
                 pressure=float(press) if press is not None else None,
